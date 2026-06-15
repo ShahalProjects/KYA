@@ -665,10 +665,104 @@
       font-size: 13px;
     }
 
-    .breadcrumb-current {
+    /* Tabs System */
+    .topbar-home-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--slate-200);
+      background: var(--slate-50);
+      color: var(--slate-500);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      flex-shrink: 0;
+    }
+    .topbar-home-btn:hover {
+      background: var(--slate-100);
       color: var(--slate-700);
+      border-color: var(--slate-300);
+    }
+    .topbar-home-btn.active {
+      background: var(--blue-50);
+      border-color: var(--blue-200);
+      color: var(--blue-600);
+    }
+    .topbar-home-btn:focus-visible {
+      outline: 2px solid var(--blue-300);
+      outline-offset: 1px;
+    }
+
+    .topbar-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .topbar-tabs::-webkit-scrollbar {
+      display: none;
+    }
+    .topbar-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      color: var(--slate-600);
       font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .topbar-tab:hover {
+      background: var(--slate-100);
+      color: var(--slate-800);
+      border-color: var(--slate-300);
+    }
+    .topbar-tab.active {
+      background: var(--blue-50);
+      border-color: var(--blue-200);
+      color: var(--blue-700);
       font-weight: 600;
+      box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
+    }
+    .topbar-tab:focus-visible {
+      outline: 2px solid var(--blue-300);
+      outline-offset: 1px;
+    }
+    .tab-close {
+      background: none;
+      border: none;
+      font-size: 15px;
+      color: var(--slate-400);
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .tab-close:hover {
+      background: var(--slate-200);
+      color: var(--slate-700);
+    }
+    .topbar-tab.active .tab-close:hover {
+      background: var(--blue-100);
+      color: var(--blue-800);
+    }
+    .tab-close:focus-visible {
+      outline: 2px solid var(--slate-300);
     }
 
     .topbar-actions {
@@ -1873,9 +1967,13 @@
     <!-- Top bar -->
     <header class="topbar">
       <div class="topbar-breadcrumb">
-        <span class="breadcrumb-home" id="breadcrumbHome">KYA</span>
-        <span class="breadcrumb-sep" id="breadcrumbSep" style="display:none">/</span>
-        <span class="breadcrumb-current" id="breadcrumbCurrent"></span>
+        <button class="topbar-home-btn" id="breadcrumbHome" title="Go to Dashboard" aria-label="Go to Dashboard">
+          <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+            <path d="M3 9.5L10 3l7 6.5V17a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M7.5 18V13h5v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <div id="topbarTabs" class="topbar-tabs"></div>
       </div>
       <div class="topbar-actions">
         <div class="topbar-date" id="topbarDate"></div>
@@ -2181,8 +2279,6 @@
   const panelPosted     = document.getElementById('panel-posted');
   const panelDrafted    = document.getElementById('panel-drafted');
   const panelChart      = document.getElementById('panel-chart');
-  const breadcrumbSep   = document.getElementById('breadcrumbSep');
-  const breadcrumbCur   = document.getElementById('breadcrumbCurrent');
   const qsJournal       = document.getElementById('qs-journal');
 
   const panels = {
@@ -2193,52 +2289,158 @@
     chart:   panelChart,
   };
 
-  const panelLabels = {
-    welcome: '',
-    journal: 'Journal Entry',
-    posted:  'Journal Entry — Posted',
-    drafted: 'Journal Entry — Drafted',
-    chart:   'Chart of Accounts',
+  const TAB_DEFS = {
+    journal: { id: 'journal', label: 'New Journal Entry', panelId: 'panel-journal', navId: 'nav-je-new' },
+    posted:  { id: 'posted',  label: 'Posted',            panelId: 'panel-posted',  navId: 'nav-je-posted' },
+    drafted: { id: 'drafted', label: 'Drafted',           panelId: 'panel-drafted', navId: 'nav-je-drafted' },
+    chart:   { id: 'chart',   label: 'Chart of Accounts', panelId: 'panel-chart',   navId: 'nav-chart' }
   };
 
-  function activatePanel(panelKey, clickedNav) {
-    // Update nav active state — only flat nav-items (not accordion headers)
-    navItems.forEach(n => n.classList.remove('active'));
-    if (clickedNav && clickedNav.classList.contains('nav-item')) {
-      clickedNav.classList.add('active');
-    }
+  let openTabs = [];
+  let activeTabId = null;
 
-    // Show/hide panels
-    Object.entries(panels).forEach(([key, el]) => {
-      if (key === panelKey) {
-        el.style.display = '';
-        el.classList.add('active');
-        el.style.animation = 'none';
-        el.offsetHeight;
-        el.style.animation = '';
+  function openTab(tabId) {
+    if (!TAB_DEFS[tabId]) return;
+    if (!openTabs.includes(tabId)) {
+      openTabs.push(tabId);
+    }
+    activeTabId = tabId;
+    renderTabs();
+    switchToActivePanel();
+  }
+
+  function closeTab(tabId, event) {
+    if (event) event.stopPropagation();
+    const index = openTabs.indexOf(tabId);
+    if (index === -1) return;
+    
+    openTabs.splice(index, 1);
+    
+    if (activeTabId === tabId) {
+      if (openTabs.length > 0) {
+        const nextActiveIndex = Math.min(index, openTabs.length - 1);
+        activeTabId = openTabs[nextActiveIndex];
       } else {
-        el.style.display = 'none';
-        el.classList.remove('active');
+        activeTabId = null;
       }
-    });
-
-    // Breadcrumb
-    const label = panelLabels[panelKey];
-    if (label) {
-      breadcrumbSep.style.display = '';
-      breadcrumbCur.textContent = label;
-    } else {
-      breadcrumbSep.style.display = 'none';
-      breadcrumbCur.textContent = '';
     }
+    
+    renderTabs();
+    switchToActivePanel();
+  }
+
+  function switchToActivePanel() {
+    // Hide all panels
+    Object.values(panels).forEach(el => {
+      el.style.display = 'none';
+      el.classList.remove('active');
+    });
+    
+    // Deactivate all sidebar items
+    navItems.forEach(n => n.classList.remove('active'));
+    subItems.forEach(s => s.classList.remove('active'));
+    
+    if (activeTabId) {
+      const def = TAB_DEFS[activeTabId];
+      const panelEl = document.getElementById(def.panelId);
+      if (panelEl) {
+        panelEl.style.display = '';
+        panelEl.classList.add('active');
+        panelEl.style.animation = 'none';
+        panelEl.offsetHeight;
+        panelEl.style.animation = '';
+      }
+      
+      // Load panel specific data
+      if (activeTabId === 'posted') renderPostedPanel();
+      if (activeTabId === 'drafted') renderDraftedPanel();
+      if (activeTabId === 'chart') renderChartPanel();
+      
+      // Highlight sidebar nav item
+      const navEl = document.getElementById(def.navId);
+      if (navEl) {
+        if (navEl.classList.contains('nav-sub-item')) {
+          navEl.classList.add('active');
+          // Ensure parent accordion is open
+          journalHeader.classList.add('open');
+          journalSubmenu.classList.add('open');
+          journalHeader.setAttribute('aria-expanded', 'true');
+        } else if (navEl.classList.contains('nav-item')) {
+          navEl.classList.add('active');
+          journalHeader.classList.remove('open');
+          journalSubmenu.classList.remove('open');
+          journalHeader.setAttribute('aria-expanded', 'false');
+        }
+      }
+    } else {
+      // Show Dashboard (welcome panel)
+      panelWelcome.style.display = '';
+      panelWelcome.classList.add('active');
+      document.getElementById('nav-dashboard').classList.add('active');
+      
+      // Close journal accordion
+      journalHeader.classList.remove('open');
+      journalSubmenu.classList.remove('open');
+      journalHeader.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function renderTabs() {
+    const tabsContainer = document.getElementById('topbarTabs');
+    if (!tabsContainer) return;
+    
+    // Update Home button active state
+    const homeBtn = document.getElementById('breadcrumbHome');
+    if (homeBtn) {
+      if (activeTabId === null) {
+        homeBtn.classList.add('active');
+      } else {
+        homeBtn.classList.remove('active');
+      }
+    }
+
+    if (openTabs.length === 0) {
+      tabsContainer.innerHTML = '';
+      return;
+    }
+    
+    tabsContainer.innerHTML = openTabs.map(tabId => {
+      const def = TAB_DEFS[tabId];
+      const isActive = tabId === activeTabId;
+      return `
+        <div class="topbar-tab ${isActive ? 'active' : ''}" data-tab-id="${tabId}" role="tab" aria-selected="${isActive}">
+          <span class="tab-label">${def.label}</span>
+          <button class="tab-close" data-tab-close="${tabId}" aria-label="Close tab">×</button>
+        </div>
+      `;
+    }).join('');
+    
+    // Add event listeners
+    tabsContainer.querySelectorAll('.topbar-tab').forEach(tabEl => {
+      const tabId = tabEl.dataset.tabId;
+      tabEl.addEventListener('click', () => openTab(tabId));
+      
+      const closeEl = tabEl.querySelector('.tab-close');
+      closeEl.addEventListener('click', (e) => closeTab(tabId, e));
+    });
   }
 
   // Flat nav items (dashboard, ledger, chart, reports, settings)
   navItems.forEach(item => {
     const handler = () => {
       const panel = item.dataset.panel || 'welcome';
-      activatePanel(panel, item);
-      if (panel === 'chart') renderChartPanel();
+      if (panel === 'chart') {
+        openTab('chart');
+      } else {
+        activeTabId = null;
+        renderTabs();
+        switchToActivePanel();
+        
+        // Highlight clicked item
+        navItems.forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+      }
+      
       // Close journal accordion when another top-level item is clicked
       journalHeader.classList.remove('open');
       journalSubmenu.classList.remove('open');
@@ -2264,7 +2466,6 @@
       journalHeader.classList.add('open');
       journalSubmenu.classList.add('open');
       journalHeader.setAttribute('aria-expanded', 'true');
-      // Deactivate flat nav items
       navItems.forEach(n => n.classList.remove('active'));
     }
   }
@@ -2274,31 +2475,19 @@
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleJournalMenu(); }
   });
 
-  function activateSubItem(clickedSub) {
-    subItems.forEach(s => s.classList.remove('active'));
-    clickedSub.classList.add('active');
-    // Deactivate flat nav
-    navItems.forEach(n => n.classList.remove('active'));
-  }
-
   subItems.forEach(sub => {
     const handler = () => {
       const action = sub.dataset.jeAction;
-      activateSubItem(sub);
       if (action === 'new') {
-        activatePanel('journal', null);
-        breadcrumbSep.style.display = '';
-        breadcrumbCur.textContent = 'Journal Entry — New Entry';
+        openTab('journal');
       } else if (action === 'posted') {
-        renderPostedPanel();
-        activatePanel('posted', null);
+        openTab('posted');
       } else if (action === 'drafted') {
-        renderDraftedPanel();
-        activatePanel('drafted', null);
+        openTab('drafted');
       } else {
-        activatePanel('welcome', null);
-        breadcrumbSep.style.display = '';
-        breadcrumbCur.textContent = 'Journal Entry — ' + sub.textContent.trim();
+        activeTabId = null;
+        renderTabs();
+        switchToActivePanel();
       }
     };
     sub.addEventListener('click', handler);
@@ -2308,29 +2497,46 @@
   // Quick-start card → journal (New Entry)
   if (qsJournal) {
     qsJournal.addEventListener('click', () => {
-      journalHeader.classList.add('open');
-      journalSubmenu.classList.add('open');
-      journalHeader.setAttribute('aria-expanded', 'true');
-      navItems.forEach(n => n.classList.remove('active'));
-      const newSub = document.getElementById('nav-je-new');
-      activateSubItem(newSub);
-      activatePanel('journal', null);
-      breadcrumbSep.style.display = '';
-      breadcrumbCur.textContent = 'Journal Entry — New Entry';
+      openTab('journal');
     });
     qsJournal.addEventListener('keydown', e => {
       if (e.key === 'Enter') qsJournal.click();
     });
   }
 
+  // Home link (KYA breadcrumb label) click handler
+  document.getElementById('breadcrumbHome')?.addEventListener('click', () => {
+    activeTabId = null;
+    renderTabs();
+    switchToActivePanel();
+  });
+
   // Initialise: dashboard active by default
-  panelJournal.style.display = 'none';
-  panelWelcome.style.display = '';
-  panelWelcome.classList.add('active');
-  document.getElementById('nav-dashboard').classList.add('active');
-  document.getElementById('nav-journal').classList.remove('active');
-  breadcrumbSep.style.display = 'none';
-  breadcrumbCur.textContent = '';
+  switchToActivePanel();
+  renderTabs();
+
+  // Keyboard shortcut: Ctrl + Space to switch to the next open tab (event-capturing phase to avoid conflicts)
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey && (e.key === ' ' || e.code === 'Space' || e.keyCode === 32)) {
+      if (openTabs.length === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      
+      let nextTabId;
+      if (activeTabId === null) {
+        nextTabId = openTabs[0];
+      } else {
+        const currentIndex = openTabs.indexOf(activeTabId);
+        if (currentIndex === -1) {
+          nextTabId = openTabs[0];
+        } else {
+          const nextIndex = (currentIndex + 1) % openTabs.length;
+          nextTabId = openTabs[nextIndex];
+        }
+      }
+      openTab(nextTabId);
+    }
+  }, true);
 
 
   /* ======================
