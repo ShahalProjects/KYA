@@ -237,62 +237,55 @@
       animation: fadeUp .8s var(--ease) 1.5s both;
     }
 
-    .landing-enter-btn {
-      margin-top: 48px;
-      padding: 16px 48px;
-      background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.3);
-      border-radius: 50px;
-      color: var(--white);
-      font-family: var(--font-main);
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      cursor: pointer;
-      backdrop-filter: blur(12px);
-      transition: background var(--duration) var(--ease),
-                  border-color var(--duration) var(--ease),
-                  transform var(--duration) var(--ease),
-                  box-shadow var(--duration) var(--ease);
-      animation: fadeUp .8s var(--ease) 1.8s both;
-    }
-
-    .landing-enter-btn:hover {
-      background: rgba(255,255,255,.22);
-      border-color: rgba(255,255,255,.5);
-      transform: translateY(-2px);
-      box-shadow: 0 12px 40px rgba(0,0,0,.25);
-    }
-
-    .landing-enter-btn:active {
-      transform: translateY(0);
-    }
-
     @keyframes fadeUp {
       from { opacity:0; transform:translateY(20px); }
       to   { opacity:1; transform:translateY(0); }
     }
 
-    /* Loading dots */
-    .landing-dots {
+    /* Loading progress bar */
+    .landing-loader {
+      margin-top: 48px;
+      width: 260px;
+      animation: fadeUp .8s var(--ease) 1.8s both;
+    }
+
+    .landing-loader-label {
       display: flex;
-      gap: 8px;
-      margin-top: 16px;
-      animation: fadeUp .8s var(--ease) 2.2s both;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
     }
-    .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.4);
-      animation: dotPulse 1.4s ease-in-out infinite;
+
+    .landing-loader-text {
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255,255,255,.55);
+      letter-spacing: .1em;
+      text-transform: uppercase;
     }
-    .dot:nth-child(2) { animation-delay: .2s; }
-    .dot:nth-child(3) { animation-delay: .4s; }
-    @keyframes dotPulse {
-      0%,100% { opacity:.3; transform:scale(1); }
-      50%      { opacity:1;  transform:scale(1.4); }
+
+    .landing-loader-pct {
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,.9);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .landing-progress-track {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,.12);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .landing-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(255,255,255,.5), rgba(255,255,255,.95), var(--accent));
+      border-radius: 4px;
+      transition: width .12s linear;
+      box-shadow: 0 0 12px rgba(6,182,212,.6);
     }
 
     /* Landing exit animation */
@@ -906,6 +899,226 @@
 
 
     /* ===========================
+       ONE HUB PANEL
+    =========================== */
+    #panel-onehub {
+      display: none;
+      animation: panelFade .5s var(--ease) both;
+    }
+    #panel-onehub.active { display: block; }
+
+    /* OneHub hero card */
+    .onehub-hero {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      background: linear-gradient(135deg, var(--blue-950) 0%, var(--blue-800) 55%, var(--blue-600) 100%);
+      padding: 60px 48px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 40px;
+      box-shadow: 0 20px 60px rgba(37,99,235,.3);
+    }
+
+    /* Mesh grid overlay on hero */
+    .onehub-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* Floating glow orb in hero */
+    .onehub-hero::after {
+      content: '';
+      position: absolute;
+      width: 340px;
+      height: 340px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(96,165,250,.25) 0%, transparent 70%);
+      right: -60px;
+      top: -80px;
+      pointer-events: none;
+    }
+
+    .onehub-hero-icon {
+      position: relative;
+      z-index: 1;
+      width: 80px;
+      height: 80px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.15);
+      border: 1.5px solid rgba(255,255,255,.3);
+      backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+
+    .onehub-hero-icon svg {
+      width: 40px;
+      height: 40px;
+      color: white;
+    }
+
+    .onehub-hero-text {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+    }
+
+    .onehub-hero-eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,.55);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .onehub-hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 4vw, 52px);
+      font-weight: 400;
+      color: var(--white);
+      line-height: 1.1;
+      letter-spacing: -.5px;
+      margin-bottom: 14px;
+    }
+
+    .onehub-hero-desc {
+      font-size: 15px;
+      color: rgba(255,255,255,.65);
+      line-height: 1.65;
+      max-width: 480px;
+    }
+
+    .onehub-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: rgba(255,255,255,.8);
+      margin-top: 18px;
+      letter-spacing: .04em;
+    }
+
+    .onehub-hero-badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: dotPulse 1.6s ease-in-out infinite;
+    }
+
+    /* Placeholder feature cards grid */
+    .onehub-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .onehub-card {
+      background: var(--white);
+      border: 1px solid var(--slate-100);
+      border-radius: 18px;
+      padding: 26px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--duration), transform var(--duration), border-color var(--duration);
+      cursor: default;
+    }
+
+    .onehub-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--blue-200);
+      transform: translateY(-3px);
+    }
+
+    .onehub-card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+
+    .onehub-card-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .onehub-card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--slate-800);
+      margin-bottom: 7px;
+      letter-spacing: -.3px;
+    }
+
+    .onehub-card-desc {
+      font-size: 13px;
+      color: var(--slate-500);
+      line-height: 1.6;
+    }
+
+    .onehub-card-chip {
+      display: inline-block;
+      background: var(--slate-100);
+      color: var(--slate-500);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 20px;
+      margin-top: 14px;
+    }
+
+    /* Coming soon banner */
+    .onehub-cta-banner {
+      background: linear-gradient(135deg, var(--blue-50), #eff6ff);
+      border: 1.5px dashed var(--blue-200);
+      border-radius: 18px;
+      padding: 32px 36px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .onehub-cta-text {
+      flex: 1;
+    }
+
+    .onehub-cta-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--blue-800);
+      margin-bottom: 6px;
+    }
+
+    .onehub-cta-desc {
+      font-size: 13.5px;
+      color: var(--slate-500);
+      line-height: 1.6;
+    }
+
+    /* ===========================
        JOURNAL ENTRY PANEL
     =========================== */
     #panel-journal {
@@ -1371,7 +1584,7 @@
       color: #065f46;
     }
 
-    /* Particulars dropdown (custom) */
+    /* Particulars dropdown (portal – attached to body) */
     .je-particulars-wrap {
       position: relative;
       width: 100%;
@@ -1407,50 +1620,111 @@
       transform: translateY(-50%);
       color: var(--slate-400);
       pointer-events: none;
+      transition: color .18s;
     }
+    .je-particulars-wrap:focus-within .je-particulars-arrow { color: var(--blue-400); }
     .je-particulars-arrow svg { width: 14px; height: 14px; display: block; }
 
-    .je-dropdown {
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
-      right: 0;
-      background: var(--white);
-      border: 1px solid var(--slate-200);
-      border-radius: 10px;
-      box-shadow: var(--shadow-lg);
-      z-index: 500;
-      max-height: 220px;
+    /* ── Global portal dropdown ── */
+    #je-portal-dropdown {
+      position: fixed;
+      z-index: 99999;
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 14px;
+      box-shadow:
+        0 4px 6px -1px rgba(0,0,0,.06),
+        0 12px 32px -4px rgba(0,0,0,.14),
+        0 0 0 1px rgba(0,0,0,.02);
+      max-height: 280px;
       overflow-y: auto;
+      overflow-x: hidden;
       display: none;
+      min-width: 240px;
+      font-family: Inter, sans-serif;
+      /* Smooth scrollbar */
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
     }
-    .je-dropdown.open { display: block; }
+    #je-portal-dropdown::-webkit-scrollbar { width: 6px; }
+    #je-portal-dropdown::-webkit-scrollbar-track { background: transparent; }
+    #je-portal-dropdown::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    #je-portal-dropdown.open { display: block; animation: jeDropIn .14s cubic-bezier(.2,0,.2,1); }
+    @keyframes jeDropIn {
+      from { opacity: 0; transform: translateY(-6px) scale(.98); }
+      to   { opacity: 1; transform: translateY(0)  scale(1); }
+    }
 
-    .je-dropdown-item {
+    /* Header inside dropdown */
+    .je-drop-header {
+      padding: 8px 14px 4px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      border-bottom: 1px solid #f1f5f9;
+      background: #fafbfc;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .je-drop-item {
       padding: 10px 14px;
-      font-size: 13px;
-      color: var(--slate-700);
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #334155;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 10px;
-      transition: background var(--duration);
-      border-bottom: 1px solid var(--slate-50);
+      transition: background .1s;
+      border-bottom: 1px solid #f8fafc;
+      user-select: none;
     }
-    .je-dropdown-item:last-child { border-bottom: none; }
-    .je-dropdown-item:hover, .je-dropdown-item.highlighted {
-      background: var(--blue-50);
-      color: var(--blue-700);
+    .je-drop-item:last-child { border-bottom: none; }
+    .je-drop-item:hover, .je-drop-item.highlighted {
+      background: #eff6ff;
+      color: #1d4ed8;
     }
-    .je-dropdown-item .acct-code {
-      display: none; /* Hide code from suggestion item */
+    .je-drop-item.highlighted { background: #dbeafe; }
+
+    /* Coloured dot showing account group */
+    .je-drop-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
-    .je-dropdown-empty {
-      padding: 16px 14px;
-      font-size: 13px;
-      color: var(--slate-400);
-      text-align: center;
+
+    /* Account name with match highlight */
+    .je-drop-name { flex: 1; }
+    .je-drop-hl { background: #fef9c3; border-radius: 3px; padding: 0 1px; color: #92400e; font-weight: 700; }
+
+    /* Account code badge */
+    .je-drop-code {
+      font-size: 11px;
+      font-weight: 600;
+      color: #94a3b8;
+      background: #f1f5f9;
+      border-radius: 5px;
+      padding: 2px 6px;
+      flex-shrink: 0;
     }
+
+    /* Empty state */
+    .je-drop-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 28px 16px;
+    }
+    .je-drop-empty-icon { color: #cbd5e1; }
+    .je-drop-empty-txt  { font-size: 13px; font-weight: 600; color: #94a3b8; }
+    .je-drop-empty-sub  { font-size: 12px; color: #cbd5e1; text-align: center; }
 
     .je-amount-input {
       width: 100%;
@@ -1779,6 +2053,830 @@
     .coa-del-btn-ok:hover { filter:brightness(1.1); }
     .coa-del-btn-ok:focus-visible { outline: 2.5px solid #fca5a5; outline-offset: 1px; }
 
+
+    /* ===========================
+       ONEHUB HR MODULE
+    =========================== */
+
+    /* Split layout for KeepOne */
+    .oh-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 32px;
+      align-items: start;
+      margin-top: 8px;
+    }
+    .oh-content-area {
+      min-width: 0;
+      flex-grow: 1;
+    }
+    @media (max-width: 992px) {
+      .oh-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+    }
+
+    /* Sub-navigation tabs */
+    .oh-sub-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 0;
+      background: transparent;
+      width: 100%;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+    .oh-sub-tab {
+      padding: 16px 20px;
+      border-radius: 14px;
+      border: 1px solid var(--slate-200);
+      background: var(--white);
+      font-family: var(--font-main);
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--slate-600);
+      cursor: pointer;
+      transition: all var(--duration) ease;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      box-sizing: border-box;
+      justify-content: flex-start;
+      box-shadow: var(--shadow-sm);
+    }
+    .oh-sub-tab:hover {
+      background: var(--slate-50);
+      border-color: var(--slate-300);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .oh-sub-tab.active {
+      background: var(--white);
+      border-color: var(--blue-600);
+      border-width: 1.5px;
+      color: var(--blue-700);
+      box-shadow: 0 8px 24px rgba(59,130,246,0.12);
+      transform: translateY(-2px);
+    }
+    .oh-tab-icon-wrap {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--slate-100);
+      color: var(--slate-500);
+      transition: all var(--duration) ease;
+      flex-shrink: 0;
+    }
+    .oh-sub-tab.active .oh-tab-icon-wrap {
+      background: var(--blue-50);
+      color: var(--blue-600);
+    }
+    .oh-tab-text {
+      flex-grow: 1;
+      text-align: left;
+    }
+    .oh-sub-tab-badge {
+      background: var(--blue-100);
+      color: var(--blue-700);
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 20px;
+      min-width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .oh-sub-tab.active .oh-sub-tab-badge {
+      background: var(--blue-600);
+      color: white;
+    }
+
+    /* Upcoming / locked tab variant */
+    .oh-sub-tab.upcoming {
+      opacity: .85;
+      pointer-events: auto;
+    }
+    .oh-sub-tab.upcoming .oh-tab-icon-wrap {
+      background: #fffbeb;
+      color: #d97706;
+    }
+    .oh-sub-tab.upcoming:hover {
+      background: var(--slate-50);
+      border-color: var(--slate-300);
+    }
+    .oh-sub-tab.upcoming.active {
+      border-color: #f59e0b;
+      color: #b45309;
+      box-shadow: 0 8px 24px rgba(245,158,11,0.12);
+    }
+    .oh-sub-tab.upcoming.active .oh-tab-icon-wrap {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .oh-sub-tab-upcoming-badge {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+      background: #fef3c7;
+      color: #92400e;
+      flex-shrink: 0;
+    }
+
+    /* Upcoming feature splash screen */
+    .oh-upcoming-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 72px 24px 80px;
+      text-align: center;
+      gap: 0;
+    }
+    .oh-upcoming-icon-ring {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 26px;
+      box-shadow: 0 8px 24px rgba(245,158,11,.18);
+    }
+    .oh-upcoming-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--slate-800);
+      letter-spacing: -.4px;
+      margin-bottom: 10px;
+    }
+    .oh-upcoming-subtitle {
+      font-size: 14.5px;
+      color: var(--slate-500);
+      line-height: 1.65;
+      max-width: 360px;
+      margin-bottom: 28px;
+    }
+    .oh-upcoming-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 18px;
+      border-radius: 24px;
+      background: #fef3c7;
+      border: 1.5px solid #fde68a;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #92400e;
+      letter-spacing: .04em;
+    }
+    .oh-upcoming-features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 24px;
+      max-width: 420px;
+    }
+    .oh-upcoming-feat-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 10px;
+      background: var(--slate-50);
+      border: 1.5px solid var(--slate-200);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-500);
+    }
+
+    /* Empty/Landing state */
+    .oh-empty-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      text-align: center;
+    }
+    .oh-empty-icon-ring {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue-100), var(--blue-200));
+      color: var(--blue-600);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 26px;
+      box-shadow: 0 8px 24px rgba(59,130,246,0.12);
+    }
+    .oh-empty-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--slate-800);
+      letter-spacing: -.4px;
+      margin-bottom: 10px;
+    }
+    .oh-empty-subtitle {
+      font-size: 14.5px;
+      color: var(--slate-500);
+      line-height: 1.65;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .oh-panel-hdr {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    /* Stats row */
+    .oh-stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .oh-stat {
+      background: var(--white);
+      border: 1px solid var(--slate-100);
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--duration), transform var(--duration);
+    }
+    .oh-stat:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .oh-stat-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--slate-400);
+      margin-bottom: 7px;
+    }
+    .oh-stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--slate-800);
+      letter-spacing: -.5px;
+      line-height: 1;
+    }
+    .oh-stat-sub {
+      font-size: 11.5px;
+      color: var(--slate-400);
+      margin-top: 5px;
+      font-weight: 500;
+    }
+    .oh-stat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+
+    /* Department Cards */
+    .oh-dept-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+    .oh-dept-card {
+      background: var(--white);
+      border: 1px solid var(--slate-100);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow var(--duration), transform var(--duration), border-color var(--duration);
+    }
+    .oh-dept-card:hover { box-shadow: var(--shadow-md); transform: translateY(-3px); border-color: var(--blue-100); }
+    .oh-dept-card-top { padding: 20px 22px 16px; border-bottom: 1px solid var(--slate-50); }
+    .oh-dept-name { font-size: 16px; font-weight: 700; color: var(--slate-800); letter-spacing: -.3px; margin-bottom: 8px; }
+    .oh-dept-head-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--slate-500); }
+    .oh-dept-head-avatar {
+      width: 22px; height: 22px; border-radius: 6px;
+      background: linear-gradient(135deg, var(--blue-500), var(--accent));
+      color: white; font-size: 9px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .oh-dept-head-name { font-weight: 600; color: var(--slate-700); }
+    .oh-dept-no-head { color: var(--slate-300); font-style: italic; }
+    .oh-dept-card-mid { padding: 14px 22px; background: var(--slate-50); }
+    .oh-dept-emp-count { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--slate-400); margin-bottom: 8px; }
+    .oh-dept-emp-list { display: flex; flex-direction: column; gap: 5px; }
+    .oh-dept-emp-item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--slate-600); font-weight: 500; }
+    .oh-dept-emp-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue-300); flex-shrink: 0; }
+    .oh-dept-overflow { font-size: 11.5px; color: var(--blue-500); font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .oh-dept-card-actions { padding: 12px 22px; display: flex; gap: 8px; border-top: 1px solid var(--slate-100); }
+    .oh-action-btn {
+      height: 30px; padding: 0 12px; border-radius: 7px; font-size: 12px; font-weight: 600;
+      cursor: pointer; font-family: var(--font-main); border: 1.5px solid var(--slate-200);
+      background: var(--white); color: var(--slate-600); transition: all .14s;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .oh-action-btn:hover { background: var(--slate-50); border-color: var(--slate-300); }
+    .oh-action-btn.primary { background: var(--blue-50); border-color: var(--blue-200); color: var(--blue-700); }
+    .oh-action-btn.primary:hover { background: var(--blue-100); }
+    .oh-action-btn.danger { color: var(--danger); border-color: #fca5a5; }
+    .oh-action-btn.danger:hover { background: #fff5f5; }
+    .oh-action-btn svg { width: 12px; height: 12px; }
+
+    /* Employees toolbar */
+    .oh-emp-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .oh-search-wrap {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--white); border: 1.5px solid var(--slate-200);
+      border-radius: 10px; padding: 8px 14px;
+      flex: 1; min-width: 200px; max-width: 340px;
+      transition: border-color var(--duration), box-shadow var(--duration);
+    }
+    .oh-search-wrap:focus-within { border-color: var(--blue-300); box-shadow: 0 0 0 3px rgba(147,197,253,.2); }
+    .oh-search-wrap input { border: none; background: none; outline: none; font-family: var(--font-main); font-size: 13.5px; color: var(--slate-700); width: 100%; }
+    .oh-search-wrap input::placeholder { color: var(--slate-300); }
+    .oh-search-wrap svg { color: var(--slate-400); flex-shrink: 0; width: 15px; height: 15px; }
+    .oh-filter-sel {
+      height: 38px; padding: 0 12px; border: 1.5px solid var(--slate-200); border-radius: 10px;
+      font-family: var(--font-main); font-size: 13px; color: var(--slate-600);
+      background: var(--white); outline: none; cursor: pointer; min-width: 160px;
+    }
+    .oh-filter-sel:focus { border-color: var(--blue-300); }
+
+    /* Employee table */
+    .oh-table-card { background: var(--white); border: 1px solid var(--slate-100); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-sm); }
+    .oh-table { width: 100%; border-collapse: collapse; }
+    .oh-table thead th {
+      padding: 11px 16px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--slate-400); background: var(--slate-50);
+      border-bottom: 1px solid var(--slate-100); text-align: left; white-space: nowrap;
+    }
+    .oh-table tbody tr { border-bottom: 1px solid var(--slate-50); transition: background var(--duration); }
+    .oh-table tbody tr:last-child { border-bottom: none; }
+    .oh-table tbody tr:hover { background: var(--blue-50); }
+    .oh-table tbody td { padding: 13px 16px; font-size: 13px; color: var(--slate-700); vertical-align: middle; }
+    .oh-emp-code { font-family: 'Courier New', monospace; font-size: 11.5px; font-weight: 700; color: var(--blue-600); background: var(--blue-50); padding: 3px 8px; border-radius: 5px; }
+    .oh-emp-name { font-weight: 600; color: var(--slate-800); }
+    .oh-dept-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; background: var(--blue-50); color: var(--blue-700); border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .oh-no-dept-chip { color: var(--slate-400); font-style: italic; font-size: 12px; }
+    .oh-empty { text-align: center; padding: 72px 24px; color: var(--slate-400); }
+    .oh-empty svg { margin: 0 auto 16px; display: block; }
+    .oh-empty-title { font-size: 16px; font-weight: 700; color: var(--slate-500); margin-bottom: 6px; }
+    .oh-empty-desc { font-size: 13.5px; color: var(--slate-400); line-height: 1.6; }
+
+    /* OneHub Modals */
+    .oh-modal-overlay {
+      position: fixed; inset: 0; z-index: 10010;
+      background: rgba(15,23,42,.55); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-main); animation: fadeIn .15s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    .oh-modal-card {
+      background: var(--white); border-radius: 24px; padding: 32px 34px 28px;
+      max-width: 520px; width: 94%; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 40px 100px rgba(0,0,0,.24);
+      animation: jePopIn .18s cubic-bezier(.34,1.3,.64,1);
+    }
+    .oh-modal-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .oh-modal-title { font-size: 20px; font-weight: 800; color: var(--slate-900); letter-spacing: -.4px; }
+    .oh-modal-close {
+      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--slate-200);
+      background: var(--white); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 17px; color: var(--slate-500); transition: all .13s; flex-shrink: 0;
+    }
+    .oh-modal-close:hover { background: var(--slate-50); color: var(--slate-700); }
+    .oh-modal-section-title {
+      font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em;
+      color: var(--slate-400); margin: 20px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--slate-100);
+    }
+    .oh-fg { margin-bottom: 14px; }
+    .oh-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--slate-500); margin-bottom: 6px; }
+    .oh-label .req { color: var(--danger); margin-left: 2px; }
+    .oh-input, .oh-select {
+      width: 100%; height: 42px; padding: 0 12px; border: 1.5px solid var(--slate-200);
+      border-radius: 11px; font-family: var(--font-main); font-size: 13.5px; color: var(--slate-800);
+      background: var(--white); outline: none; transition: border-color .15s, box-shadow .15s; box-sizing: border-box;
+    }
+    .oh-input:focus, .oh-select:focus { border-color: var(--blue-400); box-shadow: 0 0 0 3px rgba(96,165,250,.15); }
+    .oh-input.error, .oh-select.error { border-color: var(--danger); }
+    .oh-input-hint { font-size: 11.5px; color: var(--slate-400); margin-top: 4px; }
+    .oh-fg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .oh-code-toggle { display: flex; gap: 6px; margin-bottom: 6px; }
+    .oh-code-mode-btn {
+      padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;
+      border: 1.5px solid var(--slate-200); background: var(--white); color: var(--slate-500);
+      cursor: pointer; font-family: var(--font-main); transition: all .12s;
+    }
+    .oh-code-mode-btn.active { background: var(--blue-600); border-color: var(--blue-600); color: white; }
+    .oh-modal-btns { display: flex; gap: 10px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--slate-100); }
+    .oh-btn-cancel {
+      flex: 1; height: 44px; border: 1.5px solid var(--slate-200); border-radius: 12px;
+      background: var(--white); font-size: 14px; font-weight: 600; color: var(--slate-600);
+      cursor: pointer; font-family: var(--font-main); transition: all .13s;
+    }
+    .oh-btn-cancel:hover { background: var(--slate-50); }
+    .oh-btn-save {
+      flex: 2; height: 44px; border: none; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue-600), var(--blue-700));
+      color: var(--white); font-size: 14px; font-weight: 700; cursor: pointer;
+      font-family: var(--font-main); box-shadow: 0 4px 14px rgba(37,99,235,.3); transition: filter .14s;
+    }
+    .oh-btn-save:hover { filter: brightness(1.08); }
+
+    /* Detail overlay */
+    .oh-detail-overlay {
+      position: fixed; inset: 0; z-index: 10008;
+      background: rgba(15,23,42,.5); backdrop-filter: blur(5px);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-main); animation: fadeIn .15s ease;
+    }
+    .oh-detail-card {
+      background: var(--white); border-radius: 24px;
+      max-width: 580px; width: 94%; max-height: 88vh;
+      overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 40px 100px rgba(0,0,0,.22);
+      animation: jePopIn .18s cubic-bezier(.34,1.3,.64,1);
+    }
+    .oh-detail-hdr-wrap { position: relative; flex-shrink: 0; }
+    .oh-detail-hdr {
+      padding: 24px 28px 20px;
+      background: linear-gradient(135deg, var(--blue-800), var(--blue-600));
+      color: white;
+    }
+    .oh-detail-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; letter-spacing: -.4px; }
+    .oh-detail-sub { font-size: 13px; color: rgba(255,255,255,.65); }
+    .oh-detail-close {
+      position: absolute; top: 20px; right: 22px;
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+      border-radius: 8px; color: white; cursor: pointer;
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: background .13s;
+    }
+    .oh-detail-close:hover { background: rgba(255,255,255,.25); }
+    .oh-detail-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
+    .oh-detail-emp-row {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+      border-radius: 12px; border: 1px solid var(--slate-100); margin-bottom: 10px;
+      transition: background var(--duration), border-color var(--duration);
+    }
+    .oh-detail-emp-row:hover { background: var(--blue-50); border-color: var(--blue-100); }
+    .oh-detail-emp-avatar {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue-500), var(--accent));
+      color: white; font-size: 13px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .oh-detail-emp-name { font-size: 14px; font-weight: 700; color: var(--slate-800); }
+    .oh-detail-emp-meta { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+    .oh-detail-emp-is-head {
+      margin-left: auto; background: linear-gradient(135deg, var(--blue-100), #dbeafe);
+      color: var(--blue-700); font-size: 10px; font-weight: 800;
+      padding: 3px 9px; border-radius: 20px; letter-spacing: .05em;
+      text-transform: uppercase; flex-shrink: 0;
+    }
+
+    /* ===========================
+       REPORT TOOLBAR SYSTEM
+       Used by: Balance Sheet, Trial Balance, P&L
+    =========================== */
+    .rpt-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+      min-height: 42px;
+    }
+
+    /* Left cluster: all controls */
+    .rpt-tb-left {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* Right cluster: status badges etc. */
+    .rpt-tb-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Date field group: label + input stacked */
+    .rpt-fg {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .rpt-fg label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--slate-500);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .rpt-date-inp {
+      height: 38px;
+      width: 148px;
+      padding: 0 10px;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 9px;
+      font-family: var(--font-main);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--slate-800);
+      background: var(--white);
+      outline: none;
+      transition: border-color var(--duration), box-shadow var(--duration);
+      box-sizing: border-box;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .rpt-date-inp:focus {
+      border-color: var(--blue-400);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+    }
+
+    /* Separator between date group and action buttons */
+    .rpt-sep {
+      width: 1px;
+      height: 28px;
+      background: var(--slate-200);
+      flex-shrink: 0;
+      align-self: flex-end;
+      margin-bottom: 5px;
+    }
+
+    /* Action buttons: Expand All, Collapse All, Clear, Columns */
+    .rpt-btn {
+      height: 38px;
+      padding: 0 14px;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 9px;
+      background: var(--white);
+      font-family: var(--font-main);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--slate-600);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background var(--duration), border-color var(--duration), color var(--duration);
+      align-self: flex-end;
+      box-sizing: border-box;
+    }
+    .rpt-btn:hover {
+      background: var(--slate-50);
+      border-color: var(--slate-300);
+      color: var(--slate-700);
+    }
+    .rpt-btn.rpt-btn-danger:hover {
+      background: #fff1f2;
+      border-color: #fca5a5;
+      color: #dc2626;
+    }
+
+    /* Inline checkbox row (e.g. Hide Zero Balances) */
+    .rpt-chk-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 38px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--slate-600);
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+      align-self: flex-end;
+      white-space: nowrap;
+    }
+    .rpt-chk-label input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      accent-color: var(--blue-600);
+    }
+
+    /* Columns dropdown wrapper (position relative anchor) */
+    .rpt-col-wrap {
+      position: relative;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+    .rpt-col-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 200;
+      min-width: 176px;
+      padding: 14px 16px;
+      flex-direction: column;
+      gap: 10px;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 12px;
+      background: var(--white);
+      box-shadow: var(--shadow-lg);
+    }
+    .rpt-col-dropdown.open { display: flex; }
+    .rpt-col-dropdown label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--slate-700);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    /* Vault / Settings Page styling */
+    .vault-container {
+      background: var(--white);
+      border-radius: 16px;
+      border: 1px solid var(--slate-150);
+      padding: 28px;
+      box-shadow: var(--shadow-sm);
+    }
+    .vault-sec-title {
+      font-size: 18px;
+      font-weight: 750;
+      color: var(--slate-800);
+      margin-bottom: 20px;
+      letter-spacing: -0.3px;
+    }
+    .vault-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .vault-card {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .vault-card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .vault-card-icon-wrap {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: var(--blue-100);
+      color: var(--blue-600);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .vault-card-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .vault-card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--slate-800);
+      margin: 0;
+    }
+    .vault-card-subtitle {
+      font-size: 13px;
+      color: var(--slate-500);
+      margin: 0;
+    }
+    .vault-stats-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .vault-stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .v-stat-lbl {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--slate-400);
+    }
+    .v-stat-val {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--slate-700);
+    }
+    .vault-actions-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .vault-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .v-action-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .v-action-lbl {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--slate-800);
+    }
+    .v-action-desc {
+      font-size: 12.5px;
+      color: var(--slate-500);
+      max-width: 480px;
+    }
+    .vault-sep {
+      height: 1px;
+      background: var(--slate-200);
+      width: 100%;
+    }
+    .vault-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    
+    /* Toggle switch */
+    .switch-toggle {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    .switch-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--slate-300);
+      transition: .3s;
+      border-radius: 34px;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .switch-toggle input:checked + .switch-slider {
+      background-color: var(--blue-600);
+    }
+    .switch-toggle input:checked + .switch-slider:before {
+      transform: translateX(20px);
+    }
+
   </style>
 </head>
 <body>
@@ -1812,14 +2910,14 @@
 
     <p class="landing-subtitle">Professional Accounting &amp; Financial Management</p>
 
-    <button class="landing-enter-btn" id="enterBtn" aria-label="Enter KYA application">
-      Enter Application
-    </button>
-
-    <div class="landing-dots" aria-hidden="true">
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
+    <div class="landing-loader" aria-label="Loading KYA application" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="landingProgressBar">
+      <div class="landing-loader-label">
+        <span class="landing-loader-text">Loading</span>
+        <span class="landing-loader-pct" id="loadingPct">0%</span>
+      </div>
+      <div class="landing-progress-track">
+        <div class="landing-progress-fill" id="loadingFill"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1935,9 +3033,21 @@
         <span class="nav-label">Balance Sheet</span>
       </div>
 
+      <div class="nav-section-label">Hub</div>
+
+      <div class="nav-item" id="nav-onehub" data-panel="onehub" role="button" tabindex="0" aria-label="KeepOne">
+        <!-- Hub / layers icon -->
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M10 2a8 8 0 100 16A8 8 0 0010 2z" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.5 2.5"/>
+          <path d="M10 6v8M6 10h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="nav-label">KeepOne</span>
+      </div>
+
       <div class="nav-section-label">Settings</div>
 
-      <div class="nav-item" id="nav-settings" data-panel="welcome" role="button" tabindex="0" aria-label="Settings">
+      <div class="nav-item" id="nav-settings" data-panel="settings" role="button" tabindex="0" aria-label="Settings">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
           <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -2256,30 +3366,31 @@
 
         <!-- Balance Sheet Card -->
         <div class="table-card" style="padding: 24px 28px;">
-          <!-- Sheet Toolbar with Date Filters -->
-          <div class="coa-toolbar">
-            <div class="coa-tb-left" style="gap: 15px; align-items: flex-end;">
-              <div class="pt-fg">
-                <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase;">Date From</label>
-                <input type="date" id="bsDateFrom" class="je-input" style="height: 38px; width: 150px; padding: 0 10px;">
+          <!-- Balance Sheet Toolbar -->
+          <div class="rpt-toolbar">
+            <div class="rpt-tb-left">
+              <div class="rpt-fg">
+                <label for="bsDateFrom">Date From</label>
+                <input type="date" id="bsDateFrom" class="rpt-date-inp">
               </div>
-              <div class="pt-fg">
-                <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase;">Date To</label>
-                <input type="date" id="bsDateTo" class="je-input" style="height: 38px; width: 150px; padding: 0 10px;">
+              <div class="rpt-fg">
+                <label for="bsDateTo">Date To</label>
+                <input type="date" id="bsDateTo" class="rpt-date-inp">
               </div>
-              <button class="coa-util-btn" id="bsExpandAll" title="Expand All" style="height: 38px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              <div class="rpt-sep"></div>
+              <button class="rpt-btn" id="bsExpandAll" title="Expand All">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
                 Expand All
               </button>
-              <button class="coa-util-btn" id="bsCollapseAll" title="Collapse All" style="height: 38px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
+              <button class="rpt-btn" id="bsCollapseAll" title="Collapse All">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
                 Collapse All
               </button>
-              <label style="display: flex; align-items: center; gap: 8px; height: 38px; font-size: 12.5px; font-weight: 600; color: var(--slate-600); cursor: pointer; user-select: none;">
-                <input type="checkbox" id="bsHideZero" style="cursor: pointer;"> Hide Zero Balances
+              <label class="rpt-chk-label">
+                <input type="checkbox" id="bsHideZero"> Hide Zero Balances
               </label>
             </div>
-            <div id="bsStatusBadgeWrap"></div>
+            <div class="rpt-tb-right" id="bsStatusBadgeWrap"></div>
           </div>
 
           <!-- Generated Balance Sheet Content -->
@@ -2309,45 +3420,38 @@
 
         <!-- Trial Balance Card -->
         <div class="table-card" style="padding: 24px 28px;">
-          <!-- Sheet Toolbar with Date Filters -->
-          <div class="coa-toolbar">
-            <div class="coa-tb-left" style="gap: 15px; align-items: flex-end;">
-              <div class="pt-fg">
-                <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase;">Date From</label>
-                <input type="date" id="trialDateFrom" class="je-input" style="height: 38px; width: 150px; padding: 0 10px;">
+          <!-- Trial Balance Toolbar -->
+          <div class="rpt-toolbar">
+            <div class="rpt-tb-left">
+              <div class="rpt-fg">
+                <label for="trialDateFrom">Date From</label>
+                <input type="date" id="trialDateFrom" class="rpt-date-inp">
               </div>
-              <div class="pt-fg">
-                <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase;">Date To</label>
-                <input type="date" id="trialDateTo" class="je-input" style="height: 38px; width: 150px; padding: 0 10px;">
+              <div class="rpt-fg">
+                <label for="trialDateTo">Date To</label>
+                <input type="date" id="trialDateTo" class="rpt-date-inp">
               </div>
-              <button class="coa-util-btn" id="trialClearFilters" style="height: 38px; padding: 0 12px; font-size: 12px; font-weight: 600; color: var(--slate-600); border: 1.5px solid var(--slate-200); border-radius: 8px;">
-                ✕ Clear Filters
+              <div class="rpt-sep"></div>
+              <button class="rpt-btn rpt-btn-danger" id="trialClearFilters">
+                <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                Clear Filters
               </button>
-              <div class="pt-fg" style="position: relative;">
-                <button class="coa-util-btn" id="trialColToggleBtn" style="height: 38px; padding: 0 12px; font-size: 12px; font-weight: 600; color: var(--slate-600); border: 1.5px solid var(--slate-200); border-radius: 8px; display: flex; align-items: center; gap: 6px;">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+              <div class="rpt-col-wrap">
+                <button class="rpt-btn" id="trialColToggleBtn">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
                     <path d="M1.5 2.5h13v11h-13zM5.5 2.5v11M10.5 2.5v11" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                   Columns
                 </button>
-                <!-- Columns Dropdown Menu -->
-                <div id="trialColDropdown" style="display: none; position: absolute; top: 44px; left: 0; z-index: 100; min-width: 180px; padding: 16px; flex-direction: column; gap: 10px; border: 1.5px solid var(--slate-200); border-radius: 12px; background: var(--white); box-shadow: var(--shadow-lg);">
-                  <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                    <input type="checkbox" id="col-gl-check" style="cursor: pointer;"> Group Ledger
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                    <input type="checkbox" id="col-sg-check" style="cursor: pointer;"> Sub Group
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                    <input type="checkbox" id="col-mg-check" style="cursor: pointer;"> Main Group
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                    <input type="checkbox" id="col-plbs-check" style="cursor: pointer;"> PL / BS
-                  </label>
+                <div id="trialColDropdown" class="rpt-col-dropdown">
+                  <label><input type="checkbox" id="col-gl-check"> Group Ledger</label>
+                  <label><input type="checkbox" id="col-sg-check"> Sub Group</label>
+                  <label><input type="checkbox" id="col-mg-check"> Main Group</label>
+                  <label><input type="checkbox" id="col-plbs-check"> PL / BS</label>
                 </div>
               </div>
             </div>
-            <div id="trialStatusBadgeWrap"></div>
+            <div class="rpt-tb-right" id="trialStatusBadgeWrap"></div>
           </div>
 
           <!-- Generated Trial Balance Content -->
@@ -2377,35 +3481,311 @@
 
         <!-- P&L Card -->
         <div class="table-card" style="padding: 24px 28px;">
-          <!-- Sheet Toolbar with Date Filters -->
-          <div class="coa-toolbar">
-            <div class="coa-tb-left" style="gap: 15px; align-items: flex-end;">
-              <div class="pt-fg">
-                <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase;">Date From</label>
-                <input type="date" id="pnlDateFrom" class="je-input" style="height: 38px; width: 150px; padding: 0 10px;">
+          <!-- P&L Toolbar -->
+          <div class="rpt-toolbar">
+            <div class="rpt-tb-left">
+              <div class="rpt-fg">
+                <label for="pnlDateFrom">Date From</label>
+                <input type="date" id="pnlDateFrom" class="rpt-date-inp">
               </div>
-              <div class="pt-fg">
-                <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase;">Date To</label>
-                <input type="date" id="pnlDateTo" class="je-input" style="height: 38px; width: 150px; padding: 0 10px;">
+              <div class="rpt-fg">
+                <label for="pnlDateTo">Date To</label>
+                <input type="date" id="pnlDateTo" class="rpt-date-inp">
               </div>
-              <button class="coa-util-btn" id="pnlExpandAll" title="Expand All" style="height: 38px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              <div class="rpt-sep"></div>
+              <button class="rpt-btn" id="pnlExpandAll" title="Expand All">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
                 Expand All
               </button>
-              <button class="coa-util-btn" id="pnlCollapseAll" title="Collapse All" style="height: 38px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
+              <button class="rpt-btn" id="pnlCollapseAll" title="Collapse All">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
                 Collapse All
               </button>
             </div>
-            <span style="font-size: 13.5px; font-weight: 600; color: var(--slate-500); align-self: flex-end; margin-bottom: 2px;">
-              Fiscal Year: <span style="color: var(--blue-600);">2024–25</span>
-            </span>
+            <div class="rpt-tb-right">
+              <span style="font-size: 13px; font-weight: 600; color: var(--slate-500); white-space: nowrap;">
+                Fiscal Year: <span style="color: var(--blue-600);">2024–25</span>
+              </span>
+            </div>
           </div>
 
           <!-- Generated P&L Content -->
           <div id="pnlSheetWrap"></div>
         </div>
       </div>
+
+      <!-- KeepOne Panel -->
+      <div id="panel-onehub" role="region" aria-label="KeepOne" style="display:none">
+
+        <!-- Panel Header -->
+        <div class="oh-panel-hdr">
+          <div class="panel-title-group">
+            <h1 class="panel-title">KeepOne</h1>
+            <p class="panel-subtitle">HR Management &mdash; Departments, Employees &amp; more</p>
+          </div>
+          <div class="panel-actions" id="ohHeaderActions"></div>
+        </div>
+
+        <div class="oh-layout">
+          <!-- Sub-tabs (5 modules) -->
+          <div class="oh-sub-tabs" role="tablist" aria-label="KeepOne sections">
+
+            <!-- Active: Departments -->
+            <button class="oh-sub-tab" id="ohTabDept" role="tab" aria-selected="false" aria-controls="oh-dept-view">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                  <rect x="2" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M6 6V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Departments</span>
+              <span class="oh-sub-tab-badge" id="ohDeptBadge">0</span>
+            </button>
+
+            <!-- Active: Employees -->
+            <button class="oh-sub-tab" id="ohTabEmp" role="tab" aria-selected="false" aria-controls="oh-emp-view">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="6" r="3.5" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M3 18c0-4 3.1-7 7-7s7 3 7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Employees</span>
+              <span class="oh-sub-tab-badge" id="ohEmpBadge">0</span>
+            </button>
+
+            <!-- Upcoming: Budget -->
+            <button class="oh-sub-tab upcoming" id="ohTabBudget" role="tab" aria-selected="false" aria-controls="oh-budget-view" title="Coming Soon">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                  <rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M7 10h6M7 13h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  <path d="M10 4V2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Budget</span>
+            </button>
+
+            <!-- Upcoming: PayTrack -->
+            <button class="oh-sub-tab upcoming" id="ohTabPaytrack" role="tab" aria-selected="false" aria-controls="oh-paytrack-view" title="Coming Soon">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M10 6.5v1.2M10 12.3v1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  <path d="M8 8.5c0-.8.9-1.5 2-1.5s2 .7 2 1.5-1 1.3-2 1.5-2 .7-2 1.5.9 1.5 2 1.5 2-.7 2-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">PayTrack</span>
+            </button>
+
+            <!-- Upcoming: Under Ledger -->
+            <button class="oh-sub-tab upcoming" id="ohTabUnderLedger" role="tab" aria-selected="false" aria-controls="oh-underledger-view" title="Coming Soon">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 5h12M4 9h8M4 13h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <circle cx="16" cy="13" r="3.5" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M15 13h2M16 12v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Under Ledger</span>
+            </button>
+
+          </div>
+
+          <!-- Content views area -->
+          <div class="oh-content-area">
+
+            <!-- Empty / Landing View -->
+            <div id="oh-empty-view" role="tabpanel">
+              <div class="oh-empty-wrap">
+                <div class="oh-empty-icon-ring">
+                  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </div>
+                <div class="oh-empty-title">Welcome to KeepOne</div>
+                <div class="oh-empty-subtitle">Select a module from the left menu to manage departments, employees, budgets, payroll, or ledger connections.</div>
+              </div>
+            </div>
+
+            <!-- Departments View -->
+            <div id="oh-dept-view" role="tabpanel" style="display:none">
+              <div id="ohDeptViewInner"></div>
+            </div>
+
+            <!-- Employees View -->
+            <div id="oh-emp-view" role="tabpanel" style="display:none">
+              <div id="ohEmpViewInner"></div>
+            </div>
+
+            <!-- Budget View (Upcoming) -->
+            <div id="oh-budget-view" role="tabpanel" style="display:none"></div>
+
+            <!-- PayTrack View (Upcoming) -->
+            <div id="oh-paytrack-view" role="tabpanel" style="display:none"></div>
+
+            <!-- Under Ledger View (Upcoming) -->
+            <div id="oh-underledger-view" role="tabpanel" style="display:none"></div>
+
+          </div>
+        </div>
+
+      </div><!-- /#panel-onehub -->
+
+      <!-- Settings Panel -->
+      <div id="panel-settings" role="region" aria-label="Settings" style="display:none">
+
+        <!-- Panel Header -->
+        <div class="oh-panel-hdr">
+          <div class="panel-title-group">
+            <h1 class="panel-title">Settings</h1>
+            <p class="panel-subtitle">Configure your preferences, vault, and backups</p>
+          </div>
+          <div class="panel-actions" id="settingsHeaderActions"></div>
+        </div>
+
+        <div class="oh-layout">
+          <!-- Left Options Cards (Sidebar) -->
+          <div class="oh-sub-tabs" role="tablist" aria-label="Settings sections">
+            <!-- Vault Option -->
+            <button class="oh-sub-tab" id="settingsTabVault" role="tab" aria-selected="false" aria-controls="settings-vault-view">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Vault</span>
+            </button>
+          </div>
+
+          <!-- Right Content Views -->
+          <div class="oh-content-area">
+            <!-- Settings Empty / Landing View -->
+            <div id="settings-empty-view" role="tabpanel">
+              <div class="oh-empty-wrap">
+                <div class="oh-empty-icon-ring">
+                  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </div>
+                <div class="oh-empty-title">Settings</div>
+                <div class="oh-empty-subtitle">Select an option from the left menu to configure preferences and vault backups.</div>
+              </div>
+            </div>
+
+            <!-- Vault View -->
+            <div id="settings-vault-view" role="tabpanel" style="display:none">
+              <div class="vault-container">
+                <h3 class="vault-sec-title">Local Storage</h3>
+                
+                <div class="vault-grid">
+                  <!-- Folder Configuration Card -->
+                  <div class="vault-card">
+                    <div style="display: flex; flex-direction: column; gap: 16px; width: 100%;">
+                      
+                      <!-- Folder selection row -->
+                      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" id="btnVaultSelectFolder" style="height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                          </svg>
+                          Select Folder
+                        </button>
+                        <button class="btn btn-secondary" id="btnVaultClearFolder" style="height: 42px; display: none; align-items: center; justify-content: center; gap: 6px; background: #fee2e2; color: #b91c1c; border-color: #fca5a5;">
+                          Disconnect Folder
+                        </button>
+                        <button class="btn" id="btnVaultReauthFolder" style="height: 42px; display: none; align-items: center; justify-content: center; gap: 6px; background: #fef3c7; color: #d97706; border: 1.5px solid #fcd34d;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                          </svg>
+                          Grant Folder Access
+                        </button>
+                      </div>
+
+                      <!-- Backup Folder Path Display -->
+                      <div class="vault-action-row">
+                        <div class="v-action-text" style="width: 100%;">
+                          <span class="v-action-lbl">Backup Folder Path</span>
+                          <span class="v-action-desc" id="vaultBackupFolderPath" style="font-family: monospace; background: var(--slate-100); padding: 6px 12px; border-radius: 8px; margin-top: 4px; display: inline-block; word-break: break-all; width: 100%; box-sizing: border-box;">No folder selected. Storing in local browser memory.</span>
+                        </div>
+                      </div>
+
+                      <div class="vault-sep"></div>
+
+                      <!-- Auto Backup Toggle -->
+                      <div class="vault-action-row">
+                        <div class="v-action-text">
+                          <span class="v-action-lbl">Auto Backup</span>
+                          <span class="v-action-desc">Automatically save data snapshot on changes</span>
+                        </div>
+                        <label class="switch-toggle">
+                          <input type="checkbox" id="vaultAutoBackupToggle">
+                          <span class="switch-slider"></span>
+                        </label>
+                      </div>
+
+                      <div class="vault-sep"></div>
+
+                      <!-- Backup and Restore Actions -->
+                      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-primary" id="btnVaultBackupNow" style="height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                          </svg>
+                          Backup Now
+                        </button>
+                        <button class="btn btn-secondary" id="btnVaultRestoreFolder" style="height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            <path d="M12 11v6"></path>
+                            <path d="M9 14l3-3 3 3"></path>
+                          </svg>
+                          Restore Data
+                        </button>
+                        <input type="file" id="vaultFallbackFileSelector" accept=".json" style="display:none">
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <!-- Backup Status Card -->
+                  <div class="vault-card">
+                    <div class="vault-stats-list">
+                      <div class="vault-stat-item">
+                        <span class="v-stat-lbl">Last Backup Date</span>
+                        <span class="v-stat-val" id="vaultLastDate">—</span>
+                      </div>
+                      <div class="vault-stat-item">
+                        <span class="v-stat-lbl">Last Backup Time</span>
+                        <span class="v-stat-val" id="vaultLastTime">—</span>
+                      </div>
+                      <div class="vault-stat-item">
+                        <span class="v-stat-lbl">Last Backup Status</span>
+                        <span class="v-stat-val" id="vaultLastStatus"><span class="badge badge-secondary">No Backups</span></span>
+                      </div>
+                      <div class="vault-stat-item">
+                        <span class="v-stat-lbl">Backup Size</span>
+                        <span class="v-stat-val" id="vaultBackupSize">—</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /#panel-settings -->
 
     </main>
   </div>
@@ -2416,9 +3796,11 @@
   /* ======================
      LANDING → APP
   ====================== */
-  const landing  = document.getElementById('landing');
-  const app      = document.getElementById('app');
-  const enterBtn = document.getElementById('enterBtn');
+  const landing     = document.getElementById('landing');
+  const app         = document.getElementById('app');
+  const loadingFill = document.getElementById('loadingFill');
+  const loadingPct  = document.getElementById('loadingPct');
+  const progressBar = document.getElementById('landingProgressBar');
 
   function enterApp() {
     landing.classList.add('exit');
@@ -2429,10 +3811,31 @@
     }, 680);
   }
 
-  enterBtn.addEventListener('click', enterApp);
-  // Also auto-enter after 5 seconds if user doesn't click
-  const autoTimer = setTimeout(enterApp, 5200);
-  enterBtn.addEventListener('click', () => clearTimeout(autoTimer));
+  // Animate progress from 0 → 100 over ~2.6s (starts after 1.8s CSS delay)
+  let pct = 0;
+  const totalMs   = 2600;
+  const stepMs    = 40;
+  const increment = 100 / (totalMs / stepMs);
+
+  function tickLoader() {
+    pct = Math.min(100, pct + increment + (Math.random() * increment * 0.4));
+    const rounded = Math.floor(pct);
+    loadingFill.style.width = rounded + '%';
+    loadingPct.textContent  = rounded + '%';
+    progressBar.setAttribute('aria-valuenow', rounded);
+
+    if (pct < 100) {
+      setTimeout(tickLoader, stepMs);
+    } else {
+      loadingFill.style.width = '100%';
+      loadingPct.textContent  = '100%';
+      // Brief pause at 100% then open the app
+      setTimeout(enterApp, 420);
+    }
+  }
+
+  // Start the loader after the CSS fade-in animation completes (1.8s delay)
+  setTimeout(tickLoader, 1850);
 
 
   /* ======================
@@ -2455,6 +3858,8 @@
   const panelBalance    = document.getElementById('panel-balance');
   const panelPnl        = document.getElementById('panel-pnl');
   const panelTrial      = document.getElementById('panel-trial');
+  const panelOneHub     = document.getElementById('panel-onehub');
+  const panelSettings   = document.getElementById('panel-settings');
   const qsJournal       = document.getElementById('qs-journal');
 
   const panels = {
@@ -2466,6 +3871,8 @@
     balance: panelBalance,
     pnl:     panelPnl,
     trial:   panelTrial,
+    onehub:  panelOneHub,
+    settings: panelSettings,
   };
 
   const TAB_DEFS = {
@@ -2475,7 +3882,9 @@
     chart:   { id: 'chart',   label: 'Chart of Accounts', panelId: 'panel-chart',   navId: 'nav-chart' },
     balance: { id: 'balance', label: 'Balance Sheet',    panelId: 'panel-balance', navId: 'nav-balance' },
     pnl:     { id: 'pnl',     label: 'Profit & Loss',     panelId: 'panel-pnl',     navId: 'nav-pnl' },
-    trial:   { id: 'trial',   label: 'Trial Balance',     panelId: 'panel-trial',   navId: 'nav-trial' }
+    trial:   { id: 'trial',   label: 'Trial Balance',     panelId: 'panel-trial',   navId: 'nav-trial' },
+    onehub:  { id: 'onehub',  label: 'KeepOne',           panelId: 'panel-onehub',  navId: 'nav-onehub' },
+    settings: { id: 'settings', label: 'Settings',        panelId: 'panel-settings', navId: 'nav-settings' },
   };
 
   let openTabs = [];
@@ -2540,6 +3949,8 @@
       if (activeTabId === 'balance') renderBalanceSheetPanel();
       if (activeTabId === 'pnl') renderPnlPanel();
       if (activeTabId === 'trial') renderTrialBalancePanel();
+      if (activeTabId === 'onehub') renderOneHubPanel();
+      if (activeTabId === 'settings') renderSettingsPanel();
       
       // Highlight sidebar nav item
       const navEl = document.getElementById(def.navId);
@@ -2610,7 +4021,7 @@
     });
   }
 
-  // Flat nav items (dashboard, ledger, chart, reports, settings)
+  // Flat nav items (dashboard, ledger, chart, reports, onehub, settings)
   navItems.forEach(item => {
     const handler = () => {
       const panel = item.dataset.panel || 'welcome';
@@ -2622,6 +4033,10 @@
         openTab('pnl');
       } else if (panel === 'trial') {
         openTab('trial');
+      } else if (panel === 'onehub') {
+        openTab('onehub');
+      } else if (panel === 'settings') {
+        openTab('settings');
       } else {
         activeTabId = null;
         renderTabs();
@@ -2970,6 +4385,169 @@
     });
   }
 
+  // ── Global portal dropdown (single instance shared by all rows) ──────────
+  const _jePortal = (() => {
+    const el = document.createElement('div');
+    el.id = 'je-portal-dropdown';
+    document.body.appendChild(el);
+
+    // Group accent colours matching CoA main groups
+    const GROUP_COLORS = {
+      assets:               '#3b82f6',
+      'equity-liabilities': '#8b5cf6',
+      income:               '#10b981',
+      expense:              '#f59e0b',
+    };
+
+    function _dotColor(l) {
+      const sg = (typeof COA_SYS_SGS !== 'undefined')
+        ? COA_SYS_SGS.find(s => s.id === l.sgId) : null;
+      return (sg && GROUP_COLORS[sg.main]) || '#94a3b8';
+    }
+
+    function _hl(text, q) {
+      if (!q) return text;
+      const i = text.toLowerCase().indexOf(q.toLowerCase());
+      if (i < 0) return text;
+      return text.slice(0, i)
+        + `<span class="je-drop-hl">${text.slice(i, i + q.length)}</span>`
+        + text.slice(i + q.length);
+    }
+
+    let _activeInp    = null;
+    let _activeCb     = null;
+    let _highlightIdx = -1;
+    let _open         = false;
+
+    function _items() { return el.querySelectorAll('.je-drop-item'); }
+
+    function _setHL(idx) {
+      const items = _items();
+      items.forEach(it => it.classList.remove('highlighted'));
+      _highlightIdx = idx;
+      if (idx >= 0 && idx < items.length) {
+        items[idx].classList.add('highlighted');
+        items[idx].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function _position(inp) {
+      const r          = inp.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - r.bottom - 8;
+      const spaceAbove = r.top - 8;
+      const maxH       = Math.min(280, Math.max(spaceBelow, spaceAbove) - 8);
+      el.style.maxHeight = maxH + 'px';
+      el.style.width     = Math.max(r.width, 260) + 'px';
+      el.style.left      = r.left + 'px';
+      if (spaceBelow >= 140 || spaceBelow >= spaceAbove) {
+        el.style.top    = (r.bottom + 6) + 'px';
+        el.style.bottom = 'auto';
+      } else {
+        el.style.top    = 'auto';
+        el.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+      }
+    }
+
+    function open(inp, query, onSelect) {
+      _activeInp    = inp;
+      _activeCb     = onSelect;
+      _highlightIdx = -1;
+      const q = (query || '').toLowerCase().trim();
+
+      const matches = coaLedgers
+        .filter(l => l.type === 'ledger' && l.name.toLowerCase().includes(q))
+        .sort((a, b) => {
+          const as = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+          const bs = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+          return as - bs || a.name.localeCompare(b.name);
+        });
+
+      el.innerHTML = '';
+
+      if (!matches.length) {
+        el.innerHTML = `
+          <div class="je-drop-empty">
+            <svg class="je-drop-empty-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <span class="je-drop-empty-txt">No ledger found</span>
+            <span class="je-drop-empty-sub">Try a different name or add it in Chart of Accounts</span>
+          </div>`;
+      } else {
+        const GROUP_LABELS = {
+          assets: 'Assets', 'equity-liabilities': 'Equity & Liabilities',
+          income: 'Income', expense: 'Expense'
+        };
+        let lastGroup = null;
+
+        matches.forEach(acct => {
+          const sg     = (typeof COA_SYS_SGS !== 'undefined')
+            ? COA_SYS_SGS.find(s => s.id === acct.sgId) : null;
+          const grpKey = sg ? sg.main : '__other__';
+
+          if (grpKey !== lastGroup) {
+            lastGroup = grpKey;
+            const hdr = document.createElement('div');
+            hdr.className   = 'je-drop-header';
+            hdr.textContent = GROUP_LABELS[grpKey] || 'Other';
+            el.appendChild(hdr);
+          }
+
+          const item = document.createElement('div');
+          item.className = 'je-drop-item';
+          item.innerHTML = `
+            <span class="je-drop-dot" style="background:${_dotColor(acct)}"></span>
+            <span class="je-drop-name">${_hl(acct.name, query)}</span>
+            ${acct.code ? `<span class="je-drop-code">${acct.code}</span>` : ''}
+          `;
+          item.addEventListener('mousedown', e => {
+            e.preventDefault();
+            close();
+            if (_activeCb) _activeCb(acct);
+          });
+          el.appendChild(item);
+        });
+      }
+
+      _position(inp);
+      el.classList.add('open');
+      _open = true;
+    }
+
+    function close() {
+      el.classList.remove('open');
+      _open         = false;
+      _highlightIdx = -1;
+      _activeInp    = null;
+    }
+
+    function isOpen()         { return _open; }
+    function moveHighlight(d) {
+      const items = _items();
+      if (!items.length) return;
+      _setHL(Math.max(0, Math.min(_highlightIdx + d, items.length - 1)));
+    }
+    function selectHighlighted() {
+      const items = _items();
+      const idx   = _highlightIdx >= 0 ? _highlightIdx : 0;
+      if (items[idx]) items[idx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    }
+
+    // Reposition as user scrolls (tracks the anchor input)
+    function _reposition() { if (_open && _activeInp) _position(_activeInp); }
+    window.addEventListener('scroll', _reposition, true);
+    window.addEventListener('resize', _reposition);
+
+    // Click outside → close
+    document.addEventListener('mousedown', e => {
+      if (_open && !el.contains(e.target) && e.target !== _activeInp) close();
+    });
+
+    return { open, close, isOpen, moveHighlight, selectHighlighted };
+  })();
+
+
   // ── Particulars custom dropdown cell ─────────────────────────────
   function buildParticularsCell(row, isFirstRow) {
     const wrap = document.createElement('div');
@@ -2982,147 +4560,84 @@
     inp.value = row.particular;
     inp.setAttribute('aria-label', 'Particulars / ledger account');
     inp.setAttribute('autocomplete', 'off');
+    inp.setAttribute('spellcheck', 'false');
 
     const arrow = document.createElement('span');
     arrow.className = 'je-particulars-arrow';
     arrow.innerHTML = `<svg viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-    const dropdown = document.createElement('div');
-    dropdown.className = 'je-dropdown';
-
-    let highlightedIdx = -1;
-
-    function getItems() { return dropdown.querySelectorAll('.je-dropdown-item'); }
-
-    function setHighlight(idx) {
-      const items = getItems();
-      items.forEach(it => it.classList.remove('highlighted'));
-      highlightedIdx = idx;
-      if (idx >= 0 && idx < items.length) {
-        items[idx].classList.add('highlighted');
-        items[idx].scrollIntoView({ block: 'nearest' });
-      }
+    function _select(acct) {
+      inp.value      = acct.name;
+      row.particular = acct.name;
+      const tr = inp.closest('[data-row-id]');
+      if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
     }
 
-    function selectHighlighted() {
-      const items = getItems();
-      const target = highlightedIdx >= 0 ? items[highlightedIdx] : items[0];
-      if (target) target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    }
+    inp.addEventListener('focus', () => _jePortal.open(inp, inp.value, _select));
+    inp.addEventListener('input', () => {
+      row.particular = inp.value;
+      _jePortal.open(inp, inp.value, _select);
+    });
 
-    function closeDropdown() {
-      dropdown.classList.remove('open');
-      highlightedIdx = -1;
-    }
-
-    function showDropdown(query) {
-      highlightedIdx = -1;
-      const q = (query || '').toLowerCase();
-      
-      const matches = coaLedgers.filter(l =>
-        l.type === 'ledger' && l.name.toLowerCase().includes(q)
-      );
-
-      matches.sort((a, b) => a.name.localeCompare(b.name));
-
-      dropdown.innerHTML = '';
-
-      if (!matches.length) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'je-dropdown-empty';
-        emptyDiv.textContent = 'No accounts found';
-        dropdown.appendChild(emptyDiv);
-      } else {
-        matches.forEach(acct => {
-          const item = document.createElement('div');
-          item.className = 'je-dropdown-item';
-          item.textContent = acct.name;
-          item.addEventListener('mousedown', e => {
-            e.preventDefault();
-            inp.value = acct.name;
-            row.particular = acct.name;
-            closeDropdown();
-            // After selecting, jump to amount field of same row
-            const tr = inp.closest('[data-row-id]');
-            if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
-          });
-          dropdown.appendChild(item);
-        });
-      }
-      dropdown.classList.add('open');
-    }
-
-    // Keyboard navigation inside the particulars input
     inp.addEventListener('keydown', e => {
-      const isOpen = dropdown.classList.contains('open');
-      const items  = getItems();
+      const open = _jePortal.isOpen();
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (!isOpen) showDropdown(inp.value);
-        setHighlight(Math.min(highlightedIdx + 1, items.length - 1));
+        if (!open) _jePortal.open(inp, inp.value, _select);
+        _jePortal.moveHighlight(1);
 
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setHighlight(Math.max(highlightedIdx - 1, 0));
+        _jePortal.moveHighlight(-1);
 
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (isOpen && items.length) {
-          selectHighlighted();
-          // focusDebitOfRow called inside mousedown handler above
+        if (open) {
+          _jePortal.selectHighlighted();
         } else {
-          closeDropdown();
           const tr = inp.closest('[data-row-id]');
           if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
         }
 
-      } else if (e.key === 'Backspace' && !isFirstRow) {
-        // Row 2+: if the field is already empty, delete this entire row
-        if (inp.value !== '') return;   // let Backspace clear the text normally first
-        e.preventDefault();
-        closeDropdown();
-        focusPrevRowDebit(row.id);
-        deleteRow(row.id);
-
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        closeDropdown();
+        _jePortal.close();
 
       } else if (e.key === 'Tab') {
-        closeDropdown();
+        _jePortal.close();
+
+      } else if (e.key === 'Backspace' && !isFirstRow && inp.value === '') {
+        e.preventDefault();
+        _jePortal.close();
+        focusPrevRowDebit(row.id);
+        deleteRow(row.id);
       }
     });
 
-    function validateInput() {
-      const val = inp.value.trim().toLowerCase();
-      if (val === '') {
-        row.particular = '';
-        return;
-      }
-      const match = coaLedgers.find(l => l.type === 'ledger' && l.name.toLowerCase() === val);
-      if (match) {
-        inp.value = match.name;
-        row.particular = match.name;
-      } else {
-        inp.value = '';
-        row.particular = '';
-        showToast('Please select a valid ledger from the Chart of Accounts.', 'error');
-      }
-    }
-
-    inp.addEventListener('focus',  () => showDropdown(inp.value));
-    inp.addEventListener('input',  () => { highlightedIdx = -1; row.particular = inp.value; showDropdown(inp.value); });
-    inp.addEventListener('blur',   () => {
+    inp.addEventListener('blur', () => {
+      // Give portal mousedown time to fire before validating
       setTimeout(() => {
-        validateInput();
-        closeDropdown();
-      }, 180);
+        if (_jePortal.isOpen()) return;
+        const val = inp.value.trim().toLowerCase();
+        if (val === '') {
+          row.particular = '';
+        } else {
+          const match = coaLedgers.find(l => l.type === 'ledger' && l.name.toLowerCase() === val);
+          if (match) {
+            inp.value      = match.name;
+            row.particular = match.name;
+          } else {
+            inp.value      = '';
+            row.particular = '';
+            showToast('Please select a valid ledger from the Chart of Accounts.', 'error');
+          }
+        }
+      }, 200);
     });
 
     wrap.appendChild(inp);
     wrap.appendChild(arrow);
-    wrap.appendChild(dropdown);
     return wrap;
   }
 
@@ -3183,6 +4698,7 @@
     });
     showToast('Draft saved successfully.', 'info');
     jvCounter++;
+    triggerAutoBackup();
     setTimeout(initFormDefaults, 900);
   });
 
@@ -3570,31 +5086,147 @@
 
   // ── Shared styled confirmation popup ─────────────────────────────
   // showKyaConfirm({ title, message, confirmLabel, iconBg, iconColor, iconSvg, okBg, onConfirm })
-  function showKyaConfirm({ title, message, confirmLabel = 'Confirm', iconBg = '#fee2e2',
-      iconColor = '#dc2626', iconSvg = '', okBg = '#dc2626', onConfirm }) {
+  function showKyaConfirm({ title, message, confirmLabel = 'Confirm', iconBg, iconColor, iconSvg, okBg = '#dc2626', onConfirm }) {
     document.getElementById('kyaConfirmOverlay')?.remove();
+    document.getElementById('kyaConfirmStyles')?.remove();
+
+    // Default icon backgrounds and colors
+    if (!iconBg) {
+      if (okBg === '#2563eb' || title.toLowerCase().includes('restore') || title.toLowerCase().includes('switch')) {
+        iconBg = 'var(--blue-50)';
+        iconColor = 'var(--blue-600)';
+      } else if (okBg === '#16a34a' || title.toLowerCase().includes('post')) {
+        iconBg = '#dcfce7';
+        iconColor = '#16a34a';
+      } else {
+        iconBg = '#fee2e2';
+        iconColor = '#dc2626';
+      }
+    }
+    if (!iconColor) {
+      iconColor = okBg;
+    }
+
+    // Default SVGs
+    if (!iconSvg) {
+      if (title.toLowerCase().includes('delete')) {
+        iconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
+      } else if (title.toLowerCase().includes('post')) {
+        iconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      } else {
+        // default database icon
+        iconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>`;
+      }
+    }
+
+    // Inject custom animation styles for absolute centering
+    const styleEl = document.createElement('style');
+    styleEl.id = 'kyaConfirmStyles';
+    styleEl.innerHTML = `
+      #kyaConfirmOverlay {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.65) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        z-index: 10002;
+        display: block !important;
+      }
+      .kya-confirm-card-centered {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        background: var(--white);
+        border-radius: 24px;
+        box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3);
+        border: 1px solid var(--slate-100);
+        text-align: center;
+        font-family: var(--font-main);
+        z-index: 10003;
+        box-sizing: border-box;
+        animation: kyaCenterPopIn 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) forwards !important;
+      }
+      @keyframes kyaCenterPopIn {
+        from { opacity: 0; transform: translate(-50%, -45%) scale(0.95) !important; }
+        to   { opacity: 1; transform: translate(-50%, -50%) scale(1) !important; }
+      }
+    `;
+    document.head.appendChild(styleEl);
+
     const overlay = document.createElement('div');
-    overlay.className = 'kya-confirm-overlay';
     overlay.id = 'kyaConfirmOverlay';
     overlay.innerHTML = `
-      <div class="kya-confirm-card">
-        <div class="kya-confirm-icon" style="background:${iconBg}; color:${iconColor}">
+      <div class="kya-confirm-card-centered" style="max-width: 440px; width: 90%; position: relative; padding: 40px 32px 32px;">
+        <button id="kyaConfirmClose" style="position: absolute; top: 20px; right: 20px; border: none; background: none; font-size: 22px; color: var(--slate-400); cursor: pointer; line-height: 1; transition: all 0.15s ease; outline: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.color='var(--slate-700)'; this.style.backgroundColor='var(--slate-50)';" onmouseout="this.style.color='var(--slate-400)'; this.style.backgroundColor='transparent';">
+          &times;
+        </button>
+        
+        <div class="kya-confirm-icon" style="background:${iconBg}; color:${iconColor}; width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -2px 0 rgba(0,0,0,.05);">
           ${iconSvg}
         </div>
-        <div class="kya-confirm-title">${title}</div>
-        <div class="kya-confirm-msg">${message}</div>
-        <div class="kya-confirm-btns">
-          <button class="kya-confirm-cancel" id="kyaConfirmCancel">Cancel</button>
-          <button class="kya-confirm-ok" id="kyaConfirmOk" style="background:${okBg}">${confirmLabel}</button>
+        
+        <div class="kya-confirm-title" style="font-size: 20px; font-weight: 800; color: var(--slate-900); margin-bottom: 12px; letter-spacing: -0.4px;">
+          ${title}
+        </div>
+        
+        <div class="kya-confirm-msg" style="font-size: 14px; color: var(--slate-500); line-height: 1.6; margin-bottom: 28px;">
+          ${message}
+        </div>
+        
+        <div class="kya-confirm-btns" style="display: flex; gap: 12px; justify-content: stretch; width: 100%;">
+          <button class="kya-confirm-cancel" id="btnConfirmCancel" style="flex: 1; height: 46px; border: 1.5px solid var(--slate-200); border-radius: 12px; background: var(--white); font-size: 13.5px; font-weight: 600; color: var(--slate-600); cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; margin: 0;">
+            Cancel
+          </button>
+          <button class="kya-confirm-ok" id="btnConfirmOk" style="flex: 1; height: 46px; border: none; border-radius: 12px; background: ${okBg}; font-size: 13.5px; font-weight: 700; color: var(--white); cursor: pointer; transition: all 0.15s ease; box-shadow: 0 4px 12px rgba(0,0,0,.15); display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; margin: 0;">
+            ${confirmLabel}
+          </button>
         </div>
       </div>`;
+
     document.body.appendChild(overlay);
-    const close = () => overlay.remove();
-    overlay.querySelector('#kyaConfirmCancel').addEventListener('click', close);
-    overlay.querySelector('#kyaConfirmOk').addEventListener('click', () => { close(); onConfirm(); });
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-    overlay.querySelector('#kyaConfirmOk').focus();
+    
+    const close = () => {
+      overlay.remove();
+      document.getElementById('kyaConfirmStyles')?.remove();
+    };
+
+    const btnCancel = overlay.querySelector('#btnConfirmCancel');
+    btnCancel.addEventListener('mouseenter', () => {
+      btnCancel.style.background = 'var(--slate-50)';
+      btnCancel.style.borderColor = 'var(--slate-300)';
+    });
+    btnCancel.addEventListener('mouseleave', () => {
+      btnCancel.style.background = 'var(--white)';
+      btnCancel.style.borderColor = 'var(--slate-200)';
+    });
+    btnCancel.addEventListener('click', close);
+
+    const btnOk = overlay.querySelector('#btnConfirmOk');
+    btnOk.addEventListener('mouseenter', () => {
+      btnOk.style.filter = 'brightness(0.9)';
+    });
+    btnOk.addEventListener('mouseleave', () => {
+      btnOk.style.filter = 'none';
+    });
+    btnOk.addEventListener('click', () => {
+      close();
+      onConfirm();
+    });
+
+    overlay.querySelector('#kyaConfirmClose').addEventListener('click', close);
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) close();
+    });
+
+    overlay.addEventListener('keydown', e => {
+      if (e.key === 'Escape') close();
+    });
+
+    btnOk.focus();
   }
 
   function renderPostedPanel() {
@@ -3759,6 +5391,7 @@
           _ptSelected.clear();
           renderPostedPanel();
           refreshAllReports();
+          triggerAutoBackup();
         }
       });
     });
@@ -3781,6 +5414,7 @@
             _ptSelected.delete(id);
             renderPostedPanel();
             refreshAllReports();
+            triggerAutoBackup();
           }
         });
       });
@@ -3893,6 +5527,7 @@
     );
     renderDraftedPanel();
     refreshAllReports();
+    triggerAutoBackup();
   }
 
   function renderDraftedPanel() {
@@ -4061,6 +5696,7 @@
           draftedEntries = draftedEntries.filter(e => !_dtSelected.has(e.id));
           _dtSelected.clear();
           renderDraftedPanel();
+          triggerAutoBackup();
         }
       });
     });
@@ -4238,6 +5874,7 @@
     showToast('Journal entry posted successfully!', 'success');
     jvCounter++;
     refreshAllReports();
+    triggerAutoBackup();
     setTimeout(initFormDefaults, 900);
   }
 
@@ -4351,64 +5988,219 @@
     _coaStyleDone = true;
     const s = document.createElement('style');
     s.textContent = `
-      .coa-toolbar { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:20px; flex-wrap:wrap; }
-      .coa-tb-left { display:flex; align-items:center; gap:10px; flex:1; max-width:78%; flex-wrap:wrap; }
-      .coa-tree    { display:flex; flex-direction:column; gap:14px; }
+      .coa-tree { display:flex; flex-direction:column; gap:14px; }
 
-      /* ── Add Ledger button in toolbar ── */
+      /* ══════════════════════════════════════════════
+         MODERN SEARCH HERO
+      ══════════════════════════════════════════════ */
+      .coa-search-hero {
+        background: linear-gradient(135deg, #f8faff 0%, #eff6ff 50%, #f0fdff 100%);
+        border: 1.5px solid #dbeafe;
+        border-radius: 20px;
+        padding: 20px 22px 18px;
+        margin-bottom: 22px;
+        position: relative;
+        overflow: hidden;
+      }
+      .coa-search-hero::before {
+        content: '';
+        position: absolute;
+        top: -30px; right: -30px;
+        width: 160px; height: 160px;
+        background: radial-gradient(circle, rgba(37,99,235,.07) 0%, transparent 70%);
+        pointer-events: none;
+      }
+
+      /* Top row: search bar + Add button */
+      .coa-search-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      /* Search input wrapper */
+      .coa-si-wrap {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .coa-si-icon {
+        position: absolute;
+        left: 14px;
+        color: #60a5fa;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        transition: color .2s;
+      }
+      .coa-si-inp {
+        width: 100%;
+        height: 46px;
+        padding: 0 44px 0 44px;
+        border: 2px solid #e2e8f0;
+        border-radius: 14px;
+        font-size: 14.5px;
+        font-family: Inter, sans-serif;
+        color: #1e293b;
+        background: #ffffff;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+        box-shadow: 0 1px 4px rgba(0,0,0,.04);
+      }
+      .coa-si-inp::placeholder { color: #94a3b8; }
+      .coa-si-inp:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59,130,246,.12), 0 2px 8px rgba(0,0,0,.06);
+      }
+      .coa-si-inp:focus ~ .coa-si-icon { color: #2563eb; }
+      .coa-si-clear {
+        position: absolute;
+        right: 11px;
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        border: none;
+        background: #e2e8f0;
+        color: #64748b;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        transition: background .15s, color .15s;
+      }
+      .coa-si-clear.visible { display: flex; }
+      .coa-si-clear:hover { background: #cbd5e1; color: #1e293b; }
+
+      /* Result count badge */
+      .coa-result-badge {
+        display: none;
+        align-items: center;
+        gap: 5px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 20px;
+        padding: 3px 10px 3px 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #2563eb;
+        white-space: nowrap;
+        animation: coaBadgePop .18s cubic-bezier(.34,1.5,.64,1);
+      }
+      .coa-result-badge.visible { display: flex; }
+      @keyframes coaBadgePop {
+        from { transform: scale(.7); opacity: 0; }
+        to   { transform: scale(1);  opacity: 1; }
+      }
+      .coa-result-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: #3b82f6;
+        animation: coaDotPulse 1.4s ease-in-out infinite;
+      }
+      @keyframes coaDotPulse {
+        0%,100% { opacity: .4; transform: scale(1); }
+        50%      { opacity: 1;  transform: scale(1.35); }
+      }
+
+      /* Add Ledger button */
       .coa-tb-add {
-        height:40px; padding:0 18px; border-radius:10px; border:none;
-        background:linear-gradient(135deg,#2563eb,#3b82f6); color:#fff;
-        font-size:13.5px; font-weight:700; cursor:pointer; font-family:Inter,sans-serif;
-        display:flex; align-items:center; gap:7px; transition:filter .14s; white-space:nowrap;
-        box-shadow:0 2px 10px rgba(37,99,235,.28);
-        margin-left:auto;
+        height: 46px; padding: 0 20px; border-radius: 14px; border: none;
+        background: linear-gradient(135deg,#2563eb,#3b82f6); color: #fff;
+        font-size: 14px; font-weight: 700; cursor: pointer; font-family: Inter,sans-serif;
+        display: flex; align-items: center; gap: 7px; transition: filter .14s, transform .14s;
+        white-space: nowrap; box-shadow: 0 3px 14px rgba(37,99,235,.32);
+        flex-shrink: 0;
       }
-      .coa-tb-add:hover { filter:brightness(1.1); }
+      .coa-tb-add:hover { filter: brightness(1.08); transform: translateY(-1px); }
+      .coa-tb-add:active { transform: translateY(0); }
 
-      /* ── Filter toggle button ── */
-      .coa-filter-toggle-btn {
-        height:40px; padding:0 16px; border:1.5px solid #e2e8f0; background:#fff; color:#475569;
-        border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; display:flex;
-        align-items:center; gap:6px; font-family:Inter,sans-serif; transition:all .13s;
+      /* Bottom row: filter chips + utility buttons */
+      .coa-search-bottom {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
       }
-      .coa-filter-toggle-btn:hover { background:#f8fafc; border-color:#cbd5e1; }
-      .coa-filter-toggle-btn.active { background:#eff6ff; border-color:#60a5fa; color:#2563eb; }
 
-      /* ── Utility buttons (Expand/Collapse All) ── */
+      /* Chip group label */
+      .coa-chip-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        margin-right: 2px;
+      }
+
+      /* Filter chips */
+      .coa-chip-group {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .coa-chip {
+        height: 32px;
+        padding: 0 13px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 20px;
+        background: #fff;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all .14s;
+        font-family: Inter, sans-serif;
+        white-space: nowrap;
+      }
+      .coa-chip:hover { border-color: #93c5fd; color: #1e40af; background: #f0f7ff; }
+      .coa-chip.active {
+        border-color: #3b82f6;
+        background: #eff6ff;
+        color: #1d4ed8;
+        box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+      }
+      .coa-chip-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: .7;
+      }
+
+      /* Divider between chip groups */
+      .coa-chip-sep {
+        width: 1px;
+        height: 20px;
+        background: #e2e8f0;
+        flex-shrink: 0;
+        margin: 0 2px;
+      }
+
+      /* Utility buttons (Expand/Collapse) */
       .coa-util-btn {
-        height:40px; padding:0 14px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b;
-        border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; display:flex;
-        align-items:center; gap:6px; font-family:Inter,sans-serif; transition:all .13s;
+        height: 32px; padding: 0 12px; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b;
+        border-radius: 20px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: flex;
+        align-items: center; gap: 5px; font-family: Inter,sans-serif; transition: all .13s;
+        white-space: nowrap;
       }
-      .coa-util-btn:hover { background:#f8fafc; border-color:#cbd5e1; color:#475569; }
+      .coa-util-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
 
-      /* ── Filter Panel ── */
-      .coa-filter-panel {
-        background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:16px; padding:16px 20px;
-        margin-bottom:20px; animation:coaSlideDown .15s ease-out; width:100%; box-sizing:border-box;
+      /* Clear all filters link */
+      .coa-chip-clear-all {
+        height: 32px; padding: 0 12px;
+        border: none; background: transparent;
+        font-size: 12px; font-weight: 600; color: #ef4444;
+        cursor: pointer; font-family: Inter,sans-serif;
+        display: none; align-items: center; gap: 4px;
+        border-radius: 20px; transition: background .13s;
       }
-      @keyframes coaSlideDown {
-        from { opacity:0; transform:translateY(-8px); }
-        to { opacity:1; transform:translateY(0); }
-      }
-      .coa-filter-row { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
-      .coa-filter-fg { display:flex; flex-direction:column; gap:5px; }
-      .coa-filter-label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
-      .coa-filter-sel {
-        height:38px; padding:0 10px; border:1.5px solid #e2e8f0; border-radius:9px;
-        font-size:13px; font-family:Inter,sans-serif; color:#334155; background:#fff;
-        outline:none; min-width:150px; cursor:pointer;
-      }
-      .coa-filter-sel:focus { border-color:#60a5fa; }
-      .coa-filter-chk { width:16px; height:16px; border-radius:4px; border:1.5px solid #cbd5e1; cursor:pointer; }
-      .coa-filter-chk-label { font-size:13px; font-weight:600; color:#475569; cursor:pointer; user-select:none; }
-      .coa-clear-btn {
-        height:38px; padding:0 14px; border:1.5px solid #fca5a5; background:#fff; color:#dc2626;
-        border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; font-family:Inter,sans-serif;
-        transition:all .12s; margin-left:auto; display:flex; align-items:center; gap:4px;
-      }
-      .coa-clear-btn:hover { background:#fee2e2; }
+      .coa-chip-clear-all.visible { display: flex; }
+      .coa-chip-clear-all:hover { background: #fef2f2; }
 
       /* ── Type toggle slider ── */
       .coa-slider-wrap {
@@ -5129,6 +6921,7 @@
       close();
       renderChartPanel();
       refreshAllReports();
+      triggerAutoBackup();
     });
 
     // ── enter key in name → save ──
@@ -5153,123 +6946,163 @@
     let treeHtml = '';
     for (const mg of COA_MAIN_GROUPS) treeHtml += _coaRenderMg(mg, q);
 
+    // Count matching ledgers for the result badge
+    const _coaMatchCount = (() => {
+      if (!q && !_coaFilterMg && !_coaFilterType && !_coaFilterBal) return null;
+      return coaLedgers.filter(l => {
+        if (_coaFilterType && l.type !== _coaFilterType) return false;
+        if (_coaFilterBal && (l.type !== 'ledger' || !parseFloat(l.openingBalance || 0))) return false;
+        if (_coaFilterMg) {
+          const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
+          if (!sg || sg.main !== _coaFilterMg) return false;
+        }
+        if (q) {
+          const nm = l.name.toLowerCase().includes(q);
+          const cd = (l.code || '').toLowerCase().includes(q);
+          if (!nm && !cd) return false;
+        }
+        return true;
+      }).length;
+    })();
+    const hasActiveFilters = _coaFilterMg || _coaFilterType || _coaFilterBal;
+
     wrap.innerHTML = `
-      <div class="coa-toolbar">
-        <div class="coa-tb-left">
-          <div class="pt-search-wrap" style="flex:1;max-width:320px">
-            <svg class="pt-search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <input class="pt-search-inp" id="coaSearch" placeholder="Search accounts, groups, codes…" value="${_coaSearch.replace(/"/g,'&quot;')}">
+      <!-- ══ MODERN SEARCH HERO ══ -->
+      <div class="coa-search-hero">
+
+        <!-- Row 1: Search bar + Add button -->
+        <div class="coa-search-top">
+          <div class="coa-si-wrap">
+            <span class="coa-si-icon">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+                <circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M11.5 11.5l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <input
+              class="coa-si-inp"
+              id="coaSearch"
+              type="text"
+              placeholder="Search accounts, groups, codes…"
+              value="${_coaSearch.replace(/"/g,'&quot;')}"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button class="coa-si-clear ${_coaSearch ? 'visible' : ''}" id="coaSearchClear" title="Clear search" tabindex="-1">✕</button>
           </div>
-          <button class="coa-filter-toggle-btn ${_coaFilterOpen ? 'active' : ''}" id="coaFilterToggle">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 3h12M3 7h8M5 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+
+          <!-- Live result badge (shown when filtering) -->
+          <div class="coa-result-badge ${_coaMatchCount !== null ? 'visible' : ''}" id="coaResultBadge">
+            <span class="coa-result-dot"></span>
+            ${_coaMatchCount !== null ? `${_coaMatchCount} result${_coaMatchCount !== 1 ? 's' : ''}` : ''}
+          </div>
+
+          <button class="coa-tb-add" id="coaTbAdd">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            Filter${(_coaFilterMg || _coaFilterType || _coaFilterBal) ? ' ●' : ''}
+            Add Ledger
           </button>
-          <button class="coa-util-btn" id="coaExpandAll" title="Expand All">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        </div>
+
+        <!-- Row 2: Filter chips + Expand/Collapse + Clear All -->
+        <div class="coa-search-bottom">
+          <span class="coa-chip-label">Group</span>
+          <div class="coa-chip-group" id="coaChipGroupMg">
+            <button class="coa-chip ${_coaFilterMg===''?'active':''}" data-mg-chip="">All</button>
+            <button class="coa-chip ${_coaFilterMg==='assets'?'active':''}" data-mg-chip="assets"><span class="coa-chip-dot" style="background:#3b82f6"></span>Assets</button>
+            <button class="coa-chip ${_coaFilterMg==='equity-liabilities'?'active':''}" data-mg-chip="equity-liabilities"><span class="coa-chip-dot" style="background:#8b5cf6"></span>Equity & Liab.</button>
+            <button class="coa-chip ${_coaFilterMg==='income'?'active':''}" data-mg-chip="income"><span class="coa-chip-dot" style="background:#10b981"></span>Income</button>
+            <button class="coa-chip ${_coaFilterMg==='expense'?'active':''}" data-mg-chip="expense"><span class="coa-chip-dot" style="background:#f59e0b"></span>Expense</button>
+          </div>
+
+          <div class="coa-chip-sep"></div>
+
+          <span class="coa-chip-label">Type</span>
+          <div class="coa-chip-group" id="coaChipGroupType">
+            <button class="coa-chip ${_coaFilterType===''?'active':''}" data-type-chip="">All</button>
+            <button class="coa-chip ${_coaFilterType==='ledger'?'active':''}" data-type-chip="ledger">Ledger</button>
+            <button class="coa-chip ${_coaFilterType==='group-ledger'?'active':''}" data-type-chip="group-ledger">Group Ledger</button>
+          </div>
+
+          <div class="coa-chip-sep"></div>
+
+          <button class="coa-chip ${_coaFilterBal?'active':''}" id="coaChipBal">
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+              <path d="M2 7l3.5 3.5L12 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Has Balance
+          </button>
+
+          <div class="coa-chip-sep"></div>
+
+          <button class="coa-util-btn" id="coaExpandAll">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
             Expand All
           </button>
-          <button class="coa-util-btn" id="coaCollapseAll" title="Collapse All">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
+          <button class="coa-util-btn" id="coaCollapseAll">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
             Collapse All
           </button>
+
+          <button class="coa-chip-clear-all ${hasActiveFilters || _coaSearch ? 'visible' : ''}" id="coaClearAll">✕ Clear All</button>
         </div>
-        <button class="coa-tb-add" id="coaTbAdd">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          Add Ledger
-        </button>
       </div>
 
-      <!-- Collapsible Filter panel -->
-      <div class="coa-filter-panel" id="coaFilterPanel" style="${_coaFilterOpen ? '' : 'display:none'}">
-        <div class="coa-filter-row">
-          <div class="coa-filter-fg">
-            <span class="coa-filter-label">Main Group</span>
-            <select class="coa-filter-sel" id="coaFilterMg">
-              <option value="" ${_coaFilterMg===''?'selected':''}>All Groups</option>
-              <option value="assets" ${_coaFilterMg==='assets'?'selected':''}>Assets</option>
-              <option value="equity-liabilities" ${_coaFilterMg==='equity-liabilities'?'selected':''}>Equity and Liabilities</option>
-              <option value="income" ${_coaFilterMg==='income'?'selected':''}>Income</option>
-              <option value="expense" ${_coaFilterMg==='expense'?'selected':''}>Expense</option>
-            </select>
-          </div>
-          <div class="coa-filter-fg">
-            <span class="coa-filter-label">Account Type</span>
-            <select class="coa-filter-sel" id="coaFilterType">
-              <option value="" ${_coaFilterType===''?'selected':''}>All Types</option>
-              <option value="ledger" ${_coaFilterType==='ledger'?'selected':''}>Ledger Only</option>
-              <option value="group-ledger" ${_coaFilterType==='group-ledger'?'selected':''}>Group Ledger Only</option>
-            </select>
-          </div>
-          <div class="coa-filter-fg" style="flex-direction:row; align-items:center; gap:8px; margin-top:20px; cursor:pointer;">
-            <input type="checkbox" id="coaFilterBal" class="coa-filter-chk" ${_coaFilterBal?'checked':''}>
-            <label for="coaFilterBal" class="coa-filter-chk-label">Has Opening Balance</label>
-          </div>
-          <button class="coa-clear-btn" id="coaClearFilters">✕ Clear Filters</button>
+      <div class="coa-tree">${treeHtml || `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:14px;">
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <circle cx="26" cy="26" r="25" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1.5"/>
+            <circle cx="22" cy="22" r="9" stroke="#94a3b8" stroke-width="2"/>
+            <path d="M29 29l8 8" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p style="font-size:15px;font-weight:700;color:#475569;margin:0">No accounts found</p>
+          <p style="font-size:13px;color:#94a3b8;margin:0;text-align:center">Try a different search term or clear your filters</p>
         </div>
-      </div>
-      
-      <div class="coa-tree">${treeHtml || '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px">No accounts match your search or filters.</div>'}</div>`;
+      `}</div>`;
 
     // ── Wire events ────────────────────────────────────────────────
-    // Toolbar Add Ledger
+
+    // Add Ledger
     wrap.querySelector('#coaTbAdd').addEventListener('click', () => showCoaModal('', ''));
 
-    // Search
-    wrap.querySelector('#coaSearch').addEventListener('input', e => { _coaSearch = e.target.value; renderChartPanel(); });
+    // Search input – live filter
+    const coaInp = wrap.querySelector('#coaSearch');
+    coaInp.addEventListener('input', e => { _coaSearch = e.target.value; renderChartPanel(); });
 
-    // Filter toggle
-    const filterToggle = wrap.querySelector('#coaFilterToggle');
-    if (filterToggle) {
-      filterToggle.addEventListener('click', () => {
-        _coaFilterOpen = !_coaFilterOpen;
+    // Clear search button
+    const coaClearBtn = wrap.querySelector('#coaSearchClear');
+    coaClearBtn.addEventListener('click', () => { _coaSearch = ''; renderChartPanel(); });
+
+    // Group filter chips
+    wrap.querySelectorAll('[data-mg-chip]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _coaFilterMg = btn.dataset.mgChip;
         renderChartPanel();
       });
-    }
+    });
 
-    // Filter Mg
-    const filterMg = wrap.querySelector('#coaFilterMg');
-    if (filterMg) {
-      filterMg.addEventListener('change', e => {
-        _coaFilterMg = e.target.value;
+    // Type filter chips
+    wrap.querySelectorAll('[data-type-chip]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _coaFilterType = btn.dataset.typeChip;
         renderChartPanel();
       });
-    }
+    });
 
-    // Filter Type
-    const filterType = wrap.querySelector('#coaFilterType');
-    if (filterType) {
-      filterType.addEventListener('change', e => {
-        _coaFilterType = e.target.value;
-        renderChartPanel();
-      });
-    }
+    // Has-Balance chip toggle
+    const chipBal = wrap.querySelector('#coaChipBal');
+    chipBal.addEventListener('click', () => { _coaFilterBal = !_coaFilterBal; renderChartPanel(); });
 
-    // Filter Balance
-    const filterBal = wrap.querySelector('#coaFilterBal');
-    if (filterBal) {
-      filterBal.addEventListener('change', e => {
-        _coaFilterBal = e.target.checked;
-        renderChartPanel();
-      });
-    }
-
-    // Clear Filters
-    const clearFilters = wrap.querySelector('#coaClearFilters');
-    if (clearFilters) {
-      clearFilters.addEventListener('click', () => {
-        _coaFilterMg = '';
-        _coaFilterType = '';
-        _coaFilterBal = false;
-        renderChartPanel();
-      });
-    }
+    // Clear All
+    const clearAll = wrap.querySelector('#coaClearAll');
+    clearAll.addEventListener('click', () => {
+      _coaSearch = '';
+      _coaFilterMg = '';
+      _coaFilterType = '';
+      _coaFilterBal = false;
+      renderChartPanel();
+    });
 
     // Expand All
     const expandAll = wrap.querySelector('#coaExpandAll');
@@ -5336,6 +7169,7 @@
           showToast(`${isGl ? 'Group Ledger' : 'Ledger'} "${ldg.name}" deleted.`, 'info');
           renderChartPanel();
           refreshAllReports();
+          triggerAutoBackup();
         });
       });
     });
@@ -6479,15 +8313,15 @@
   if (trialColToggleBtn && trialColDropdown) {
     trialColToggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const isHidden = trialColDropdown.style.display === 'none';
-      trialColDropdown.style.display = isHidden ? 'flex' : 'none';
+      trialColDropdown.classList.toggle('open');
     });
 
     document.addEventListener('click', (e) => {
       if (!trialColDropdown.contains(e.target) && e.target !== trialColToggleBtn) {
-        trialColDropdown.style.display = 'none';
+        trialColDropdown.classList.remove('open');
       }
     });
+
 
     ['gl', 'sg', 'mg', 'plbs'].forEach(col => {
       const chk = document.getElementById(`col-${col}-check`);
@@ -6513,9 +8347,1653 @@
   });
 
   // ── Bootstrap ─────────────────────────────────────────────────────
+  loadKyaDataOnStartup();
   initFormDefaults();
   syncGlobalDates(_globalDateFrom, _globalDateTo);
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  ONEHUB — HR MODULE  (Departments & Employees)
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── Data ──────────────────────────────────────────────────────────
+  let ohDepartments = [];   // { id, name, headEmpId }
+  let ohEmployees   = [];   // { id, code, name, designation, deptId, joiningDate, salary, pan, phone, email, address }
+  let _ohDeptCtr    = 1;
+  let _ohEmpCtr     = 1;
+
+  // ── UI State ──────────────────────────────────────────────────────
+  let _ohActiveTab     = '';  // empty by default (no tab open on load)
+  let _ohEmpSearch     = '';
+  let _ohEmpDeptFilter = '';      // '' = all, or dept id string
+
+  // ── HTML-escape helper ────────────────────────────────────────────
+  function ohEsc(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Data helpers ──────────────────────────────────────────────────
+  function ohGetDeptEmps(deptId) { return ohEmployees.filter(e => e.deptId === deptId); }
+  function ohGetEmpById(id)      { return ohEmployees.find(e => e.id === id); }
+  function ohGetDeptById(id)     { return ohDepartments.find(d => d.id === id); }
+  function ohInitials(name) {
+    if (!name) return '?';
+    return name.trim().split(/\s+/).slice(0,2).map(w => w[0].toUpperCase()).join('');
+  }
+  function ohAutoCode() { return 'EMP-' + String(_ohEmpCtr).padStart(3,'0'); }
+  function ohFmtSalary(v) {
+    if (v === null || v === undefined || v === '') return '\u2014';
+    return '\u20B9\u202F' + Number(v).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  // ── Entry point (called by switchToActivePanel) ───────────────────
+  // Upcoming module configs
+  const OH_UPCOMING = {
+    budget: {
+      label: 'Budget',
+      icon: `<svg width="38" height="38" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M7 10h6M7 13h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M10 4V2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>`,
+      desc: 'Plan and track departmental budgets, set spending caps, and monitor variance against actuals.',
+      features: ['Budget Allocation', 'Spend Tracking', 'Variance Reports', 'Approval Workflows'],
+    },
+    paytrack: {
+      label: 'PayTrack',
+      icon: `<svg width="38" height="38" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10 5.5v1.2M10 13.3v1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M8 8c0-.8.9-1.5 2-1.5s2 .7 2 1.5-1 1.3-2 1.5-2 .7-2 1.5.9 1.5 2 1.5 2-.7 2-1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      </svg>`,
+      desc: 'Manage employee payroll, salaries, deductions, and generate payslips — all from one place.',
+      features: ['Payroll Processing', 'Salary Slips', 'TDS & Deductions', 'Pay History'],
+    },
+    underledger: {
+      label: 'Under Ledger',
+      icon: `<svg width="38" height="38" viewBox="0 0 20 20" fill="none">
+        <path d="M4 5h12M4 9h8M4 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="16" cy="13" r="3.5" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M15 13h2M16 12v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>`,
+      desc: 'Link employees and departments directly to ledger accounts for seamless cost-centre accounting.',
+      features: ['Ledger Mapping', 'Cost Centres', 'Department P&L', 'Auto Journal Lines'],
+    },
+  };
+
+  function renderOneHubPanel() {
+    updateOhBadges();
+    
+    // Switch to active tab (or empty state if not set)
+    switchOhTab(_ohActiveTab);
+
+    // Wire all 5 tabs (once)
+    const tabMap = {
+      ohTabDept:        'dept',
+      ohTabEmp:         'emp',
+      ohTabBudget:      'budget',
+      ohTabPaytrack:    'paytrack',
+      ohTabUnderLedger: 'underledger',
+    };
+    Object.entries(tabMap).forEach(([btnId, tab]) => {
+      const btn = document.getElementById(btnId);
+      if (btn && !btn._ohWired) {
+        btn._ohWired = true;
+        btn.addEventListener('click', () => switchOhTab(tab));
+      }
+    });
+  }
+
+  function switchOhTab(tab) {
+    _ohActiveTab = tab;
+
+    // All tab IDs → which tab key they represent
+    const allTabs = [
+      ['ohTabDept',        'dept'],
+      ['ohTabEmp',         'emp'],
+      ['ohTabBudget',      'budget'],
+      ['ohTabPaytrack',    'paytrack'],
+      ['ohTabUnderLedger', 'underledger'],
+    ];
+    const allViews = [
+      ['oh-dept-view',        'dept'],
+      ['oh-emp-view',         'emp'],
+      ['oh-budget-view',      'budget'],
+      ['oh-paytrack-view',    'paytrack'],
+      ['oh-underledger-view', 'underledger'],
+      ['oh-empty-view',       ''],
+    ];
+
+    allTabs.forEach(([btnId, t]) => {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      const isActive = t === tab;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive);
+    });
+    allViews.forEach(([viewId, t]) => {
+      const view = document.getElementById(viewId);
+      if (view) view.style.display = t === tab ? '' : 'none';
+    });
+
+    updateOhHeaderBtn();
+    if (tab === 'dept')        renderOhDeptView();
+    else if (tab === 'emp')    renderOhEmpView();
+    else if (tab)              _renderOhUpcomingView(tab);
+  }
+
+  function _renderOhUpcomingView(key) {
+    const viewIdMap = {
+      budget:      'oh-budget-view',
+      paytrack:    'oh-paytrack-view',
+      underledger: 'oh-underledger-view',
+    };
+    const wrap = document.getElementById(viewIdMap[key]);
+    if (!wrap) return;
+    const cfg = OH_UPCOMING[key];
+    if (!cfg) return;
+
+    const featureTags = cfg.features
+      .map(f => `<span class="oh-upcoming-feat-tag">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M2 6l3 3 5-5" stroke="#10b981" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        ${f}
+      </span>`)
+      .join('');
+
+    wrap.innerHTML = `
+      <div class="oh-upcoming-wrap">
+        <div class="oh-upcoming-icon-ring" style="color:#b45309;">
+          ${cfg.icon}
+        </div>
+        <div class="oh-upcoming-title">${cfg.label}</div>
+        <div class="oh-upcoming-subtitle">${cfg.desc}</div>
+        <div class="oh-upcoming-pill">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Upcoming Feature
+        </div>
+        <div class="oh-upcoming-features">${featureTags}</div>
+      </div>
+    `;
+  }
+
+  function updateOhBadges() {
+    const db = document.getElementById('ohDeptBadge');
+    const eb = document.getElementById('ohEmpBadge');
+    if (db) db.textContent = ohDepartments.length;
+    if (eb) eb.textContent = ohEmployees.length;
+  }
+
+  function updateOhHeaderBtn() {
+    const wrap = document.getElementById('ohHeaderActions');
+    if (!wrap) return;
+    if (_ohActiveTab === 'dept') {
+      wrap.innerHTML = `
+        <button class="btn btn-primary" id="ohAddDeptBtn" aria-label="Add Department">
+          <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Add Department
+        </button>`;
+      document.getElementById('ohAddDeptBtn')?.addEventListener('click', () => openOhDeptModal());
+    } else if (_ohActiveTab === 'emp') {
+      wrap.innerHTML = `
+        <button class="btn btn-primary" id="ohAddEmpBtn" aria-label="Add Employee">
+          <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Add Employee
+        </button>`;
+      document.getElementById('ohAddEmpBtn')?.addEventListener('click', () => openOhEmpModal());
+    } else {
+      // Upcoming feature tabs — no action button
+      wrap.innerHTML = '';
+    }
+  }
+
+
+  // ════════════════════════════════════
+  //  DEPARTMENTS VIEW
+  // ════════════════════════════════════
+  function renderOhDeptView() {
+    const wrap = document.getElementById('ohDeptViewInner');
+    if (!wrap) return;
+
+    const totalDepts = ohDepartments.length;
+    const totalEmps  = ohEmployees.length;
+    const unassigned = ohEmployees.filter(e => !e.deptId || !ohGetDeptById(e.deptId)).length;
+
+    let html = `
+      <div class="oh-stats-row">
+        <div class="oh-stat">
+          <div class="oh-stat-icon" style="background:#dbeafe;">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="color:#2563eb;">
+              <rect x="2" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M6 6V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="oh-stat-label">Departments</div>
+          <div class="oh-stat-value">${totalDepts}</div>
+          <div class="oh-stat-sub">${totalDepts === 0 ? 'None created yet' : totalDepts + ' total'}</div>
+        </div>
+        <div class="oh-stat">
+          <div class="oh-stat-icon" style="background:#d1fae5;">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="color:#059669;">
+              <circle cx="10" cy="6" r="3.5" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M3 18c0-4 3.1-7 7-7s7 3 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="oh-stat-label">Employees</div>
+          <div class="oh-stat-value">${totalEmps}</div>
+          <div class="oh-stat-sub">${totalEmps === 0 ? 'None added yet' : totalEmps + ' total'}</div>
+        </div>
+        <div class="oh-stat">
+          <div class="oh-stat-icon" style="background:#fef3c7;">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="color:#d97706;">
+              <path d="M10 9v4M10 15h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <path d="M2 16L10 3l8 13H2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="oh-stat-label">Unassigned</div>
+          <div class="oh-stat-value">${unassigned}</div>
+          <div class="oh-stat-sub">${unassigned === 0 ? 'All assigned \u2713' : 'Need assignment'}</div>
+        </div>
+      </div>`;
+
+    if (ohDepartments.length === 0) {
+      html += `
+        <div class="oh-empty">
+          <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+            <rect x="10" y="20" width="40" height="30" rx="5" fill="#dbeafe" stroke="#93c5fd" stroke-width="2"/>
+            <path d="M20 20V14a4 4 0 014-4h12a4 4 0 014 4v6" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+            <path d="M24 35h12M30 30v10" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <div class="oh-empty-title">No departments yet</div>
+          <div class="oh-empty-desc">Create your first department to start organising your team hierarchy.</div>
+        </div>`;
+    } else {
+      html += `<div class="oh-dept-grid">`;
+      ohDepartments.forEach(dept => {
+        const emps     = ohGetDeptEmps(dept.id);
+        const head     = dept.headEmpId ? ohGetEmpById(dept.headEmpId) : null;
+        const preview  = emps.slice(0, 3);
+        const overflow = emps.length - 3;
+        html += `
+          <div class="oh-dept-card">
+            <div class="oh-dept-card-top">
+              <div class="oh-dept-name">${ohEsc(dept.name)}</div>
+              <div class="oh-dept-head-row">
+                ${head
+                  ? `<div class="oh-dept-head-avatar">${ohInitials(head.name)}</div>
+                     <span>Head: <span class="oh-dept-head-name">${ohEsc(head.name)}</span></span>`
+                  : `<span class="oh-dept-no-head">\u2014 No head assigned \u2014</span>`}
+              </div>
+            </div>
+            <div class="oh-dept-card-mid">
+              <div class="oh-dept-emp-count">${emps.length} Employee${emps.length !== 1 ? 's' : ''}</div>
+              <div class="oh-dept-emp-list">
+                ${preview.map(e => `
+                  <div class="oh-dept-emp-item">
+                    <span class="oh-dept-emp-dot"></span>
+                    <span>${ohEsc(e.name)}${e.designation ? ` <span style="color:var(--slate-400);font-size:11px;">(${ohEsc(e.designation)})</span>` : ''}</span>
+                  </div>`).join('')}
+                ${overflow > 0 ? `<div class="oh-dept-overflow" data-dept-detail="${dept.id}">+${overflow} more&hellip;</div>` : ''}
+                ${emps.length === 0 ? `<div style="font-size:12px;color:var(--slate-300);font-style:italic;">No employees assigned</div>` : ''}
+              </div>
+            </div>
+            <div class="oh-dept-card-actions">
+              <button class="oh-action-btn primary oh-dept-detail-btn" data-id="${dept.id}">
+                <svg viewBox="0 0 12 12" fill="none"><path d="M1 6s1.8-4 5-4 5 4 5 4-1.8 4-5 4-5-4-5-4z" stroke="currentColor" stroke-width="1.3"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+                View
+              </button>
+              <button class="oh-action-btn oh-dept-edit-btn" data-id="${dept.id}">
+                <svg viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5l2 2-7 7H1.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Edit
+              </button>
+              <button class="oh-action-btn danger oh-dept-del-btn" data-id="${dept.id}" style="margin-left:auto;">
+                <svg viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M4.5 5v4M7.5 5v4M3 3l.7 7h4.6L9 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Delete
+              </button>
+            </div>
+          </div>`;
+      });
+      html += `</div>`;
+    }
+
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('.oh-dept-edit-btn').forEach(btn =>
+      btn.addEventListener('click', () => openOhDeptModal(Number(btn.dataset.id))));
+    wrap.querySelectorAll('.oh-dept-del-btn').forEach(btn =>
+      btn.addEventListener('click', () => deleteOhDept(Number(btn.dataset.id))));
+    wrap.querySelectorAll('.oh-dept-detail-btn').forEach(btn =>
+      btn.addEventListener('click', () => openOhDeptDetail(Number(btn.dataset.id))));
+    wrap.querySelectorAll('.oh-dept-overflow').forEach(el =>
+      el.addEventListener('click', () => openOhDeptDetail(Number(el.dataset.deptDetail))));
+  }
+
+
+  // ════════════════════════════════════
+  //  EMPLOYEES VIEW
+  // ════════════════════════════════════
+  function renderOhEmpView() {
+    const wrap = document.getElementById('ohEmpViewInner');
+    if (!wrap) return;
+
+    let filtered = ohEmployees.filter(emp => {
+      if (_ohEmpDeptFilter && emp.deptId !== Number(_ohEmpDeptFilter)) return false;
+      if (_ohEmpSearch) {
+        const q = _ohEmpSearch.toLowerCase();
+        const hay = [emp.name, emp.code, emp.designation, emp.phone, emp.email].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const deptOptions = ohDepartments.map(d =>
+      `<option value="${d.id}" ${String(d.id) === String(_ohEmpDeptFilter) ? 'selected' : ''}>${ohEsc(d.name)}</option>`
+    ).join('');
+
+    let html = `
+      <div class="oh-emp-toolbar">
+        <div class="oh-search-wrap">
+          <svg viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <input id="ohEmpSearch" placeholder="Search by name, code, designation, phone&hellip;" value="${_ohEmpSearch.replace(/"/g,'&quot;')}">
+        </div>
+        <select class="oh-filter-sel" id="ohDeptFilter">
+          <option value="">All Departments</option>
+          ${deptOptions}
+        </select>
+      </div>
+      <div class="oh-table-card">`;
+
+    if (filtered.length === 0) {
+      html += `
+        <div class="oh-empty">
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+            <circle cx="28" cy="18" r="10" fill="#dbeafe" stroke="#93c5fd" stroke-width="2"/>
+            <path d="M8 48c0-10 9-18 20-18s20 8 20 18" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <div class="oh-empty-title">${ohEmployees.length ? 'No employees match your filter' : 'No employees yet'}</div>
+          <div class="oh-empty-desc">${ohEmployees.length ? 'Try adjusting your search or department filter.' : 'Add your first employee using the button above.'}</div>
+        </div>`;
+    } else {
+      html += `
+        <table class="oh-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Code</th>
+              <th>Name &amp; Designation</th>
+              <th>Department</th>
+              <th>Phone</th>
+              <th>Joining Date</th>
+              <th>Salary</th>
+              <th style="text-align:center;width:100px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map((emp, i) => {
+              const dept   = emp.deptId ? ohGetDeptById(emp.deptId) : null;
+              const isHead = dept && dept.headEmpId === emp.id;
+              return `
+                <tr data-emp-id="${emp.id}">
+                  <td style="color:var(--slate-400);font-size:12px;font-weight:600;">${i+1}</td>
+                  <td><span class="oh-emp-code">${ohEsc(emp.code)}</span></td>
+                  <td>
+                    <div class="oh-emp-name">${ohEsc(emp.name)}</div>
+                    ${emp.designation ? `<div style="font-size:11.5px;color:var(--slate-400);margin-top:2px;">${ohEsc(emp.designation)}</div>` : ''}
+                  </td>
+                  <td>${dept ? `<span class="oh-dept-chip">${ohEsc(dept.name)}${isHead ? ' \uD83D\uDC51' : ''}</span>` : `<span class="oh-no-dept-chip">Unassigned</span>`}</td>
+                  <td style="white-space:nowrap;">${ohEsc(emp.phone || '\u2014')}</td>
+                  <td style="white-space:nowrap;">${ohEsc(emp.joiningDate || '\u2014')}</td>
+                  <td style="font-weight:600;">${ohFmtSalary(emp.salary)}</td>
+                  <td style="text-align:center;white-space:nowrap;">
+                    <button class="oh-action-btn primary oh-emp-edit-btn" data-id="${emp.id}" title="Edit">Edit</button>
+                    <button class="oh-action-btn danger oh-emp-del-btn" data-id="${emp.id}" title="Delete" style="margin-left:4px;">
+                      <svg viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M4.5 5v4M7.5 5v4M3 3l.7 7h4.6L9 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    html += `</div>`;
+    wrap.innerHTML = html;
+
+    const srch = document.getElementById('ohEmpSearch');
+    if (srch) srch.addEventListener('input', e => { _ohEmpSearch = e.target.value; renderOhEmpView(); });
+    const deptF = document.getElementById('ohDeptFilter');
+    if (deptF) deptF.addEventListener('change', e => { _ohEmpDeptFilter = e.target.value; renderOhEmpView(); });
+
+    wrap.querySelectorAll('.oh-emp-edit-btn').forEach(btn =>
+      btn.addEventListener('click', () => openOhEmpModal(Number(btn.dataset.id))));
+    wrap.querySelectorAll('.oh-emp-del-btn').forEach(btn =>
+      btn.addEventListener('click', () => deleteOhEmp(Number(btn.dataset.id))));
+  }
+
+
+  // ════════════════════════════════════
+  //  DEPARTMENT MODAL  (Add / Edit)
+  // ════════════════════════════════════
+  let _ohDeptModalEditId = null;
+
+  function openOhDeptModal(editId) {
+    _ohDeptModalEditId = editId || null;
+    const dept = editId ? ohGetDeptById(editId) : null;
+
+    const empOptions = ohEmployees.map(e =>
+      `<option value="${e.id}" ${dept && dept.headEmpId === e.id ? 'selected' : ''}>${ohEsc(e.name)}${e.designation ? ' \u2013 ' + ohEsc(e.designation) : ''}</option>`
+    ).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'oh-modal-overlay';
+    overlay.id = 'ohDeptModal';
+    overlay.innerHTML = `
+      <div class="oh-modal-card" role="dialog" aria-modal="true">
+        <div class="oh-modal-hdr">
+          <div class="oh-modal-title">${dept ? 'Edit Department' : 'New Department'}</div>
+          <button class="oh-modal-close" id="ohDeptModalClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="oh-fg">
+          <label class="oh-label" for="ohDeptName">Department Name <span class="req">*</span></label>
+          <input class="oh-input" id="ohDeptName" type="text" placeholder="e.g. Engineering, Finance, HR&hellip;" value="${dept ? ohEsc(dept.name) : ''}" autocomplete="off">
+        </div>
+        <div class="oh-fg">
+          <label class="oh-label" for="ohDeptHead">Department Head</label>
+          <select class="oh-select" id="ohDeptHead">
+            <option value="">&mdash; No head assigned &mdash;</option>
+            ${empOptions}
+          </select>
+          ${ohEmployees.length === 0 ? '<div class="oh-input-hint">\u26A0 No employees available. Add employees first to assign a head.</div>' : ''}
+        </div>
+        <div class="oh-modal-btns">
+          <button class="oh-btn-cancel" id="ohDeptCancelBtn">Cancel</button>
+          <button class="oh-btn-save" id="ohDeptSaveBtn">${dept ? 'Save Changes' : 'Create Department'}</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.getElementById('ohDeptModalClose').addEventListener('click', closeOhDeptModal);
+    document.getElementById('ohDeptCancelBtn').addEventListener('click', closeOhDeptModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeOhDeptModal(); });
+    document.getElementById('ohDeptSaveBtn').addEventListener('click', saveOhDept);
+    const nameInp = document.getElementById('ohDeptName');
+    nameInp.focus();
+    nameInp.addEventListener('keydown', e => { if (e.key === 'Enter') saveOhDept(); });
+  }
+
+  function closeOhDeptModal() {
+    document.getElementById('ohDeptModal')?.remove();
+    _ohDeptModalEditId = null;
+  }
+
+  function saveOhDept() {
+    const nameInp = document.getElementById('ohDeptName');
+    const headSel = document.getElementById('ohDeptHead');
+    const name = nameInp.value.trim();
+
+    if (!name) {
+      nameInp.classList.add('error');
+      nameInp.focus();
+      setTimeout(() => nameInp.classList.remove('error'), 1500);
+      return;
+    }
+
+    const dup = ohDepartments.find(d => d.name.toLowerCase() === name.toLowerCase() && d.id !== _ohDeptModalEditId);
+    if (dup) {
+      nameInp.classList.add('error');
+      showToast(`Department "${name}" already exists.`, 'error');
+      setTimeout(() => nameInp.classList.remove('error'), 1500);
+      return;
+    }
+
+    const headId = headSel.value ? Number(headSel.value) : null;
+
+    if (_ohDeptModalEditId) {
+      const dept = ohGetDeptById(_ohDeptModalEditId);
+      if (dept) { dept.name = name; dept.headEmpId = headId; }
+      showToast('Department updated successfully.', 'success');
+    } else {
+      ohDepartments.push({ id: _ohDeptCtr++, name, headEmpId: headId });
+      showToast(`Department "${name}" created.`, 'success');
+    }
+
+    closeOhDeptModal();
+    updateOhBadges();
+    renderOhDeptView();
+    triggerAutoBackup();
+  }
+
+  function deleteOhDept(id) {
+    const dept = ohGetDeptById(id);
+    if (!dept) return;
+    const empCount = ohGetDeptEmps(id).length;
+    if (empCount > 0) {
+      showToast(`Cannot delete "${dept.name}" \u2014 it has ${empCount} employee${empCount > 1 ? 's' : ''}. Transfer or remove them first.`, 'error');
+      return;
+    }
+    showKyaConfirm({
+      title: 'Delete Department?',
+      message: `Permanently delete <strong>${ohEsc(dept.name)}</strong>?<br>This action cannot be undone.`,
+      confirmLabel: '\u2715 Delete',
+      iconBg: '#fee2e2', iconColor: '#dc2626',
+      iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      okBg: '#dc2626',
+      onConfirm: () => {
+        ohDepartments = ohDepartments.filter(d => d.id !== id);
+        showToast(`Department "${dept.name}" deleted.`, 'success');
+        updateOhBadges();
+        renderOhDeptView();
+        triggerAutoBackup();
+      }
+    });
+  }
+
+
+  // ════════════════════════════════════
+  //  EMPLOYEE MODAL  (Add / Edit)
+  // ════════════════════════════════════
+  let _ohEmpModalEditId = null;
+  let _ohEmpCodeMode = 'auto';
+
+  function openOhEmpModal(editId) {
+    _ohEmpModalEditId = editId || null;
+    const emp = editId ? ohGetEmpById(editId) : null;
+    _ohEmpCodeMode = 'auto';
+
+    const deptOptions = ohDepartments.map(d =>
+      `<option value="${d.id}" ${emp && emp.deptId === d.id ? 'selected' : ''}>${ohEsc(d.name)}</option>`
+    ).join('');
+
+    const autoCode = emp ? emp.code : ohAutoCode();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'oh-modal-overlay';
+    overlay.id = 'ohEmpModal';
+    overlay.innerHTML = `
+      <div class="oh-modal-card" role="dialog" aria-modal="true">
+        <div class="oh-modal-hdr">
+          <div class="oh-modal-title">${emp ? 'Edit Employee' : 'New Employee'}</div>
+          <button class="oh-modal-close" id="ohEmpModalClose" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="oh-modal-section-title">Basic Information</div>
+
+        <div class="oh-fg">
+          <label class="oh-label">Employee Code <span class="req">*</span></label>
+          <div class="oh-code-toggle">
+            <button class="oh-code-mode-btn active" id="ohCodeAuto" type="button">Auto</button>
+            <button class="oh-code-mode-btn" id="ohCodeManual" type="button">Manual</button>
+          </div>
+          <input class="oh-input" id="ohEmpCode" type="text" value="${ohEsc(autoCode)}" placeholder="Employee code" readonly style="background:var(--slate-50);color:var(--slate-400);">
+          <div class="oh-input-hint" id="ohCodeHint">Code is auto-generated. Switch to Manual to customise.</div>
+        </div>
+
+        <div class="oh-fg-row">
+          <div class="oh-fg">
+            <label class="oh-label" for="ohEmpName">Full Name <span class="req">*</span></label>
+            <input class="oh-input" id="ohEmpName" type="text" placeholder="e.g. Rahul Sharma" value="${ohEsc(emp?.name || '')}">
+          </div>
+          <div class="oh-fg">
+            <label class="oh-label" for="ohEmpDesig">Designation</label>
+            <input class="oh-input" id="ohEmpDesig" type="text" placeholder="e.g. Manager, Engineer&hellip;" value="${ohEsc(emp?.designation || '')}">
+          </div>
+        </div>
+
+        <div class="oh-fg-row">
+          <div class="oh-fg">
+            <label class="oh-label" for="ohEmpDept">Department <span class="req">*</span></label>
+            <select class="oh-select" id="ohEmpDept">
+              <option value="">&mdash; Select Department &mdash;</option>
+              ${deptOptions}
+            </select>
+            ${ohDepartments.length === 0 ? '<div class="oh-input-hint">\u26A0 No departments yet. Create one first.</div>' : ''}
+          </div>
+          <div class="oh-fg">
+            <label class="oh-label" for="ohEmpJoining">Joining Date</label>
+            <input class="oh-input" id="ohEmpJoining" type="date" value="${ohEsc(emp?.joiningDate || '')}">
+          </div>
+        </div>
+
+        <div class="oh-fg">
+          <label class="oh-label" for="ohEmpSalary">Salary (\u20B9)</label>
+          <input class="oh-input" id="ohEmpSalary" type="number" min="0" step="0.01" placeholder="e.g. 50000" value="${emp?.salary ?? ''}">
+        </div>
+
+        <div class="oh-modal-section-title">Contact Details</div>
+
+        <div class="oh-fg-row">
+          <div class="oh-fg">
+            <label class="oh-label" for="ohEmpPhone">Phone No.</label>
+            <input class="oh-input" id="ohEmpPhone" type="tel" placeholder="+91 XXXXX XXXXX" value="${ohEsc(emp?.phone || '')}">
+          </div>
+          <div class="oh-fg">
+            <label class="oh-label" for="ohEmpEmail">Email</label>
+            <input class="oh-input" id="ohEmpEmail" type="email" placeholder="employee@company.com" value="${ohEsc(emp?.email || '')}">
+          </div>
+        </div>
+
+        <div class="oh-fg">
+          <label class="oh-label" for="ohEmpPan">PAN Number</label>
+          <input class="oh-input" id="ohEmpPan" type="text" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase;" value="${ohEsc(emp?.pan || '')}">
+        </div>
+
+        <div class="oh-fg">
+          <label class="oh-label" for="ohEmpAddress">Address</label>
+          <input class="oh-input" id="ohEmpAddress" type="text" placeholder="Full address&hellip;" value="${ohEsc(emp?.address || '')}">
+        </div>
+
+        <div class="oh-modal-btns">
+          <button class="oh-btn-cancel" id="ohEmpCancelBtn">Cancel</button>
+          <button class="oh-btn-save" id="ohEmpSaveBtn">${emp ? 'Save Changes' : 'Add Employee'}</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    // Code mode toggle
+    const codeInp  = document.getElementById('ohEmpCode');
+    const codeHint = document.getElementById('ohCodeHint');
+    const btnAuto  = document.getElementById('ohCodeAuto');
+    const btnMan   = document.getElementById('ohCodeManual');
+
+    btnAuto.addEventListener('click', () => {
+      _ohEmpCodeMode = 'auto';
+      btnAuto.classList.add('active'); btnMan.classList.remove('active');
+      codeInp.value = emp ? emp.code : ohAutoCode();
+      codeInp.readOnly = true;
+      codeInp.style.background = 'var(--slate-50)'; codeInp.style.color = 'var(--slate-400)';
+      codeHint.textContent = 'Code is auto-generated. Switch to Manual to customise.';
+    });
+    btnMan.addEventListener('click', () => {
+      _ohEmpCodeMode = 'manual';
+      btnMan.classList.add('active'); btnAuto.classList.remove('active');
+      codeInp.readOnly = false;
+      codeInp.style.background = ''; codeInp.style.color = '';
+      codeHint.textContent = 'Enter a custom employee code.';
+      codeInp.focus(); codeInp.select();
+    });
+
+    document.getElementById('ohEmpModalClose').addEventListener('click', closeOhEmpModal);
+    document.getElementById('ohEmpCancelBtn').addEventListener('click', closeOhEmpModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeOhEmpModal(); });
+    document.getElementById('ohEmpSaveBtn').addEventListener('click', saveOhEmp);
+    document.getElementById('ohEmpName').focus();
+  }
+
+  function closeOhEmpModal() {
+    document.getElementById('ohEmpModal')?.remove();
+    _ohEmpModalEditId = null;
+  }
+
+  function saveOhEmp() {
+    const nameInp  = document.getElementById('ohEmpName');
+    const codeInp  = document.getElementById('ohEmpCode');
+    const deptSel  = document.getElementById('ohEmpDept');
+    const name     = nameInp.value.trim();
+    const code     = codeInp.value.trim();
+    const deptId   = deptSel.value ? Number(deptSel.value) : null;
+
+    let err = false;
+    if (!name)  { nameInp.classList.add('error'); err = true; }
+    if (!code)  { codeInp.classList.add('error'); err = true; }
+    if (!deptId) { deptSel.classList.add('error'); err = true; }
+    if (err) {
+      showToast('Please fill in all required fields (Name, Code, Department).', 'error');
+      setTimeout(() => { nameInp.classList.remove('error'); codeInp.classList.remove('error'); deptSel.classList.remove('error'); }, 1500);
+      return;
+    }
+
+    const dupCode = ohEmployees.find(e => e.code.trim().toLowerCase() === code.toLowerCase() && e.id !== _ohEmpModalEditId);
+    if (dupCode) {
+      codeInp.classList.add('error');
+      showToast(`Employee code "${code}" is already in use.`, 'error');
+      setTimeout(() => codeInp.classList.remove('error'), 1500);
+      return;
+    }
+
+    const salary      = document.getElementById('ohEmpSalary').value;
+    const pan         = document.getElementById('ohEmpPan').value.trim().toUpperCase();
+    const phone       = document.getElementById('ohEmpPhone').value.trim();
+    const email       = document.getElementById('ohEmpEmail').value.trim();
+    const address     = document.getElementById('ohEmpAddress').value.trim();
+    const joiningDate = document.getElementById('ohEmpJoining').value;
+    const designation = document.getElementById('ohEmpDesig').value.trim();
+
+    if (_ohEmpModalEditId) {
+      const emp = ohGetEmpById(_ohEmpModalEditId);
+      if (emp) {
+        const oldDeptId = emp.deptId;
+        // Transfer rule: auto-clear head of old dept if this employee was head
+        if (oldDeptId && oldDeptId !== deptId) {
+          const oldDept = ohGetDeptById(oldDeptId);
+          if (oldDept && oldDept.headEmpId === emp.id) {
+            oldDept.headEmpId = null;
+            showToast(`${name} was transferred. Head of "${oldDept.name}" has been cleared automatically.`, 'success');
+          }
+        }
+        emp.code = code; emp.name = name; emp.designation = designation;
+        emp.deptId = deptId; emp.joiningDate = joiningDate;
+        emp.salary = salary !== '' ? Number(salary) : null;
+        emp.pan = pan; emp.phone = phone; emp.email = email; emp.address = address;
+      }
+      showToast('Employee updated successfully.', 'success');
+    } else {
+      ohEmployees.push({
+        id: _ohEmpCtr++, code, name, designation, deptId, joiningDate,
+        salary: salary !== '' ? Number(salary) : null,
+        pan, phone, email, address
+      });
+      showToast(`Employee "${name}" added successfully.`, 'success');
+    }
+
+    closeOhEmpModal();
+    updateOhBadges();
+    if (_ohActiveTab === 'dept') renderOhDeptView();
+    else if (_ohActiveTab === 'emp') renderOhEmpView();
+    triggerAutoBackup();
+  }
+
+  function deleteOhEmp(id) {
+    const emp = ohGetEmpById(id);
+    if (!emp) return;
+    showKyaConfirm({
+      title: 'Delete Employee?',
+      message: `Permanently delete <strong>${ohEsc(emp.name)}</strong> (${ohEsc(emp.code)})?<br>This cannot be undone.`,
+      confirmLabel: '✕ Delete',
+      iconBg: '#fee2e2', iconColor: '#dc2626',
+      iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>',
+      okBg: '#dc2626',
+      onConfirm: () => {
+        // Clear dept head if this employee was head of any dept
+        ohDepartments.forEach(d => { if (d.headEmpId === id) d.headEmpId = null; });
+        ohEmployees = ohEmployees.filter(e => e.id !== id);
+        showToast(`Employee "${emp.name}" deleted.`, 'success');
+        updateOhBadges();
+        if (_ohActiveTab === 'dept') renderOhDeptView();
+        else if (_ohActiveTab === 'emp') renderOhEmpView();
+        triggerAutoBackup();
+      }
+    });
+  }
+
+
+  // ════════════════════════════════════
+  //  DEPARTMENT DETAIL OVERLAY
+  // ════════════════════════════════════
+  function openOhDeptDetail(id) {
+    const dept = ohGetDeptById(id);
+    if (!dept) return;
+    const emps = ohGetDeptEmps(id);
+    const head = dept.headEmpId ? ohGetEmpById(dept.headEmpId) : null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'oh-detail-overlay';
+    overlay.id = 'ohDetailOverlay';
+    overlay.innerHTML = `
+      <div class="oh-detail-card" role="dialog" aria-modal="true">
+        <div class="oh-detail-hdr-wrap">
+          <div class="oh-detail-hdr">
+            <div class="oh-detail-title">${ohEsc(dept.name)}</div>
+            <div class="oh-detail-sub">
+              ${head ? 'Head: ' + ohEsc(head.name) : 'No department head assigned'}
+              &nbsp;&middot;&nbsp; ${emps.length} employee${emps.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+          <button class="oh-detail-close" id="ohDetailClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="oh-detail-body">
+          ${emps.length === 0 ? `
+            <div class="oh-empty" style="padding:40px 16px;">
+              <div class="oh-empty-title">No employees in this department</div>
+              <div class="oh-empty-desc">Add employees and assign them to this department.</div>
+            </div>` : emps.map(e => `
+            <div class="oh-detail-emp-row">
+              <div class="oh-detail-emp-avatar">${ohInitials(e.name)}</div>
+              <div style="flex:1;min-width:0;">
+                <div class="oh-detail-emp-name">${ohEsc(e.name)}</div>
+                <div class="oh-detail-emp-meta">
+                  <span class="oh-emp-code" style="font-size:10.5px;padding:2px 6px;">${ohEsc(e.code)}</span>
+                  ${e.designation ? ' &middot; ' + ohEsc(e.designation) : ''}
+                  ${e.phone ? ' &middot; ' + ohEsc(e.phone) : ''}
+                </div>
+              </div>
+              ${dept.headEmpId === e.id ? '<span class="oh-detail-emp-is-head">👑 Head</span>' : ''}
+            </div>`).join('')}
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.getElementById('ohDetailClose').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  SETTINGS & VAULT (Local Storage Backup / Restore)
+  // ══════════════════════════════════════════════════════════════════
+  let _settingsActiveTab = ''; // empty/welcome state by default
+  let _vaultWired = false;
+  let _activeFolderHandle = null;
+  let _activeFolderPermission = false;
+
+  const KYA_DB_NAME = 'KyaFolderStorage';
+  const KYA_STORE_NAME = 'handles';
+
+  function getIndexedDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(KYA_DB_NAME, 1);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(KYA_STORE_NAME)) {
+          db.createObjectStore(KYA_STORE_NAME);
+        }
+      };
+      request.onsuccess = (e) => resolve(e.target.result);
+      request.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  async function saveDirectoryHandle(handle) {
+    const db = await getIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(KYA_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(KYA_STORE_NAME);
+      const request = store.put(handle, 'current_directory');
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function loadDirectoryHandle() {
+    const db = await getIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(KYA_STORE_NAME, 'readonly');
+      const store = tx.objectStore(KYA_STORE_NAME);
+      const request = store.get('current_directory');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function clearDirectoryHandle() {
+    const db = await getIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(KYA_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(KYA_STORE_NAME);
+      const request = store.delete('current_directory');
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function verifyDirectoryPermission(handle, withRequest = false) {
+    if (!handle) return false;
+    const options = { mode: 'readwrite' };
+    try {
+      if ((await handle.queryPermission(options)) === 'granted') {
+        return true;
+      }
+      if (withRequest) {
+        if ((await handle.requestPermission(options)) === 'granted') {
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error('Permission verification failed:', e);
+    }
+    return false;
+  }
+
+  async function writeDataToDirectory(directoryHandle, backupData) {
+    try {
+      const fileHandle = await directoryHandle.getFileHandle('kya_backup_data.json', { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(backupData, null, 2));
+      await writable.close();
+      return true;
+    } catch (e) {
+      console.error('Failed to write to folder:', e);
+      throw e;
+    }
+  }
+
+  async function readDataFromDirectory(directoryHandle) {
+    try {
+      const fileHandle = await directoryHandle.getFileHandle('kya_backup_data.json');
+      const file = await fileHandle.getFile();
+      const text = await file.text();
+      return text;
+    } catch (e) {
+      console.error('Failed to read from folder:', e);
+      throw e;
+    }
+  }
+
+  function getActiveVaultPath() {
+    return localStorage.getItem('kya_current_path') || 'kya-database';
+  }
+
+  function getVaultKey(key, path) {
+    const p = path || getActiveVaultPath();
+    if (p === 'kya-database' || p === 'default') {
+      return key;
+    }
+    return key + '_' + p.trim();
+  }
+
+  function clearKyaData() {
+    coaLedgers = [];
+    postedEntries = [];
+    draftedEntries = [];
+    jvCounter = 1;
+    ohDepartments = [];
+    ohEmployees = [];
+    _ohDeptCtr = 1;
+    _ohEmpCtr = 1;
+    if (window.KYA_STORE) {
+      window.KYA_STORE = {};
+    }
+  }
+
+  function refreshAllActivePanels() {
+    if (activeTabId === 'posted') renderPostedPanel();
+    if (activeTabId === 'drafted') renderDraftedPanel();
+    if (activeTabId === 'chart') renderChartPanel();
+    if (activeTabId === 'balance') renderBalanceSheetPanel();
+    if (activeTabId === 'pnl') renderPnlPanel();
+    if (activeTabId === 'trial') renderTrialBalancePanel();
+    if (activeTabId === 'onehub') renderOneHubPanel();
+  }
+
+  function performRestore(jsonStr, quiet = false) {
+    try {
+      const data = JSON.parse(jsonStr);
+      
+      // Restore Core KYA Data
+      if (Array.isArray(data.coaLedgers)) coaLedgers = data.coaLedgers;
+      else coaLedgers = [];
+
+      if (Array.isArray(data.postedEntries)) postedEntries = data.postedEntries;
+      else postedEntries = [];
+
+      if (Array.isArray(data.draftedEntries)) draftedEntries = data.draftedEntries;
+      else draftedEntries = [];
+
+      if (typeof data.jvCounter === 'number') jvCounter = data.jvCounter;
+      else jvCounter = 1;
+
+      // Restore KeepOne Data
+      if (Array.isArray(data.ohDepartments)) ohDepartments = data.ohDepartments;
+      else ohDepartments = [];
+
+      if (Array.isArray(data.ohEmployees)) ohEmployees = data.ohEmployees;
+      else ohEmployees = [];
+
+      if (typeof data._ohDeptCtr === 'number') _ohDeptCtr = data._ohDeptCtr;
+      else _ohDeptCtr = 1;
+
+      if (typeof data._ohEmpCtr === 'number') _ohEmpCtr = data._ohEmpCtr;
+      else _ohEmpCtr = 1;
+
+      // Restore Settings
+      if (data.kyaSettings) {
+        const autoToggle = document.getElementById('vaultAutoBackupToggle');
+        if (autoToggle) {
+          autoToggle.checked = !!data.kyaSettings.autoBackup;
+          localStorage.setItem(getVaultKey('kya_auto_backup'), autoToggle.checked ? 'true' : 'false');
+        }
+      }
+
+      // Restore Future extensions
+      if (data.futureStore) {
+        window.KYA_STORE = data.futureStore;
+      } else {
+        window.KYA_STORE = {};
+      }
+
+      if (!quiet) {
+        showToast('Data restored successfully.', 'success');
+        updateVaultUI();
+        refreshAllActivePanels();
+      }
+      return true;
+    } catch (e) {
+      console.error(e);
+      if (!quiet) {
+        showToast('Restore failed: ' + e.message, 'danger');
+      }
+      return false;
+    }
+  }
+
+  function showLoadFolderDataConfirm({ folderName, onRestore, onKeep, onCancel }) {
+    document.getElementById('kyaConfirmOverlay')?.remove();
+    document.getElementById('kyaConfirmStyles')?.remove();
+
+    // Create style tag to enforce exact center positioning and animation
+    const styleEl = document.createElement('style');
+    styleEl.id = 'kyaConfirmStyles';
+    styleEl.innerHTML = `
+      #kyaConfirmOverlay {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.65) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        z-index: 10002;
+        display: block !important;
+      }
+      .kya-confirm-card-centered {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        background: var(--white);
+        border-radius: 24px;
+        box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3);
+        border: 1px solid var(--slate-100);
+        text-align: center;
+        font-family: var(--font-main);
+        z-index: 10003;
+        box-sizing: border-box;
+        animation: kyaCenterPopIn 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) forwards !important;
+      }
+      @keyframes kyaCenterPopIn {
+        from { opacity: 0; transform: translate(-50%, -45%) scale(0.95) !important; }
+        to   { opacity: 1; transform: translate(-50%, -50%) scale(1) !important; }
+      }
+    `;
+    document.head.appendChild(styleEl);
+
+    const overlay = document.createElement('div');
+    overlay.id = 'kyaConfirmOverlay';
+    overlay.innerHTML = `
+      <div class="kya-confirm-card-centered" style="max-width: 460px; width: 90%; position: relative; padding: 40px 32px 32px;">
+        <button id="kyaConfirmClose" style="position: absolute; top: 20px; right: 20px; border: none; background: none; font-size: 22px; color: var(--slate-400); cursor: pointer; line-height: 1; transition: all 0.15s ease; outline: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.color='var(--slate-700)'; this.style.backgroundColor='var(--slate-50)';" onmouseout="this.style.color='var(--slate-400)'; this.style.backgroundColor='transparent';">
+          &times;
+        </button>
+        
+        <div class="kya-confirm-icon" style="background: var(--blue-50); color: var(--blue-600); width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -2px 0 rgba(37,99,235,.1);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </div>
+        
+        <div class="kya-confirm-title" style="font-size: 22px; font-weight: 800; color: var(--slate-900); margin-bottom: 12px; letter-spacing: -0.5px;">
+          Folder Detected
+        </div>
+        
+        <div style="font-size: 14px; color: var(--slate-500); line-height: 1.5; margin-bottom: 8px;">
+          data folder was found in:
+        </div>
+        
+        <div class="kya-folder-path-container" style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; padding: 12px 16px; margin: 12px 0 20px; font-family: monospace; font-size: 13px; color: var(--slate-700); word-break: break-all; text-align: left; display: flex; align-items: center; gap: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); box-sizing: border-box;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0; color: var(--slate-400);">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span style="font-weight: 600;">${ohEsc(folderName)}</span>
+        </div>
+        
+        <div style="font-size: 14px; color: var(--slate-600); font-weight: 500; margin-bottom: 28px;">
+          Choose how you would like to continue.
+        </div>
+        
+        <div class="kya-confirm-btns" style="display: flex; gap: 12px; justify-content: stretch; width: 100%;">
+          <button class="kya-confirm-cancel" id="btnConfirmKeep" style="flex: 1; height: 46px; border: 1.5px solid var(--slate-200); border-radius: 12px; background: var(--white); font-size: 13.5px; font-weight: 600; color: var(--slate-600); cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box;">
+            Keep Current Workspace
+          </button>
+          <button class="kya-confirm-ok" id="btnConfirmRestore" style="flex: 1; height: 46px; border: none; border-radius: 12px; background: var(--blue-600); font-size: 13.5px; font-weight: 700; color: var(--white); cursor: pointer; transition: all 0.15s ease; box-shadow: 0 4px 12px rgba(37,99,235,.2); display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box;">
+            Continue with Existing Data
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    
+    const close = () => {
+      overlay.remove();
+      document.getElementById('kyaConfirmStyles')?.remove();
+    };
+
+    const btnKeep = overlay.querySelector('#btnConfirmKeep');
+    btnKeep.addEventListener('mouseenter', () => {
+      btnKeep.style.background = 'var(--slate-50)';
+      btnKeep.style.borderColor = 'var(--slate-300)';
+    });
+    btnKeep.addEventListener('mouseleave', () => {
+      btnKeep.style.background = 'var(--white)';
+      btnKeep.style.borderColor = 'var(--slate-200)';
+    });
+    btnKeep.addEventListener('click', () => {
+      close();
+      if (onKeep) onKeep();
+    });
+
+    const btnRestore = overlay.querySelector('#btnConfirmRestore');
+    btnRestore.addEventListener('mouseenter', () => {
+      btnRestore.style.background = 'var(--blue-700)';
+    });
+    btnRestore.addEventListener('mouseleave', () => {
+      btnRestore.style.background = 'var(--blue-600)';
+    });
+    btnRestore.addEventListener('click', () => {
+      close();
+      if (onRestore) onRestore();
+    });
+
+    overlay.querySelector('#kyaConfirmClose').addEventListener('click', () => {
+      close();
+      if (onCancel) onCancel();
+    });
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) {
+        close();
+        if (onCancel) onCancel();
+      }
+    });
+
+    overlay.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        close();
+        if (onCancel) onCancel();
+      }
+    });
+
+    btnRestore.focus();
+  }
+
+  function showPathSwitchConfirm({ newPath, onCopy, onFresh, onCancel }) {
+    document.getElementById('kyaConfirmOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'kya-confirm-overlay';
+    overlay.id = 'kyaConfirmOverlay';
+    overlay.innerHTML = `
+      <div class="kya-confirm-card" style="max-width: 450px;">
+        <div class="kya-confirm-icon" style="background:#dbeafe; color:#2563eb">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path>
+          </svg>
+        </div>
+        <div class="kya-confirm-title">Initialize New Data Path</div>
+        <div class="kya-confirm-msg">
+          The path <strong>"${ohEsc(newPath)}"</strong> does not have an existing database.<br><br>
+          Would you like to <strong>copy your current data</strong> to this path, or start with a <strong>fresh blank database</strong>?
+        </div>
+        <div class="kya-confirm-btns" style="display:flex; flex-direction:column; gap:8px; margin-top:20px;">
+          <button class="btn btn-primary" id="btnConfirmCopy" style="width:100%; justify-content:center; padding:10px;">
+            Copy Current Data to New Path
+          </button>
+          <button class="btn btn-secondary" id="btnConfirmFresh" style="width:100%; justify-content:center; padding:10px; background:#f1f5f9; color:#334155; border:1px solid var(--slate-200);">
+            Start Fresh (Blank Database)
+          </button>
+          <button class="kya-confirm-cancel" id="btnConfirmCancel" style="width:100%; border:none; background:none; color:var(--slate-500); padding:8px; cursor:pointer; font-weight:600;">
+            Cancel
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    
+    overlay.querySelector('#btnConfirmCopy').addEventListener('click', () => {
+      close();
+      onCopy();
+    });
+    overlay.querySelector('#btnConfirmFresh').addEventListener('click', () => {
+      close();
+      onFresh();
+    });
+    overlay.querySelector('#btnConfirmCancel').addEventListener('click', () => {
+      close();
+      if (onCancel) onCancel();
+    });
+    
+    overlay.addEventListener('click', e => { if (e.target === overlay) { close(); if (onCancel) onCancel(); } });
+    overlay.addEventListener('keydown', e => { if (e.key === 'Escape') { close(); if (onCancel) onCancel(); } });
+  }
+
+
+
+  async function loadKyaDataOnStartup() {
+    try {
+      const handle = await loadDirectoryHandle();
+      if (handle) {
+        _activeFolderHandle = handle;
+        const hasPerm = await verifyDirectoryPermission(handle, false);
+        if (hasPerm) {
+          _activeFolderPermission = true;
+          const jsonStr = await readDataFromDirectory(handle);
+          performRestore(jsonStr, true);
+        } else {
+          _activeFolderPermission = false;
+          // Fallback to local storage copy
+          const currentPath = getActiveVaultPath();
+          const jsonStr = localStorage.getItem(getVaultKey('kya_backup_data', currentPath));
+          if (jsonStr) {
+            performRestore(jsonStr, true);
+          }
+        }
+      } else {
+        const currentPath = getActiveVaultPath();
+        const jsonStr = localStorage.getItem(getVaultKey('kya_backup_data', currentPath));
+        if (jsonStr) {
+          performRestore(jsonStr, true);
+        }
+      }
+      updateVaultUI();
+    } catch (e) {
+      console.error('Error during startup load:', e);
+    }
+  }
+
+  function renderSettingsPanel() {
+    switchSettingsTab(_settingsActiveTab);
+
+    const tabMap = {
+      settingsTabVault: 'vault',
+    };
+    Object.entries(tabMap).forEach(([btnId, tab]) => {
+      const btn = document.getElementById(btnId);
+      if (btn && !btn._settingsWired) {
+        btn._settingsWired = true;
+        btn.addEventListener('click', () => switchSettingsTab(tab));
+      }
+    });
+  }
+
+  function switchSettingsTab(tab) {
+    _settingsActiveTab = tab;
+
+    const allTabs = [
+      ['settingsTabVault', 'vault'],
+    ];
+    const allViews = [
+      ['settings-vault-view', 'vault'],
+      ['settings-empty-view', ''],
+    ];
+
+    allTabs.forEach(([btnId, t]) => {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      const isActive = t === tab;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive);
+    });
+    allViews.forEach(([viewId, t]) => {
+      const view = document.getElementById(viewId);
+      if (view) view.style.display = t === tab ? '' : 'none';
+    });
+
+    if (tab === 'vault') {
+      initVaultListeners();
+      updateVaultUI();
+    }
+  }
+
+  async function selectFolderWithHandle(handle) {
+    const hasPerm = await verifyDirectoryPermission(handle, true);
+    if (!hasPerm) {
+      showToast('Permission to write to the folder is required.', 'warning');
+      return;
+    }
+    
+    _activeFolderHandle = handle;
+    _activeFolderPermission = true;
+    await saveDirectoryHandle(handle);
+
+    // Check if backup already exists
+    let existingData = null;
+    try {
+      existingData = await readDataFromDirectory(handle);
+    } catch (err) {
+      // file doesn't exist, which is fine
+    }
+
+    if (existingData) {
+      showLoadFolderDataConfirm({
+        folderName: handle.name,
+        onRestore: () => {
+          performRestore(existingData, false);
+        },
+        onKeep: () => {
+          saveKyaBackup(true);
+          updateVaultUI();
+          showToast(`Switched to folder "${handle.name}" and saved current data.`, 'success');
+        },
+        onCancel: async () => {
+          _activeFolderHandle = null;
+          _activeFolderPermission = false;
+          await clearDirectoryHandle();
+          updateVaultUI();
+        }
+      });
+    } else {
+      showPathSwitchConfirm({
+        newPath: `Folder: ${handle.name}`,
+        onCopy: () => {
+          saveKyaBackup(true);
+          updateVaultUI();
+          showToast(`Synced folder: ${handle.name}`, 'success');
+        },
+        onFresh: () => {
+          clearKyaData();
+          saveKyaBackup(true);
+          updateVaultUI();
+          refreshAllActivePanels();
+          showToast(`Initialized fresh database in folder: ${handle.name}`, 'success');
+        },
+        onCancel: async () => {
+          _activeFolderHandle = null;
+          _activeFolderPermission = false;
+          await clearDirectoryHandle();
+          updateVaultUI();
+        }
+      });
+    }
+  }
+
+  function initVaultListeners() {
+    if (_vaultWired) return;
+    _vaultWired = true;
+
+    const autoToggle = document.getElementById('vaultAutoBackupToggle');
+    if (autoToggle) {
+      autoToggle.addEventListener('change', (e) => {
+        localStorage.setItem(getVaultKey('kya_auto_backup'), e.target.checked ? 'true' : 'false');
+        if (e.target.checked) {
+          saveKyaBackup(true); // run initial backup immediately
+        }
+      });
+    }
+
+    const backupBtn = document.getElementById('btnVaultBackupNow');
+    if (backupBtn) {
+      backupBtn.addEventListener('click', () => {
+        saveKyaBackup(false);
+      });
+    }
+
+    const selectFolderBtn = document.getElementById('btnVaultSelectFolder');
+    if (selectFolderBtn) {
+      selectFolderBtn.addEventListener('click', async () => {
+        if (!window.showDirectoryPicker) {
+          showToast('Folder picker is not supported on this browser/platform. Please use Chrome, Edge, or another compatible browser.', 'warning');
+          return;
+        }
+        try {
+          const handle = await window.showDirectoryPicker();
+          await selectFolderWithHandle(handle);
+        } catch (e) {
+          console.error(e);
+          if (e.name !== 'AbortError') {
+            showToast('Failed to select folder: ' + e.message, 'danger');
+          }
+        }
+      });
+    }
+
+    const clearFolderBtn = document.getElementById('btnVaultClearFolder');
+    if (clearFolderBtn) {
+      clearFolderBtn.addEventListener('click', async () => {
+        showKyaConfirm({
+          title: 'Disconnect Local Folder?',
+          message: 'This will stop syncing data to the physical folder. Your local files will remain intact.',
+          confirmLabel: 'Disconnect',
+          okBg: '#dc2626',
+          onConfirm: async () => {
+            _activeFolderHandle = null;
+            _activeFolderPermission = false;
+            await clearDirectoryHandle();
+            updateVaultUI();
+            showToast('Disconnected from physical folder.', 'info');
+          }
+        });
+      });
+    }
+
+    const reauthFolderBtn = document.getElementById('btnVaultReauthFolder');
+    if (reauthFolderBtn) {
+      reauthFolderBtn.addEventListener('click', async () => {
+        if (_activeFolderHandle) {
+          const hasPerm = await verifyDirectoryPermission(_activeFolderHandle, true);
+          if (hasPerm) {
+            _activeFolderPermission = true;
+            updateVaultUI();
+            showToast('Folder access granted.', 'success');
+            saveKyaBackup(true);
+          } else {
+            showToast('Access not granted.', 'warning');
+          }
+        }
+      });
+    }
+
+    const restoreFolderBtn = document.getElementById('btnVaultRestoreFolder');
+    if (restoreFolderBtn) {
+      restoreFolderBtn.addEventListener('click', async () => {
+        if (!window.showDirectoryPicker) {
+          document.getElementById('vaultFallbackFileSelector')?.click();
+          return;
+        }
+        try {
+          const handle = await window.showDirectoryPicker();
+          const hasPerm = await verifyDirectoryPermission(handle, true);
+          if (!hasPerm) {
+            showToast('Folder access required to restore.', 'warning');
+            return;
+          }
+          const jsonStr = await readDataFromDirectory(handle);
+          showKyaConfirm({
+            title: 'Restore Backup from Folder?',
+            message: `This will overwrite all current data and switch your active data path to "${handle.name}". Proceed?`,
+            confirmLabel: 'Restore & Switch',
+            okBg: '#2563eb',
+            onConfirm: async () => {
+              _activeFolderHandle = handle;
+              _activeFolderPermission = true;
+              await saveDirectoryHandle(handle);
+              performRestore(jsonStr, false);
+            }
+          });
+        } catch (e) {
+          console.error(e);
+          if (e.name === 'NotFoundError') {
+            showToast('No backup file (kya_backup_data.json) found in the selected folder.', 'warning');
+          } else if (e.name !== 'AbortError') {
+            showToast('Failed to restore from folder: ' + e.message, 'danger');
+          }
+        }
+      });
+    }
+
+    const fallbackFileSelector = document.getElementById('vaultFallbackFileSelector');
+    if (fallbackFileSelector) {
+      fallbackFileSelector.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          showKyaConfirm({
+            title: 'Restore Backup?',
+            message: 'This will overwrite all current data. Are you sure you want to proceed?',
+            confirmLabel: 'Restore',
+            okBg: '#2563eb',
+            onConfirm: () => {
+              performRestore(event.target.result, false);
+            }
+          });
+        };
+        reader.onerror = () => {
+          showToast('Failed to read backup file.', 'danger');
+        };
+        reader.readAsText(file);
+      });
+    }
+  }
+
+  function updateVaultUI() {
+    const activePath = getActiveVaultPath();
+    const clearFolderBtn = document.getElementById('btnVaultClearFolder');
+    const reauthFolderBtn = document.getElementById('btnVaultReauthFolder');
+    const folderPathEl = document.getElementById('vaultBackupFolderPath');
+
+    if (_activeFolderHandle) {
+      if (folderPathEl) {
+        folderPathEl.innerHTML = `Folder: <strong style="color:var(--blue-600)">${ohEsc(_activeFolderHandle.name)}</strong> (Physical File: kya_backup_data.json)`;
+      }
+      if (clearFolderBtn) clearFolderBtn.style.display = 'inline-flex';
+
+      if (_activeFolderPermission) {
+        if (reauthFolderBtn) reauthFolderBtn.style.display = 'none';
+      } else {
+        if (reauthFolderBtn) reauthFolderBtn.style.display = 'inline-flex';
+      }
+    } else {
+      if (folderPathEl) {
+        folderPathEl.innerHTML = `Virtual Storage: <strong style="color:var(--blue-600)">${ohEsc(activePath)}</strong> (LocalStorage Key: ${ohEsc(getVaultKey('kya_backup_data'))})`;
+      }
+      if (clearFolderBtn) clearFolderBtn.style.display = 'none';
+      if (reauthFolderBtn) reauthFolderBtn.style.display = 'none';
+    }
+
+    const autoVal = localStorage.getItem(getVaultKey('kya_auto_backup', activePath)) === 'true';
+    const autoToggle = document.getElementById('vaultAutoBackupToggle');
+    if (autoToggle) autoToggle.checked = autoVal;
+
+    const lastDate = localStorage.getItem(getVaultKey('kya_backup_date', activePath)) || '—';
+    const lastTime = localStorage.getItem(getVaultKey('kya_backup_time', activePath)) || '—';
+    const lastStatus = localStorage.getItem(getVaultKey('kya_backup_status', activePath)) || 'No Backups';
+    const lastSize = localStorage.getItem(getVaultKey('kya_backup_size', activePath)) || '—';
+
+    const lastDateEl = document.getElementById('vaultLastDate');
+    const lastTimeEl = document.getElementById('vaultLastTime');
+    const lastStatusEl = document.getElementById('vaultLastStatus');
+    const lastSizeEl = document.getElementById('vaultBackupSize');
+
+    if (lastDateEl) lastDateEl.textContent = lastDate;
+    if (lastTimeEl) lastTimeEl.textContent = lastTime;
+    if (lastSizeEl) lastSizeEl.textContent = lastSize;
+
+    if (lastStatusEl) {
+      if (lastStatus === 'Success') {
+        lastStatusEl.innerHTML = '<span class="badge" style="background:#dcfce7; color:#15803d; padding:3px 8px; border-radius:20px; font-weight:700; font-size:11px">✓ Success</span>';
+      } else if (lastStatus === 'Failed') {
+        lastStatusEl.innerHTML = '<span class="badge" style="background:#fee2e2; color:#b91c1c; padding:3px 8px; border-radius:20px; font-weight:700; font-size:11px">✕ Failed</span>';
+      } else if (lastStatus === 'Write Pending Access') {
+        lastStatusEl.innerHTML = '<span class="badge" style="background:#fef3c7; color:#d97706; padding:3px 8px; border-radius:20px; font-weight:700; font-size:11px">⚠ Access Pending</span>';
+      } else {
+        lastStatusEl.innerHTML = `<span class="badge" style="background:#f1f5f9; color:#64748b; padding:3px 8px; border-radius:20px; font-weight:700; font-size:11px">${lastStatus}</span>`;
+      }
+    }
+  }
+
+  async function saveKyaBackup(isAuto = false) {
+    try {
+      const activePath = getActiveVaultPath();
+      const backupData = {
+        coaLedgers,
+        postedEntries,
+        draftedEntries,
+        jvCounter,
+        ohDepartments,
+        ohEmployees,
+        _ohDeptCtr,
+        _ohEmpCtr,
+        kyaSettings: {
+          autoBackup: document.getElementById('vaultAutoBackupToggle')?.checked || false
+        },
+        futureStore: window.KYA_STORE || {}
+      };
+
+      const jsonStr = JSON.stringify(backupData);
+      localStorage.setItem(getVaultKey('kya_backup_data', activePath), jsonStr);
+      
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+      const sizeStr = (jsonStr.length / 1024).toFixed(2) + ' KB';
+
+      localStorage.setItem(getVaultKey('kya_backup_date', activePath), dateStr);
+      localStorage.setItem(getVaultKey('kya_backup_time', activePath), timeStr);
+      localStorage.setItem(getVaultKey('kya_backup_status', activePath), 'Success');
+      localStorage.setItem(getVaultKey('kya_backup_size', activePath), sizeStr);
+
+      if (_activeFolderHandle) {
+        if (_activeFolderPermission) {
+          await writeDataToDirectory(_activeFolderHandle, backupData);
+        } else {
+          const hasPerm = await verifyDirectoryPermission(_activeFolderHandle, false);
+          if (hasPerm) {
+            _activeFolderPermission = true;
+            await writeDataToDirectory(_activeFolderHandle, backupData);
+          } else {
+            console.warn("Folder write skipped: permission not granted.");
+            localStorage.setItem(getVaultKey('kya_backup_status', activePath), 'Write Pending Access');
+          }
+        }
+      }
+
+      updateVaultUI();
+      if (!isAuto) {
+        showToast('Backup completed successfully.', 'success');
+      }
+    } catch (e) {
+      console.error(e);
+      localStorage.setItem(getVaultKey('kya_backup_status'), 'Failed');
+      updateVaultUI();
+      if (!isAuto) {
+        showToast('Backup failed: ' + e.message, 'danger');
+      }
+    }
+  }
+
+  function restoreKyaBackup() {
+    try {
+      const activePath = getActiveVaultPath();
+      const jsonStr = localStorage.getItem(getVaultKey('kya_backup_data', activePath));
+      if (!jsonStr) {
+        showToast('No backup found in Local Storage for the current path.', 'warning');
+        return;
+      }
+
+      showKyaConfirm({
+        title: 'Restore Backup?',
+        message: 'This will overwrite all current data. Are you sure you want to proceed?',
+        confirmLabel: 'Restore',
+        okBg: '#2563eb',
+        onConfirm: () => {
+          performRestore(jsonStr, false);
+        }
+      });
+    } catch (e) {
+      console.error(e);
+      showToast('Restore failed: ' + e.message, 'danger');
+    }
+  }
+
+  function triggerAutoBackup() {
+    const activePath = getActiveVaultPath();
+    const autoVal = localStorage.getItem(getVaultKey('kya_auto_backup', activePath)) === 'true';
+    if (autoVal) {
+      saveKyaBackup(true);
+    }
+  }
+
+  // Initialize store for future features
+  if (!window.KYA_STORE) {
+    window.KYA_STORE = {};
+  }
+
 </script>
+
 </body>
 </html>
 
