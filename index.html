@@ -3169,6 +3169,335 @@
       margin-bottom: 4px;
     }
 
+    /* ===========================
+       SALES MODULE STYLES
+    =========================== */
+    .sales-type-wrap {
+      position: relative;
+      display: flex;
+      background: var(--slate-100);
+      border-radius: 10px;
+      padding: 3px;
+      height: 42px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .sales-type-bg {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      width: calc(50% - 3px);
+      background: var(--white);
+      border-radius: 7px;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--duration) cubic-bezier(.34,1.56,.64,1);
+      z-index: 1;
+    }
+    .sales-type-bg.prod-active { transform: translateX(0); }
+    .sales-type-bg.serv-active { transform: translateX(100%); }
+    .sales-type-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-500);
+      cursor: pointer;
+      font-family: var(--font-main);
+      z-index: 2;
+      transition: color .15s;
+    }
+    .sales-type-btn.active { color: var(--blue-700); }
+
+    .sales-tdstcs-wrap {
+      position: relative;
+      display: flex;
+      background: var(--slate-100);
+      border-radius: 10px;
+      padding: 3px;
+      height: 38px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .sales-tdstcs-bg {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      width: calc(33.33% - 3px);
+      background: var(--white);
+      border-radius: 7px;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--duration) cubic-bezier(.34,1.56,.64,1);
+      z-index: 1;
+    }
+    .sales-tdstcs-bg.none-active { transform: translateX(0); }
+    .sales-tdstcs-bg.tds-active  { transform: translateX(100%); }
+    .sales-tdstcs-bg.tcs-active  { transform: translateX(200%); }
+    .sales-tdstcs-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--slate-500);
+      cursor: pointer;
+      font-family: var(--font-main);
+      z-index: 2;
+      transition: color .15s;
+    }
+    .sales-tdstcs-btn.active { color: var(--blue-700); }
+
+    .sales-slider {
+      width: 100%;
+      height: 6px;
+      background: var(--slate-200);
+      border-radius: 3px;
+      outline: none;
+      accent-color: var(--blue-600);
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    .sales-summary-card {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 14px;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 380px;
+      margin-left: auto;
+      box-shadow: var(--shadow-sm);
+    }
+    .sales-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--slate-600);
+    }
+    .sales-summary-row.total-row {
+      border-top: 1.5px solid var(--slate-200);
+      padding-top: 12px;
+      margin-top: 4px;
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--blue-900);
+    }
+
+    .sales-table-wrap {
+      overflow-x: auto;
+      width: 100%;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sales-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 6px;
+      table-layout: fixed;
+      min-width: 850px;
+    }
+    .sales-table thead th {
+      padding: 0 12px 8px;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--slate-400);
+      background: transparent;
+      border-bottom: none;
+    }
+    .sales-table thead th.col-sno   { width: 50px; text-align: center; }
+    .sales-table thead th.col-item  { width: auto; }
+    .sales-table thead th.col-qty   { width: 80px; text-align: right; }
+    .sales-table thead th.col-rate  { width: 120px; text-align: right; }
+    .sales-table thead th.col-disc  { width: 140px; text-align: right; }
+    .sales-table thead th.col-tax   { width: 100px; text-align: right; }
+    .sales-table thead th.col-amt   { width: 140px; text-align: right; }
+    .sales-table thead th.col-del   { width: 50px; text-align: center; }
+
+    .sales-row {
+      background: var(--white);
+      border-radius: 10px;
+      transition: box-shadow var(--duration);
+      animation: rowSlideIn .25s var(--ease) both;
+    }
+    .sales-row:hover { box-shadow: var(--shadow-sm); }
+    .sales-row:focus-within { box-shadow: 0 0 0 2px var(--blue-200), var(--shadow-sm); }
+    .sales-row td {
+      padding: 6px 12px;
+      vertical-align: middle;
+      background: transparent;
+    }
+    .sales-row td:first-child {
+      border-radius: 10px 0 0 10px;
+      background: var(--slate-50);
+    }
+    .sales-row td:last-child { border-radius: 0 10px 10px 0; }
+    
+    .sales-item-select {
+      width: 100%;
+      height: 36px;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      padding: 0 10px;
+      font-family: var(--font-main);
+      font-size: 13.5px;
+      color: var(--slate-800);
+      outline: none;
+      background: var(--white);
+      transition: border-color var(--duration);
+    }
+    .sales-item-select:focus { border-color: var(--blue-400); }
+
+    .sales-totals-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+      padding: 24px 28px;
+      border-top: 2px solid var(--slate-100);
+    }
+    @media (max-width: 768px) {
+      .sales-totals-grid {
+        grid-template-columns: 1fr !important;
+        padding: 16px 18px !important;
+      }
+      .sales-summary-card {
+        max-width: 100% !important;
+        margin-left: 0 !important;
+      }
+      #panel-sales-voucher .je-fields-bar {
+        padding: 16px 18px !important;
+        gap: 16px !important;
+      }
+      #panel-sales-voucher .je-table-section {
+        padding: 16px 18px 0 !important;
+      }
+      #panel-sales-voucher .je-add-row-wrap {
+        padding: 12px 18px !important;
+      }
+      #panel-sales-voucher .je-actions-bar {
+        padding: 16px 18px !important;
+      }
+    }
+
+    /* Custom styles for print invoice */
+    .inv-modal-overlay {
+      position: fixed; inset: 0; z-index: 10005;
+      background: rgba(15,23,42,.6); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-main);
+    }
+    .inv-modal-card {
+      background: #fff; border-radius: 20px;
+      width: min(95vw, 840px); max-height: 90vh; overflow-y: auto;
+      box-shadow: var(--shadow-xl); display: flex; flex-direction: column;
+      animation: jePopIn .18s cubic-bezier(.34,1.3,.64,1);
+    }
+    .inv-modal-hdr {
+      background: linear-gradient(90deg, var(--blue-800), var(--blue-600));
+      color: #fff; padding: 20px 28px; display: flex; align-items: center;
+      justify-content: space-between; border-radius: 20px 20px 0 0;
+    }
+    .inv-modal-body { padding: 32px; }
+    .inv-print-btn {
+      background: var(--white); color: var(--blue-700); border: 1.5px solid var(--white);
+      padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px; transition: all .15s;
+    }
+    .inv-print-btn:hover { background: rgba(255,255,255,.15); color: #fff; }
+
+    /* Printable invoice layout */
+    .inv-paper {
+      background: #fff; color: #334155; font-size: 13px; line-height: 1.5;
+    }
+    .inv-paper-hdr { display: flex; justify-content: space-between; border-bottom: 2px solid var(--slate-200); padding-bottom: 20px; margin-bottom: 20px; }
+    .inv-company-title { font-family: var(--font-display); font-size: 26px; color: var(--blue-800); }
+    .inv-title { font-size: 22px; font-weight: 800; color: var(--slate-700); text-transform: uppercase; letter-spacing: 0.5px; }
+    .inv-meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 28px; }
+    .inv-party-box { background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 10px; padding: 14px 18px; }
+    .inv-party-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.5px; margin-bottom: 6px; }
+    .inv-party-val { font-size: 14px; font-weight: 700; color: var(--slate-800); }
+    .inv-details-list { display: flex; flex-direction: column; gap: 6px; }
+    .inv-details-row { display: flex; justify-content: space-between; }
+    .inv-details-lbl { font-weight: 600; color: var(--slate-400); }
+    .inv-details-val { font-weight: 600; color: var(--slate-800); }
+
+    .inv-tbl { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    .inv-tbl th { background: var(--slate-50); color: var(--slate-500); font-weight: 700; font-size: 11px; text-transform: uppercase; padding: 10px 12px; border-bottom: 2px solid var(--slate-200); }
+    .inv-tbl td { padding: 12px; border-bottom: 1px solid var(--slate-100); }
+    .inv-tbl tfoot td { font-weight: 700; padding: 12px; border-bottom: none; }
+
+    .inv-summary-section { display: flex; justify-content: space-between; align-items: flex-start; gap: 40px; margin-top: 12px; }
+    .inv-notes-box { flex: 1; border: 1.5px dashed var(--slate-200); border-radius: 10px; padding: 14px; font-size: 12px; color: var(--slate-500); }
+    .inv-summary-table { width: 280px; font-size: 13.5px; }
+    .inv-summary-table td { padding: 6px 0; }
+    .inv-summary-table tr.grand-total { font-size: 16px; font-weight: 800; color: var(--blue-800); border-top: 1.5px solid var(--slate-200); }
+
+    .inv-sign-block { margin-top: 50px; display: flex; justify-content: flex-end; }
+    .inv-sign-line { width: 200px; border-top: 1.5px solid var(--slate-300); text-align: center; padding-top: 8px; font-size: 11px; font-weight: 600; color: var(--slate-400); text-transform: uppercase; }
+
+    /* Print media query override */
+    @media print {
+      body * { visibility: hidden; }
+      .inv-paper, .inv-paper * { visibility: visible; }
+      .inv-paper { position: absolute; left: 0; top: 0; width: 100%; }
+      .inv-modal-overlay { background: none; position: relative; inset: auto; }
+      .inv-modal-card { width: 100%; max-height: none; overflow: visible; box-shadow: none; }
+      .inv-modal-hdr { display: none; }
+      .inv-modal-body { padding: 0; }
+    }
+    /* Payment Status Slider Segmented Control */
+    .sales-paystatus-wrap {
+      position: relative;
+      display: flex;
+      background: var(--slate-100);
+      border-radius: 10px;
+      padding: 3px;
+      height: 38px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .sales-paystatus-bg {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      width: calc(33.33% - 3px);
+      background: var(--white);
+      border-radius: 7px;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--duration) cubic-bezier(.34,1.56,.64,1);
+      z-index: 1;
+    }
+    .sales-paystatus-bg.notpaid-active { transform: translateX(0); }
+    .sales-paystatus-bg.fullpaid-active  { transform: translateX(100%); }
+    .sales-paystatus-bg.partpaid-active  { transform: translateX(200%); }
+    .sales-paystatus-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--slate-500);
+      cursor: pointer;
+      font-family: var(--font-main);
+      z-index: 2;
+      transition: color .15s;
+    }
+    .sales-paystatus-btn.active { color: var(--blue-700); }
   </style>
 </head>
 <body>
@@ -3250,6 +3579,34 @@
 
       <div class="nav-section-label">Accounting</div>
 
+      <div class="nav-accordion" id="nav-sales-group">
+        <!-- Accordion header -->
+        <div class="nav-accordion-header" id="nav-sales" role="button" tabindex="0" aria-label="Sales Voucher" aria-expanded="false">
+          <!-- Shopping cart or receipt icon -->
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+            <path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+            <circle cx="14" cy="16" r="1.5" fill="currentColor"/>
+          </svg>
+          <span class="nav-label">Sales Voucher</span>
+          <svg class="nav-accordion-chevron" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <!-- Submenu -->
+        <div class="nav-submenu" id="nav-sales-submenu">
+          <div class="nav-sub-item" id="nav-sales-new" role="button" tabindex="0" data-sales-action="new" aria-label="New Sales Voucher">
+            <span class="nav-sub-dot"></span>New Invoice
+          </div>
+          <div class="nav-sub-item" id="nav-sales-posted" role="button" tabindex="0" data-sales-action="posted" aria-label="Posted invoices">
+            <span class="nav-sub-dot"></span>Posted Invoices
+          </div>
+          <div class="nav-sub-item" id="nav-sales-drafted" role="button" tabindex="0" data-sales-action="drafted" aria-label="Drafted invoices">
+            <span class="nav-sub-dot"></span>Drafted Invoices
+          </div>
+        </div>
+      </div>
+
       <div class="nav-accordion" id="nav-journal-group">
         <!-- Accordion header -->
         <div class="nav-accordion-header" id="nav-journal" role="button" tabindex="0" aria-label="Journal Entry" aria-expanded="false">
@@ -3298,6 +3655,8 @@
         </svg>
         <span class="nav-label">Chart of Accounts</span>
       </div>
+
+
 
       <div class="nav-section-label">Reports</div>
 
@@ -4097,6 +4456,264 @@
 
       </div><!-- /#panel-settings -->
 
+      <!-- Sales Voucher Panel -->
+      <div id="panel-sales-voucher" role="region" aria-label="Sales Voucher" style="display:none">
+        <!-- Page header -->
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <h1 class="panel-title">Sales Voucher</h1>
+            <p class="panel-subtitle">Create and manage tax invoices for goods and services</p>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" id="btnNewSales" aria-label="New sales voucher">
+              <svg viewBox="0 0 15 15" fill="none">
+                <path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              New Invoice
+            </button>
+          </div>
+        </div>
+
+        <!-- FORM CARD -->
+        <div class="je-form-card">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-800), var(--accent)); flex-wrap: wrap; gap: 12px;">
+            <div class="je-card-header-left">
+              <div class="je-card-icon" aria-hidden="true" style="background: rgba(255,255,255,.18);">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+                  <circle cx="14" cy="16" r="1.5" fill="currentColor"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text">Sales Invoice</div>
+                <div class="je-card-subtitle-text">Record sales transactions and customer receivables</div>
+              </div>
+            </div>
+            <div class="je-voucher-chip" id="salesVoucherChipDisplay" style="background: rgba(255,255,255,.2);">INV-2026-001</div>
+          </div>
+
+          <!-- Header fields -->
+          <div class="je-fields-bar">
+            <div class="je-field">
+              <label>Invoice No. Mode</label>
+              <div class="sales-type-wrap" style="height: 42px;">
+                <div class="sales-type-bg prod-active" id="salesInvoiceNoModeBg"></div>
+                <button class="sales-type-btn active" id="salesInvoiceNoModeAuto" type="button">Auto</button>
+                <button class="sales-type-btn" id="salesInvoiceNoModeManual" type="button">Manual</button>
+              </div>
+            </div>
+            <div class="je-field">
+              <label for="salesInvoiceNo">Invoice No.</label>
+              <input type="text" id="salesInvoiceNo" class="je-input" placeholder="INV-2026-001" readonly style="background: var(--slate-50); color: var(--slate-400);" aria-label="Invoice number" />
+            </div>
+            <div class="je-field">
+              <label for="salesOrderNo">Order No.</label>
+              <input type="text" id="salesOrderNo" class="je-input" placeholder="e.g. PO-98765" aria-label="Order number" />
+            </div>
+            <div class="je-field">
+              <label for="salesDate">Date</label>
+              <input type="date" id="salesDate" class="je-input" aria-label="Invoice date" />
+            </div>
+            <div class="je-field">
+              <label for="salesDueDate">Due Date</label>
+              <input type="date" id="salesDueDate" class="je-input" aria-label="Due date" />
+            </div>
+            <div class="je-field">
+              <label for="salesCustomer">Customer *</label>
+              <select id="salesCustomer" class="je-input" aria-label="Customer Selection">
+                <option value="">&mdash; Select Customer &mdash;</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="je-fields-bar" id="salesTypeBar" style="padding-top: 16px; padding-bottom: 16px; background: #fff; display: flex; align-items: flex-end;">
+            <div class="je-field" style="max-width: 320px; width: 100%;">
+              <label>Voucher Type</label>
+              <div class="sales-type-wrap" style="height: 42px; width: 100%;">
+                <div class="sales-type-bg prod-active" id="salesTypeBg"></div>
+                <button class="sales-type-btn active" id="salesTypeProduct" type="button">Product</button>
+                <button class="sales-type-btn" id="salesTypeService" type="button">Service</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Line items table section -->
+          <div class="je-table-section">
+            <div class="je-table-label">Line Items</div>
+            <div class="sales-table-wrap">
+              <table class="sales-table" id="salesItemTable">
+                <thead>
+                  <tr id="salesTableHeader">
+                    <!-- dynamically header columns injected by JS -->
+                  </tr>
+                </thead>
+                <tbody id="salesItemBody">
+                  <!-- rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Add row button -->
+          <div class="je-add-row-wrap" style="padding-top: 6px;">
+            <button class="je-add-row-btn" id="salesAddRow" aria-label="Add item line">
+              <svg viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Row
+            </button>
+          </div>
+
+          <!-- Summary & Totals Grid -->
+          <div class="sales-totals-grid">
+            <!-- Left side notes & Payment details -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="je-narration-wrap" style="padding: 0;">
+                <label for="salesNotes" class="je-narration-label">Notes / Terms</label>
+                <textarea id="salesNotes" class="je-narration-input" placeholder="Payment terms, bank details, delivery terms..." style="min-height: 90px;"></textarea>
+              </div>
+              
+              <!-- Payment Status Sliding selector -->
+              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                  <label style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment Status</label>
+                  <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
+                    <div class="sales-paystatus-bg notpaid-active" id="salesPaymentStatusBg"></div>
+                    <button class="sales-paystatus-btn active" id="salesPaymentStatusNotPaid" type="button">Not Paid</button>
+                    <button class="sales-paystatus-btn" id="salesPaymentStatusFull" type="button">Full Payment</button>
+                    <button class="sales-paystatus-btn" id="salesPaymentStatusPartial" type="button">Partial Payment</button>
+                  </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                  <div id="salesPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
+                    <select id="salesPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
+                  </div>
+                  <div id="salesPaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
+                    <input type="number" id="salesPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right side Summary Card -->
+            <div>
+              <div class="sales-summary-card">
+                <div class="sales-summary-row">
+                  <span>Sub Total</span>
+                  <span id="salesSubTotal">₹ 0.00</span>
+                </div>
+
+                <div class="sales-summary-row" style="flex-direction: column; align-items: stretch; gap: 8px; background: var(--white); border: 1.5px solid var(--slate-100); padding: 12px; border-radius: 12px; margin-top: 4px;">
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <label style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Tax Deduction / Collection</label>
+                      <span style="font-weight: 700; font-size: 12.5px; color: var(--blue-700);" id="salesTdsTcsRateLabel">0%</span>
+                    </div>
+                    <div class="sales-tdstcs-wrap" style="margin-top: 4px; width: 100%;">
+                      <div class="sales-tdstcs-bg none-active" id="salesTdsTcsBg"></div>
+                      <button class="sales-tdstcs-btn active" id="salesTdsTcsNone" type="button">None</button>
+                      <button class="sales-tdstcs-btn" id="salesTdsTcsTds" type="button">TDS</button>
+                      <button class="sales-tdstcs-btn" id="salesTdsTcsTcs" type="button">TCS</button>
+                    </div>
+                  </div>
+                  
+                  <div id="salesTdsTcsRateGroup" style="display: none; flex-direction: column; gap: 8px; margin-top: 4px; border-top: 1px dashed var(--slate-200); padding-top: 8px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Rate</label>
+                        <select id="salesTdsTcsRateSelect" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                          <option value="0.1">0.1%</option>
+                          <option value="1">1%</option>
+                          <option value="2">2%</option>
+                          <option value="5">5%</option>
+                          <option value="10">10%</option>
+                          <option value="custom">Custom...</option>
+                        </select>
+                      </div>
+                      <div id="salesTdsTcsRateCustomWrap" style="flex: 1; display: none; flex-direction: column; gap: 4px;">
+                        <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Custom %</label>
+                        <input type="number" id="salesTdsTcsRateCustom" class="je-input" placeholder="e.g. 1.25" min="0" max="100" step="0.01" style="height: 38px; padding: 0 10px;" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sales-summary-row" id="salesTdsTcsAmountRow" style="display: none;">
+                  <span id="salesTdsTcsAmountLabel">TDS / TCS Amount</span>
+                  <input type="number" id="salesTdsTcsAmount" class="je-input" placeholder="0.00" style="width: 120px; height: 32px; padding: 0 8px; text-align: right; font-weight: 600;" />
+                </div>
+
+                <div class="sales-summary-row">
+                  <span>Adjustments</span>
+                  <input type="number" id="salesAdjustments" class="je-input" placeholder="0.00" style="width: 120px; height: 32px; padding: 0 8px; text-align: right; font-weight: 600;" />
+                </div>
+
+                <div class="sales-summary-row total-row">
+                  <span>Total</span>
+                  <span id="salesTotal">₹ 0.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="je-actions-bar">
+            <div class="je-actions-left">
+              <button class="btn btn-danger" id="btnClearSales" aria-label="Clear all fields">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+            <div class="je-actions-right">
+              <button class="btn btn-secondary" id="btnSaveSalesDraft" aria-label="Save as draft">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M5 2v4h5V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  <path d="M4 8.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Save Draft
+              </button>
+              <button class="btn btn-success" id="btnPostSales" aria-label="Post invoice">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Post Invoice
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /.je-form-card -->
+      </div><!-- /#panel-sales-voucher -->
+
+      <!-- Posted Invoices Panel -->
+      <div id="panel-sales-posted" role="region" aria-label="Posted Sales Invoices" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <h1 class="panel-title">Posted Invoices</h1>
+            <p class="panel-subtitle">All confirmed and posted sales vouchers</p>
+          </div>
+        </div>
+        <div id="salesPostedTableWrap"></div>
+      </div>
+
+      <!-- Drafted Invoices Panel -->
+      <div id="panel-sales-drafted" role="region" aria-label="Drafted Sales Invoices" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <h1 class="panel-title">Drafted Invoices</h1>
+            <p class="panel-subtitle">All saved draft sales invoices</p>
+          </div>
+        </div>
+        <div id="salesDraftedTableWrap"></div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -4191,6 +4808,9 @@
     trial:   panelTrial,
     onehub:  panelOneHub,
     settings: panelSettings,
+    sales_voucher: document.getElementById('panel-sales-voucher'),
+    sales_posted: document.getElementById('panel-sales-posted'),
+    sales_drafted: document.getElementById('panel-sales-drafted'),
   };
 
   const TAB_DEFS = {
@@ -4203,6 +4823,9 @@
     trial:   { id: 'trial',   label: 'Trial Balance',     panelId: 'panel-trial',   navId: 'nav-trial' },
     onehub:  { id: 'onehub',  label: 'KeepOne',           panelId: 'panel-onehub',  navId: 'nav-onehub' },
     settings: { id: 'settings', label: 'Settings',        panelId: 'panel-settings', navId: 'nav-settings' },
+    sales_voucher: { id: 'sales_voucher', label: 'New Invoice', panelId: 'panel-sales-voucher', navId: 'nav-sales-new' },
+    sales_posted: { id: 'sales_posted', label: 'Posted Invoices', panelId: 'panel-sales-posted', navId: 'nav-sales-posted' },
+    sales_drafted: { id: 'sales_drafted', label: 'Drafted Invoices', panelId: 'panel-sales-drafted', navId: 'nav-sales-drafted' },
   };
 
   let openTabs = [];
@@ -4270,6 +4893,9 @@
       if (activeTabId === 'trial') renderTrialBalancePanel();
       if (activeTabId === 'onehub') renderOneHubPanel();
       if (activeTabId === 'settings') renderSettingsPanel();
+      if (activeTabId === 'sales_voucher') initSalesForm();
+      if (activeTabId === 'sales_posted') renderSalesPostedPanel();
+      if (activeTabId === 'sales_drafted') renderSalesDraftedPanel();
       
       // Highlight sidebar nav item
       const navEl = document.getElementById(def.navId);
@@ -4277,14 +4903,41 @@
         if (navEl.classList.contains('nav-sub-item')) {
           navEl.classList.add('active');
           // Ensure parent accordion is open
-          journalHeader.classList.add('open');
-          journalSubmenu.classList.add('open');
-          journalHeader.setAttribute('aria-expanded', 'true');
+          if (activeTabId && activeTabId.startsWith('sales_')) {
+            const sHeader = document.getElementById('nav-sales');
+            const sSubmenu = document.getElementById('nav-sales-submenu');
+            if (sHeader && sSubmenu) {
+              sHeader.classList.add('open');
+              sSubmenu.classList.add('open');
+              sHeader.setAttribute('aria-expanded', 'true');
+            }
+            journalHeader.classList.remove('open');
+            journalSubmenu.classList.remove('open');
+            journalHeader.setAttribute('aria-expanded', 'false');
+          } else {
+            journalHeader.classList.add('open');
+            journalSubmenu.classList.add('open');
+            journalHeader.setAttribute('aria-expanded', 'true');
+            const sHeader = document.getElementById('nav-sales');
+            const sSubmenu = document.getElementById('nav-sales-submenu');
+            if (sHeader && sSubmenu) {
+              sHeader.classList.remove('open');
+              sSubmenu.classList.remove('open');
+              sHeader.setAttribute('aria-expanded', 'false');
+            }
+          }
         } else if (navEl.classList.contains('nav-item')) {
           navEl.classList.add('active');
           journalHeader.classList.remove('open');
           journalSubmenu.classList.remove('open');
           journalHeader.setAttribute('aria-expanded', 'false');
+          const sHeader = document.getElementById('nav-sales');
+          const sSubmenu = document.getElementById('nav-sales-submenu');
+          if (sHeader && sSubmenu) {
+            sHeader.classList.remove('open');
+            sSubmenu.classList.remove('open');
+            sHeader.setAttribute('aria-expanded', 'false');
+          }
         }
       }
     } else {
@@ -4293,10 +4946,17 @@
       panelWelcome.classList.add('active');
       document.getElementById('nav-dashboard').classList.add('active');
       
-      // Close journal accordion
+      // Close accordions
       journalHeader.classList.remove('open');
       journalSubmenu.classList.remove('open');
       journalHeader.setAttribute('aria-expanded', 'false');
+      const sHeader = document.getElementById('nav-sales');
+      const sSubmenu = document.getElementById('nav-sales-submenu');
+      if (sHeader && sSubmenu) {
+        sHeader.classList.remove('open');
+        sSubmenu.classList.remove('open');
+        sHeader.setAttribute('aria-expanded', 'false');
+      }
     }
   }
 
@@ -4366,10 +5026,17 @@
         item.classList.add('active');
       }
       
-      // Close journal accordion when another top-level item is clicked
+      // Close accordions when another top-level item is clicked
       journalHeader.classList.remove('open');
       journalSubmenu.classList.remove('open');
       journalHeader.setAttribute('aria-expanded', 'false');
+      const sHeader = document.getElementById('nav-sales');
+      const sSubmenu = document.getElementById('nav-sales-submenu');
+      if (sHeader && sSubmenu) {
+        sHeader.classList.remove('open');
+        sSubmenu.classList.remove('open');
+        sHeader.setAttribute('aria-expanded', 'false');
+      }
       subItems.forEach(s => s.classList.remove('active'));
     };
     item.addEventListener('click', handler);
@@ -4403,12 +5070,19 @@
   subItems.forEach(sub => {
     const handler = () => {
       const action = sub.dataset.jeAction;
+      const salesAction = sub.dataset.salesAction;
       if (action === 'new') {
         openTab('journal');
       } else if (action === 'posted') {
         openTab('posted');
       } else if (action === 'drafted') {
         openTab('drafted');
+      } else if (salesAction === 'new') {
+        openTab('sales_voucher');
+      } else if (salesAction === 'posted') {
+        openTab('sales_posted');
+      } else if (salesAction === 'drafted') {
+        openTab('sales_drafted');
       } else {
         activeTabId = null;
         renderTabs();
@@ -10710,6 +11384,9 @@
       } else {
         window.KYA_STORE = {};
       }
+      window.KYA_STORE.salesVouchers = window.KYA_STORE.salesVouchers || [];
+      window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
+      window.KYA_STORE.salesInvoiceCtr = window.KYA_STORE.salesInvoiceCtr || 1;
 
       if (!quiet) {
         showToast('Data restored successfully.', 'success');
@@ -11345,10 +12022,1617 @@
     }
   }
 
+  // ── Sales Voucher State & Functions ────────────────────────────────
+  let currentSalesType = 'Product';
+  let salesRows = [];
+  let currentSalesInvoiceMode = 'Auto'; // 'Auto' | 'Manual'
+
   // Initialize store for future features
   if (!window.KYA_STORE) {
     window.KYA_STORE = {};
   }
+  window.KYA_STORE.salesVouchers = window.KYA_STORE.salesVouchers || [];
+  window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
+  window.KYA_STORE.salesInvoiceCtr = window.KYA_STORE.salesInvoiceCtr || 1;
+
+  function getNextAutoInvoiceNumber() {
+    const year = new Date().getFullYear();
+    const ctr = window.KYA_STORE.salesInvoiceCtr || 1;
+    return `INV-${year}-${String(ctr).padStart(3, '0')}`;
+  }
+
+  function setInvoiceNoMode(mode) {
+    currentSalesInvoiceMode = mode;
+    const autoBtn = document.getElementById('salesInvoiceNoModeAuto');
+    const manualBtn = document.getElementById('salesInvoiceNoModeManual');
+    const bgEl = document.getElementById('salesInvoiceNoModeBg');
+    const invNoEl = document.getElementById('salesInvoiceNo');
+    const chipEl = document.getElementById('salesVoucherChipDisplay');
+    
+    if (!autoBtn || !manualBtn || !bgEl || !invNoEl || !chipEl) return;
+
+    if (mode === 'Auto') {
+      autoBtn.classList.add('active');
+      manualBtn.classList.remove('active');
+      bgEl.classList.add('prod-active');
+      bgEl.classList.remove('serv-active');
+      invNoEl.value = getNextAutoInvoiceNumber();
+      invNoEl.setAttribute('readonly', 'true');
+      invNoEl.style.background = 'var(--slate-50)';
+      invNoEl.style.color = 'var(--slate-400)';
+      chipEl.textContent = invNoEl.value;
+    } else {
+      manualBtn.classList.add('active');
+      autoBtn.classList.remove('active');
+      bgEl.classList.add('serv-active');
+      bgEl.classList.remove('prod-active');
+      invNoEl.removeAttribute('readonly');
+      invNoEl.value = '';
+      invNoEl.placeholder = 'INV-XXXX';
+      invNoEl.style.background = '#fff';
+      invNoEl.style.color = 'var(--slate-900)';
+      chipEl.textContent = 'INV-XXXX';
+    }
+  }
+
+  function populateSalesCustomers(selectedId = null) {
+    const custSelect = document.getElementById('salesCustomer');
+    if (!custSelect) return;
+    
+    custSelect.innerHTML = '<option value="">&mdash; Select Customer &mdash;</option>';
+    
+    const customers = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-tr');
+    customers.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      if (selectedId && c.id == selectedId) {
+        opt.selected = true;
+      }
+      custSelect.appendChild(opt);
+    });
+  }
+
+  function populateSalesPaymentAccounts(selectedId = null) {
+    const paySelect = document.getElementById('salesPaymentAccount');
+    if (!paySelect) return;
+    
+    paySelect.innerHTML = '<option value="">&mdash; Select Payment Account &mdash;</option>';
+    
+    const accounts = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
+    accounts.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.name;
+      if (selectedId && a.id == selectedId) {
+        opt.selected = true;
+      }
+      paySelect.appendChild(opt);
+    });
+  }
+
+  function getSalesPaymentStatus() {
+    const fullBtn = document.getElementById('salesPaymentStatusFull');
+    const partBtn = document.getElementById('salesPaymentStatusPartial');
+    if (fullBtn && fullBtn.classList.contains('active')) return 'Full Payment';
+    if (partBtn && partBtn.classList.contains('active')) return 'Partial Payment';
+    return 'Not Paid';
+  }
+
+  function getOrCreateSystemLedger(name, sgId) {
+    let ldg = coaLedgers.find(l => l.type === 'ledger' && l.name.toLowerCase() === name.toLowerCase());
+    if (!ldg) {
+      const newId = Date.now() + _coaLedgerCtr++;
+      ldg = {
+        id: newId,
+        sgId: sgId,
+        glId: null,
+        name: name,
+        code: '',
+        openingBalance: 0,
+        type: 'ledger'
+      };
+      coaLedgers.push(ldg);
+      
+      const sg = COA_SYS_SGS.find(s => s.id === sgId);
+      if (sg) {
+        _coaExpanded.add(sgId);
+        if (sg.parent) _coaExpanded.add(sg.parent);
+        _coaExpanded.add(sg.main);
+      }
+      
+      renderChartPanel();
+      refreshAllReports();
+      triggerAutoBackup();
+    }
+    return ldg.id;
+  }
+
+  function getIncomeLedgers() {
+    let list = coaLedgers.filter(l => l.type === 'ledger' && (l.sgId === 'sg-rfo' || l.sgId === 'sg-oi'));
+    if (list.length === 0) {
+      getOrCreateSystemLedger('Sales Account', 'sg-rfo');
+      list = coaLedgers.filter(l => l.type === 'ledger' && (l.sgId === 'sg-rfo' || l.sgId === 'sg-oi'));
+    }
+    return list;
+  }
+
+  function renderSalesHeaders() {
+    const headerRow = document.getElementById('salesTableHeader');
+    if (!headerRow) return;
+    
+    if (currentSalesType === 'Product') {
+      headerRow.innerHTML = `
+        <th class="col-item">Item Name</th>
+        <th class="col-qty" style="width: 80px; text-align: right;">Qty</th>
+        <th class="col-rate" style="width: 120px; text-align: right;">Rate</th>
+        <th class="col-disc" style="width: 140px; text-align: right;">Discount</th>
+        <th class="col-tax" style="width: 100px; text-align: right;">Tax</th>
+        <th class="col-amt" style="width: 140px; text-align: right;">Amount</th>
+        <th class="col-del" style="width: 50px; text-align: center;"></th>
+      `;
+    } else {
+      headerRow.innerHTML = `
+        <th class="col-item">Revenue Account</th>
+        <th class="col-rate" style="width: 150px; text-align: right;">Base Amount</th>
+        <th class="col-disc" style="width: 140px; text-align: right;">Discount</th>
+        <th class="col-tax" style="width: 100px; text-align: right;">Tax</th>
+        <th class="col-amt" style="width: 140px; text-align: right;">Amount</th>
+        <th class="col-del" style="width: 50px; text-align: center;"></th>
+      `;
+    }
+  }
+
+  function renderSalesRows() {
+    renderSalesHeaders();
+    const body = document.getElementById('salesItemBody');
+    if (!body) return;
+    
+    body.innerHTML = '';
+    const incomeLedgers = getIncomeLedgers();
+    
+    salesRows.forEach((row, index) => {
+      let trHtml = '';
+      if (currentSalesType === 'Product') {
+        trHtml = `
+          <tr class="sales-row" data-row-index="${index}">
+            <td>
+              <input type="text" class="sales-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Item Description" style="border: none; background: transparent; box-shadow: none;" />
+            </td>
+            <td style="width: 80px;">
+              <input type="number" class="sales-row-qty je-input" value="${row.qty}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right;" />
+            </td>
+            <td style="width: 120px;">
+              <input type="number" class="sales-row-rate je-input" value="${row.rate === 0 ? '' : row.rate}" placeholder="0.00" min="0" step="0.01" style="border: none; background: transparent; box-shadow: none; text-align: right;" />
+            </td>
+            <td style="width: 140px;">
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <input type="number" class="sales-row-discount je-input" value="${row.discount === 0 ? '' : row.discount}" placeholder="0.00" min="0" step="0.01" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 70px;" />
+                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 45px; padding: 0 2px; font-weight: 600; cursor: pointer;">
+                  <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
+                  <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
+                </select>
+              </div>
+            </td>
+            <td style="width: 100px;">
+              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none;">
+                <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
+                <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
+                <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
+                <option value="18" ${row.tax === 18 ? 'selected' : ''}>18%</option>
+                <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+              </select>
+            </td>
+            <td style="width: 140px; text-align: right; padding-right: 12px; font-weight: 600;" class="sales-row-amount">
+              ₹ ${fmtNum(row.amount)}
+            </td>
+            <td style="width: 50px; text-align: center;">
+              <button type="button" class="sales-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
+                <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
+                  <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </td>
+          </tr>
+        `;
+      } else {
+        trHtml = `
+          <tr class="sales-row" data-row-index="${index}">
+            <td>
+              <select class="sales-row-rev-acc je-input" style="border: none; background: transparent; box-shadow: none;">
+                <option value="">&mdash; Select Revenue Account &mdash;</option>
+                ${incomeLedgers.map(l => `<option value="${l.id}" ${row.revenueLedgerId == l.id ? 'selected' : ''}>${l.name}</option>`).join('')}
+              </select>
+            </td>
+            <td style="width: 150px;">
+              <input type="number" class="sales-row-base je-input" value="${row.baseAmount === 0 ? '' : row.baseAmount}" placeholder="0.00" min="0" step="0.01" style="border: none; background: transparent; box-shadow: none; text-align: right;" />
+            </td>
+            <td style="width: 140px;">
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <input type="number" class="sales-row-discount je-input" value="${row.discount === 0 ? '' : row.discount}" placeholder="0.00" min="0" step="0.01" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 70px;" />
+                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 45px; padding: 0 2px; font-weight: 600; cursor: pointer;">
+                  <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
+                  <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
+                </select>
+              </div>
+            </td>
+            <td style="width: 100px;">
+              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none;">
+                <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
+                <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
+                <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
+                <option value="18" ${row.tax === 18 ? 'selected' : ''}>18%</option>
+                <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+              </select>
+            </td>
+            <td style="width: 140px; text-align: right; padding-right: 12px; font-weight: 600;" class="sales-row-amount">
+              ₹ ${fmtNum(row.amount)}
+            </td>
+            <td style="width: 50px; text-align: center;">
+              <button type="button" class="sales-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
+                <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
+                  <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </td>
+          </tr>
+        `;
+      }
+      
+      const tempDiv = document.createElement('tbody');
+      tempDiv.innerHTML = trHtml;
+      const tr = tempDiv.firstElementChild;
+      body.appendChild(tr);
+    });
+  }
+
+  function addSalesRow() {
+    if (currentSalesType === 'Product') {
+      salesRows.push({ item: '', qty: 1, rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
+    } else {
+      salesRows.push({ revenueLedgerId: '', baseAmount: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
+    }
+    renderSalesRows();
+    recalculateSalesTotals();
+  }
+
+  function switchSalesType(type) {
+    currentSalesType = type;
+    salesRows = [];
+    addSalesRow();
+  }
+
+  function updateRowFromDOM(index, tr) {
+    const row = salesRows[index];
+    if (!row) return;
+    
+    if (currentSalesType === 'Product') {
+      row.item = tr.querySelector('.sales-row-item').value;
+      row.qty = parseFloat(tr.querySelector('.sales-row-qty').value) || 0;
+      row.rate = parseFloat(tr.querySelector('.sales-row-rate').value) || 0;
+      row.discount = parseFloat(tr.querySelector('.sales-row-discount').value) || 0;
+      row.discountType = tr.querySelector('.sales-row-discount-type').value;
+      row.tax = parseFloat(tr.querySelector('.sales-row-tax').value) || 0;
+      
+      const base = row.qty * row.rate;
+      const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+      const afterDiscount = Math.max(0, base - discAmt);
+      const taxAmt = afterDiscount * (row.tax / 100);
+      row.amount = afterDiscount + taxAmt;
+    } else {
+      row.revenueLedgerId = tr.querySelector('.sales-row-rev-acc').value;
+      row.baseAmount = parseFloat(tr.querySelector('.sales-row-base').value) || 0;
+      row.discount = parseFloat(tr.querySelector('.sales-row-discount').value) || 0;
+      row.discountType = tr.querySelector('.sales-row-discount-type').value;
+      row.tax = parseFloat(tr.querySelector('.sales-row-tax').value) || 0;
+      
+      const discAmt = row.discountType === 'pct' ? (row.baseAmount * (row.discount / 100)) : row.discount;
+      const afterDiscount = Math.max(0, row.baseAmount - discAmt);
+      const taxAmt = afterDiscount * (row.tax / 100);
+      row.amount = afterDiscount + taxAmt;
+    }
+    
+    tr.querySelector('.sales-row-amount').textContent = '₹ ' + fmtNum(row.amount);
+    recalculateSalesTotals();
+  }
+
+  function calculateSubtotal() {
+    let sub = 0;
+    salesRows.forEach(r => {
+      sub += r.amount || 0;
+    });
+    return sub;
+  }
+
+  function recalculateSalesTotals() {
+    const subTotal = calculateSubtotal();
+    const subTotalEl = document.getElementById('salesSubTotal');
+    if (subTotalEl) subTotalEl.textContent = '₹ ' + fmtNum(subTotal);
+    
+    let tdsTcsMode = 'None';
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
+    if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
+    
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
+    let rate = 0;
+    
+    if (tdsTcsMode === 'None') {
+      rate = 0;
+    } else if (rateSelect) {
+      if (rateSelect.value === 'custom') {
+        if (customWrap) customWrap.style.display = 'block';
+        const customInput = document.getElementById('salesTdsTcsRateCustom');
+        rate = customInput ? (parseFloat(customInput.value) || 0) : 0;
+      } else {
+        if (customWrap) customWrap.style.display = 'none';
+        rate = parseFloat(rateSelect.value) || 0;
+      }
+    }
+    
+    const rateLabel = document.getElementById('salesTdsTcsRateLabel');
+    if (rateLabel) {
+      rateLabel.textContent = (rate % 1 === 0 ? rate.toFixed(0) : (rate * 10 % 1 === 0 ? rate.toFixed(1) : rate.toFixed(2))) + '%';
+    }
+    
+    const amountInput = document.getElementById('salesTdsTcsAmount');
+    
+    if (amountInput && document.activeElement !== amountInput) {
+      if (tdsTcsMode !== 'None') {
+        const calculatedAmt = subTotal * (rate / 100);
+        amountInput.value = calculatedAmt.toFixed(2);
+      } else {
+        amountInput.value = '';
+      }
+    }
+    
+    const tdsTcsAmount = amountInput ? (parseFloat(amountInput.value) || 0) : 0;
+    const adjustmentsInput = document.getElementById('salesAdjustments');
+    const adjustments = adjustmentsInput ? (parseFloat(adjustmentsInput.value) || 0) : 0;
+    
+    let total = subTotal;
+    if (tdsTcsMode === 'TDS') {
+      total = subTotal - tdsTcsAmount;
+    } else if (tdsTcsMode === 'TCS') {
+      total = subTotal + tdsTcsAmount;
+    }
+    total += adjustments;
+    
+    const totalEl = document.getElementById('salesTotal');
+    if (totalEl) totalEl.textContent = '₹ ' + fmtNum(total);
+  }
+
+  function initSalesForm() {
+    const today = new Date().toISOString().split('T')[0];
+    const dateEl = document.getElementById('salesDate');
+    const dueEl = document.getElementById('salesDueDate');
+    if (dateEl) dateEl.value = today;
+    if (dueEl) dueEl.value = today;
+    
+    const orderEl = document.getElementById('salesOrderNo');
+    const notesEl = document.getElementById('salesNotes');
+    const adjEl = document.getElementById('salesAdjustments');
+    if (orderEl) orderEl.value = '';
+    if (notesEl) notesEl.value = '';
+    if (adjEl) adjEl.value = '';
+    
+    const noneBtn = document.getElementById('salesTdsTcsNone');
+    if (noneBtn) noneBtn.click();
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    const customInput = document.getElementById('salesTdsTcsRateCustom');
+    const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
+    const label = document.getElementById('salesTdsTcsRateLabel');
+    const amt = document.getElementById('salesTdsTcsAmount');
+    if (rateSelect) rateSelect.value = '1';
+    if (customInput) customInput.value = '';
+    if (customWrap) customWrap.style.display = 'none';
+    if (label) label.textContent = '0%';
+    if (amt) amt.value = '';
+    
+    populateSalesCustomers();
+    const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
+    if (notPaidBtn) notPaidBtn.click();
+    const payAccEl = document.getElementById('salesPaymentAccount');
+    if (payAccEl) payAccEl.value = '';
+    const payAmtEl = document.getElementById('salesPaymentAmount');
+    if (payAmtEl) payAmtEl.value = '';
+    setInvoiceNoMode('Auto');
+    
+    currentSalesType = 'Product';
+    const prodBtn = document.getElementById('salesTypeProduct');
+    const servBtn = document.getElementById('salesTypeService');
+    const typeBg = document.getElementById('salesTypeBg');
+    if (prodBtn) prodBtn.classList.add('active');
+    if (servBtn) servBtn.classList.remove('active');
+    if (typeBg) {
+      typeBg.classList.add('prod-active');
+      typeBg.classList.remove('serv-active');
+    }
+    
+    salesRows = [];
+    addSalesRow();
+  }
+
+  function loadSalesInvoice(inv, isDraft) {
+    openTab('sales_voucher');
+    
+    currentSalesType = inv.type;
+    const prodBtn = document.getElementById('salesTypeProduct');
+    const servBtn = document.getElementById('salesTypeService');
+    const typeBg = document.getElementById('salesTypeBg');
+    if (inv.type === 'Product') {
+      if (prodBtn) prodBtn.classList.add('active');
+      if (servBtn) servBtn.classList.remove('active');
+      if (typeBg) {
+        typeBg.classList.add('prod-active');
+        typeBg.classList.remove('serv-active');
+      }
+    } else {
+      if (servBtn) servBtn.classList.add('active');
+      if (prodBtn) prodBtn.classList.remove('active');
+      if (typeBg) {
+        typeBg.classList.add('serv-active');
+        typeBg.classList.remove('prod-active');
+      }
+    }
+    
+    setInvoiceNoMode(inv.mode || 'Manual');
+    const invNoEl = document.getElementById('salesInvoiceNo');
+    const chipEl = document.getElementById('salesVoucherChipDisplay');
+    if (invNoEl) invNoEl.value = inv.invoiceNo;
+    if (chipEl) chipEl.textContent = inv.invoiceNo;
+    
+    const orderEl = document.getElementById('salesOrderNo');
+    const dateEl = document.getElementById('salesDate');
+    const dueEl = document.getElementById('salesDueDate');
+    if (orderEl) orderEl.value = inv.orderNo || '';
+    if (dateEl) dateEl.value = inv.date;
+    if (dueEl) dueEl.value = inv.dueDate || inv.date;
+    
+    populateSalesCustomers(inv.customerId);
+    
+    const notesEl = document.getElementById('salesNotes');
+    if (notesEl) notesEl.value = inv.notes || '';
+    
+    const tdsTcsMode = inv.tdsTcsMode || 'None';
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    const customInput = document.getElementById('salesTdsTcsRateCustom');
+    const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
+    const label = document.getElementById('salesTdsTcsRateLabel');
+    const amt = document.getElementById('salesTdsTcsAmount');
+    
+    const rateVal = inv.tdsTcsRate || 0;
+    if (rateSelect) {
+      const stdOptions = ['0', '0.1', '1', '2', '5', '10'];
+      if (stdOptions.includes(String(rateVal))) {
+        rateSelect.value = String(rateVal);
+        if (customWrap) customWrap.style.display = 'none';
+      } else {
+        rateSelect.value = 'custom';
+        if (customInput) customInput.value = rateVal;
+        if (customWrap) customWrap.style.display = 'block';
+      }
+    }
+    if (label) {
+      label.textContent = (rateVal % 1 === 0 ? rateVal.toFixed(0) : (rateVal * 10 % 1 === 0 ? rateVal.toFixed(1) : rateVal.toFixed(2))) + '%';
+    }
+    if (amt) amt.value = inv.tdsTcsAmount !== undefined ? inv.tdsTcsAmount : '';
+    
+    if (tdsTcsMode === 'TDS') {
+      const tdsBtn = document.getElementById('salesTdsTcsTds');
+      if (tdsBtn) tdsBtn.click();
+    } else if (tdsTcsMode === 'TCS') {
+      const tcsBtn = document.getElementById('salesTdsTcsTcs');
+      if (tcsBtn) tcsBtn.click();
+    } else {
+      const noneBtn = document.getElementById('salesTdsTcsNone');
+      if (noneBtn) noneBtn.click();
+    }
+    
+    const adjEl = document.getElementById('salesAdjustments');
+    if (adjEl) adjEl.value = inv.adjustments !== undefined ? inv.adjustments : '';
+    
+    const payStatus = inv.paymentStatus || 'Not Paid';
+    if (payStatus === 'Full Payment') {
+      const fullBtn = document.getElementById('salesPaymentStatusFull');
+      if (fullBtn) fullBtn.click();
+    } else if (payStatus === 'Partial Payment') {
+      const partBtn = document.getElementById('salesPaymentStatusPartial');
+      if (partBtn) partBtn.click();
+    } else {
+      const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
+      if (notPaidBtn) notPaidBtn.click();
+    }
+    populateSalesPaymentAccounts(inv.paymentAccountId);
+    const payAmtEl = document.getElementById('salesPaymentAmount');
+    if (payAmtEl) payAmtEl.value = inv.paymentAmount !== undefined ? inv.paymentAmount : '';
+    
+    salesRows = JSON.parse(JSON.stringify(inv.rows));
+    renderSalesRows();
+    recalculateSalesTotals();
+    
+    window._editingSalesInvoice = { id: inv.id, isDraft: isDraft };
+  }
+
+  function saveSalesDraft() {
+    const customerId = document.getElementById('salesCustomer').value;
+    const invoiceNo = document.getElementById('salesInvoiceNo').value.trim();
+    const date = document.getElementById('salesDate').value;
+    const dueDate = document.getElementById('salesDueDate').value;
+    const orderNo = document.getElementById('salesOrderNo').value.trim();
+    const notes = document.getElementById('salesNotes').value;
+    const adjustments = parseFloat(document.getElementById('salesAdjustments').value) || 0;
+    
+    let tdsTcsMode = 'None';
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
+    if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
+    
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    let tdsTcsRate = 0;
+    if (rateSelect) {
+      if (rateSelect.value === 'custom') {
+        const customInput = document.getElementById('salesTdsTcsRateCustom');
+        tdsTcsRate = customInput ? (parseFloat(customInput.value) || 0) : 0;
+      } else {
+        tdsTcsRate = parseFloat(rateSelect.value) || 0;
+      }
+    }
+    const amtEl = document.getElementById('salesTdsTcsAmount');
+    const tdsTcsAmount = amtEl ? (parseFloat(amtEl.value) || 0) : 0;
+    
+    const subTotal = calculateSubtotal();
+    let total = subTotal;
+    if (tdsTcsMode === 'TDS') total = subTotal - tdsTcsAmount;
+    else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
+    total += adjustments;
+    
+    const paymentStatus = getSalesPaymentStatus();
+    const paymentAccountId = document.getElementById('salesPaymentAccount').value;
+    let paymentAmount = 0;
+    if (paymentStatus === 'Full Payment') {
+      paymentAmount = total;
+    } else if (paymentStatus === 'Partial Payment') {
+      paymentAmount = parseFloat(document.getElementById('salesPaymentAmount').value) || 0;
+    }
+
+    const draftData = {
+      id: (window._editingSalesInvoice && window._editingSalesInvoice.isDraft) ? window._editingSalesInvoice.id : Date.now(),
+      type: currentSalesType,
+      mode: currentSalesInvoiceMode,
+      invoiceNo: invoiceNo || 'Draft',
+      customerId,
+      date,
+      dueDate,
+      orderNo,
+      notes,
+      tdsTcsMode,
+      tdsTcsRate,
+      tdsTcsAmount,
+      adjustments,
+      subTotal,
+      total,
+      paymentStatus,
+      paymentAccountId,
+      paymentAmount,
+      rows: JSON.parse(JSON.stringify(salesRows)),
+      updatedAt: Date.now()
+    };
+    
+    window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
+    
+    const existingIndex = window.KYA_STORE.salesVouchersDrafts.findIndex(d => d.id === draftData.id);
+    if (existingIndex > -1) {
+      window.KYA_STORE.salesVouchersDrafts[existingIndex] = draftData;
+    } else {
+      window.KYA_STORE.salesVouchersDrafts.push(draftData);
+    }
+    
+    showToast('Sales Invoice Draft saved successfully.', 'success');
+    window._editingSalesInvoice = null;
+    initSalesForm();
+    openTab('sales_drafted');
+    triggerAutoBackup();
+  }
+
+  function postSalesInvoice() {
+    const customerId = document.getElementById('salesCustomer').value;
+    if (!customerId) {
+      showToast('Please select a Customer.', 'warning');
+      return;
+    }
+    
+    const invoiceNo = document.getElementById('salesInvoiceNo').value.trim();
+    if (!invoiceNo) {
+      showToast('Invoice number is required.', 'warning');
+      return;
+    }
+    
+    window.KYA_STORE.salesVouchers = window.KYA_STORE.salesVouchers || [];
+    const dup = window.KYA_STORE.salesVouchers.some(v => v.invoiceNo.toLowerCase() === invoiceNo.toLowerCase() && (!window._editingSalesInvoice || window._editingSalesInvoice.isDraft || v.id !== window._editingSalesInvoice.id));
+    if (dup) {
+      showToast(`Invoice No. "${invoiceNo}" has already been posted. Please use a unique number.`, 'danger');
+      return;
+    }
+    
+    if (salesRows.length === 0) {
+      showToast('Please add at least one line item.', 'warning');
+      return;
+    }
+    
+    if (currentSalesType === 'Product') {
+      const invalid = salesRows.some(r => !r.item.trim() || r.qty <= 0 || r.rate < 0);
+      if (invalid) {
+        showToast('Please ensure all items have descriptions, quantity > 0, and rate >= 0.', 'warning');
+        return;
+      }
+    } else {
+      const invalid = salesRows.some(r => !r.revenueLedgerId || r.baseAmount < 0);
+      if (invalid) {
+        showToast('Please ensure all items have a selected Revenue Account and base amount >= 0.', 'warning');
+        return;
+      }
+    }
+    
+    const date = document.getElementById('salesDate').value;
+    const dueDate = document.getElementById('salesDueDate').value;
+    const orderNo = document.getElementById('salesOrderNo').value.trim();
+    const notes = document.getElementById('salesNotes').value;
+    const adjustments = parseFloat(document.getElementById('salesAdjustments').value) || 0;
+    
+    let tdsTcsMode = 'None';
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
+    if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
+    
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    let tdsTcsRate = 0;
+    if (rateSelect) {
+      if (rateSelect.value === 'custom') {
+        const customInput = document.getElementById('salesTdsTcsRateCustom');
+        tdsTcsRate = customInput ? (parseFloat(customInput.value) || 0) : 0;
+      } else {
+        tdsTcsRate = parseFloat(rateSelect.value) || 0;
+      }
+    }
+    const amtEl = document.getElementById('salesTdsTcsAmount');
+    const tdsTcsAmount = amtEl ? (parseFloat(amtEl.value) || 0) : 0;
+    
+    const subTotal = calculateSubtotal();
+    let total = subTotal;
+    if (tdsTcsMode === 'TDS') total = subTotal - tdsTcsAmount;
+    else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
+    total += adjustments;
+    
+    const paymentStatus = getSalesPaymentStatus();
+    const paymentAccountId = document.getElementById('salesPaymentAccount').value;
+    let paymentAmount = 0;
+    
+    if (paymentStatus !== 'Not Paid') {
+      if (!paymentAccountId) {
+        showToast('Please select a Payment Account.', 'warning');
+        return;
+      }
+      if (paymentStatus === 'Full Payment') {
+        paymentAmount = total;
+      } else if (paymentStatus === 'Partial Payment') {
+        paymentAmount = parseFloat(document.getElementById('salesPaymentAmount').value) || 0;
+        if (paymentAmount <= 0) {
+          showToast('Payment Amount must be greater than zero for Partial Payments.', 'warning');
+          return;
+        }
+        if (paymentAmount > total) {
+          showToast('Payment Amount cannot exceed the Grand Total.', 'warning');
+          return;
+        }
+      }
+    }
+
+    const journalEntryId = postSalesVoucherToJournal({
+      invoiceNo,
+      customerId,
+      date,
+      dueDate,
+      orderNo,
+      notes,
+      tdsTcsMode,
+      tdsTcsRate,
+      tdsTcsAmount,
+      adjustments,
+      subTotal,
+      total,
+      paymentStatus,
+      paymentAccountId,
+      paymentAmount,
+      rows: salesRows,
+      type: currentSalesType
+    });
+    
+    const invoiceData = {
+      id: Date.now(),
+      type: currentSalesType,
+      invoiceNo,
+      customerId,
+      date,
+      dueDate,
+      orderNo,
+      notes,
+      tdsTcsMode,
+      tdsTcsRate,
+      tdsTcsAmount,
+      adjustments,
+      subTotal,
+      total,
+      paymentStatus,
+      paymentAccountId,
+      paymentAmount,
+      rows: JSON.parse(JSON.stringify(salesRows)),
+      journalEntryId,
+      postedAt: Date.now()
+    };
+    
+    if (window._editingSalesInvoice && window._editingSalesInvoice.isDraft) {
+      window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts.filter(d => d.id !== window._editingSalesInvoice.id);
+    }
+    
+    window.KYA_STORE.salesVouchers.push(invoiceData);
+    
+    if (currentSalesInvoiceMode === 'Auto') {
+      window.KYA_STORE.salesInvoiceCtr = (window.KYA_STORE.salesInvoiceCtr || 1) + 1;
+    }
+    
+    showToast(`Invoice "${invoiceNo}" posted and journal entry created successfully.`, 'success');
+    window._editingSalesInvoice = null;
+    initSalesForm();
+    openTab('sales_posted');
+    triggerAutoBackup();
+  }
+
+  function postSalesVoucherToJournal(invoice) {
+    const customer = coaLedgers.find(l => l.id == invoice.customerId);
+    const customerName = customer ? customer.name : 'Unknown Customer';
+    
+    const journalRows = [];
+    
+    let paidAmount = 0;
+    if (invoice.paymentStatus === 'Full Payment') {
+      paidAmount = invoice.total;
+    } else if (invoice.paymentStatus === 'Partial Payment') {
+      paidAmount = invoice.paymentAmount || 0;
+    }
+    const unpaidAmount = invoice.total - paidAmount;
+    
+    if (unpaidAmount > 0) {
+      journalRows.push({
+        id: journalRows.length + 1,
+        type: 'By',
+        particular: customerName,
+        debit: unpaidAmount.toFixed(2),
+        credit: ''
+      });
+    }
+    
+    if (paidAmount > 0) {
+      const payAccount = coaLedgers.find(l => l.id == invoice.paymentAccountId);
+      const payAccountName = payAccount ? payAccount.name : 'Cash Account';
+      
+      journalRows.push({
+        id: journalRows.length + 1,
+        type: 'By',
+        particular: payAccountName,
+        debit: paidAmount.toFixed(2),
+        credit: ''
+      });
+    }
+    
+    if (invoice.tdsTcsMode === 'TDS' && invoice.tdsTcsAmount > 0) {
+      const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
+      const tdsName = coaLedgers.find(l => l.id == tdsLedgerId).name;
+      journalRows.push({
+        id: journalRows.length + 1,
+        type: 'By',
+        particular: tdsName,
+        debit: invoice.tdsTcsAmount.toFixed(2),
+        credit: ''
+      });
+    }
+    
+    if (invoice.adjustments < 0) {
+      const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+      const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
+      journalRows.push({
+        id: journalRows.length + 1,
+        type: 'By',
+        particular: adjName,
+        debit: Math.abs(invoice.adjustments).toFixed(2),
+        credit: ''
+      });
+    }
+    
+    if (invoice.type === 'Product') {
+      let totalRevenue = 0;
+      invoice.rows.forEach(r => {
+        const base = r.qty * r.rate;
+        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+        totalRevenue += Math.max(0, base - discAmt);
+      });
+      if (totalRevenue > 0) {
+        const salesLedgerId = getOrCreateSystemLedger('Sales Account', 'sg-rfo');
+        const salesName = coaLedgers.find(l => l.id == salesLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: salesName,
+          debit: '',
+          credit: totalRevenue.toFixed(2)
+        });
+      }
+    } else {
+      const revenueByLedger = {};
+      invoice.rows.forEach(r => {
+        const base = r.baseAmount;
+        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+        const amt = Math.max(0, base - discAmt);
+        revenueByLedger[r.revenueLedgerId] = (revenueByLedger[r.revenueLedgerId] || 0) + amt;
+      });
+      for (const ledgId in revenueByLedger) {
+        const revAmt = revenueByLedger[ledgId];
+        if (revAmt > 0) {
+          const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'To',
+            particular: ledgerName,
+            debit: '',
+            credit: revAmt.toFixed(2)
+          });
+        }
+      }
+    }
+    
+    let totalGst = 0;
+    invoice.rows.forEach(r => {
+      const base = invoice.type === 'Product' ? (r.qty * r.rate) : r.baseAmount;
+      const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+      const afterDiscount = Math.max(0, base - discAmt);
+      totalGst += afterDiscount * (r.tax / 100);
+    });
+    if (totalGst > 0) {
+      const gstLedgerId = getOrCreateSystemLedger('GST Payable', 'sg-ocl');
+      const gstName = coaLedgers.find(l => l.id == gstLedgerId).name;
+      journalRows.push({
+        id: journalRows.length + 1,
+        type: 'To',
+        particular: gstName,
+        debit: '',
+        credit: totalGst.toFixed(2)
+      });
+    }
+    
+    if (invoice.tdsTcsMode === 'TCS' && invoice.tdsTcsAmount > 0) {
+      const tcsLedgerId = getOrCreateSystemLedger('TCS Payable', 'sg-ocl');
+      const tcsName = coaLedgers.find(l => l.id == tcsLedgerId).name;
+      journalRows.push({
+        id: journalRows.length + 1,
+        type: 'To',
+        particular: tcsName,
+        debit: '',
+        credit: invoice.tdsTcsAmount.toFixed(2)
+      });
+    }
+    
+    if (invoice.adjustments > 0) {
+      const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+      const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
+      journalRows.push({
+        id: journalRows.length + 1,
+        type: 'To',
+        particular: adjName,
+        debit: '',
+        credit: invoice.adjustments.toFixed(2)
+      });
+    }
+    
+    const entryId = Date.now();
+    const entry = {
+      id:             entryId,
+      date:           invoice.date,
+      voucherNo:      `SV-${invoice.invoiceNo}`,
+      preparedBy:     'Sales Module',
+      departmentId:   '',
+      isBudget:       false,
+      firstParticular: customerName,
+      amount:         fmtNum(invoice.total),
+      allRows:        journalRows,
+      narration:      `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}. ${invoice.notes || ''}`,
+    };
+    
+    postedEntries.unshift(entry);
+    refreshAllReports();
+    return entryId;
+  }
+
+  function renderSalesPostedPanel() {
+    const wrap = document.getElementById('salesPostedTableWrap');
+    if (!wrap) return;
+    
+    const list = window.KYA_STORE.salesVouchers || [];
+    if (list.length === 0) {
+      wrap.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px; color: var(--slate-400);">
+          <div style="font-size: 40px; margin-bottom: 12px;">📄</div>
+          <div style="font-weight: 600; font-size: 15px; color: var(--slate-500);">No Posted Invoices Yet</div>
+          <p style="font-size: 13px; margin: 4px 0 16px;">Post a Sales Voucher to see it here.</p>
+          <button class="btn btn-primary" onclick="openTab('sales_voucher')">Create Invoice</button>
+        </div>
+      `;
+      return;
+    }
+    
+    const sorted = [...list].sort((a,b) => b.postedAt - a.postedAt);
+    
+    let rowsHtml = sorted.map(inv => {
+      const custName = (coaLedgers.find(l => l.id == inv.customerId) || { name: 'Unknown Customer' }).name;
+      return `
+        <tr class="sales-row">
+          <td style="padding: 14px 16px; font-weight: 700; color: var(--blue-700);">${ohEsc(inv.invoiceNo)}</td>
+          <td style="padding: 14px 16px;">${inv.date}</td>
+          <td style="padding: 14px 16px; font-weight: 600;">${ohEsc(custName)}</td>
+          <td style="padding: 14px 16px;"><span class="badge" style="background: var(--blue-50); color: var(--blue-700); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${inv.type}</span></td>
+          <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: var(--slate-900);">₹ ${fmtNum(inv.total)}</td>
+          <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
+            <button class="btn btn-secondary btn-sm" onclick="viewPrintInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px;">View / Print</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSalesInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    wrap.innerHTML = `
+      <div class="sales-table-wrap" style="background: #fff; border: 1.5px solid var(--slate-200); border-radius: 16px; padding: 8px 16px 16px; box-shadow: var(--shadow-sm);">
+        <table class="sales-table" style="border-spacing: 0;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--slate-100);">
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Invoice No.</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Date</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Customer</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Type</th>
+              <th style="padding: 12px 16px; text-align: right; border-bottom: 2px solid var(--slate-100);">Total Amount</th>
+              <th style="padding: 12px 16px; text-align: center; border-bottom: 2px solid var(--slate-100);">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function deleteSalesInvoice(id) {
+    showKyaConfirm({
+      title: 'Delete Posted Invoice?',
+      message: 'Are you sure you want to delete this sales invoice? This will also delete the corresponding journal entry and cannot be undone.',
+      confirmLabel: 'Delete',
+      okBg: 'var(--red-600)',
+      onConfirm: () => {
+        const list = window.KYA_STORE.salesVouchers || [];
+        const index = list.findIndex(v => v.id === id);
+        if (index === -1) return;
+        
+        const invoice = list[index];
+        list.splice(index, 1);
+        window.KYA_STORE.salesVouchers = list;
+        
+        if (invoice.journalEntryId) {
+          postedEntries = postedEntries.filter(e => e.id !== invoice.journalEntryId);
+        }
+        
+        showToast(`Invoice "${invoice.invoiceNo}" deleted.`, 'success');
+        renderSalesPostedPanel();
+        refreshAllReports();
+        triggerAutoBackup();
+      }
+    });
+  }
+
+  function renderSalesDraftedPanel() {
+    const wrap = document.getElementById('salesDraftedTableWrap');
+    if (!wrap) return;
+    
+    const list = window.KYA_STORE.salesVouchersDrafts || [];
+    if (list.length === 0) {
+      wrap.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px; color: var(--slate-400);">
+          <div style="font-size: 40px; margin-bottom: 12px;">📝</div>
+          <div style="font-weight: 600; font-size: 15px; color: var(--slate-500);">No Drafts Found</div>
+          <p style="font-size: 13px; margin: 4px 0 16px;">Save an invoice as a draft to see it here.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    const sorted = [...list].sort((a,b) => b.updatedAt - a.updatedAt);
+    
+    let rowsHtml = sorted.map(draft => {
+      const custName = draft.customerId ? ((coaLedgers.find(l => l.id == draft.customerId) || { name: 'Unknown Customer' }).name) : '&mdash; No Customer &mdash;';
+      return `
+        <tr class="sales-row">
+          <td style="padding: 14px 16px; font-weight: 700; color: var(--slate-700);">${ohEsc(draft.invoiceNo || 'Draft')}</td>
+          <td style="padding: 14px 16px;">${draft.date || '&mdash;'}</td>
+          <td style="padding: 14px 16px; font-weight: 600;">${ohEsc(custName)}</td>
+          <td style="padding: 14px 16px;"><span class="badge" style="background: var(--slate-100); color: var(--slate-600); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${draft.type}</span></td>
+          <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: var(--slate-700);">₹ ${fmtNum(draft.total)}</td>
+          <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
+            <button class="btn btn-primary btn-sm" onclick="editSalesDraft(${draft.id})" style="padding: 6px 12px; font-size: 12px;">Edit / Load</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSalesDraft(${draft.id})" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    wrap.innerHTML = `
+      <div class="sales-table-wrap" style="background: #fff; border: 1.5px solid var(--slate-200); border-radius: 16px; padding: 8px 16px 16px; box-shadow: var(--shadow-sm);">
+        <table class="sales-table" style="border-spacing: 0;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--slate-100);">
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Invoice No.</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Date</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Customer</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Type</th>
+              <th style="padding: 12px 16px; text-align: right; border-bottom: 2px solid var(--slate-100);">Total Amount</th>
+              <th style="padding: 12px 16px; text-align: center; border-bottom: 2px solid var(--slate-100);">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function editSalesDraft(id) {
+    const list = window.KYA_STORE.salesVouchersDrafts || [];
+    const draft = list.find(d => d.id === id);
+    if (!draft) return;
+    
+    loadSalesInvoice(draft, true);
+  }
+
+  function deleteSalesDraft(id) {
+    showKyaConfirm({
+      title: 'Delete Draft?',
+      message: 'Are you sure you want to delete this draft? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      okBg: 'var(--red-600)',
+      onConfirm: () => {
+        let list = window.KYA_STORE.salesVouchersDrafts || [];
+        list = list.filter(d => d.id !== id);
+        window.KYA_STORE.salesVouchersDrafts = list;
+        showToast('Draft deleted successfully.', 'success');
+        renderSalesDraftedPanel();
+        triggerAutoBackup();
+      }
+    });
+  }
+
+  function viewPrintInvoice(id) {
+    const list = window.KYA_STORE.salesVouchers || [];
+    const inv = list.find(v => v.id === id);
+    if (!inv) return;
+    
+    const customer = coaLedgers.find(l => l.id == inv.customerId) || { name: 'Unknown Customer' };
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'inv-modal-overlay';
+    overlay.id = 'salesInvoicePrintOverlay';
+    
+    let rowsHtml = '';
+    if (inv.type === 'Product') {
+      rowsHtml = inv.rows.map((r, i) => {
+        const base = r.qty * r.rate;
+        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+        const itemTotal = base - discAmt;
+        const taxAmt = itemTotal * (r.tax / 100);
+        const finalAmt = itemTotal + taxAmt;
+        const discStr = r.discountType === 'pct' ? `${r.discount}% (₹${fmtNum(discAmt)})` : `₹${fmtNum(r.discount)}`;
+        return `
+          <tr style="border-bottom: 1px solid var(--slate-100);">
+            <td style="padding: 10px; font-weight: 500;">${i+1}</td>
+            <td style="padding: 10px; font-weight: 600;">${ohEsc(r.item)}</td>
+            <td style="padding: 10px; text-align: right;">${r.qty}</td>
+            <td style="padding: 10px; text-align: right;">₹ ${fmtNum(r.rate)}</td>
+            <td style="padding: 10px; text-align: right;">${discStr}</td>
+            <td style="padding: 10px; text-align: right;">${r.tax}%</td>
+            <td style="padding: 10px; text-align: right; font-weight: 700;">₹ ${fmtNum(finalAmt)}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      rowsHtml = inv.rows.map((r, i) => {
+        const revenueName = (coaLedgers.find(l => l.id == r.revenueLedgerId) || { name: 'Revenue Account' }).name;
+        const base = r.baseAmount;
+        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+        const itemTotal = base - discAmt;
+        const taxAmt = itemTotal * (r.tax / 100);
+        const finalAmt = itemTotal + taxAmt;
+        const discStr = r.discountType === 'pct' ? `${r.discount}% (₹${fmtNum(discAmt)})` : `₹${fmtNum(r.discount)}`;
+        return `
+          <tr style="border-bottom: 1px solid var(--slate-100);">
+            <td style="padding: 10px; font-weight: 500;">${i+1}</td>
+            <td style="padding: 10px; font-weight: 600;">${ohEsc(revenueName)}</td>
+            <td style="padding: 10px; text-align: right;">1</td>
+            <td style="padding: 10px; text-align: right;">₹ ${fmtNum(r.baseAmount)}</td>
+            <td style="padding: 10px; text-align: right;">${discStr}</td>
+            <td style="padding: 10px; text-align: right;">${r.tax}%</td>
+            <td style="padding: 10px; text-align: right; font-weight: 700;">₹ ${fmtNum(finalAmt)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+    
+    let taxDetailsHtml = '';
+    const taxSummary = {};
+    inv.rows.forEach(r => {
+      const base = inv.type === 'Product' ? (r.qty * r.rate) : r.baseAmount;
+      const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+      const val = Math.max(0, base - discAmt);
+      const taxAmt = val * (r.tax / 100);
+      if (r.tax > 0) {
+        if (!taxSummary[r.tax]) {
+          taxSummary[r.tax] = { taxable: 0, taxAmt: 0 };
+        }
+        taxSummary[r.tax].taxable += val;
+        taxSummary[r.tax].taxAmt += taxAmt;
+      }
+    });
+    
+    for (const pct in taxSummary) {
+      taxDetailsHtml += `
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-500); margin-top: 4px;">
+          <span>GST @ ${pct}% (on ₹ ${fmtNum(taxSummary[pct].taxable)})</span>
+          <span>₹ ${fmtNum(taxSummary[pct].taxAmt)}</span>
+        </div>
+      `;
+    }
+    
+    overlay.innerHTML = `
+      <div class="inv-modal-card" style="padding: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1.5px solid var(--slate-100); background: var(--slate-50); border-radius: 20px 20px 0 0;">
+          <div style="font-weight: 700; color: var(--slate-800);">Invoice Preview</div>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary" id="btnPrintInvoiceAction" style="padding: 8px 16px;">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px; margin-right: 6px; display: inline-block; vertical-align: middle;">
+                <path d="M4 5v-3h8v3M2 5h12v7h-3v3H5v-3H2V5zm3 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+              Print
+            </button>
+            <button class="btn btn-danger" id="btnCloseInvoiceAction" style="padding: 8px 16px;">Close</button>
+          </div>
+        </div>
+        
+        <div id="invoicePrintArea" style="padding: 40px; background: #fff; color: #1e293b;">
+          <style>
+            @media print {
+              body * { visibility: hidden; }
+              #invoicePrintArea, #invoicePrintArea * { visibility: visible; }
+              #invoicePrintArea { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; }
+            }
+          </style>
+          
+          <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+            <div>
+              <div style="font-size: 26px; font-weight: 900; color: var(--blue-800); letter-spacing: -1px; display: flex; align-items: center; gap: 8px;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--accent);">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+                </svg>
+                Keep Your Account (KYA)
+              </div>
+              <div style="font-size: 13px; color: var(--slate-500); margin-top: 6px; font-weight: 500;">
+                Your Trusted Cloud Accounting Suite
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: var(--slate-800); margin: 0; letter-spacing: -0.5px;">Tax Invoice</h1>
+              <div style="font-size: 14px; font-weight: 700; color: var(--blue-700); margin-top: 4px;"># ${ohEsc(inv.invoiceNo)}</div>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; border-bottom: 2px solid var(--slate-100); padding-bottom: 30px; margin-bottom: 30px;">
+            <div>
+              <h3 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 700;">Billed To:</h3>
+              <div style="font-size: 16px; font-weight: 800; color: var(--slate-900);">${ohEsc(customer.name)}</div>
+              <div style="font-size: 13px; color: var(--slate-500); margin-top: 4px; font-weight: 500;">Trade Receivables Account</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13.5px;">
+              <div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Invoice Date:</div>
+                <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${inv.date}</div>
+              </div>
+              <div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Due Date:</div>
+                <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${inv.dueDate || inv.date}</div>
+              </div>
+              <div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Order Number:</div>
+                <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${ohEsc(inv.orderNo) || '&mdash;'}</div>
+              </div>
+              <div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Payment Terms:</div>
+                <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">Due on Receipt</div>
+              </div>
+            </div>
+          </div>
+          
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13.5px;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--slate-200); background: var(--slate-50);">
+                <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500); width: 40px;">#</th>
+                <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500);">Description</th>
+                <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 60px;">Qty</th>
+                <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 110px;">Rate</th>
+                <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 90px;">Discount</th>
+                <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 80px;">Tax</th>
+                <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 140px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; margin-top: 30px;">
+            <div>
+              <h4 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 700;">Terms & Notes:</h4>
+              <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${ohEsc(inv.notes) || 'Thank you for your business! Please settle this invoice by the due date.'}</div>
+            </div>
+            
+            <div>
+              <div style="background: var(--slate-50); border-radius: 16px; padding: 18px 22px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-600); margin-bottom: 8px; font-weight: 500;">
+                  <span>Sub Total</span>
+                  <span>₹ ${fmtNum(inv.subTotal)}</span>
+                </div>
+                
+                ${taxDetailsHtml}
+                
+                ${inv.tdsTcsMode !== 'None' ? `
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
+                    <span>${inv.tdsTcsMode} (${(inv.tdsTcsRate % 1 === 0 ? inv.tdsTcsRate.toFixed(0) : (inv.tdsTcsRate * 10 % 1 === 0 ? inv.tdsTcsRate.toFixed(1) : inv.tdsTcsRate.toFixed(2)))}%)</span>
+                    <span>${inv.tdsTcsMode === 'TDS' ? '-' : '+'} ₹ ${fmtNum(inv.tdsTcsAmount)}</span>
+                  </div>
+                ` : ''}
+                
+                ${inv.adjustments !== 0 ? `
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
+                    <span>Adjustments</span>
+                    <span>₹ ${fmtNum(inv.adjustments)}</span>
+                  </div>
+                ` : ''}
+                
+                <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; color: var(--slate-900); margin-top: 12px; border-top: 2px solid var(--slate-200); padding-top: 12px;">
+                  <span>Grand Total</span>
+                  <span>₹ ${fmtNum(inv.total)}</span>
+                </div>
+                
+                ${inv.paymentStatus && inv.paymentStatus !== 'Not Paid' ? `
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
+                    <span>Paid Amount (${inv.paymentStatus})</span>
+                    <span style="color: #10b981; font-weight: 700;">₹ ${fmtNum(inv.paymentAmount)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 6px; font-weight: 700;">
+                    <span>Balance Due</span>
+                    <span style="color: ${inv.total - inv.paymentAmount > 0 ? '#ef4444' : 'var(--slate-600)'};">₹ ${fmtNum(inv.total - inv.paymentAmount)}</span>
+                  </div>
+                ` : `
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 700;">
+                    <span>Balance Due</span>
+                    <span style="color: #ef4444;">₹ ${fmtNum(inv.total)}</span>
+                  </div>
+                `}
+              </div>
+            </div>
+          </div>
+          
+          <div style="margin-top: 60px; border-top: 1px solid var(--slate-100); padding-top: 20px; text-align: center; font-size: 11.5px; color: var(--slate-400); font-weight: 500;">
+            This is a system generated tax invoice. No signature required.
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.focus();
+    
+    overlay.querySelector('#btnCloseInvoiceAction').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#btnPrintInvoiceAction').addEventListener('click', () => {
+      window.print();
+    });
+    
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
+  }
+
+  window.viewPrintInvoice = viewPrintInvoice;
+  window.deleteSalesInvoice = deleteSalesInvoice;
+  window.editSalesDraft = editSalesDraft;
+  window.deleteSalesDraft = deleteSalesDraft;
+
+  function setupSalesVoucherEventListeners() {
+    document.getElementById('salesInvoiceNoModeAuto').addEventListener('click', () => setInvoiceNoMode('Auto'));
+    document.getElementById('salesInvoiceNoModeManual').addEventListener('click', () => setInvoiceNoMode('Manual'));
+    
+    document.getElementById('salesTypeProduct').addEventListener('click', () => {
+      const bg = document.getElementById('salesTypeBg');
+      if (bg) {
+        bg.classList.add('prod-active');
+        bg.classList.remove('serv-active');
+      }
+      document.getElementById('salesTypeProduct').classList.add('active');
+      document.getElementById('salesTypeService').classList.remove('active');
+      switchSalesType('Product');
+    });
+    
+    document.getElementById('salesTypeService').addEventListener('click', () => {
+      const bg = document.getElementById('salesTypeBg');
+      if (bg) {
+        bg.classList.add('serv-active');
+        bg.classList.remove('prod-active');
+      }
+      document.getElementById('salesTypeService').classList.add('active');
+      document.getElementById('salesTypeProduct').classList.remove('active');
+      switchSalesType('Service');
+    });
+    
+    const noneBtn = document.getElementById('salesTdsTcsNone');
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    const tBg = document.getElementById('salesTdsTcsBg');
+    const rateGroup = document.getElementById('salesTdsTcsRateGroup');
+    const amtRow = document.getElementById('salesTdsTcsAmountRow');
+    const amtLabel = document.getElementById('salesTdsTcsAmountLabel');
+    
+    if (noneBtn && tdsBtn && tcsBtn && tBg && rateGroup && amtRow && amtLabel) {
+      noneBtn.addEventListener('click', () => {
+        noneBtn.classList.add('active');
+        tdsBtn.classList.remove('active');
+        tcsBtn.classList.remove('active');
+        tBg.className = 'sales-tdstcs-bg none-active';
+        rateGroup.style.display = 'none';
+        amtRow.style.display = 'none';
+        recalculateSalesTotals();
+      });
+      
+      tdsBtn.addEventListener('click', () => {
+        tdsBtn.classList.add('active');
+        noneBtn.classList.remove('active');
+        tcsBtn.classList.remove('active');
+        tBg.className = 'sales-tdstcs-bg tds-active';
+        rateGroup.style.display = 'block';
+        amtRow.style.display = 'flex';
+        amtLabel.textContent = 'TDS Deducted (Dr)';
+        recalculateSalesTotals();
+      });
+      
+      tcsBtn.addEventListener('click', () => {
+        tcsBtn.classList.add('active');
+        noneBtn.classList.remove('active');
+        tdsBtn.classList.remove('active');
+        tBg.className = 'sales-tdstcs-bg tcs-active';
+        rateGroup.style.display = 'block';
+        amtRow.style.display = 'flex';
+        amtLabel.textContent = 'TCS Collected (Cr)';
+        recalculateSalesTotals();
+      });
+    }
+    
+    const addRowBtn = document.getElementById('salesAddRow');
+    if (addRowBtn) {
+      addRowBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        addSalesRow();
+      });
+    }
+    
+    const clearBtn = document.getElementById('btnClearSales');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window._editingSalesInvoice = null;
+        initSalesForm();
+      });
+    }
+    
+    const saveDraftBtn = document.getElementById('btnSaveSalesDraft');
+    if (saveDraftBtn) {
+      saveDraftBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        saveSalesDraft();
+      });
+    }
+    
+    const postInvoiceBtn = document.getElementById('btnPostSales');
+    if (postInvoiceBtn) {
+      postInvoiceBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        postSalesInvoice();
+      });
+    }
+    
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    if (rateSelect) {
+      rateSelect.addEventListener('change', () => {
+        const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
+        if (rateSelect.value === 'custom') {
+          if (customWrap) customWrap.style.display = 'block';
+        } else {
+          if (customWrap) customWrap.style.display = 'none';
+        }
+        recalculateSalesTotals();
+      });
+    }
+    const customInput = document.getElementById('salesTdsTcsRateCustom');
+    if (customInput) {
+      customInput.addEventListener('input', recalculateSalesTotals);
+    }
+    
+    const tdsTcsAmt = document.getElementById('salesTdsTcsAmount');
+    if (tdsTcsAmt) tdsTcsAmt.addEventListener('input', recalculateSalesTotals);
+    
+    const adjustments = document.getElementById('salesAdjustments');
+    if (adjustments) adjustments.addEventListener('input', recalculateSalesTotals);
+    
+    const body = document.getElementById('salesItemBody');
+    if (body) {
+      body.addEventListener('input', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const index = parseInt(tr.dataset.rowIndex);
+        updateRowFromDOM(index, tr);
+      });
+      
+      body.addEventListener('change', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const index = parseInt(tr.dataset.rowIndex);
+        updateRowFromDOM(index, tr);
+      });
+      
+      body.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sales-del-row');
+        if (btn) {
+          const tr = btn.closest('tr');
+          const index = parseInt(tr.dataset.rowIndex);
+          salesRows.splice(index, 1);
+          if (salesRows.length === 0) {
+            addSalesRow();
+          } else {
+            renderSalesRows();
+            recalculateSalesTotals();
+          }
+        }
+      });
+    }
+    
+    const dateEl = document.getElementById('salesDate');
+    const dueEl = document.getElementById('salesDueDate');
+    if (dateEl && dueEl) {
+      dateEl.addEventListener('change', () => {
+        dueEl.value = dateEl.value;
+      });
+    }
+    
+    const custEl = document.getElementById('salesCustomer');
+    if (custEl) {
+      custEl.addEventListener('focus', () => {
+        populateSalesCustomers(custEl.value);
+      });
+    }
+    
+    const newCustBtn = document.getElementById('btnSalesNewCustomer');
+    if (newCustBtn) {
+      newCustBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showCoaModal('sg-tr');
+      });
+    }
+
+    const payNotPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
+    const payFullBtn = document.getElementById('salesPaymentStatusFull');
+    const payPartialBtn = document.getElementById('salesPaymentStatusPartial');
+    const payBg = document.getElementById('salesPaymentStatusBg');
+    const payAccField = document.getElementById('salesPaymentAccountField');
+    const payAmtField = document.getElementById('salesPaymentAmountField');
+    
+    if (payNotPaidBtn && payFullBtn && payPartialBtn && payBg && payAccField && payAmtField) {
+      payNotPaidBtn.addEventListener('click', () => {
+        payNotPaidBtn.classList.add('active');
+        payFullBtn.classList.remove('active');
+        payPartialBtn.classList.remove('active');
+        payBg.className = 'sales-paystatus-bg notpaid-active';
+        payAccField.style.display = 'none';
+        payAmtField.style.display = 'none';
+      });
+      
+      payFullBtn.addEventListener('click', () => {
+        payFullBtn.classList.add('active');
+        payNotPaidBtn.classList.remove('active');
+        payPartialBtn.classList.remove('active');
+        payBg.className = 'sales-paystatus-bg fullpaid-active';
+        payAccField.style.display = 'flex';
+        payAmtField.style.display = 'none';
+        populateSalesPaymentAccounts();
+      });
+      
+      payPartialBtn.addEventListener('click', () => {
+        payPartialBtn.classList.add('active');
+        payNotPaidBtn.classList.remove('active');
+        payFullBtn.classList.remove('active');
+        payBg.className = 'sales-paystatus-bg partpaid-active';
+        payAccField.style.display = 'flex';
+        payAmtField.style.display = 'flex';
+        populateSalesPaymentAccounts();
+      });
+    }
+    
+    const payAccEl = document.getElementById('salesPaymentAccount');
+    if (payAccEl) {
+      payAccEl.addEventListener('focus', () => {
+        populateSalesPaymentAccounts(payAccEl.value);
+      });
+    }
+    
+    const salesNewNav = document.getElementById('nav-sales-new');
+    const salesPostedNav = document.getElementById('nav-sales-posted');
+    const salesDraftedNav = document.getElementById('nav-sales-drafted');
+    
+    const clickNew = () => { openTab('sales_voucher'); };
+    const clickPosted = () => { openTab('sales_posted'); };
+    const clickDrafted = () => { openTab('sales_drafted'); };
+    
+    if (salesNewNav) {
+      salesNewNav.addEventListener('click', clickNew);
+      salesNewNav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickNew(); } });
+    }
+    if (salesPostedNav) {
+      salesPostedNav.addEventListener('click', clickPosted);
+      salesPostedNav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickPosted(); } });
+    }
+    if (salesDraftedNav) {
+      salesDraftedNav.addEventListener('click', clickDrafted);
+      salesDraftedNav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickDrafted(); } });
+    }
+    
+    const salesHeader = document.getElementById('nav-sales');
+    const salesSubmenu = document.getElementById('nav-sales-submenu');
+    if (salesHeader && salesSubmenu) {
+      const toggleSalesMenu = () => {
+        const isOpen = salesSubmenu.classList.contains('open');
+        if (isOpen) {
+          salesHeader.classList.remove('open');
+          salesSubmenu.classList.remove('open');
+          salesHeader.setAttribute('aria-expanded', 'false');
+        } else {
+          salesHeader.classList.add('open');
+          salesSubmenu.classList.add('open');
+          salesHeader.setAttribute('aria-expanded', 'true');
+          navItems.forEach(n => n.classList.remove('active'));
+        }
+      };
+      salesHeader.addEventListener('click', toggleSalesMenu);
+      salesHeader.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSalesMenu(); } });
+    }
+  }
+
+  // Setup and Initial Call
+  setupSalesVoucherEventListeners();
+  initSalesForm();
 
 </script>
 
