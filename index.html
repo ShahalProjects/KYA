@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+  <!-- CryptoJS for KYA Vault AES-256 encryption -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js" integrity="sha512-a+SUDuwNzXDvz4XrIcXHuCFkuqMLkB5bhFtETzBknAbMs4hu2GqkXNMGe4dITraJFKB+ZWnCsSRnTIJoV0uoA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
   <style>
     /* ===========================
@@ -2891,7 +2893,270 @@
       flex-wrap: wrap;
       gap: 12px;
     }
-    
+
+    /* ── KYA Encrypted Vault card accent ─────────────────── */
+    .vault-card-enc {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+      border: 1px solid rgba(20,184,166,0.35);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .vault-card-enc::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 80% 20%, rgba(20,184,166,0.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .vault-enc-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .vault-enc-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: rgba(20,184,166,0.2);
+      border: 1px solid rgba(20,184,166,0.4);
+      color: #5eead4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .vault-enc-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #f1f5f9;
+      letter-spacing: -0.3px;
+    }
+    .vault-enc-subtitle {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .vault-enc-badge {
+      margin-left: auto;
+      background: rgba(20,184,166,0.2);
+      border: 1px solid rgba(20,184,166,0.4);
+      color: #5eead4;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      padding: 3px 9px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .vault-enc-sep {
+      height: 1px;
+      background: rgba(148,163,184,0.15);
+      margin: 0 0 16px;
+    }
+    .vault-enc-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn-vault-export {
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 20px;
+      background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      box-shadow: 0 4px 14px rgba(13,148,136,0.35);
+      font-family: var(--font-main);
+    }
+    .btn-vault-export:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(13,148,136,0.45);
+      background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+    }
+    .btn-vault-import {
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 20px;
+      background: rgba(255,255,255,0.08);
+      color: #cbd5e1;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      font-family: var(--font-main);
+    }
+    .btn-vault-import:hover {
+      background: rgba(255,255,255,0.15);
+      color: #f1f5f9;
+      border-color: rgba(255,255,255,0.28);
+    }
+
+    /* ── KYA Vault Password Modal ─────────────────────────── */
+    #kyaVaultPwdOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.72);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 10010;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .kya-vault-pwd-card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 36px 32px 28px;
+      max-width: 440px;
+      width: 92%;
+      box-shadow: 0 24px 60px -10px rgba(15,23,42,0.35);
+      border: 1px solid var(--slate-100);
+      position: relative;
+      animation: kvpCardIn 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) forwards;
+    }
+    @keyframes kvpCardIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+    .kya-vault-pwd-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .kya-vault-pwd-icon.export { background: #ccfbf1; color: #0d9488; }
+    .kya-vault-pwd-icon.import { background: #dbeafe; color: #2563eb; }
+    .kya-vault-pwd-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--slate-900);
+      text-align: center;
+      margin-bottom: 6px;
+      letter-spacing: -0.4px;
+    }
+    .kya-vault-pwd-desc {
+      font-size: 13px;
+      color: var(--slate-500);
+      text-align: center;
+      line-height: 1.55;
+      margin-bottom: 24px;
+    }
+    .kya-vault-pwd-field-wrap {
+      position: relative;
+      margin-bottom: 8px;
+    }
+    .kya-vault-pwd-field-wrap input {
+      width: 100%;
+      height: 46px;
+      padding: 0 44px 0 14px;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: var(--font-main);
+      color: var(--slate-800);
+      background: var(--slate-50);
+      outline: none;
+      transition: border-color 0.15s;
+      box-sizing: border-box;
+    }
+    .kya-vault-pwd-field-wrap input:focus {
+      border-color: var(--blue-500);
+      background: var(--white);
+    }
+    .kya-vault-pwd-eye {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--slate-400);
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      transition: color 0.15s;
+    }
+    .kya-vault-pwd-eye:hover { color: var(--slate-700); }
+    .kya-vault-pwd-hint {
+      font-size: 11.5px;
+      color: var(--slate-400);
+      margin-bottom: 20px;
+    }
+    .kya-vault-pwd-error {
+      font-size: 12px;
+      font-weight: 600;
+      color: #dc2626;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .kya-vault-pwd-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .kya-vault-pwd-actions .btn-cancel {
+      flex: 1;
+      height: 44px;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 10px;
+      background: var(--white);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--slate-600);
+      cursor: pointer;
+      font-family: var(--font-main);
+      transition: background 0.15s;
+    }
+    .kya-vault-pwd-actions .btn-cancel:hover { background: var(--slate-50); }
+    .kya-vault-pwd-actions .btn-ok {
+      flex: 2;
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: var(--font-main);
+      transition: all 0.15s;
+    }
+    .kya-vault-pwd-actions .btn-ok.export {
+      background: linear-gradient(135deg, #0d9488, #14b8a6);
+      box-shadow: 0 4px 12px rgba(13,148,136,.3);
+    }
+    .kya-vault-pwd-actions .btn-ok.export:hover { background: linear-gradient(135deg, #0f766e, #0d9488); }
+    .kya-vault-pwd-actions .btn-ok.import {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      box-shadow: 0 4px 12px rgba(37,99,235,.3);
+    }
+    .kya-vault-pwd-actions .btn-ok.import:hover { background: linear-gradient(135deg, #1e40af, #1d4ed8); }
+    #kyaVaultFileInput { display: none; }
+
     /* Toggle switch */
     .switch-toggle {
       position: relative;
@@ -4447,7 +4712,62 @@
                       </div>
                     </div>
                   </div>
+                  </div>
                 </div>
+
+                <!-- ═══ KYA Encrypted Vault ═══ -->
+                <h3 class="vault-sec-title" style="margin-top: 28px;">KYA Vault — Encrypted Backup</h3>
+                <div class="vault-grid">
+
+                  <!-- Encrypted Vault Card -->
+                  <div class="vault-card-enc">
+                    <div class="vault-enc-header">
+                      <div class="vault-enc-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                          <circle cx="12" cy="16" r="1" fill="currentColor"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="vault-enc-title">KYA Vault</div>
+                        <div class="vault-enc-subtitle">Password-protected encrypted backup for all your data</div>
+                      </div>
+                      <span class="vault-enc-badge">AES-256</span>
+                    </div>
+
+                    <div class="vault-enc-sep"></div>
+
+                    <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.6; margin-bottom: 16px;">
+                      Export encrypts <strong style="color:#cbd5e1;">all localStorage data</strong> into a password-protected <code style="background:rgba(255,255,255,0.08); padding:1px 5px; border-radius:4px; font-size:11px;">.kya</code> file using AES-256.
+                      Future modules and settings are included automatically.
+                      Import decrypts and restores your data — <strong style="color:#fca5a5;">this overwrites all current data.</strong>
+                    </div>
+
+                    <div class="vault-enc-row">
+                      <button class="btn-vault-export" id="btnKyaVaultExport">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Export Backup (.kya)
+                      </button>
+                      <button class="btn-vault-import" id="btnKyaVaultImport">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 16 12 21 17 16"/>
+                          <line x1="12" y1="21" x2="12" y2="9"/>
+                        </svg>
+                        Import Backup (.kya)
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+                <!-- hidden file input for .kya import -->
+                <input type="file" id="kyaVaultFileInput" accept=".kya">
+
 
               </div>
             </div>
@@ -4831,7 +5151,83 @@
   let openTabs = [];
   let activeTabId = null;
 
+  // ── ROUTING SYSTEM ──────────────────────────────────────────────────
+  const ROUTE_SECTIONS = {
+    dashboard: { tabId: null, navId: 'nav-dashboard' },
+    ledger:    { tabId: null, navId: 'nav-ledger' },
+    journal:   { tabId: 'journal' },
+    posted:    { tabId: 'posted' },
+    drafted:   { tabId: 'drafted' },
+    chart:     { tabId: 'chart' },
+    balance:   { tabId: 'balance' },
+    pnl:       { tabId: 'pnl' },
+    trial:     { tabId: 'trial' },
+    onehub:    { tabId: 'onehub' },
+    settings:  { tabId: 'settings' },
+    sales_voucher: { tabId: 'sales_voucher' },
+    sales_posted:  { tabId: 'sales_posted' },
+    sales_drafted: { tabId: 'sales_drafted' }
+  };
+
+  const NAV_ID_TO_ROUTE = {
+    'nav-dashboard': 'dashboard',
+    'nav-ledger': 'ledger',
+    'nav-chart': 'chart',
+    'nav-trial': 'trial',
+    'nav-pnl': 'pnl',
+    'nav-balance': 'balance',
+    'nav-onehub': 'onehub',
+    'nav-settings': 'settings',
+    'nav-je-new': 'journal',
+    'nav-je-posted': 'posted',
+    'nav-je-drafted': 'drafted',
+    'nav-sales-new': 'sales_voucher',
+    'nav-sales-posted': 'sales_posted',
+    'nav-sales-drafted': 'sales_drafted'
+  };
+
+  let currentActiveRoute = null;
+
+  function navigateTo(sectionId) {
+    let target = sectionId;
+    if (!ROUTE_SECTIONS[target]) {
+      target = 'dashboard';
+    }
+
+    if (currentActiveRoute === target) {
+      if (window.location.hash !== '#' + target) {
+        window.location.hash = '#' + target;
+      }
+      return;
+    }
+
+    currentActiveRoute = target;
+
+    if (window.location.hash !== '#' + target) {
+      window.location.hash = '#' + target;
+    }
+
+    const route = ROUTE_SECTIONS[target];
+    if (route.tabId !== undefined && route.tabId !== null) {
+      openTabUI(route.tabId);
+    } else {
+      activeTabId = null;
+      renderTabs();
+      switchToActivePanel();
+      
+      if (route.navId) {
+        navItems.forEach(n => n.classList.remove('active'));
+        const navEl = document.getElementById(route.navId);
+        if (navEl) navEl.classList.add('active');
+      }
+    }
+  }
+
   function openTab(tabId) {
+    navigateTo(tabId);
+  }
+
+  function openTabUI(tabId) {
     if (!TAB_DEFS[tabId]) return;
     if (!openTabs.includes(tabId)) {
       openTabs.push(tabId);
@@ -4848,17 +5244,26 @@
     
     openTabs.splice(index, 1);
     
+    let nextActiveTabId = activeTabId;
     if (activeTabId === tabId) {
       if (openTabs.length > 0) {
         const nextActiveIndex = Math.min(index, openTabs.length - 1);
-        activeTabId = openTabs[nextActiveIndex];
+        nextActiveTabId = openTabs[nextActiveIndex];
       } else {
-        activeTabId = null;
+        nextActiveTabId = null;
       }
     }
     
-    renderTabs();
-    switchToActivePanel();
+    if (nextActiveTabId !== activeTabId) {
+      if (nextActiveTabId) {
+        navigateTo(nextActiveTabId);
+      } else {
+        navigateTo('dashboard');
+      }
+    } else {
+      renderTabs();
+      switchToActivePanel();
+    }
   }
 
   function switchToActivePanel() {
@@ -5000,47 +5405,21 @@
     });
   }
 
-  // Flat nav items (dashboard, ledger, chart, reports, onehub, settings)
-  navItems.forEach(item => {
-    const handler = () => {
-      const panel = item.dataset.panel || 'welcome';
-      if (panel === 'chart') {
-        openTab('chart');
-      } else if (panel === 'balance') {
-        openTab('balance');
-      } else if (panel === 'pnl') {
-        openTab('pnl');
-      } else if (panel === 'trial') {
-        openTab('trial');
-      } else if (panel === 'onehub') {
-        openTab('onehub');
-      } else if (panel === 'settings') {
-        openTab('settings');
-      } else {
-        activeTabId = null;
-        renderTabs();
-        switchToActivePanel();
-        
-        // Highlight clicked item
-        navItems.forEach(n => n.classList.remove('active'));
-        item.classList.add('active');
-      }
-      
-      // Close accordions when another top-level item is clicked
-      journalHeader.classList.remove('open');
-      journalSubmenu.classList.remove('open');
-      journalHeader.setAttribute('aria-expanded', 'false');
-      const sHeader = document.getElementById('nav-sales');
-      const sSubmenu = document.getElementById('nav-sales-submenu');
-      if (sHeader && sSubmenu) {
-        sHeader.classList.remove('open');
-        sSubmenu.classList.remove('open');
-        sHeader.setAttribute('aria-expanded', 'false');
-      }
-      subItems.forEach(s => s.classList.remove('active'));
-    };
-    item.addEventListener('click', handler);
-    item.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
+  // Setup click handlers for all sidebar items mapping to routes
+  Object.entries(NAV_ID_TO_ROUTE).forEach(([navId, route]) => {
+    const el = document.getElementById(navId);
+    if (el) {
+      const handler = (e) => {
+        if (e) e.preventDefault();
+        window.location.hash = '#' + route;
+      };
+      el.addEventListener('click', handler);
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          handler(e);
+        }
+      });
+    }
   });
 
   // ── Journal Entry accordion ───────────────────────────────────────
@@ -5067,36 +5446,10 @@
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleJournalMenu(); }
   });
 
-  subItems.forEach(sub => {
-    const handler = () => {
-      const action = sub.dataset.jeAction;
-      const salesAction = sub.dataset.salesAction;
-      if (action === 'new') {
-        openTab('journal');
-      } else if (action === 'posted') {
-        openTab('posted');
-      } else if (action === 'drafted') {
-        openTab('drafted');
-      } else if (salesAction === 'new') {
-        openTab('sales_voucher');
-      } else if (salesAction === 'posted') {
-        openTab('sales_posted');
-      } else if (salesAction === 'drafted') {
-        openTab('sales_drafted');
-      } else {
-        activeTabId = null;
-        renderTabs();
-        switchToActivePanel();
-      }
-    };
-    sub.addEventListener('click', handler);
-    sub.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
-  });
-
   // Quick-start card → journal (New Entry)
   if (qsJournal) {
     qsJournal.addEventListener('click', () => {
-      openTab('journal');
+      window.location.hash = '#journal';
     });
     qsJournal.addEventListener('keydown', e => {
       if (e.key === 'Enter') qsJournal.click();
@@ -5105,14 +5458,18 @@
 
   // Home link (KYA breadcrumb label) click handler
   document.getElementById('breadcrumbHome')?.addEventListener('click', () => {
-    activeTabId = null;
-    renderTabs();
-    switchToActivePanel();
+    window.location.hash = '#dashboard';
   });
 
-  // Initialise: dashboard active by default
-  switchToActivePanel();
-  renderTabs();
+  // Handle browser back/forward and hash changes
+  window.addEventListener('hashchange', () => {
+    const sectionId = window.location.hash.substring(1);
+    navigateTo(sectionId);
+  });
+
+  // Initialise routing based on current URL hash
+  const initialSection = window.location.hash.substring(1) || 'dashboard';
+  navigateTo(initialSection);
 
   // Keyboard shortcut: Ctrl + Space to switch to the next open tab (event-capturing phase to avoid conflicts)
   window.addEventListener('keydown', e => {
@@ -7017,7 +7374,202 @@
 
   // Each entry: { id, sgId, glId, name, code, openingBalance, type:'ledger'|'group-ledger' }
   let coaLedgers = [];
+
+  function initDefaultLedgers() {
+    if (coaLedgers && coaLedgers.length > 0) return;
+
+    const defaults = [
+      // ── Assets ───────────────────────────────────────────────────
+      // Property, Plant and Equipment (PPE) (sg-ppe)
+      { name: 'Land', sgId: 'sg-ppe' },
+      { name: 'Building', sgId: 'sg-ppe' },
+      { name: 'Plant & Machinery', sgId: 'sg-ppe' },
+      { name: 'Furniture & Fixtures', sgId: 'sg-ppe' },
+      { name: 'Office Equipment', sgId: 'sg-ppe' },
+      { name: 'Computers & Laptops', sgId: 'sg-ppe' },
+      { name: 'Vehicles', sgId: 'sg-ppe' },
+
+      // Capital Work-in-Progress (sg-cwip)
+      { name: 'Capital Work-in-Progress', sgId: 'sg-cwip' },
+
+      // Intangible Assets (sg-ia)
+      { name: 'Software', sgId: 'sg-ia' },
+      { name: 'Licenses', sgId: 'sg-ia' },
+      { name: 'Trademarks', sgId: 'sg-ia' },
+      { name: 'Patents', sgId: 'sg-ia' },
+      { name: 'Goodwill', sgId: 'sg-ia' },
+
+      // Intangible Assets Under Development (sg-iaud)
+      { name: 'Intangible Assets Under Development', sgId: 'sg-iaud' },
+
+      // Non-Current Investments (sg-nci)
+      { name: 'Long-Term Investments', sgId: 'sg-nci' },
+
+      // Long-Term Loans and Advances (sg-ltla)
+      { name: 'Security Deposits', sgId: 'sg-ltla' },
+      { name: 'Long-Term Advances', sgId: 'sg-ltla' },
+      { name: 'Loans to Employees', sgId: 'sg-ltla' },
+
+      // Other Non-Current Assets (sg-onca)
+      { name: 'Deferred Tax Asset', sgId: 'sg-onca' },
+      { name: 'Other Non-Current Assets', sgId: 'sg-onca' },
+
+      // Current Investments (sg-ci)
+      { name: 'Short-Term Investments', sgId: 'sg-ci' },
+
+      // Inventories (sg-inv)
+      { name: 'Raw Materials', sgId: 'sg-inv' },
+      { name: 'Work-in-Progress', sgId: 'sg-inv' },
+      { name: 'Finished Goods', sgId: 'sg-inv' },
+      { name: 'Stock-in-Trade', sgId: 'sg-inv' },
+      { name: 'Stores & Spares', sgId: 'sg-inv' },
+
+      // Trade Receivables (sg-tr)
+      { name: 'Trade Receivables', sgId: 'sg-tr' },
+
+      // Cash and Cash Equivalents (sg-cce)
+      { name: 'Cash in Hand', sgId: 'sg-cce' },
+      { name: 'Bank Accounts', sgId: 'sg-cce' },
+      { name: 'Petty Cash', sgId: 'sg-cce' },
+
+      // Short-Term Loans and Advances (sg-stla)
+      { name: 'Advances to Suppliers', sgId: 'sg-stla' },
+      { name: 'Employee Advances', sgId: 'sg-stla' },
+      { name: 'Short-Term Loans', sgId: 'sg-stla' },
+
+      // Other Current Assets (sg-oca)
+      { name: 'Input CGST', sgId: 'sg-oca' },
+      { name: 'Input SGST', sgId: 'sg-oca' },
+      { name: 'Input IGST', sgId: 'sg-oca' },
+      { name: 'TDS Receivable', sgId: 'sg-oca' },
+      { name: 'Prepaid Expenses', sgId: 'sg-oca' },
+      { name: 'Accrued Income', sgId: 'sg-oca' },
+      { name: 'Other Current Assets', sgId: 'sg-oca' },
+
+      // ── Equity and Liabilities ────────────────────────────────────
+      // Shareholders' Funds (sg-sc, sg-rs)
+      { name: 'Share Capital', sgId: 'sg-sc' },
+      { name: 'Reserves & Surplus', sgId: 'sg-rs' },
+      { name: 'Retained Earnings', sgId: 'sg-rs' },
+
+      // Non-Current Liabilities (sg-ltb, sg-dtl, sg-ltp)
+      { name: 'Long-Term Bank Loan', sgId: 'sg-ltb' },
+      { name: 'Vehicle Loan', sgId: 'sg-ltb' },
+      { name: 'Mortgage Loan', sgId: 'sg-ltb' },
+      { name: 'Deferred Tax Liability', sgId: 'sg-dtl' },
+      { name: 'Long-Term Provisions', sgId: 'sg-ltp' },
+
+      // Current Liabilities (sg-tp, sg-stb, sg-ocl)
+      { name: 'Trade Payables', sgId: 'sg-tp' },
+      { name: 'Outstanding Expenses', sgId: 'sg-ocl' },
+      { name: 'Salary Payable', sgId: 'sg-ocl' },
+      { name: 'Output CGST', sgId: 'sg-ocl' },
+      { name: 'Output SGST', sgId: 'sg-ocl' },
+      { name: 'Output IGST', sgId: 'sg-ocl' },
+      { name: 'TDS Payable', sgId: 'sg-ocl' },
+      { name: 'TCS Payable', sgId: 'sg-ocl' },
+      { name: 'Short-Term Borrowings', sgId: 'sg-stb' },
+      { name: 'Bank Overdraft', sgId: 'sg-stb' },
+      { name: 'Current Portion of Long-Term Debt', sgId: 'sg-ocl' },
+      { name: 'Advance from Customers', sgId: 'sg-ocl' },
+      { name: 'Other Current Liabilities', sgId: 'sg-ocl' },
+
+      // ── Income ───────────────────────────────────────────────────
+      // Revenue from Operations (sg-rfo)
+      { name: 'Sales', sgId: 'sg-rfo' },
+      { name: 'Service Income', sgId: 'sg-rfo' },
+      { name: 'Sales Returns', sgId: 'sg-rfo' },
+      { name: 'Discounts Allowed (Sales)', sgId: 'sg-rfo' },
+      { name: 'Export Sales', sgId: 'sg-rfo' },
+      { name: 'Domestic Sales', sgId: 'sg-rfo' },
+
+      // Other Income (sg-oi)
+      { name: 'Interest Income', sgId: 'sg-oi' },
+      { name: 'Commission Received', sgId: 'sg-oi' },
+      { name: 'Rental Income', sgId: 'sg-oi' },
+      { name: 'Dividend Income', sgId: 'sg-oi' },
+      { name: 'Profit on Sale of Assets', sgId: 'sg-oi' },
+      { name: 'Foreign Exchange Gain', sgId: 'sg-oi' },
+      { name: 'Miscellaneous Income', sgId: 'sg-oi' },
+      { name: 'Discount Received', sgId: 'sg-oi' },
+
+      // ── Expense ──────────────────────────────────────────────────
+      // Cost of Materials Consumed (sg-cmc)
+      { name: 'Raw Material Purchase', sgId: 'sg-cmc' },
+      { name: 'Freight Inward', sgId: 'sg-cmc' },
+      { name: 'Direct Expenses', sgId: 'sg-cmc' },
+
+      // Purchases of Stock-in-Trade (sg-pst)
+      { name: 'Purchase', sgId: 'sg-pst' },
+      { name: 'Import Purchase', sgId: 'sg-pst' },
+      { name: 'Freight Inward', sgId: 'sg-pst' },
+      { name: 'Purchase Returns', sgId: 'sg-pst' },
+
+      // Changes in Inventories of Finished Goods, Work-in-Progress and Stock-in-Trade (sg-cinv)
+      { name: 'Closing Stock Adjustment', sgId: 'sg-cinv' },
+      { name: 'Opening Stock Adjustment', sgId: 'sg-cinv' },
+      { name: 'Inventory Adjustment', sgId: 'sg-cinv' },
+
+      // Employee Benefits Expense (sg-ebe)
+      { name: 'Salaries and Wages', sgId: 'sg-ebe' },
+      { name: 'Bonus', sgId: 'sg-ebe' },
+      { name: 'Staff Welfare Expenses', sgId: 'sg-ebe' },
+      { name: 'PF Contribution', sgId: 'sg-ebe' },
+      { name: 'ESI Contribution', sgId: 'sg-ebe' },
+      { name: 'Gratuity', sgId: 'sg-ebe' },
+      { name: 'Leave Encashment', sgId: 'sg-ebe' },
+
+      // Finance Costs (sg-fc)
+      { name: 'Interest on Loan', sgId: 'sg-fc' },
+      { name: 'Bank Charges', sgId: 'sg-fc' },
+      { name: 'Processing Charges', sgId: 'sg-fc' },
+      { name: 'Finance Charges', sgId: 'sg-fc' },
+
+      // Depreciation and Amortization Expense (sg-da)
+      { name: 'Depreciation', sgId: 'sg-da' },
+      { name: 'Amortization', sgId: 'sg-da' },
+
+      // Other Expenses (sg-oe)
+      { name: 'Rent', sgId: 'sg-oe' },
+      { name: 'Electricity', sgId: 'sg-oe' },
+      { name: 'Water Charges', sgId: 'sg-oe' },
+      { name: 'Telephone & Internet', sgId: 'sg-oe' },
+      { name: 'Office Expenses', sgId: 'sg-oe' },
+      { name: 'Printing & Stationery', sgId: 'sg-oe' },
+      { name: 'Repairs & Maintenance', sgId: 'sg-oe' },
+      { name: 'Insurance', sgId: 'sg-oe' },
+      { name: 'Advertisement & Marketing', sgId: 'sg-oe' },
+      { name: 'Travelling & Conveyance', sgId: 'sg-oe' },
+      { name: 'Vehicle Expenses', sgId: 'sg-oe' },
+      { name: 'Fuel Expenses', sgId: 'sg-oe' },
+      { name: 'Professional Fees', sgId: 'sg-oe' },
+      { name: 'Audit Fees', sgId: 'sg-oe' },
+      { name: 'Legal Charges', sgId: 'sg-oe' },
+      { name: 'Courier & Postage', sgId: 'sg-oe' },
+      { name: 'Software Subscription', sgId: 'sg-oe' },
+      { name: 'Security Charges', sgId: 'sg-oe' },
+      { name: 'Housekeeping Expenses', sgId: 'sg-oe' },
+      { name: 'Miscellaneous Expenses', sgId: 'sg-oe' },
+
+      // Tax Expense (sg-tax)
+      { name: 'Current Tax', sgId: 'sg-tax' },
+      { name: 'Deferred Tax', sgId: 'sg-tax' }
+    ];
+
+    let baseTime = Date.now();
+    coaLedgers = defaults.map((d, index) => ({
+      id: baseTime + index + _coaLedgerCtr++,
+      sgId: d.sgId,
+      glId: null,
+      name: d.name,
+      code: '',
+      openingBalance: 0,
+      type: 'ledger'
+    }));
+  }
+
   let _coaLedgerCtr  = 1;
+  initDefaultLedgers();
   let _coaExpanded   = new Set(['assets','equity-liabilities','income','expense']);
   let _coaSearch     = '';
   let _coaStyleDone  = false;
@@ -11057,6 +11609,7 @@
       window.KYA_STORE = {};
     }
     populateJeDepartments();
+    initDefaultLedgers();
   }
 
   function saveOhBudget() {
@@ -11325,8 +11878,11 @@
       const data = JSON.parse(jsonStr);
       
       // Restore Core KYA Data
-      if (Array.isArray(data.coaLedgers)) coaLedgers = data.coaLedgers;
-      else coaLedgers = [];
+      if (Array.isArray(data.coaLedgers) && data.coaLedgers.length > 0) coaLedgers = data.coaLedgers;
+      else {
+        coaLedgers = [];
+        initDefaultLedgers();
+      }
 
       if (Array.isArray(data.postedEntries)) postedEntries = data.postedEntries;
       else postedEntries = [];
@@ -11597,6 +12153,7 @@
 
   async function loadKyaDataOnStartup() {
     try {
+      let restored = false;
       const handle = await loadDirectoryHandle();
       if (handle) {
         _activeFolderHandle = handle;
@@ -11604,7 +12161,10 @@
         if (hasPerm) {
           _activeFolderPermission = true;
           const jsonStr = await readDataFromDirectory(handle);
-          performRestore(jsonStr, true);
+          if (jsonStr) {
+            performRestore(jsonStr, true);
+            restored = true;
+          }
         } else {
           _activeFolderPermission = false;
           // Fallback to local storage copy
@@ -11612,6 +12172,7 @@
           const jsonStr = localStorage.getItem(getVaultKey('kya_backup_data', currentPath));
           if (jsonStr) {
             performRestore(jsonStr, true);
+            restored = true;
           }
         }
       } else {
@@ -11619,8 +12180,15 @@
         const jsonStr = localStorage.getItem(getVaultKey('kya_backup_data', currentPath));
         if (jsonStr) {
           performRestore(jsonStr, true);
+          restored = true;
         }
       }
+
+      if (!restored) {
+        // Fresh load, save the default initial state immediately.
+        await saveKyaBackup(true);
+      }
+
       updateVaultUI();
     } catch (e) {
       console.error('Error during startup load:', e);
@@ -11870,6 +12438,32 @@
         reader.readAsText(file);
       });
     }
+
+    // ── KYA Vault Encrypted Backup buttons ──────────────────────────
+    const exportBtn = document.getElementById('btnKyaVaultExport');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => kyaVaultExport());
+    }
+
+    const importBtn = document.getElementById('btnKyaVaultImport');
+    if (importBtn) {
+      importBtn.addEventListener('click', () => {
+        const fi = document.getElementById('kyaVaultFileInput');
+        if (fi) { fi.value = ''; fi.click(); }
+      });
+    }
+
+    const kyaFileInput = document.getElementById('kyaVaultFileInput');
+    if (kyaFileInput) {
+      kyaFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => kyaVaultImport(ev.target.result);
+        reader.onerror = () => showToast('Failed to read .kya file.', 'danger');
+        reader.readAsText(file);
+      });
+    }
   }
 
   function updateVaultUI() {
@@ -12020,6 +12614,244 @@
     if (autoVal) {
       saveKyaBackup(true);
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  KYA VAULT — AES-256 Encrypted Backup / Restore
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Show a password-prompt modal for vault export or import.
+   * @param {'export'|'import'} mode
+   * @param {function(string)} onConfirm  Called with the entered password.
+   */
+  function kyaVaultShowPwdModal(mode, onConfirm) {
+    // Remove any existing modal
+    document.getElementById('kyaVaultPwdOverlay')?.remove();
+
+    const isExport = mode === 'export';
+    const overlay = document.createElement('div');
+    overlay.id = 'kyaVaultPwdOverlay';
+    overlay.innerHTML = `
+      <div class="kya-vault-pwd-card">
+        <div class="kya-vault-pwd-icon ${mode}">
+          ${isExport
+            ? `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`
+            : `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`
+          }
+        </div>
+        <div class="kya-vault-pwd-title">${isExport ? 'Set Vault Password' : 'Enter Vault Password'}</div>
+        <div class="kya-vault-pwd-desc">${
+          isExport
+            ? 'All your data will be encrypted with AES-256 and saved as a <strong>.kya</strong> file. Remember your password — it cannot be recovered.'
+            : 'Enter the password used when the backup was created. Wrong password will not restore any data.'
+        }</div>
+        <div class="kya-vault-pwd-field-wrap">
+          <input type="password" id="kyaVaultPwdInput" placeholder="${isExport ? 'Create a strong password' : 'Enter your vault password'}" autocomplete="${isExport ? 'new-password' : 'current-password'}" />
+          <button class="kya-vault-pwd-eye" id="kyaVaultPwdEye" type="button" title="Show/hide password">
+            <svg id="kyaEyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <div class="kya-vault-pwd-hint">🔒 Minimum 1 character. Use a strong, memorable password.</div>
+        <div class="kya-vault-pwd-error" id="kyaVaultPwdError"></div>
+        <div class="kya-vault-pwd-actions">
+          <button class="btn-cancel" id="kyaVaultPwdCancel">Cancel</button>
+          <button class="btn-ok ${mode}" id="kyaVaultPwdOk">${isExport ? 'Encrypt &amp; Export' : 'Decrypt &amp; Restore'}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const input  = overlay.querySelector('#kyaVaultPwdInput');
+    const errEl  = overlay.querySelector('#kyaVaultPwdError');
+    const okBtn  = overlay.querySelector('#kyaVaultPwdOk');
+    const eyeBtn = overlay.querySelector('#kyaVaultPwdEye');
+
+    const close = () => overlay.remove();
+
+    // Eye toggle
+    eyeBtn.addEventListener('click', () => {
+      const isText = input.type === 'text';
+      input.type = isText ? 'password' : 'text';
+      overlay.querySelector('#kyaEyeIcon').innerHTML = isText
+        ? `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`
+        : `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+    });
+
+    // Show error helper
+    const showErr = (msg) => {
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+      input.style.borderColor = '#fca5a5';
+    };
+    const clearErr = () => {
+      errEl.style.display = 'none';
+      input.style.borderColor = '';
+    };
+
+    input.addEventListener('input', clearErr);
+
+    // OK action
+    const handleOk = () => {
+      const pwd = input.value;
+      if (!pwd || pwd.length < 1) {
+        showErr('Password cannot be empty.');
+        input.focus();
+        return;
+      }
+      close();
+      onConfirm(pwd);
+    };
+
+    okBtn.addEventListener('click', handleOk);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleOk(); });
+    overlay.querySelector('#kyaVaultPwdCancel').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+    setTimeout(() => input.focus(), 80);
+  }
+
+  /**
+   * Collect ALL localStorage keys and values, encrypt with AES-256,
+   * and download as a .kya file.
+   */
+  function kyaVaultExport() {
+    if (typeof CryptoJS === 'undefined') {
+      showToast('CryptoJS library not loaded. Check your internet connection.', 'danger');
+      return;
+    }
+    kyaVaultShowPwdModal('export', (password) => {
+      try {
+        // First trigger an in-memory save so the snapshot is fresh
+        const activePath = getActiveVaultPath();
+        const backupData = {
+          coaLedgers,
+          postedEntries,
+          draftedEntries,
+          jvCounter,
+          ohDepartments,
+          ohEmployees,
+          ohBudgets,
+          _ohDeptCtr,
+          _ohEmpCtr,
+          _ohBudgetCtr,
+          kyaSettings: {
+            autoBackup: document.getElementById('vaultAutoBackupToggle')?.checked || false
+          },
+          futureStore: window.KYA_STORE || {}
+        };
+        // Always persist fresh snapshot before export
+        const freshJson = JSON.stringify(backupData);
+        localStorage.setItem(getVaultKey('kya_backup_data', activePath), freshJson);
+
+        // Collect EVERY localStorage key-value pair
+        const allData = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          allData[k] = localStorage.getItem(k);
+        }
+
+        // Wrap with meta
+        const payload = {
+          version: '1.0',
+          app: 'KYA',
+          exportedAt: new Date().toISOString(),
+          data: allData
+        };
+
+        const plaintext = JSON.stringify(payload);
+        const encrypted = CryptoJS.AES.encrypt(plaintext, password).toString();
+
+        // Download
+        const blob = new Blob([encrypted], { type: 'text/plain' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        a.href     = url;
+        a.download = `KYA_Vault_${ts}.kya`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+
+        showToast('✓ Encrypted backup exported successfully.', 'success');
+      } catch (err) {
+        console.error('KYA Vault export error:', err);
+        showToast('Export failed: ' + err.message, 'danger');
+      }
+    });
+  }
+
+  /**
+   * Decrypt the provided ciphertext string and restore all data from it.
+   * @param {string} ciphertext  Raw contents of the .kya file
+   */
+  function kyaVaultImport(ciphertext) {
+    if (typeof CryptoJS === 'undefined') {
+      showToast('CryptoJS library not loaded. Check your internet connection.', 'danger');
+      return;
+    }
+    kyaVaultShowPwdModal('import', (password) => {
+      try {
+        const bytes = CryptoJS.AES.decrypt(ciphertext, password);
+        let plaintext;
+        try {
+          plaintext = bytes.toString(CryptoJS.enc.Utf8);
+        } catch (e) {
+          plaintext = '';
+        }
+        if (!plaintext) {
+          showToast('Incorrect password or corrupted file. No data was changed.', 'danger');
+          return;
+        }
+
+        let payload;
+        try {
+          payload = JSON.parse(plaintext);
+        } catch (e) {
+          showToast('Incorrect password or corrupted file. No data was changed.', 'danger');
+          return;
+        }
+
+        if (!payload.data || typeof payload.data !== 'object') {
+          showToast('Invalid .kya file format. No data was changed.', 'danger');
+          return;
+        }
+
+        // Confirm before overwriting
+        showKyaConfirm({
+          title: 'Restore from KYA Vault?',
+          message: `This will overwrite ALL current data with the backup from <strong>${payload.exportedAt ? new Date(payload.exportedAt).toLocaleString() : 'unknown date'}</strong>. This cannot be undone.`,
+          confirmLabel: 'Restore',
+          okBg: '#2563eb',
+          onConfirm: () => {
+            // Restore every key that was in the export
+            const restoredData = payload.data;
+            Object.keys(restoredData).forEach(k => {
+              localStorage.setItem(k, restoredData[k]);
+            });
+
+            // Now reload in-memory state from the restored kya_backup_data
+            const activePath = getActiveVaultPath();
+            const jsonStr = localStorage.getItem(getVaultKey('kya_backup_data', activePath));
+            if (jsonStr) {
+              performRestore(jsonStr, false);
+            } else {
+              showToast('Vault restored to localStorage. Please refresh if data does not appear.', 'info');
+            }
+            refreshAllActivePanels();
+            updateVaultUI();
+            showToast('✓ Vault restored successfully.', 'success');
+          }
+        });
+      } catch (err) {
+        console.error('KYA Vault import error:', err);
+        showToast('Incorrect password or corrupted file. No data was changed.', 'danger');
+      }
+    });
   }
 
   // ── Sales Voucher State & Functions ────────────────────────────────
