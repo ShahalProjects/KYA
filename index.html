@@ -51,6 +51,13 @@
       --warning: #f59e0b;
       --danger:  #ef4444;
 
+      --red-50:  #fef2f2;
+      --red-100: #fee2e2;
+      --red-200: #fecaca;
+      --red-500: #ef4444;
+      --red-600: #dc2626;
+      --red-700: #b91c1c;
+
       /* Spacing */
       --sidebar-width: 260px;
       --sidebar-collapsed: 72px;
@@ -3498,6 +3505,217 @@
       transition: color .15s;
     }
     .sales-paystatus-btn.active { color: var(--blue-700); }
+
+    /* Validation and Status Badges */
+    .tb-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .tb-badge svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .tb-badge-success { background: #ecfdf5; color: #059669; border: 1.5px solid #a7f3d0; }
+    .tb-badge-danger { background: #fff5f5; color: #dc2626; border: 1.5px solid #fecaca; }
+
+    /* General Log / List Table Styles (reusable across logs/desks) */
+    .ptb { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+    .pt-search-wrap { flex:1; min-width:180px; position:relative; }
+    .pt-search-inp {
+      width:100%; height:40px; border:1.5px solid #e2e8f0; border-radius:10px;
+      padding:0 12px 0 38px; font-size:13.5px; font-family:Inter,sans-serif;
+      outline:none; transition:border-color .15s,box-shadow .15s; background:#fff;
+      box-sizing:border-box; color:#1e293b;
+    }
+    .pt-search-inp:focus { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.15); }
+    .pt-search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
+    .pt-btn {
+      height:40px; padding:0 16px; border-radius:10px; border:1.5px solid #e2e8f0;
+      background:#fff; font-size:13px; font-weight:600; color:#475569; cursor:pointer;
+      display:flex; align-items:center; gap:6px; transition:all .15s;
+      font-family:Inter,sans-serif; white-space:nowrap;
+    }
+    .pt-btn:hover { background:#f8fafc; border-color:#94a3b8; color:#1e293b; }
+    .pt-btn.filter-active { background:#dbeafe; border-color:#60a5fa; color:#2563eb; }
+    .pt-sel-bar {
+      display:flex; align-items:center; gap:10px;
+      background:#eff6ff; border:1.5px solid #bfdbfe;
+      border-radius:10px; padding:6px 14px;
+    }
+    .pt-sel-count { font-size:13px; font-weight:600; color:#2563eb; }
+    .pt-del-btn {
+      height:32px; padding:0 14px; border-radius:8px; border:none;
+      background:#fee2e2; color:#dc2626; font-size:12.5px; font-weight:600;
+      cursor:pointer; font-family:Inter,sans-serif; transition:background .15s;
+    }
+    .pt-del-btn:hover { background:#fecaca; }
+    .pt-filter-panel {
+      background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px;
+      padding:16px 20px; margin-bottom:16px;
+      display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;
+    }
+    .pt-fg { display:flex; flex-direction:column; gap:5px; }
+    .pt-fg label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
+    .pt-fg input {
+      height:36px; border:1.5px solid #e2e8f0; border-radius:8px;
+      padding:0 10px; font-size:13px; font-family:Inter,sans-serif;
+      outline:none; background:#fff; color:#1e293b; transition:border-color .15s;
+    }
+    .pt-fg input:focus { border-color:#60a5fa; }
+    .pt-clear-btn {
+      height:36px; padding:0 14px; border-radius:8px; border:1.5px solid #e2e8f0;
+      background:#fff; font-size:13px; font-weight:500; color:#64748b;
+      cursor:pointer; font-family:Inter,sans-serif; transition:all .15s;
+    }
+    .pt-clear-btn:hover { background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+    .pt-table-wrap { overflow-x:auto; border-radius:14px; box-shadow:0 2px 14px rgba(0,0,0,.08); background:#fff; }
+    .pt-table { width:100%; border-collapse:collapse; font-family:Inter,sans-serif; font-size:13.5px; }
+    .pt-table thead tr { background:linear-gradient(90deg,#2563eb,#3b82f6); color:#fff; }
+    .pt-table thead th { padding:12px 14px; font-weight:600; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; text-align:left; }
+    .pt-table tbody tr { border-bottom:1px solid #f1f5f9; transition:background .12s; }
+    .pt-table tbody tr:hover { background:#f8fafc; }
+    .pt-table tbody tr.pt-sel-row { background:#eff6ff !important; }
+    .pt-table tbody td { padding:11px 14px; color:#475569; vertical-align:middle; }
+    .pt-cb { width:16px; height:16px; accent-color:#2563eb; cursor:pointer; }
+    .pt-vbadge { background:#dbeafe; color:#1d4ed8; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px; }
+    .pt-amt { font-weight:700; color:#2563eb; font-size:14px; }
+    .pt-view-btn {
+      width:32px; height:32px; border:1.5px solid #e2e8f0; border-radius:8px;
+      background:#fff; cursor:pointer; display:inline-flex; align-items:center;
+      justify-content:center; color:#64748b; transition:all .15s;
+    }
+    .pt-view-btn:hover { background:#dbeafe; border-color:#93c5fd; color:#2563eb; }
+    .pt-row-del-btn {
+      width:32px; height:32px; border:1.5px solid #fecaca; border-radius:8px;
+      background:#fff5f5; cursor:pointer; display:inline-flex; align-items:center;
+      justify-content:center; color:#dc2626; transition:all .15s;
+    }
+    .pt-row-del-btn:hover { background:#fee2e2; border-color:#f87171; }
+
+    /* Shared KYA confirmation popup */
+    .kya-confirm-overlay {
+      position:fixed; inset:0; z-index:10002;
+      background:rgba(15,23,42,.52); backdrop-filter:blur(5px);
+      display:flex; align-items:center; justify-content:center;
+      font-family:Inter,sans-serif;
+    }
+    .kya-confirm-card {
+      background:#fff; border-radius:22px; padding:36px 38px 30px;
+      max-width:400px; width:90%; box-shadow:0 32px 80px rgba(0,0,0,.22);
+      text-align:center; animation:jePopIn .18s cubic-bezier(.34,1.3,.64,1);
+    }
+    .kya-confirm-icon {
+      width:58px; height:58px; border-radius:18px;
+      display:flex; align-items:center; justify-content:center;
+      margin:0 auto 20px;
+    }
+    .kya-confirm-title { font-size:18px; font-weight:700; color:#0f172a; margin-bottom:7px; letter-spacing:-.3px; }
+    .kya-confirm-msg   { font-size:13.5px; color:#64748b; line-height:1.65; margin-bottom:26px; }
+    .kya-confirm-btns  { display:flex; gap:11px; }
+    .kya-confirm-cancel {
+      flex:1; height:44px; border:1.5px solid #e2e8f0; border-radius:13px;
+      background:#fff; font-size:14px; font-weight:600; color:#475569;
+      cursor:pointer; transition:background .14s,border-color .14s;
+    }
+    .kya-confirm-cancel:hover { background:#f8fafc; border-color:#94a3b8; }
+    .kya-confirm-ok {
+      flex:1; height:44px; border:none; border-radius:13px;
+      font-size:14px; font-weight:700; color:#fff; cursor:pointer;
+      transition:filter .14s; letter-spacing:.01em;
+    }
+    .kya-confirm-ok:hover { filter:brightness(1.1); }
+    /* Full Journal modal */
+    .fj-overlay {
+      position:fixed; inset:0; z-index:10001;
+      background:rgba(15,23,42,.55); backdrop-filter:blur(5px);
+      display:flex; align-items:center; justify-content:center;
+      font-family:Inter,sans-serif;
+    }
+    .fj-card {
+      background:#fff; border-radius:22px;
+      width:min(92vw,680px); max-height:88vh; overflow-y:auto;
+      box-shadow:0 32px 80px rgba(0,0,0,.25);
+      animation:jePopIn .18s cubic-bezier(.34,1.3,.64,1);
+    }
+    .fj-head {
+      background:linear-gradient(90deg,#2563eb,#3b82f6); color:#fff;
+      padding:22px 28px 18px; border-radius:22px 22px 0 0;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    }
+    .fj-head-title { font-size:17px; font-weight:700; }
+    .fj-head-sub   { font-size:12.5px; opacity:.8; margin-top:3px; }
+    .fj-close-btn {
+      width:32px; height:32px; flex-shrink:0; border:none;
+      border-radius:8px; background:rgba(255,255,255,.2); color:#fff;
+      cursor:pointer; font-size:17px; display:flex; align-items:center; justify-content:center;
+    }
+    .fj-close-btn:hover { background:rgba(255,255,255,.35); }
+    .fj-body { padding:26px 28px 28px; }
+    .fj-meta { display:grid; grid-template-columns:1fr 1fr; gap:12px 28px; margin-bottom:22px; }
+    .fj-meta-item label { font-size:10.5px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.07em; }
+    .fj-meta-item span  { display:block; font-size:14px; font-weight:600; color:#1e293b; margin-top:3px; }
+    .fj-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+    .fj-tbl thead tr { background:#f8fafc; }
+    .fj-tbl thead th { padding:9px 12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; border-bottom:2px solid #e2e8f0; text-align:left; }
+    .fj-tbl tbody td { padding:10px 12px; border-bottom:1px solid #f1f5f9; }
+    .fj-by { color:#2563eb; font-weight:700; background:#dbeafe; padding:2px 8px; border-radius:6px; }
+    .fj-to { color:#059669; font-weight:700; background:#d1fae5; padding:2px 8px; border-radius:6px; }
+    .fj-tbl tfoot tr { background:#f8fafc; }
+    .fj-tbl tfoot td { padding:10px 12px; font-weight:700; color:#1e293b; border-top:2px solid #e2e8f0; }
+    .fj-narration { margin-top:18px; padding:14px 16px; background:#f0f9ff; border-radius:10px; font-size:13px; color:#64748b; border-left:3px solid #38bdf8; line-height:1.6; }
+    .pt-view-btn svg, .pt-row-del-btn svg { flex-shrink: 0; display: block; }
+
+    /* Voucher Desk top status switcher tabs */
+    .vd-status-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--slate-600);
+      background: var(--white);
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: all 0.2s ease;
+    }
+    .vd-status-tab-btn svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      stroke: var(--blue-600);
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      transition: all 0.2s ease;
+    }
+    .vd-status-tab-btn:hover {
+      background: var(--slate-50);
+      color: var(--slate-800);
+      border-color: var(--slate-300);
+    }
+    .vd-status-tab-btn.active {
+      background: var(--blue-600) !important;
+      color: var(--white) !important;
+      border-color: var(--blue-600) !important;
+    }
+    .vd-status-tab-btn.active svg {
+      stroke: var(--white) !important;
+    }
   </style>
 </head>
 <body>
@@ -3579,62 +3797,35 @@
 
       <div class="nav-section-label">Accounting</div>
 
-      <div class="nav-accordion" id="nav-sales-group">
-        <!-- Accordion header -->
-        <div class="nav-accordion-header" id="nav-sales" role="button" tabindex="0" aria-label="Sales Voucher" aria-expanded="false">
-          <!-- Shopping cart or receipt icon -->
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-            <path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
-            <circle cx="14" cy="16" r="1.5" fill="currentColor"/>
-          </svg>
-          <span class="nav-label">Sales Voucher</span>
-          <svg class="nav-accordion-chevron" viewBox="0 0 16 16" fill="none">
-            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <!-- Submenu -->
-        <div class="nav-submenu" id="nav-sales-submenu">
-          <div class="nav-sub-item" id="nav-sales-new" role="button" tabindex="0" data-sales-action="new" aria-label="New Sales Voucher">
-            <span class="nav-sub-dot"></span>New Invoice
-          </div>
-          <div class="nav-sub-item" id="nav-sales-posted" role="button" tabindex="0" data-sales-action="posted" aria-label="Posted invoices">
-            <span class="nav-sub-dot"></span>Posted Invoices
-          </div>
-          <div class="nav-sub-item" id="nav-sales-drafted" role="button" tabindex="0" data-sales-action="drafted" aria-label="Drafted invoices">
-            <span class="nav-sub-dot"></span>Drafted Invoices
-          </div>
-        </div>
+      <div class="nav-item" id="nav-sales" role="button" tabindex="0" aria-label="Sales Voucher">
+        <!-- Shopping cart or receipt icon -->
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+          <circle cx="14" cy="16" r="1.5" fill="currentColor"/>
+        </svg>
+        <span class="nav-label">Sales Voucher</span>
       </div>
 
-      <div class="nav-accordion" id="nav-journal-group">
-        <!-- Accordion header -->
-        <div class="nav-accordion-header" id="nav-journal" role="button" tabindex="0" aria-label="Journal Entry" aria-expanded="false">
-          <!-- Book/ledger icon -->
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-            <rect x="3" y="2" width="13" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/>
-            <rect x="3" y="2" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/>
-            <line x1="9.5" y1="7"  x2="14" y2="7"  stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            <line x1="9.5" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            <line x1="9.5" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-          </svg>
-          <span class="nav-label">Journal Entry</span>
-          <svg class="nav-accordion-chevron" viewBox="0 0 16 16" fill="none">
-            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <!-- Submenu -->
-        <div class="nav-submenu" id="nav-journal-submenu">
-          <div class="nav-sub-item" id="nav-je-new" role="button" tabindex="0" data-je-action="new" aria-label="New Journal Entry">
-            <span class="nav-sub-dot"></span>New Entry
-          </div>
-          <div class="nav-sub-item" id="nav-je-posted" role="button" tabindex="0" data-je-action="posted" aria-label="Posted entries">
-            <span class="nav-sub-dot"></span>Posted
-          </div>
-          <div class="nav-sub-item" id="nav-je-drafted" role="button" tabindex="0" data-je-action="drafted" aria-label="Drafted entries">
-            <span class="nav-sub-dot"></span>Drafted
-          </div>
-        </div>
+      <div class="nav-item" id="nav-journal" role="button" tabindex="0" aria-label="Journal Entry">
+        <!-- Book/ledger icon -->
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <rect x="3" y="2" width="13" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/>
+          <rect x="3" y="2" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/>
+          <line x1="9.5" y1="7"  x2="14" y2="7"  stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <line x1="9.5" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          <line x1="9.5" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        <span class="nav-label">Journal Entry</span>
+      </div>
+
+      <div class="nav-item" id="nav-voucher-desk" data-panel="voucher-desk" role="button" tabindex="0" aria-label="Voucher Desk">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <rect x="3" y="4" width="14" height="12" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+          <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M7 10v2a1 1 0 001 1h4a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="nav-label">Voucher Desk</span>
       </div>
 
       <div class="nav-item" id="nav-ledger" data-panel="welcome" role="button" tabindex="0" aria-label="General Ledger">
@@ -3809,26 +4000,48 @@
       <div id="panel-journal" role="region" aria-label="Journal Entry">
 
         <!-- Page header -->
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <h1 class="panel-title">Journal Entry</h1>
-            <p class="panel-subtitle">Record double-entry transactions with ledger accounts</p>
-          </div>
-          <div class="panel-actions">
-            <button class="btn btn-secondary" id="btnPrint" aria-label="Print voucher">
-              <svg viewBox="0 0 15 15" fill="none">
-                <path d="M4 5V2h7v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <rect x="2" y="5" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-                <path d="M4 9h7M4 11.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                <circle cx="11.5" cy="7.5" r=".8" fill="currentColor"/>
-              </svg>
-              Print
-            </button>
-            <button class="btn btn-primary" id="btnNewJE" aria-label="New journal entry">
-              <svg viewBox="0 0 15 15" fill="none">
+        <div class="panel-header" style="border-bottom: 1.5px solid var(--slate-100); padding-bottom: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%;">
+          <style>
+            .btn-je-action {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              padding: 8px 14px;
+              font-size: 13px;
+              font-weight: 600;
+              color: var(--slate-600);
+              background: var(--white);
+              border: 1.5px solid var(--slate-200);
+              border-radius: 8px;
+              cursor: pointer;
+              box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+              transition: all 0.2s ease;
+            }
+            .btn-je-action:hover {
+              background: var(--slate-50) !important;
+              color: var(--slate-800) !important;
+              border-color: var(--slate-300) !important;
+            }
+          </style>
+          <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-primary" id="btnNewJE" type="button" aria-label="New journal entry" style="display: flex; align-items: center; gap: 6px; height: 38px;">
+              <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
                 <path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
               </svg>
               New Entry
+            </button>
+            <button class="btn-je-action" id="btnJeReverse" type="button">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <path d="M2.5 8a5.5 5.5 0 0 1 8.5-4.5l2 2M13.5 8a5.5 5.5 0 0 1-8.5 4.5l-2-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M13 2.5v3h-3M3 13.5v-3h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Reverse
+            </button>
+            <button class="btn-je-action" id="btnJeCancel" type="button">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Cancel
             </button>
           </div>
         </div>
@@ -3866,14 +4079,8 @@
               <label for="jeVoucherNo">Journal Voucher No.</label>
               <input type="text" id="jeVoucherNo" class="je-input" placeholder="e.g. JV-2024-001" aria-label="Journal voucher number" />
             </div>
-            <div class="je-field">
-              <label for="jeFiscalYear">Fiscal Year</label>
-              <input type="text" id="jeFiscalYear" class="je-input" value="2024–25" aria-label="Fiscal year" readonly />
-            </div>
-            <div class="je-field">
-              <label for="jePreparedBy">Prepared By</label>
-              <input type="text" id="jePreparedBy" class="je-input" value="Admin User" aria-label="Prepared by" />
-            </div>
+            <input type="hidden" id="jeFiscalYear" value="2024–25" />
+            <input type="hidden" id="jePreparedBy" value="Admin User" />
             <div class="je-field">
               <label for="jeDepartment">Department</label>
               <select id="jeDepartment" class="je-input" aria-label="Department selection">
@@ -4001,39 +4208,133 @@
         <div id="draftedTableWrap"></div>
       </div>
 
+      <!-- Voucher Desk Panel -->
+      <div id="panel-voucher-desk" role="region" aria-label="Voucher Desk" style="display:none">
+        <!-- Status switcher tabs (Posted / Drafted) between title bar and ceiling -->
+        <div class="vd-status-tabs" style="display: flex; gap: 8px; margin-bottom: 16px; margin-top: 4px;">
+          <button class="vd-status-tab-btn active" data-status="All">
+            <svg viewBox="0 0 16 16">
+              <rect x="2" y="2" width="12" height="12" rx="1.5"/>
+              <path d="M5.5 6h5M5.5 10h5"/>
+            </svg>
+            All Vouchers
+          </button>
+          <button class="vd-status-tab-btn" data-status="Posted">
+            <svg viewBox="0 0 16 16">
+              <path d="M3 2h7l4 4v8H3V2z"/>
+              <path d="M10 2v4h4"/>
+              <path d="M5.5 9.5l1.5 1.5 3.5-3.5"/>
+            </svg>
+            Posted
+          </button>
+          <button class="vd-status-tab-btn" data-status="Draft">
+            <svg viewBox="0 0 16 16">
+              <path d="M3 2h7l4 4v8H3V2z"/>
+              <path d="M10 2v4h4"/>
+              <path d="M5.5 11.5l1.5-1.5L9 12.5"/>
+              <path d="M7 9l2-2"/>
+            </svg>
+            Drafted
+          </button>
+        </div>
+
+        <div class="table-card" style="padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--white);">
+                  <rect x="3" y="4" width="18" height="15" rx="2"/>
+                  <line x1="3" y1="11" x2="21" y2="11"/>
+                  <path d="M9 11v2a1 1 0 001 1h4a1 1 0 001-1v-2"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Voucher Desk</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Central control to manage, view, and organize all voucher transactions</div>
+              </div>
+            </div>
+            <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn btn-primary" id="vdNewJEBtn" style="display: flex; align-items: center; gap: 6px; height: 36px; background: rgba(255, 255, 255, 0.2); border: 1.5px solid rgba(255,255,255,0.4); color: var(--white); font-size: 13px; font-weight: 600; padding: 0 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2;"><path d="M8 2v12M2 8h12"/></svg>
+                New Journal
+              </button>
+              <button class="btn btn-primary" id="vdNewInvBtn" style="display: flex; align-items: center; gap: 6px; height: 36px; background: var(--white); border: 1.5px solid var(--white); color: var(--blue-700); font-size: 13px; font-weight: 600; padding: 0 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2;"><path d="M8 2v12M2 8h12"/></svg>
+                New Invoice
+              </button>
+            </div>
+          </div>
+
+          <!-- Statistics Cards Grid -->
+          <div class="vd-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+            <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Total Vouchers</span>
+              <span id="vdStatTotal" style="font-size: 24px; font-weight: 800; color: var(--slate-800);">0</span>
+            </div>
+            <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Journal Entries</span>
+              <span id="vdStatJE" style="font-size: 24px; font-weight: 800; color: var(--blue-600);">0</span>
+            </div>
+            <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Sales Invoices</span>
+              <span id="vdStatInv" style="font-size: 24px; font-weight: 800; color: #059669;">0</span>
+            </div>
+            <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Drafts Count</span>
+              <span id="vdStatDrafts" style="font-size: 24px; font-weight: 800; color: #d97706;">0</span>
+            </div>
+          </div>
+
+          <!-- Main Content Area -->
+          <div id="voucherDeskWrap"></div>
+        </div>
+      </div>
+
       <!-- Chart of Accounts Panel -->
       <div id="panel-chart" role="region" aria-label="Chart of Accounts" style="display:none">
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <h1 class="panel-title">Chart of Accounts</h1>
-            <p class="panel-subtitle">Manage your account groups and ledgers</p>
+
+        <div class="table-card" style="padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M8 2.5h5.5v3H8v-3zM2.5 10.5h5.5v3H2.5v-3zM10.5 10.5H16v3h-5.5v-3z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <path d="M5.25 10.5V5.5h2.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Chart of Accounts</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Manage your account groups and ledgers</div>
+              </div>
+            </div>
           </div>
+          <div id="chartWrap"></div>
         </div>
-        <div id="chartWrap"></div>
       </div>
 
       <!-- Balance Sheet Panel -->
       <div id="panel-balance" role="region" aria-label="Balance Sheet" style="display:none">
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <h1 class="panel-title">Balance Sheet</h1>
-            <p class="panel-subtitle">Statement of Assets, Equity and Liabilities as per Schedule III</p>
-          </div>
-          <div class="panel-actions">
-            <button class="btn btn-secondary" id="btnBSPrint" aria-label="Print Balance Sheet">
-              <svg viewBox="0 0 15 15" fill="none">
-                <path d="M4 5V2h7v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <rect x="2" y="5" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-                <path d="M4 9h7M4 11.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                <circle cx="11.5" cy="7.5" r=".8" fill="currentColor"/>
-              </svg>
-              Print
-            </button>
-          </div>
-        </div>
+
 
         <!-- Balance Sheet Card -->
         <div class="table-card" style="padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M8 2v12M2 5h12M4.5 12h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <path d="M2.5 5l2.5 4h6l2.5-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Balance Sheet</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Statement of Assets, Equity and Liabilities as per Schedule III</div>
+              </div>
+            </div>
+          </div>
           <!-- Balance Sheet Toolbar -->
           <div class="rpt-toolbar">
             <div class="rpt-tb-left">
@@ -4068,26 +4369,24 @@
 
       <!-- Trial Balance Panel -->
       <div id="panel-trial" role="region" aria-label="Trial Balance" style="display:none">
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <h1 class="panel-title">Trial Balance</h1>
-            <p class="panel-subtitle">Summary of all ledger balances as of selected dates</p>
-          </div>
-          <div class="panel-actions">
-            <button class="btn btn-secondary" id="btnTrialPrint" aria-label="Print Trial Balance">
-              <svg viewBox="0 0 15 15" fill="none">
-                <path d="M4 5V2h7v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <rect x="2" y="5" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-                <path d="M4 9h7M4 11.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                <circle cx="11.5" cy="7.5" r=".8" fill="currentColor"/>
-              </svg>
-              Print
-            </button>
-          </div>
-        </div>
+
 
         <!-- Trial Balance Card -->
         <div class="table-card" style="padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M2.5 13.5h11M4.5 13.5V6.5M8 13.5V3.5M11.5 13.5v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Trial Balance</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Summary of all ledger balances as of selected dates</div>
+              </div>
+            </div>
+          </div>
           <!-- Trial Balance Toolbar -->
           <div class="rpt-toolbar">
             <div class="rpt-tb-left">
@@ -4118,6 +4417,11 @@
                   <label><input type="checkbox" id="col-plbs-check"> PL / BS</label>
                 </div>
               </div>
+              <div class="rpt-sep"></div>
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none; margin: 0 4px; height: 32px;">
+                <input type="checkbox" id="trialShowAllCheck" style="accent-color: var(--blue-600); width: 14px; height: 14px; cursor: pointer; margin: 0;" />
+                Show All
+              </label>
             </div>
             <div class="rpt-tb-right" id="trialStatusBadgeWrap"></div>
           </div>
@@ -4129,26 +4433,25 @@
 
       <!-- Profit & Loss Panel -->
       <div id="panel-pnl" role="region" aria-label="Profit and Loss Statement" style="display:none">
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <h1 class="panel-title">Profit &amp; Loss Statement</h1>
-            <p class="panel-subtitle">Statement of Income and Expenses as per Schedule III</p>
-          </div>
-          <div class="panel-actions">
-            <button class="btn btn-secondary" id="btnPNLPrint" aria-label="Print Profit and Loss Statement">
-              <svg viewBox="0 0 15 15" fill="none">
-                <path d="M4 5V2h7v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <rect x="2" y="5" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-                <path d="M4 9h7M4 11.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                <circle cx="11.5" cy="7.5" r=".8" fill="currentColor"/>
-              </svg>
-              Print
-            </button>
-          </div>
-        </div>
+
 
         <!-- P&L Card -->
         <div class="table-card" style="padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M2 14h12M3 11l3-4 3 3 5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M11 4h3v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Profit &amp; Loss Statement</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Statement of Income and Expenses as per Schedule III</div>
+              </div>
+            </div>
+          </div>
           <!-- P&L Toolbar -->
           <div class="rpt-toolbar">
             <div class="rpt-tb-left">
@@ -4185,16 +4488,29 @@
       <!-- KeepOne Panel -->
       <div id="panel-onehub" role="region" aria-label="KeepOne" style="display:none">
 
-        <!-- Panel Header -->
-        <div class="oh-panel-hdr">
-          <div class="panel-title-group">
-            <h1 class="panel-title">KeepOne</h1>
-            <p class="panel-subtitle">HR Management &mdash; Departments, Employees &amp; more</p>
-          </div>
-          <div class="panel-actions" id="ohHeaderActions"></div>
-        </div>
 
-        <div class="oh-layout">
+
+        <div class="table-card" style="padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">KeepOne</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">HR Management &mdash; Departments, Employees &amp; more</div>
+              </div>
+            </div>
+            <div class="panel-actions" id="ohHeaderActions" style="display: flex; gap: 8px; align-items: center;"></div>
+          </div>
+
+          <div class="oh-layout">
           <!-- Sub-tabs (5 modules) -->
           <div class="oh-sub-tabs" role="tablist" aria-label="KeepOne sections">
 
@@ -4301,22 +4617,33 @@
 
           </div>
         </div>
-
+      </div>
       </div><!-- /#panel-onehub -->
 
       <!-- Settings Panel -->
       <div id="panel-settings" role="region" aria-label="Settings" style="display:none">
 
-        <!-- Panel Header -->
-        <div class="oh-panel-hdr">
-          <div class="panel-title-group">
-            <h1 class="panel-title">Settings</h1>
-            <p class="panel-subtitle">Configure your preferences, vault, and backups</p>
-          </div>
-          <div class="panel-actions" id="settingsHeaderActions"></div>
-        </div>
 
-        <div class="oh-layout">
+
+        <div class="table-card" style="padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--white);">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51 1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Settings</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Configure your preferences, vault, and backups</div>
+              </div>
+            </div>
+            <div class="panel-actions" id="settingsHeaderActions" style="display: flex; gap: 8px; align-items: center;"></div>
+          </div>
+
+          <div class="oh-layout">
           <!-- Left Options Cards (Sidebar) -->
           <div class="oh-sub-tabs" role="tablist" aria-label="Settings sections">
             <!-- Vault Option -->
@@ -4453,23 +4780,63 @@
             </div>
           </div>
         </div>
-
+      </div>
       </div><!-- /#panel-settings -->
 
       <!-- Sales Voucher Panel -->
       <div id="panel-sales-voucher" role="region" aria-label="Sales Voucher" style="display:none">
         <!-- Page header -->
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <h1 class="panel-title">Sales Voucher</h1>
-            <p class="panel-subtitle">Create and manage tax invoices for goods and services</p>
-          </div>
-          <div class="panel-actions">
-            <button class="btn btn-primary" id="btnNewSales" aria-label="New sales voucher">
-              <svg viewBox="0 0 15 15" fill="none">
-                <path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <div class="panel-header" style="border-bottom: 1.5px solid var(--slate-100); padding-bottom: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%;">
+          <style>
+            .btn-sales-action {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              padding: 8px 14px;
+              font-size: 13px;
+              font-weight: 600;
+              color: var(--slate-600);
+              background: var(--white);
+              border: 1.5px solid var(--slate-200);
+              border-radius: 8px;
+              cursor: pointer;
+              box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+              transition: all 0.2s ease;
+            }
+            .btn-sales-action:hover {
+              background: var(--slate-50) !important;
+              color: var(--slate-800) !important;
+              border-color: var(--slate-300) !important;
+            }
+          </style>
+          <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-primary" id="btnNewSales" type="button" aria-label="New sales voucher" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <path d="M3 2h7l4 4v8H3V2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 2v4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6 9h4M6 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
               </svg>
               New Invoice
+            </button>
+            <button class="btn-sales-action" id="btnSalesReturn" type="button">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <path d="M2.5 8h11M2.5 8l4-4M2.5 8l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Return
+            </button>
+            <button class="btn-sales-action" id="btnSalesOrder" type="button">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <rect x="3" y="3" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+                <line x1="6" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <line x1="6" y1="9" x2="10" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              Order
+            </button>
+            <button class="btn-sales-action" id="btnSalesRejection" type="button">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Rejection
             </button>
           </div>
         </div>
@@ -4477,7 +4844,7 @@
         <!-- FORM CARD -->
         <div class="je-form-card">
           <!-- Colored header strip -->
-          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-800), var(--accent)); flex-wrap: wrap; gap: 12px;">
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); flex-wrap: wrap; gap: 12px;">
             <div class="je-card-header-left">
               <div class="je-card-icon" aria-hidden="true" style="background: rgba(255,255,255,.18);">
                 <svg viewBox="0 0 20 20" fill="none">
@@ -4497,34 +4864,22 @@
           <!-- Header fields -->
           <div class="je-fields-bar">
             <div class="je-field">
-              <label>Invoice No. Mode</label>
-              <div class="sales-type-wrap" style="height: 42px;">
-                <div class="sales-type-bg prod-active" id="salesInvoiceNoModeBg"></div>
-                <button class="sales-type-btn active" id="salesInvoiceNoModeAuto" type="button">Auto</button>
-                <button class="sales-type-btn" id="salesInvoiceNoModeManual" type="button">Manual</button>
-              </div>
-            </div>
-            <div class="je-field">
-              <label for="salesInvoiceNo">Invoice No.</label>
-              <input type="text" id="salesInvoiceNo" class="je-input" placeholder="INV-2026-001" readonly style="background: var(--slate-50); color: var(--slate-400);" aria-label="Invoice number" />
-            </div>
-            <div class="je-field">
-              <label for="salesOrderNo">Order No.</label>
-              <input type="text" id="salesOrderNo" class="je-input" placeholder="e.g. PO-98765" aria-label="Order number" />
-            </div>
-            <div class="je-field">
               <label for="salesDate">Date</label>
               <input type="date" id="salesDate" class="je-input" aria-label="Invoice date" />
             </div>
             <div class="je-field">
-              <label for="salesDueDate">Due Date</label>
-              <input type="date" id="salesDueDate" class="je-input" aria-label="Due date" />
+              <label for="salesInvoiceNo">Invoice No.</label>
+              <input type="text" id="salesInvoiceNo" class="je-input" placeholder="INV-2026-001" aria-label="Invoice number" />
             </div>
             <div class="je-field">
               <label for="salesCustomer">Customer *</label>
               <select id="salesCustomer" class="je-input" aria-label="Customer Selection">
                 <option value="">&mdash; Select Customer &mdash;</option>
               </select>
+            </div>
+            <div class="je-field">
+              <label for="salesOrderNo">Order No.</label>
+              <input type="text" id="salesOrderNo" class="je-input" readonly style="background: var(--slate-50); color: var(--slate-400);" aria-label="Order number" />
             </div>
           </div>
 
@@ -4570,11 +4925,6 @@
           <div class="sales-totals-grid">
             <!-- Left side notes & Payment details -->
             <div style="display: flex; flex-direction: column; gap: 16px;">
-              <div class="je-narration-wrap" style="padding: 0;">
-                <label for="salesNotes" class="je-narration-label">Notes / Terms</label>
-                <textarea id="salesNotes" class="je-narration-input" placeholder="Payment terms, bank details, delivery terms..." style="min-height: 90px;"></textarea>
-              </div>
-              
               <!-- Payment Status Sliding selector -->
               <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
@@ -4587,7 +4937,14 @@
                   </div>
                 </div>
                 
-                <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
+                  <div id="salesDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
+                    <div id="salesDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                      <input type="date" id="salesDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                      <span id="salesDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
+                    </div>
+                  </div>
                   <div id="salesPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
                     <select id="salesPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
@@ -4597,6 +4954,11 @@
                     <input type="number" id="salesPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
                   </div>
                 </div>
+              </div>
+              
+              <div class="je-narration-wrap" style="padding: 0;">
+                <label for="salesNotes" class="je-narration-label">Notes / Terms</label>
+                <textarea id="salesNotes" class="je-narration-input" placeholder="Payment terms, bank details, delivery terms..." style="min-height: 90px;"></textarea>
               </div>
             </div>
 
@@ -4787,8 +5149,6 @@
   const navItems        = document.querySelectorAll('.nav-item');
   const panelWelcome    = document.getElementById('panel-welcome');
   const panelJournal    = document.getElementById('panel-journal');
-  const panelPosted     = document.getElementById('panel-posted');
-  const panelDrafted    = document.getElementById('panel-drafted');
   const panelChart      = document.getElementById('panel-chart');
   const panelBalance    = document.getElementById('panel-balance');
   const panelPnl        = document.getElementById('panel-pnl');
@@ -4800,8 +5160,7 @@
   const panels = {
     welcome: panelWelcome,
     journal: panelJournal,
-    posted:  panelPosted,
-    drafted: panelDrafted,
+    voucher_desk: document.getElementById('panel-voucher-desk'),
     chart:   panelChart,
     balance: panelBalance,
     pnl:     panelPnl,
@@ -4809,14 +5168,11 @@
     onehub:  panelOneHub,
     settings: panelSettings,
     sales_voucher: document.getElementById('panel-sales-voucher'),
-    sales_posted: document.getElementById('panel-sales-posted'),
-    sales_drafted: document.getElementById('panel-sales-drafted'),
   };
 
   const TAB_DEFS = {
     journal: { id: 'journal', label: 'New Journal Entry', panelId: 'panel-journal', navId: 'nav-je-new' },
-    posted:  { id: 'posted',  label: 'Posted',            panelId: 'panel-posted',  navId: 'nav-je-posted' },
-    drafted: { id: 'drafted', label: 'Drafted',           panelId: 'panel-drafted', navId: 'nav-je-drafted' },
+    voucher_desk: { id: 'voucher_desk', label: 'Voucher Desk', panelId: 'panel-voucher-desk', navId: 'nav-voucher-desk' },
     chart:   { id: 'chart',   label: 'Chart of Accounts', panelId: 'panel-chart',   navId: 'nav-chart' },
     balance: { id: 'balance', label: 'Balance Sheet',    panelId: 'panel-balance', navId: 'nav-balance' },
     pnl:     { id: 'pnl',     label: 'Profit & Loss',     panelId: 'panel-pnl',     navId: 'nav-pnl' },
@@ -4824,8 +5180,6 @@
     onehub:  { id: 'onehub',  label: 'KeepOne',           panelId: 'panel-onehub',  navId: 'nav-onehub' },
     settings: { id: 'settings', label: 'Settings',        panelId: 'panel-settings', navId: 'nav-settings' },
     sales_voucher: { id: 'sales_voucher', label: 'New Invoice', panelId: 'panel-sales-voucher', navId: 'nav-sales-new' },
-    sales_posted: { id: 'sales_posted', label: 'Posted Invoices', panelId: 'panel-sales-posted', navId: 'nav-sales-posted' },
-    sales_drafted: { id: 'sales_drafted', label: 'Drafted Invoices', panelId: 'panel-sales-drafted', navId: 'nav-sales-drafted' },
   };
 
   let openTabs = [];
@@ -4836,8 +5190,7 @@
     dashboard: { tabId: null, navId: 'nav-dashboard' },
     ledger:    { tabId: null, navId: 'nav-ledger' },
     journal:   { tabId: 'journal' },
-    posted:    { tabId: 'posted' },
-    drafted:   { tabId: 'drafted' },
+    voucher_desk: { tabId: 'voucher_desk' },
     chart:     { tabId: 'chart' },
     balance:   { tabId: 'balance' },
     pnl:       { tabId: 'pnl' },
@@ -4845,25 +5198,20 @@
     onehub:    { tabId: 'onehub' },
     settings:  { tabId: 'settings' },
     sales_voucher: { tabId: 'sales_voucher' },
-    sales_posted:  { tabId: 'sales_posted' },
-    sales_drafted: { tabId: 'sales_drafted' }
   };
 
   const NAV_ID_TO_ROUTE = {
     'nav-dashboard': 'dashboard',
     'nav-ledger': 'ledger',
+    'nav-voucher-desk': 'voucher_desk',
     'nav-chart': 'chart',
     'nav-trial': 'trial',
     'nav-pnl': 'pnl',
     'nav-balance': 'balance',
     'nav-onehub': 'onehub',
     'nav-settings': 'settings',
-    'nav-je-new': 'journal',
-    'nav-je-posted': 'posted',
-    'nav-je-drafted': 'drafted',
-    'nav-sales-new': 'sales_voucher',
-    'nav-sales-posted': 'sales_posted',
-    'nav-sales-drafted': 'sales_drafted'
+    'nav-journal': 'journal',
+    'nav-sales': 'sales_voucher',
   };
 
   let currentActiveRoute = null;
@@ -4952,11 +5300,11 @@
       el.style.display = 'none';
       el.classList.remove('active');
     });
-    
+
     // Deactivate all sidebar items
     navItems.forEach(n => n.classList.remove('active'));
-    subItems.forEach(s => s.classList.remove('active'));
-    
+    document.querySelectorAll('.nav-sub-item').forEach(s => s.classList.remove('active'));
+
     if (activeTabId) {
       const def = TAB_DEFS[activeTabId];
       const panelEl = document.getElementById(def.panelId);
@@ -4967,11 +5315,10 @@
         panelEl.offsetHeight;
         panelEl.style.animation = '';
       }
-      
+
       // Load panel specific data
       if (activeTabId === 'journal') populateJeDepartments();
-      if (activeTabId === 'posted') renderPostedPanel();
-      if (activeTabId === 'drafted') renderDraftedPanel();
+      if (activeTabId === 'voucher_desk') renderVoucherDeskPanel();
       if (activeTabId === 'chart') renderChartPanel();
       if (activeTabId === 'balance') renderBalanceSheetPanel();
       if (activeTabId === 'pnl') renderPnlPanel();
@@ -4979,69 +5326,16 @@
       if (activeTabId === 'onehub') renderOneHubPanel();
       if (activeTabId === 'settings') renderSettingsPanel();
       if (activeTabId === 'sales_voucher') initSalesForm();
-      if (activeTabId === 'sales_posted') renderSalesPostedPanel();
-      if (activeTabId === 'sales_drafted') renderSalesDraftedPanel();
-      
+
       // Highlight sidebar nav item
       const navEl = document.getElementById(def.navId);
-      if (navEl) {
-        if (navEl.classList.contains('nav-sub-item')) {
-          navEl.classList.add('active');
-          // Ensure parent accordion is open
-          if (activeTabId && activeTabId.startsWith('sales_')) {
-            const sHeader = document.getElementById('nav-sales');
-            const sSubmenu = document.getElementById('nav-sales-submenu');
-            if (sHeader && sSubmenu) {
-              sHeader.classList.add('open');
-              sSubmenu.classList.add('open');
-              sHeader.setAttribute('aria-expanded', 'true');
-            }
-            journalHeader.classList.remove('open');
-            journalSubmenu.classList.remove('open');
-            journalHeader.setAttribute('aria-expanded', 'false');
-          } else {
-            journalHeader.classList.add('open');
-            journalSubmenu.classList.add('open');
-            journalHeader.setAttribute('aria-expanded', 'true');
-            const sHeader = document.getElementById('nav-sales');
-            const sSubmenu = document.getElementById('nav-sales-submenu');
-            if (sHeader && sSubmenu) {
-              sHeader.classList.remove('open');
-              sSubmenu.classList.remove('open');
-              sHeader.setAttribute('aria-expanded', 'false');
-            }
-          }
-        } else if (navEl.classList.contains('nav-item')) {
-          navEl.classList.add('active');
-          journalHeader.classList.remove('open');
-          journalSubmenu.classList.remove('open');
-          journalHeader.setAttribute('aria-expanded', 'false');
-          const sHeader = document.getElementById('nav-sales');
-          const sSubmenu = document.getElementById('nav-sales-submenu');
-          if (sHeader && sSubmenu) {
-            sHeader.classList.remove('open');
-            sSubmenu.classList.remove('open');
-            sHeader.setAttribute('aria-expanded', 'false');
-          }
-        }
-      }
+      if (navEl) navEl.classList.add('active');
+
     } else {
       // Show Dashboard (welcome panel)
       panelWelcome.style.display = '';
       panelWelcome.classList.add('active');
       document.getElementById('nav-dashboard').classList.add('active');
-      
-      // Close accordions
-      journalHeader.classList.remove('open');
-      journalSubmenu.classList.remove('open');
-      journalHeader.setAttribute('aria-expanded', 'false');
-      const sHeader = document.getElementById('nav-sales');
-      const sSubmenu = document.getElementById('nav-sales-submenu');
-      if (sHeader && sSubmenu) {
-        sHeader.classList.remove('open');
-        sSubmenu.classList.remove('open');
-        sHeader.setAttribute('aria-expanded', 'false');
-      }
     }
   }
 
@@ -5100,30 +5394,6 @@
         }
       });
     }
-  });
-
-  // ── Journal Entry accordion ───────────────────────────────────────
-  const journalHeader  = document.getElementById('nav-journal');
-  const journalSubmenu = document.getElementById('nav-journal-submenu');
-  const subItems       = document.querySelectorAll('.nav-sub-item');
-
-  function toggleJournalMenu() {
-    const isOpen = journalSubmenu.classList.contains('open');
-    if (isOpen) {
-      journalHeader.classList.remove('open');
-      journalSubmenu.classList.remove('open');
-      journalHeader.setAttribute('aria-expanded', 'false');
-    } else {
-      journalHeader.classList.add('open');
-      journalSubmenu.classList.add('open');
-      journalHeader.setAttribute('aria-expanded', 'true');
-      navItems.forEach(n => n.classList.remove('active'));
-    }
-  }
-
-  journalHeader.addEventListener('click', toggleJournalMenu);
-  journalHeader.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleJournalMenu(); }
   });
 
   // Quick-start card → journal (New Entry)
@@ -5372,6 +5642,17 @@
       inpAmt.className   = 'je-amount-input ' + (isBy ? 'amt-debit' : 'amt-credit');
       inpAmt.setAttribute('aria-label', isBy ? 'Debit amount' : 'Credit amount');
 
+      inpAmt.addEventListener('focus', () => {
+        const thisTr = document.querySelector(`[data-row-id="${row.id}"]`);
+        if (thisTr) {
+          const partInp = thisTr.querySelector('.je-particulars-input');
+          if (partInp && partInp.value.trim() === '') {
+            partInp.focus();
+            showToast('Please select a ledger account in Particulars first.', 'warning');
+          }
+        }
+      });
+
       inpAmt.addEventListener('input', () => {
         if (isBy) { row.debit  = inpAmt.value; row.credit = ''; }
         else      { row.credit = inpAmt.value; row.debit  = ''; }
@@ -5399,7 +5680,14 @@
 
           // Commit current amount first
           const v = parseAmt(inpAmt.value);
-          if (v) { const fmt = v.toFixed(2); inpAmt.value = fmt; if (isBy) row.debit = fmt; else row.credit = fmt; }
+          if (!v || v <= 0) {
+            showToast('Please enter an amount greater than zero.', 'warning');
+            return;
+          }
+
+          const fmt = v.toFixed(2);
+          inpAmt.value = fmt;
+          if (isBy) row.debit = fmt; else row.credit = fmt;
           refreshTotals();
 
           // After committing, re-check balance
@@ -5416,6 +5704,12 @@
             else                   addRow('By');
           }
 
+        } else if (e.key === 'Tab') {
+          const v = parseAmt(inpAmt.value);
+          if (!v || v <= 0) {
+            e.preventDefault();
+            showToast('Please enter an amount greater than zero.', 'warning');
+          }
         } else if (e.key === 'Backspace' && inpAmt.value === '') {
           // Amount is empty → step back to Particulars of the same row
           e.preventDefault();
@@ -5671,8 +5965,12 @@
         if (open) {
           _jePortal.selectHighlighted();
         } else {
-          const tr = inp.closest('[data-row-id]');
-          if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
+          if (inp.value.trim() === '') {
+            showToast('Please select a ledger account in Particulars.', 'warning');
+          } else {
+            const tr = inp.closest('[data-row-id]');
+            if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
+          }
         }
 
       } else if (e.key === 'Escape') {
@@ -5680,7 +5978,12 @@
         _jePortal.close();
 
       } else if (e.key === 'Tab') {
-        _jePortal.close();
+        if (inp.value.trim() === '') {
+          e.preventDefault();
+          showToast('Please select a ledger account in Particulars.', 'warning');
+        } else {
+          _jePortal.close();
+        }
 
       } else if (e.key === 'Backspace' && !isFirstRow && inp.value === '') {
         e.preventDefault();
@@ -5784,31 +6087,22 @@
 
   // ── Post Entry ────────────────────────────────────────────────────
   document.getElementById('btnPostJE').addEventListener('click', () => {
-    const chip = document.getElementById('jeBalanceChip');
-    if (chip.classList.contains('unbalanced')) {
-      showToast('Cannot post: Debit and Credit totals do not balance.', 'error');
-      return;
-    }
-    const hasEmpty = jeRows.some(r => !r.particular.trim());
-    if (hasEmpty) {
-      showToast('Please select a ledger account for all rows.', 'error');
-      return;
-    }
-    const invalidRow = jeRows.find(r => {
-      const val = r.particular.trim().toLowerCase();
-      return !coaLedgers.some(l => l.type === 'ledger' && l.name.toLowerCase() === val);
-    });
-    if (invalidRow) {
-      showToast(`Invalid ledger name: "${invalidRow.particular}". Please select a ledger from the Chart of Accounts.`, 'error');
-      return;
-    }
-    showToast('Journal entry posted successfully!', 'success');
-    jvCounter++;
-    setTimeout(initFormDefaults, 900);
+    showSavePopup();
   });
 
-  // ── Print ─────────────────────────────────────────────────────────
-  document.getElementById('btnPrint').addEventListener('click', () => window.print());
+  // ── Reverse & Cancel Actions ──────────────────────────────────────
+  const reverseBtn = document.getElementById('btnJeReverse');
+  if (reverseBtn) {
+    reverseBtn.addEventListener('click', () => {
+      showToast('Reverse is an upcoming feature!', 'info');
+    });
+  }
+  const cancelBtn = document.getElementById('btnJeCancel');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      showToast('Cancel is an upcoming feature!', 'info');
+    });
+  }
 
   // ── Toast notification ────────────────────────────────────────────
   function showToast(msg, type) {
@@ -5927,7 +6221,8 @@
     canc.addEventListener('mouseenter', () => { canc.style.background='#f8fafc'; canc.style.borderColor='#94a3b8'; });
     canc.addEventListener('mouseleave', () => { canc.style.background='#fff';    canc.style.borderColor='#e2e8f0'; });
 
-    conf.addEventListener('click', doPostEntry);
+    // Use mousedown instead of click so it fires before focus-loss hides the overlay
+    conf.addEventListener('mousedown', e => { e.preventDefault(); doPostEntry(); });
     canc.addEventListener('click', hideSavePopup);
 
     // Keyboard shortcuts on the overlay
@@ -6000,155 +6295,7 @@
   let _dtFilterOpen       = false;
 
   function injectPostedStyles() {
-    if (_ptStyleDone) return;
     _ptStyleDone = true;
-    const s = document.createElement('style');
-    s.textContent = `
-      .ptb { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
-      .pt-search-wrap { flex:1; min-width:180px; position:relative; }
-      .pt-search-inp {
-        width:100%; height:40px; border:1.5px solid #e2e8f0; border-radius:10px;
-        padding:0 12px 0 38px; font-size:13.5px; font-family:Inter,sans-serif;
-        outline:none; transition:border-color .15s,box-shadow .15s; background:#fff;
-        box-sizing:border-box; color:#1e293b;
-      }
-      .pt-search-inp:focus { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.15); }
-      .pt-search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
-      .pt-btn {
-        height:40px; padding:0 16px; border-radius:10px; border:1.5px solid #e2e8f0;
-        background:#fff; font-size:13px; font-weight:600; color:#475569; cursor:pointer;
-        display:flex; align-items:center; gap:6px; transition:all .15s;
-        font-family:Inter,sans-serif; white-space:nowrap;
-      }
-      .pt-btn:hover { background:#f8fafc; border-color:#94a3b8; color:#1e293b; }
-      .pt-btn.filter-active { background:#dbeafe; border-color:#60a5fa; color:#2563eb; }
-      .pt-sel-bar {
-        display:flex; align-items:center; gap:10px;
-        background:#eff6ff; border:1.5px solid #bfdbfe;
-        border-radius:10px; padding:6px 14px;
-      }
-      .pt-sel-count { font-size:13px; font-weight:600; color:#2563eb; }
-      .pt-del-btn {
-        height:32px; padding:0 14px; border-radius:8px; border:none;
-        background:#fee2e2; color:#dc2626; font-size:12.5px; font-weight:600;
-        cursor:pointer; font-family:Inter,sans-serif; transition:background .15s;
-      }
-      .pt-del-btn:hover { background:#fecaca; }
-      .pt-filter-panel {
-        background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px;
-        padding:16px 20px; margin-bottom:16px;
-        display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;
-      }
-      .pt-fg { display:flex; flex-direction:column; gap:5px; }
-      .pt-fg label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
-      .pt-fg input {
-        height:36px; border:1.5px solid #e2e8f0; border-radius:8px;
-        padding:0 10px; font-size:13px; font-family:Inter,sans-serif;
-        outline:none; background:#fff; color:#1e293b; transition:border-color .15s;
-      }
-      .pt-fg input:focus { border-color:#60a5fa; }
-      .pt-clear-btn {
-        height:36px; padding:0 14px; border-radius:8px; border:1.5px solid #e2e8f0;
-        background:#fff; font-size:13px; font-weight:500; color:#64748b;
-        cursor:pointer; font-family:Inter,sans-serif; transition:all .15s;
-      }
-      .pt-clear-btn:hover { background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
-      .pt-table-wrap { overflow-x:auto; border-radius:14px; box-shadow:0 2px 14px rgba(0,0,0,.08); background:#fff; }
-      .pt-table { width:100%; border-collapse:collapse; font-family:Inter,sans-serif; font-size:13.5px; }
-      .pt-table thead tr { background:linear-gradient(90deg,#2563eb,#3b82f6); color:#fff; }
-      .pt-table thead th { padding:12px 14px; font-weight:600; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; text-align:left; }
-      .pt-table tbody tr { border-bottom:1px solid #f1f5f9; transition:background .12s; }
-      .pt-table tbody tr:hover { background:#f8fafc; }
-      .pt-table tbody tr.pt-sel-row { background:#eff6ff !important; }
-      .pt-table tbody td { padding:11px 14px; color:#475569; vertical-align:middle; }
-      .pt-cb { width:16px; height:16px; accent-color:#2563eb; cursor:pointer; }
-      .pt-vbadge { background:#dbeafe; color:#1d4ed8; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px; }
-      .pt-amt { font-weight:700; color:#2563eb; font-size:14px; }
-      .pt-view-btn {
-        width:32px; height:32px; border:1.5px solid #e2e8f0; border-radius:8px;
-        background:#fff; cursor:pointer; display:inline-flex; align-items:center;
-        justify-content:center; color:#64748b; transition:all .15s;
-      }
-      .pt-view-btn:hover { background:#dbeafe; border-color:#93c5fd; color:#2563eb; }
-      .pt-row-del-btn {
-        width:32px; height:32px; border:1.5px solid #fecaca; border-radius:8px;
-        background:#fff5f5; cursor:pointer; display:inline-flex; align-items:center;
-        justify-content:center; color:#dc2626; transition:all .15s;
-      }
-      .pt-row-del-btn:hover { background:#fee2e2; border-color:#f87171; }
-      /* Shared KYA confirmation popup */
-      .kya-confirm-overlay {
-        position:fixed; inset:0; z-index:10002;
-        background:rgba(15,23,42,.52); backdrop-filter:blur(5px);
-        display:flex; align-items:center; justify-content:center;
-        font-family:Inter,sans-serif;
-      }
-      .kya-confirm-card {
-        background:#fff; border-radius:22px; padding:36px 38px 30px;
-        max-width:400px; width:90%; box-shadow:0 32px 80px rgba(0,0,0,.22);
-        text-align:center; animation:jePopIn .18s cubic-bezier(.34,1.3,.64,1);
-      }
-      .kya-confirm-icon {
-        width:58px; height:58px; border-radius:18px;
-        display:flex; align-items:center; justify-content:center;
-        margin:0 auto 20px;
-      }
-      .kya-confirm-title { font-size:18px; font-weight:700; color:#0f172a; margin-bottom:7px; letter-spacing:-.3px; }
-      .kya-confirm-msg   { font-size:13.5px; color:#64748b; line-height:1.65; margin-bottom:26px; }
-      .kya-confirm-btns  { display:flex; gap:11px; }
-      .kya-confirm-cancel {
-        flex:1; height:44px; border:1.5px solid #e2e8f0; border-radius:13px;
-        background:#fff; font-size:14px; font-weight:600; color:#475569;
-        cursor:pointer; transition:background .14s,border-color .14s;
-      }
-      .kya-confirm-cancel:hover { background:#f8fafc; border-color:#94a3b8; }
-      .kya-confirm-ok {
-        flex:1; height:44px; border:none; border-radius:13px;
-        font-size:14px; font-weight:700; color:#fff; cursor:pointer;
-        transition:filter .14s; letter-spacing:.01em;
-      }
-      .kya-confirm-ok:hover { filter:brightness(1.1); }
-      /* Full Journal modal */
-      .fj-overlay {
-        position:fixed; inset:0; z-index:10001;
-        background:rgba(15,23,42,.55); backdrop-filter:blur(5px);
-        display:flex; align-items:center; justify-content:center;
-        font-family:Inter,sans-serif;
-      }
-      .fj-card {
-        background:#fff; border-radius:22px;
-        width:min(92vw,680px); max-height:88vh; overflow-y:auto;
-        box-shadow:0 32px 80px rgba(0,0,0,.25);
-        animation:jePopIn .18s cubic-bezier(.34,1.3,.64,1);
-      }
-      .fj-head {
-        background:linear-gradient(90deg,#2563eb,#3b82f6); color:#fff;
-        padding:22px 28px 18px; border-radius:22px 22px 0 0;
-        display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-      }
-      .fj-head-title { font-size:17px; font-weight:700; }
-      .fj-head-sub   { font-size:12.5px; opacity:.8; margin-top:3px; }
-      .fj-close-btn {
-        width:32px; height:32px; flex-shrink:0; border:none;
-        border-radius:8px; background:rgba(255,255,255,.2); color:#fff;
-        cursor:pointer; font-size:17px; display:flex; align-items:center; justify-content:center;
-      }
-      .fj-close-btn:hover { background:rgba(255,255,255,.35); }
-      .fj-body { padding:26px 28px 28px; }
-      .fj-meta { display:grid; grid-template-columns:1fr 1fr; gap:12px 28px; margin-bottom:22px; }
-      .fj-meta-item label { font-size:10.5px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.07em; }
-      .fj-meta-item span  { display:block; font-size:14px; font-weight:600; color:#1e293b; margin-top:3px; }
-      .fj-tbl { width:100%; border-collapse:collapse; font-size:13px; }
-      .fj-tbl thead tr { background:#f8fafc; }
-      .fj-tbl thead th { padding:9px 12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; border-bottom:2px solid #e2e8f0; text-align:left; }
-      .fj-tbl tbody td { padding:10px 12px; border-bottom:1px solid #f1f5f9; }
-      .fj-by { color:#2563eb; font-weight:700; background:#dbeafe; padding:2px 8px; border-radius:6px; }
-      .fj-to { color:#059669; font-weight:700; background:#d1fae5; padding:2px 8px; border-radius:6px; }
-      .fj-tbl tfoot tr { background:#f8fafc; }
-      .fj-tbl tfoot td { padding:10px 12px; font-weight:700; color:#1e293b; border-top:2px solid #e2e8f0; }
-      .fj-narration { margin-top:18px; padding:14px 16px; background:#f0f9ff; border-radius:10px; font-size:13px; color:#64748b; border-left:3px solid #38bdf8; line-height:1.6; }
-    `;
-    document.head.appendChild(s);
   }
 
   function getFilteredPosted() {
@@ -6167,144 +6314,100 @@
   // ── Shared styled confirmation popup ─────────────────────────────
   // showKyaConfirm({ title, message, confirmLabel, iconBg, iconColor, iconSvg, okBg, onConfirm })
   function showKyaConfirm({ title, message, confirmLabel = 'Confirm', iconBg, iconColor, iconSvg, okBg = '#dc2626', onConfirm }) {
+    // Remove any existing overlay
     document.getElementById('kyaConfirmOverlay')?.remove();
     document.getElementById('kyaConfirmStyles')?.remove();
 
-    // Default icon backgrounds and colors
+    // Defaults
     if (!iconBg) {
       if (okBg === '#2563eb' || title.toLowerCase().includes('restore') || title.toLowerCase().includes('switch')) {
-        iconBg = 'var(--blue-50)';
-        iconColor = 'var(--blue-600)';
+        iconBg = 'var(--blue-50)'; iconColor = 'var(--blue-600)';
       } else if (okBg === '#16a34a' || title.toLowerCase().includes('post')) {
-        iconBg = '#dcfce7';
-        iconColor = '#16a34a';
+        iconBg = '#dcfce7'; iconColor = '#16a34a';
       } else {
-        iconBg = '#fee2e2';
-        iconColor = '#dc2626';
+        iconBg = '#fee2e2'; iconColor = '#dc2626';
       }
     }
-    if (!iconColor) {
-      iconColor = okBg;
-    }
-
-    // Default SVGs
+    if (!iconColor) iconColor = okBg;
     if (!iconSvg) {
       if (title.toLowerCase().includes('delete')) {
         iconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
       } else if (title.toLowerCase().includes('post')) {
         iconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
       } else {
-        // default database icon
         iconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>`;
       }
     }
 
-    // Inject custom animation styles for absolute centering
-    const styleEl = document.createElement('style');
-    styleEl.id = 'kyaConfirmStyles';
-    styleEl.innerHTML = `
-      #kyaConfirmOverlay {
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(15, 23, 42, 0.65) !important;
-        backdrop-filter: blur(8px) !important;
-        -webkit-backdrop-filter: blur(8px) !important;
-        z-index: 10002;
-        display: block !important;
-      }
-      .kya-confirm-card-centered {
-        position: fixed !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        background: var(--white);
-        border-radius: 24px;
-        box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3);
-        border: 1px solid var(--slate-100);
-        text-align: center;
-        font-family: var(--font-main);
-        z-index: 10003;
-        box-sizing: border-box;
-        animation: kyaCenterPopIn 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) forwards !important;
-      }
-      @keyframes kyaCenterPopIn {
-        from { opacity: 0; transform: translate(-50%, -45%) scale(0.95) !important; }
-        to   { opacity: 1; transform: translate(-50%, -50%) scale(1) !important; }
-      }
-    `;
-    document.head.appendChild(styleEl);
-
     const overlay = document.createElement('div');
     overlay.id = 'kyaConfirmOverlay';
-    overlay.innerHTML = `
-      <div class="kya-confirm-card-centered" style="max-width: 440px; width: 90%; position: relative; padding: 40px 32px 32px;">
-        <button id="kyaConfirmClose" style="position: absolute; top: 20px; right: 20px; border: none; background: none; font-size: 22px; color: var(--slate-400); cursor: pointer; line-height: 1; transition: all 0.15s ease; outline: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.color='var(--slate-700)'; this.style.backgroundColor='var(--slate-50)';" onmouseout="this.style.color='var(--slate-400)'; this.style.backgroundColor='transparent';">
-          &times;
-        </button>
-        
-        <div class="kya-confirm-icon" style="background:${iconBg}; color:${iconColor}; width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -2px 0 rgba(0,0,0,.05);">
-          ${iconSvg}
-        </div>
-        
-        <div class="kya-confirm-title" style="font-size: 20px; font-weight: 800; color: var(--slate-900); margin-bottom: 12px; letter-spacing: -0.4px;">
-          ${title}
-        </div>
-        
-        <div class="kya-confirm-msg" style="font-size: 14px; color: var(--slate-500); line-height: 1.6; margin-bottom: 28px;">
-          ${message}
-        </div>
-        
-        <div class="kya-confirm-btns" style="display: flex; gap: 12px; justify-content: stretch; width: 100%;">
-          <button class="kya-confirm-cancel" id="btnConfirmCancel" style="flex: 1; height: 46px; border: 1.5px solid var(--slate-200); border-radius: 12px; background: var(--white); font-size: 13.5px; font-weight: 600; color: var(--slate-600); cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; margin: 0;">
-            Cancel
-          </button>
-          <button class="kya-confirm-ok" id="btnConfirmOk" style="flex: 1; height: 46px; border: none; border-radius: 12px; background: ${okBg}; font-size: 13.5px; font-weight: 700; color: var(--white); cursor: pointer; transition: all 0.15s ease; box-shadow: 0 4px 12px rgba(0,0,0,.15); display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; margin: 0;">
-            ${confirmLabel}
-          </button>
-        </div>
+
+    // Overlay: full-screen fixed, flex-centered, no external CSS needed
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      inset: '0',
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(15,23,42,0.65)',
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
+      zIndex: '99999',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxSizing: 'border-box',
+    });
+
+    const card = document.createElement('div');
+    Object.assign(card.style, {
+      position: 'relative',
+      background: '#ffffff',
+      borderRadius: '24px',
+      boxShadow: '0 24px 48px -12px rgba(15,23,42,0.35)',
+      border: '1px solid #f1f5f9',
+      textAlign: 'center',
+      fontFamily: 'var(--font-main, Inter, sans-serif)',
+      maxWidth: '440px',
+      width: '90%',
+      padding: '40px 32px 32px',
+      boxSizing: 'border-box',
+      animation: 'none',
+    });
+
+    card.innerHTML = `
+      <button id="kyaConfirmClose" style="position:absolute;top:16px;right:16px;border:none;background:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all 0.15s;">&times;</button>
+      <div style="background:${iconBg};color:${iconColor};width:64px;height:64px;border-radius:20px;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -2px 0 rgba(0,0,0,.05);">
+        ${iconSvg}
+      </div>
+      <div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:12px;letter-spacing:-0.4px;">${title}</div>
+      <div style="font-size:14px;color:#64748b;line-height:1.6;margin-bottom:28px;">${message}</div>
+      <div style="display:flex;gap:12px;width:100%;">
+        <button id="btnConfirmCancel" style="flex:1;height:46px;border:1.5px solid #e2e8f0;border-radius:12px;background:#fff;font-size:13.5px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.15s;box-sizing:border-box;">Cancel</button>
+        <button id="btnConfirmOk" style="flex:1;height:46px;border:none;border-radius:12px;background:${okBg};font-size:13.5px;font-weight:700;color:#fff;cursor:pointer;transition:all 0.15s;box-shadow:0 4px 12px rgba(0,0,0,.15);box-sizing:border-box;">${confirmLabel}</button>
       </div>`;
 
+    overlay.appendChild(card);
     document.body.appendChild(overlay);
-    
-    const close = () => {
-      overlay.remove();
-      document.getElementById('kyaConfirmStyles')?.remove();
-    };
 
-    const btnCancel = overlay.querySelector('#btnConfirmCancel');
-    btnCancel.addEventListener('mouseenter', () => {
-      btnCancel.style.background = 'var(--slate-50)';
-      btnCancel.style.borderColor = 'var(--slate-300)';
-    });
-    btnCancel.addEventListener('mouseleave', () => {
-      btnCancel.style.background = 'var(--white)';
-      btnCancel.style.borderColor = 'var(--slate-200)';
-    });
+    const close = () => overlay.remove();
+
+    const btnCancel = card.querySelector('#btnConfirmCancel');
+    btnCancel.addEventListener('mouseenter', () => { btnCancel.style.background = '#f8fafc'; btnCancel.style.borderColor = '#94a3b8'; });
+    btnCancel.addEventListener('mouseleave', () => { btnCancel.style.background = '#fff'; btnCancel.style.borderColor = '#e2e8f0'; });
     btnCancel.addEventListener('click', close);
 
-    const btnOk = overlay.querySelector('#btnConfirmOk');
-    btnOk.addEventListener('mouseenter', () => {
-      btnOk.style.filter = 'brightness(0.9)';
-    });
-    btnOk.addEventListener('mouseleave', () => {
-      btnOk.style.filter = 'none';
-    });
-    btnOk.addEventListener('click', () => {
-      close();
-      onConfirm();
-    });
+    const btnOk = card.querySelector('#btnConfirmOk');
+    btnOk.addEventListener('mouseenter', () => { btnOk.style.filter = 'brightness(0.88)'; });
+    btnOk.addEventListener('mouseleave', () => { btnOk.style.filter = 'none'; });
+    btnOk.addEventListener('click', () => { close(); onConfirm(); });
 
-    overlay.querySelector('#kyaConfirmClose').addEventListener('click', close);
+    const closeBtn = card.querySelector('#kyaConfirmClose');
+    closeBtn.addEventListener('mouseenter', () => { closeBtn.style.color = '#334155'; closeBtn.style.background = '#f1f5f9'; });
+    closeBtn.addEventListener('mouseleave', () => { closeBtn.style.color = '#94a3b8'; closeBtn.style.background = 'none'; });
+    closeBtn.addEventListener('click', close);
 
-    overlay.addEventListener('click', e => {
-      if (e.target === overlay) close();
-    });
-
-    overlay.addEventListener('keydown', e => {
-      if (e.key === 'Escape') close();
-    });
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 
     btnOk.focus();
   }
@@ -6968,6 +7071,364 @@
     refreshAllReports();
     triggerAutoBackup();
     setTimeout(initFormDefaults, 900);
+  }
+
+  // ── Voucher Desk state & logic ───────────────────────────────────
+  let _vdSearch = '';
+  let _vdTypeFilter = 'All';
+  let _vdStatusFilter = 'All';
+
+  function deleteVoucherFromDesk(type, id) {
+    if (type === 'Journal') {
+      const isDraft = draftedEntries.some(e => e.id === id);
+      if (isDraft) {
+        const entry = draftedEntries.find(e => e.id === id);
+        showKyaConfirm({
+          title: 'Delete this journal entry?',
+          message: `Permanently delete draft <strong>${entry ? entry.voucherNo || '—' : '—'}</strong>?<br>This action cannot be undone.`,
+          confirmLabel: '✕ Delete',
+          iconBg: '#fee2e2', iconColor: '#dc2626',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          okBg: '#dc2626',
+          onConfirm: () => {
+            draftedEntries = draftedEntries.filter(e => e.id !== id);
+            triggerAutoBackup();
+            renderVoucherDeskPanel();
+          }
+        });
+      } else {
+        const entry = postedEntries.find(e => e.id === id);
+        showKyaConfirm({
+          title: 'Delete this journal entry?',
+          message: `Permanently delete voucher <strong>${entry ? entry.voucherNo || '—' : '—'}</strong>?<br>This action cannot be undone.`,
+          confirmLabel: '✕ Delete',
+          iconBg: '#fee2e2', iconColor: '#dc2626',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          okBg: '#dc2626',
+          onConfirm: () => {
+            postedEntries = postedEntries.filter(e => e.id !== id);
+            refreshAllReports();
+            triggerAutoBackup();
+            renderVoucherDeskPanel();
+          }
+        });
+      }
+    } else if (type === 'Invoice') {
+      const isDraft = (window.KYA_STORE.salesVouchersDrafts || []).some(v => v.id === id);
+      if (isDraft) {
+        showKyaConfirm({
+          title: 'Delete Draft Invoice?',
+          message: 'Are you sure you want to delete this draft? This action cannot be undone.',
+          confirmLabel: 'Delete',
+          okBg: 'var(--red-600)',
+          onConfirm: () => {
+            let list = window.KYA_STORE.salesVouchersDrafts || [];
+            list = list.filter(d => d.id !== id);
+            window.KYA_STORE.salesVouchersDrafts = list;
+            showToast('Draft deleted successfully.', 'success');
+            triggerAutoBackup();
+            renderVoucherDeskPanel();
+          }
+        });
+      } else {
+        deleteSalesInvoice(id);
+      }
+    }
+  }
+
+  function renderVoucherDeskPanel() {
+    const wrap = document.getElementById('voucherDeskWrap');
+    if (!wrap) return;
+
+    const activeEl = document.activeElement;
+    const isSearchFocused = activeEl && activeEl.id === 'vdSearch';
+    let caretStart = 0, caretEnd = 0;
+    if (isSearchFocused) {
+      caretStart = activeEl.selectionStart;
+      caretEnd = activeEl.selectionEnd;
+    }
+
+    const salesJeIds = new Set(
+      (window.KYA_STORE.salesVouchers || [])
+        .map(v => v.journalEntryId)
+        .filter(id => id !== undefined && id !== null)
+    );
+    const standalonePostedCount = postedEntries.filter(e => !salesJeIds.has(e.id)).length;
+
+    const totalJE = standalonePostedCount + draftedEntries.length;
+    const totalInv = (window.KYA_STORE.salesVouchers || []).length + (window.KYA_STORE.salesVouchersDrafts || []).length;
+    const totalVouchers = totalJE + totalInv;
+    const totalDrafts = draftedEntries.length + (window.KYA_STORE.salesVouchersDrafts || []).length;
+
+    const elTotal = document.getElementById('vdStatTotal');
+    const elJE = document.getElementById('vdStatJE');
+    const elInv = document.getElementById('vdStatInv');
+    const elDrafts = document.getElementById('vdStatDrafts');
+
+    if (elTotal) elTotal.textContent = totalVouchers;
+    if (elJE) elJE.textContent = totalJE;
+    if (elInv) elInv.textContent = totalInv;
+    if (elDrafts) elDrafts.textContent = totalDrafts;
+
+    let list = [];
+
+    postedEntries.forEach(e => {
+      // Exclude Journal Entries generated from Sales Invoices
+      if (salesJeIds.has(e.id)) return;
+
+      list.push({
+        id: e.id,
+        date: e.date,
+        voucherNo: e.voucherNo,
+        type: 'Journal',
+        particulars: e.narration || e.firstParticular || '—',
+        amount: e.amount,
+        isDraft: false,
+        raw: e
+      });
+    });
+
+    draftedEntries.forEach(e => {
+      list.push({
+        id: e.id,
+        date: e.date,
+        voucherNo: e.voucherNo,
+        type: 'Journal',
+        particulars: e.narration || e.firstParticular || '—',
+        amount: e.amount,
+        isDraft: true,
+        raw: e
+      });
+    });
+
+    (window.KYA_STORE.salesVouchers || []).forEach(e => {
+      const customer = coaLedgers.find(l => l.id == e.customerId);
+      const customerName = customer ? customer.name : '—';
+      list.push({
+        id: e.id,
+        date: e.date,
+        voucherNo: e.invoiceNo,
+        type: 'Invoice',
+        particulars: `Customer: ${customerName}`,
+        amount: fmtNum(e.total),
+        isDraft: false,
+        raw: e
+      });
+    });
+
+    (window.KYA_STORE.salesVouchersDrafts || []).forEach(e => {
+      const customer = coaLedgers.find(l => l.id == e.customerId);
+      const customerName = customer ? customer.name : '—';
+      list.push({
+        id: e.id,
+        date: e.date,
+        voucherNo: e.invoiceNo,
+        type: 'Invoice',
+        particulars: `Customer: ${customerName}`,
+        amount: fmtNum(e.total),
+        isDraft: true,
+        raw: e
+      });
+    });
+
+    list.sort((a, b) => {
+      const dComp = (b.date || '').localeCompare(a.date || '');
+      if (dComp !== 0) return dComp;
+      return b.id - a.id;
+    });
+
+    let filtered = list.filter(e => {
+      if (_vdTypeFilter !== 'All' && e.type !== _vdTypeFilter) return false;
+      
+      if (_vdStatusFilter !== 'All') {
+        const isDraft = _vdStatusFilter === 'Draft';
+        if (e.isDraft !== isDraft) return false;
+      }
+
+      if (_vdSearch) {
+        const q = _vdSearch.toLowerCase();
+        const noMatch = (e.voucherNo || '').toLowerCase().includes(q);
+        const partMatch = (e.particulars || '').toLowerCase().includes(q);
+        const dateMatch = (e.date || '').toLowerCase().includes(q);
+        const amtMatch = (e.amount || '').toLowerCase().includes(q);
+        if (!noMatch && !partMatch && !dateMatch && !amtMatch) return false;
+      }
+
+      return true;
+    });
+
+    let tableHtml = '';
+    if (filtered.length === 0) {
+      tableHtml = `
+        <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div class="pt-search-wrap" style="flex: 1; min-width: 240px; position: relative;">
+            <svg class="pt-search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400);">
+              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input class="pt-search-inp" id="vdSearch" placeholder="Search voucher #, particulars, amount, date…" style="padding-left: 36px; width: 100%; height: 38px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13.5px; transition: all 0.15s;" value="${_vdSearch.replace(/"/g,'&quot;')}">
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <select id="vdTypeFilter" style="height: 38px; padding: 0 12px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13px; font-weight: 600; color: var(--slate-700); background: var(--white);">
+              <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
+              <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
+              <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="text-align: center; padding: 72px 20px; color: #94a3b8;">
+          <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; display: block; color: var(--slate-300);">
+            <rect x="3" y="4" width="18" height="15" rx="2"/>
+            <line x1="3" y1="11" x2="21" y2="11"/>
+          </svg>
+          <div style="font-size: 15px; font-weight: 600; color: var(--slate-500); margin-bottom: 5px;">No vouchers found</div>
+          <div style="font-size: 13px;">Try adjusting your search query or filters.</div>
+        </div>
+      `;
+    } else {
+      tableHtml = `
+        <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div class="pt-search-wrap" style="flex: 1; min-width: 240px; position: relative;">
+            <svg class="pt-search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400);">
+              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input class="pt-search-inp" id="vdSearch" placeholder="Search voucher #, particulars, amount, date…" style="padding-left: 36px; width: 100%; height: 38px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13.5px; transition: all 0.15s;" value="${_vdSearch.replace(/"/g,'&quot;')}">
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <select id="vdTypeFilter" style="height: 38px; padding: 0 12px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13px; font-weight: 600; color: var(--slate-700); background: var(--white);">
+              <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
+              <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
+              <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-table-wrap">
+          <table class="pt-table">
+            <thead>
+              <tr style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500));">
+                <th style="width: 32px; text-align: center;">#</th>
+                <th>Date</th>
+                <th>Voucher No.</th>
+                <th>Type</th>
+                <th>Particulars / Narration</th>
+                <th style="text-align: right;">Amount</th>
+                <th style="text-align: center;">Status</th>
+                <th style="width: 88px; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filtered.map((e, index) => {
+                const typeBadge = e.type === 'Journal'
+                   ? `<span class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Journal Entry</span>`
+                   : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`;
+
+                const statusBadge = e.isDraft
+                   ? `<span class="tb-badge" style="background:#fffbeb; color:#d97706; border:1.5px solid #fde68a; font-size:11px; padding:3px 8px; text-transform:none;">Draft</span>`
+                   : `<span class="tb-badge" style="background:#ecfdf5; color:#059669; border:1.5px solid #a7f3d0; font-size:11px; padding:3px 8px; text-transform:none;">Posted</span>`;
+
+                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : '#059669';
+
+                return `
+                  <tr data-id="${e.id}" data-type="${e.type}" class="vd-row">
+                    <td style="color:#94a3b8; font-size:12px; font-weight:600; text-align:center;">${index + 1}</td>
+                    <td style="white-space:nowrap;">${e.date || '—'}</td>
+                    <td><span style="font-family: monospace; font-weight: 700; color: var(--slate-700);">${e.voucherNo || '—'}</span></td>
+                    <td>${typeBadge}</td>
+                    <td style="font-weight:500; color:var(--slate-800); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${ohEsc(e.particulars)}</td>
+                    <td style="text-align:right; font-weight:700; color:${amtColor}; white-space:nowrap;">₹&thinsp;${e.amount}</td>
+                    <td style="text-align:center;">${statusBadge}</td>
+                    <td style="text-align:center; white-space:nowrap;">
+                      <button class="pt-view-btn vd-view" data-id="${e.id}" data-type="${e.type}" data-draft="${e.isDraft}" title="View Voucher" style="margin-right:4px;">
+                        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                          <ellipse cx="7.5" cy="7.5" rx="6" ry="4.5" stroke="currentColor" stroke-width="1.4"/>
+                          <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.4"/>
+                        </svg>
+                      </button>
+                      <button class="pt-row-del-btn vd-delete" data-id="${e.id}" data-type="${e.type}" title="Delete Voucher" style="width:32px;height:32px;border:1.5px solid #fecaca;border-radius:8px;background:#fff5f5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#dc2626;flex-shrink:0;">
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="display:block;flex-shrink:0;">
+                          <path d="M2 2l9 9M11 2l-9 9" stroke="#dc2626" stroke-width="1.7" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    wrap.innerHTML = tableHtml;
+
+    // Update active state of top status tab switcher
+    document.querySelectorAll('.vd-status-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === _vdStatusFilter);
+    });
+
+    const searchEl = document.getElementById('vdSearch');
+    if (searchEl) {
+      searchEl.addEventListener('input', e => {
+        _vdSearch = e.target.value;
+        renderVoucherDeskPanel();
+      });
+    }
+
+    const typeFilterEl = document.getElementById('vdTypeFilter');
+    if (typeFilterEl) {
+      typeFilterEl.addEventListener('change', e => {
+        _vdTypeFilter = e.target.value;
+        renderVoucherDeskPanel();
+      });
+    }
+
+    wrap.querySelectorAll('.vd-view').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.id);
+        const type = btn.dataset.type;
+        const isDraft = btn.dataset.draft === 'true';
+
+        if (type === 'Journal') {
+          const entry = isDraft
+            ? draftedEntries.find(e => e.id === id)
+            : postedEntries.find(e => e.id === id);
+          if (entry) showFullJournalModal(entry, isDraft);
+        } else if (type === 'Invoice') {
+          if (isDraft) {
+            editSalesDraft(id);
+          } else {
+            viewPrintInvoice(id);
+          }
+        }
+      });
+    });
+
+    wrap.querySelectorAll('.vd-delete').forEach(btn => {
+      btn.addEventListener('mouseenter', () => {
+        btn.style.background = '#fee2e2';
+        btn.style.borderColor = '#f87171';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.background = '#fff5f5';
+        btn.style.borderColor = '#fecaca';
+      });
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.id);
+        const type = btn.dataset.type;
+        deleteVoucherFromDesk(type, id);
+      });
+    });
+
+    if (isSearchFocused) {
+      const searchInput = document.getElementById('vdSearch');
+      if (searchInput) {
+        searchInput.focus();
+        try { searchInput.setSelectionRange(caretStart, caretEnd); } catch (e) {}
+      }
+    }
   }
 
 
@@ -7909,7 +8370,8 @@
     }).length;
     let bodyHtml = '';
     for (const sg of l1sgs) bodyHtml += _coaRenderSg1(sg, q);
-    const initials = mg.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    let initials = mg.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    if (mg.id === 'equity-liabilities') initials = 'L';
     const meta = [totalLdg + ' ledger' + (totalLdg!==1?'s':''), totalGl ? totalGl+' group'+(totalGl!==1?'s':'') : ''].filter(Boolean).join(' · ');
     return `
       <div class="coa-mg" data-mg="${mg.id}">
@@ -8793,7 +9255,7 @@
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;">
               <path d="M13.485 1.929a.75.75 0 0 1 .06 1.057l-7.25 8a.75.75 0 0 1-1.083.03l-3.25-3.5a.75.75 0 1 1 1.096-1.024l2.673 2.879 6.704-7.39a.75.75 0 0 1 1.05-.052z"/>
             </svg>
-            Balanced (Assets = Liab & Equity)
+            Balanced
           </span>
         `;
       } else {
@@ -8946,10 +9408,6 @@
   document.getElementById('bsCollapseAll')?.addEventListener('click', () => {
     _bsExpanded = new Set();
     renderBalanceSheetPanel();
-  });
-
-  document.getElementById('btnBSPrint')?.addEventListener('click', () => {
-    window.print();
   });
 
 
@@ -9300,10 +9758,6 @@
     renderPnlPanel();
   });
 
-  document.getElementById('btnPNLPrint')?.addEventListener('click', () => {
-    window.print();
-  });
-
 
 
 
@@ -9327,10 +9781,6 @@
       .tb-total-row { background: var(--slate-50) !important; font-weight: 800; font-size: 14px; border-top: 1.5px solid var(--slate-300); border-bottom: 4px double var(--slate-800) !important; color: var(--slate-800); }
       .tb-total-row:hover { background: var(--slate-50) !important; }
       .tb-total-row td { border-bottom: 4px double var(--slate-800) !important; }
-
-      .tb-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
-      .tb-badge-success { background: #ecfdf5; color: #059669; border: 1.5px solid #a7f3d0; }
-      .tb-badge-danger { background: #fff5f5; color: #dc2626; border: 1.5px solid #fecaca; }
     `;
     document.head.appendChild(s);
   }
@@ -9452,6 +9902,12 @@
           }
         }
 
+        const showAllChk = document.getElementById('trialShowAllCheck');
+        const showAll = showAllChk ? showAllChk.checked : false;
+        if (!showAll && drVal === 0 && crVal === 0) {
+          return;
+        }
+
         totalDr += drVal;
         totalCr += crVal;
 
@@ -9563,6 +10019,7 @@
     if (activeTabId === 'balance') renderBalanceSheetPanel();
     if (activeTabId === 'pnl') renderPnlPanel();
     if (activeTabId === 'trial') renderTrialBalancePanel();
+    if (activeTabId === 'voucher_desk') renderVoucherDeskPanel();
   }
 
   // Bind Date Input Events across all panels to keep them synchronized
@@ -9586,8 +10043,10 @@
     onDateFilterChange();
   });
 
-  // Print buttons event handlers
-  document.getElementById('btnTrialPrint')?.addEventListener('click', () => { window.print(); });
+  // Trial Balance Show All Event Listener
+  document.getElementById('trialShowAllCheck')?.addEventListener('change', () => {
+    renderTrialBalancePanel();
+  });
 
   // Balance Sheet Hide Zero Balances Event Listener
   document.getElementById('bsHideZero')?.addEventListener('change', () => {
@@ -9821,22 +10280,22 @@
     if (!wrap) return;
     if (_ohActiveTab === 'dept') {
       wrap.innerHTML = `
-        <button class="btn btn-primary" id="ohAddDeptBtn" aria-label="Add Department">
-          <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <button class="btn" id="ohAddDeptBtn" aria-label="Add Department" style="background: var(--white) !important; color: var(--blue-700) !important; border: none; font-weight: 700; height: 36px; padding: 0 16px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s ease;">
+          <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           Add Department
         </button>`;
       document.getElementById('ohAddDeptBtn')?.addEventListener('click', () => openOhDeptModal());
     } else if (_ohActiveTab === 'emp') {
       wrap.innerHTML = `
-        <button class="btn btn-primary" id="ohAddEmpBtn" aria-label="Add Employee">
-          <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <button class="btn" id="ohAddEmpBtn" aria-label="Add Employee" style="background: var(--white) !important; color: var(--blue-700) !important; border: none; font-weight: 700; height: 36px; padding: 0 16px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s ease;">
+          <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           Add Employee
         </button>`;
       document.getElementById('ohAddEmpBtn')?.addEventListener('click', () => openOhEmpModal());
     } else if (_ohActiveTab === 'budget') {
       wrap.innerHTML = `
-        <button class="btn btn-primary" id="ohAddBudgetBtn" aria-label="Add Budget">
-          <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <button class="btn" id="ohAddBudgetBtn" aria-label="Add Budget" style="background: var(--white) !important; color: var(--blue-700) !important; border: none; font-weight: 700; height: 36px; padding: 0 16px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s ease;">
+          <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           Add Budget
         </button>`;
       document.getElementById('ohAddBudgetBtn')?.addEventListener('click', () => openOhBudgetModal());
@@ -12290,37 +12749,19 @@
   }
 
   function setInvoiceNoMode(mode) {
-    currentSalesInvoiceMode = mode;
-    const autoBtn = document.getElementById('salesInvoiceNoModeAuto');
-    const manualBtn = document.getElementById('salesInvoiceNoModeManual');
-    const bgEl = document.getElementById('salesInvoiceNoModeBg');
+    currentSalesInvoiceMode = 'Auto';
     const invNoEl = document.getElementById('salesInvoiceNo');
     const chipEl = document.getElementById('salesVoucherChipDisplay');
     
-    if (!autoBtn || !manualBtn || !bgEl || !invNoEl || !chipEl) return;
+    if (!invNoEl || !chipEl) return;
 
     if (mode === 'Auto') {
-      autoBtn.classList.add('active');
-      manualBtn.classList.remove('active');
-      bgEl.classList.add('prod-active');
-      bgEl.classList.remove('serv-active');
       invNoEl.value = getNextAutoInvoiceNumber();
-      invNoEl.setAttribute('readonly', 'true');
-      invNoEl.style.background = 'var(--slate-50)';
-      invNoEl.style.color = 'var(--slate-400)';
       chipEl.textContent = invNoEl.value;
-    } else {
-      manualBtn.classList.add('active');
-      autoBtn.classList.remove('active');
-      bgEl.classList.add('serv-active');
-      bgEl.classList.remove('prod-active');
-      invNoEl.removeAttribute('readonly');
-      invNoEl.value = '';
-      invNoEl.placeholder = 'INV-XXXX';
-      invNoEl.style.background = '#fff';
-      invNoEl.style.color = 'var(--slate-900)';
-      chipEl.textContent = 'INV-XXXX';
     }
+    invNoEl.removeAttribute('readonly');
+    invNoEl.style.background = '#fff';
+    invNoEl.style.color = 'var(--slate-900)';
   }
 
   function populateSalesCustomers(selectedId = null) {
@@ -12345,7 +12786,7 @@
     const paySelect = document.getElementById('salesPaymentAccount');
     if (!paySelect) return;
     
-    paySelect.innerHTML = '<option value="">&mdash; Select Payment Account &mdash;</option>';
+    paySelect.innerHTML = '<option value="">&mdash; Select &mdash;</option>';
     
     const accounts = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
     accounts.forEach(a => {
@@ -13033,10 +13474,10 @@
       window.KYA_STORE.salesInvoiceCtr = (window.KYA_STORE.salesInvoiceCtr || 1) + 1;
     }
     
-    showToast(`Invoice "${invoiceNo}" posted and journal entry created successfully.`, 'success');
+    showToast(`Invoice "${invoiceNo}" posted successfully.`, 'success');
     window._editingSalesInvoice = null;
     initSalesForm();
-    openTab('sales_posted');
+    openTab('sales_voucher');
     triggerAutoBackup();
   }
 
@@ -13612,9 +14053,49 @@
   window.editSalesDraft = editSalesDraft;
   window.deleteSalesDraft = deleteSalesDraft;
 
+  function updateDueDateHelper() {
+    const dateEl = document.getElementById('salesDate');
+    const dueEl = document.getElementById('salesDueDate');
+    const daysEl = document.getElementById('salesDueDateDays');
+    if (!dateEl || !dueEl || !daysEl) return;
+    
+    const dateVal = dateEl.value;
+    const dueVal = dueEl.value;
+    
+    if (!dateVal || !dueVal) {
+      daysEl.textContent = '';
+      return;
+    }
+    
+    const d1 = new Date(dateVal);
+    const d2 = new Date(dueVal);
+    
+    d1.setHours(0,0,0,0);
+    d2.setHours(0,0,0,0);
+    
+    const diffTime = d2.getTime() - d1.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 0) {
+      daysEl.textContent = `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+      daysEl.style.color = 'var(--blue-600)';
+    } else if (diffDays === 0) {
+      daysEl.textContent = 'Due today';
+      daysEl.style.color = 'var(--slate-500)';
+    } else {
+      daysEl.textContent = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) > 1 ? 's' : ''}`;
+      daysEl.style.color = 'var(--red-600)';
+    }
+  }
+
   function setupSalesVoucherEventListeners() {
-    document.getElementById('salesInvoiceNoModeAuto').addEventListener('click', () => setInvoiceNoMode('Auto'));
-    document.getElementById('salesInvoiceNoModeManual').addEventListener('click', () => setInvoiceNoMode('Manual'));
+    const invNoEl = document.getElementById('salesInvoiceNo');
+    const chipEl = document.getElementById('salesVoucherChipDisplay');
+    if (invNoEl && chipEl) {
+      invNoEl.addEventListener('input', () => {
+        chipEl.textContent = invNoEl.value.trim() || 'INV-XXXX';
+      });
+    }
     
     document.getElementById('salesTypeProduct').addEventListener('click', () => {
       const bg = document.getElementById('salesTypeBg');
@@ -13697,6 +14178,15 @@
       });
     }
     
+    const newSalesBtn = document.getElementById('btnNewSales');
+    if (newSalesBtn) {
+      newSalesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window._editingSalesInvoice = null;
+        initSalesForm();
+      });
+    }
+    
     const saveDraftBtn = document.getElementById('btnSaveSalesDraft');
     if (saveDraftBtn) {
       saveDraftBtn.addEventListener('click', (e) => {
@@ -13773,6 +14263,10 @@
     if (dateEl && dueEl) {
       dateEl.addEventListener('change', () => {
         dueEl.value = dateEl.value;
+        updateDueDateHelper();
+      });
+      dueEl.addEventListener('change', () => {
+        updateDueDateHelper();
       });
     }
     
@@ -13780,6 +14274,19 @@
     if (custEl) {
       custEl.addEventListener('focus', () => {
         populateSalesCustomers(custEl.value);
+      });
+      custEl.addEventListener('change', () => {
+        const customerId = custEl.value;
+        const orderEl = document.getElementById('salesOrderNo');
+        if (orderEl) {
+          if (customerId) {
+            const postedInvoices = window.KYA_STORE.salesVouchers || [];
+            const count = postedInvoices.filter(v => v.customerId == customerId).length;
+            orderEl.value = count + 1;
+          } else {
+            orderEl.value = '';
+          }
+        }
       });
     }
     
@@ -13797,6 +14304,7 @@
     const payBg = document.getElementById('salesPaymentStatusBg');
     const payAccField = document.getElementById('salesPaymentAccountField');
     const payAmtField = document.getElementById('salesPaymentAmountField');
+    const payDueDateField = document.getElementById('salesDueDateField');
     
     if (payNotPaidBtn && payFullBtn && payPartialBtn && payBg && payAccField && payAmtField) {
       payNotPaidBtn.addEventListener('click', () => {
@@ -13806,6 +14314,13 @@
         payBg.className = 'sales-paystatus-bg notpaid-active';
         payAccField.style.display = 'none';
         payAmtField.style.display = 'none';
+        if (payDueDateField) payDueDateField.style.display = 'flex';
+        const wrapper = document.getElementById('salesDueDateWrapper');
+        if (wrapper) {
+          wrapper.style.flexDirection = 'row';
+          wrapper.style.alignItems = 'center';
+        }
+        updateDueDateHelper();
       });
       
       payFullBtn.addEventListener('click', () => {
@@ -13815,6 +14330,7 @@
         payBg.className = 'sales-paystatus-bg fullpaid-active';
         payAccField.style.display = 'flex';
         payAmtField.style.display = 'none';
+        if (payDueDateField) payDueDateField.style.display = 'none';
         populateSalesPaymentAccounts();
       });
       
@@ -13825,6 +14341,14 @@
         payBg.className = 'sales-paystatus-bg partpaid-active';
         payAccField.style.display = 'flex';
         payAmtField.style.display = 'flex';
+        if (payDueDateField) payDueDateField.style.display = 'flex';
+        const wrapper = document.getElementById('salesDueDateWrapper');
+        if (wrapper) {
+          wrapper.style.flexDirection = 'column';
+          wrapper.style.alignItems = 'flex-start';
+          wrapper.style.gap = '4px';
+        }
+        updateDueDateHelper();
         populateSalesPaymentAccounts();
       });
     }
@@ -13836,50 +14360,48 @@
       });
     }
     
-    const salesNewNav = document.getElementById('nav-sales-new');
-    const salesPostedNav = document.getElementById('nav-sales-posted');
-    const salesDraftedNav = document.getElementById('nav-sales-drafted');
+
+    const returnBtn = document.getElementById('btnSalesReturn');
+    const orderBtn = document.getElementById('btnSalesOrder');
+    const rejectionBtn = document.getElementById('btnSalesRejection');
     
-    const clickNew = () => { openTab('sales_voucher'); };
-    const clickPosted = () => { openTab('sales_posted'); };
-    const clickDrafted = () => { openTab('sales_drafted'); };
-    
-    if (salesNewNav) {
-      salesNewNav.addEventListener('click', clickNew);
-      salesNewNav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickNew(); } });
+    if (returnBtn) {
+      returnBtn.addEventListener('click', () => {
+        showToast('Return is an upcoming feature!', 'info');
+      });
     }
-    if (salesPostedNav) {
-      salesPostedNav.addEventListener('click', clickPosted);
-      salesPostedNav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickPosted(); } });
+    if (orderBtn) {
+      orderBtn.addEventListener('click', () => {
+        showToast('Order is an upcoming feature!', 'info');
+      });
     }
-    if (salesDraftedNav) {
-      salesDraftedNav.addEventListener('click', clickDrafted);
-      salesDraftedNav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickDrafted(); } });
+    if (rejectionBtn) {
+      rejectionBtn.addEventListener('click', () => {
+        showToast('Rejection is an upcoming feature!', 'info');
+      });
     }
-    
-    const salesHeader = document.getElementById('nav-sales');
-    const salesSubmenu = document.getElementById('nav-sales-submenu');
-    if (salesHeader && salesSubmenu) {
-      const toggleSalesMenu = () => {
-        const isOpen = salesSubmenu.classList.contains('open');
-        if (isOpen) {
-          salesHeader.classList.remove('open');
-          salesSubmenu.classList.remove('open');
-          salesHeader.setAttribute('aria-expanded', 'false');
-        } else {
-          salesHeader.classList.add('open');
-          salesSubmenu.classList.add('open');
-          salesHeader.setAttribute('aria-expanded', 'true');
-          navItems.forEach(n => n.classList.remove('active'));
-        }
-      };
-      salesHeader.addEventListener('click', toggleSalesMenu);
-      salesHeader.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSalesMenu(); } });
-    }
+  }
+
+  function setupVoucherDeskEventListeners() {
+    document.getElementById('vdNewJEBtn')?.addEventListener('click', () => {
+      openTab('journal');
+    });
+    document.getElementById('vdNewInvBtn')?.addEventListener('click', () => {
+      openTab('sales_voucher');
+    });
+
+    // Status tab switcher
+    document.querySelectorAll('.vd-status-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _vdStatusFilter = btn.dataset.status;
+        renderVoucherDeskPanel();
+      });
+    });
   }
 
   // Setup and Initial Call
   setupSalesVoucherEventListeners();
+  setupVoucherDeskEventListeners();
   initSalesForm();
 
 </script>
