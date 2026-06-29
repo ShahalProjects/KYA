@@ -4563,8 +4563,8 @@
               <span class="oh-tab-text">PayTrack</span>
             </button>
 
-            <!-- Upcoming: Under Ledger -->
-            <button class="oh-sub-tab upcoming" id="ohTabUnderLedger" role="tab" aria-selected="false" aria-controls="oh-underledger-view" title="Coming Soon">
+            <!-- Upcoming: Mini Ledger -->
+            <button class="oh-sub-tab upcoming" id="ohTabMiniLedger" role="tab" aria-selected="false" aria-controls="oh-miniledger-view" title="Coming Soon">
               <div class="oh-tab-icon-wrap">
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
                   <path d="M4 5h12M4 9h8M4 13h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -4572,7 +4572,7 @@
                   <path d="M15 13h2M16 12v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                 </svg>
               </div>
-              <span class="oh-tab-text">Under Ledger</span>
+              <span class="oh-tab-text">Mini Ledger</span>
             </button>
 
           </div>
@@ -4612,8 +4612,8 @@
             <!-- PayTrack View (Upcoming) -->
             <div id="oh-paytrack-view" role="tabpanel" style="display:none"></div>
 
-            <!-- Under Ledger View (Upcoming) -->
-            <div id="oh-underledger-view" role="tabpanel" style="display:none"></div>
+            <!-- Mini Ledger View (Upcoming) -->
+            <div id="oh-miniledger-view" role="tabpanel" style="display:none"></div>
 
           </div>
         </div>
@@ -4878,8 +4878,25 @@
               </select>
             </div>
             <div class="je-field">
+              <label for="salesSupplyType">Supply Type *</label>
+              <select id="salesSupplyType" class="je-input" aria-label="Supply Type Selection">
+                <option value="Intra-State (CGST + SGST)">Intra-State (CGST + SGST)</option>
+                <option value="Inter-State (IGST)">Inter-State (IGST)</option>
+                <option value="Export (Zero-Rated / LUT)">Export (Zero-Rated / LUT)</option>
+                <option value="SEZ With Tax">SEZ With Tax</option>
+                <option value="SEZ Without Tax">SEZ Without Tax</option>
+                <option value="Deemed Export">Deemed Export</option>
+              </select>
+            </div>
+            <div class="je-field">
               <label for="salesOrderNo">Order No.</label>
               <input type="text" id="salesOrderNo" class="je-input" readonly style="background: var(--slate-50); color: var(--slate-400);" aria-label="Order number" />
+            </div>
+            <div class="je-field">
+              <label for="salesExecutive">Sales Executive</label>
+              <select id="salesExecutive" class="je-input" aria-label="Sales Executive Selection">
+                <option value="">&mdash; Select Sales Executive &mdash;</option>
+              </select>
             </div>
           </div>
 
@@ -5824,7 +5841,12 @@
       const q = (query || '').toLowerCase().trim();
 
       const matches = coaLedgers
-        .filter(l => l.type === 'ledger' && l.name.toLowerCase().includes(q))
+        .filter(l => {
+          if (l.type !== 'ledger') return false;
+          const nm = l.name.toLowerCase().includes(q);
+          const ak = l.aliases && l.aliases.some(a => a.toLowerCase().includes(q));
+          return nm || ak;
+        })
         .sort((a, b) => {
           const as = a.name.toLowerCase().startsWith(q) ? 0 : 1;
           const bs = b.name.toLowerCase().startsWith(q) ? 0 : 1;
@@ -5865,9 +5887,10 @@
 
           const item = document.createElement('div');
           item.className = 'je-drop-item';
+          const akaStr = acct.aliases && acct.aliases.length > 0 ? ` [A.K.A: ${acct.aliases.join(', ')}]` : '';
           item.innerHTML = `
             <span class="je-drop-dot" style="background:${_dotColor(acct)}"></span>
-            <span class="je-drop-name">${_hl(acct.name, query)}</span>
+            <span class="je-drop-name">${_hl(acct.name, query)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${_hl(akaStr, query)}</span>` : ''}</span>
             ${acct.code ? `<span class="je-drop-code">${acct.code}</span>` : ''}
           `;
           item.addEventListener('mousedown', e => {
@@ -7729,6 +7752,20 @@
   let _coaMGlId     = '';
   let _coaMBal      = '';
   let _coaMPreSgId  = null;     // pre-selected sgId when opened from tree button
+  let _coaMAliases  = [];
+  let _coaMAddress1     = '';
+  let _coaMAddress2     = '';
+  let _coaMAddress3     = '';
+  let _coaMState        = '';
+  let _coaMCountry      = 'India';
+  let _coaMPincode      = '';
+  let _coaMPan          = '';
+  let _coaMGst          = '';
+  let _coaMBankAccName  = '';
+  let _coaMBankName     = '';
+  let _coaMBankAccNo    = '';
+  let _coaMBankIfsc     = '';
+  let _coaMAdditionalOpen = false;
 
   // ── CSS ──────────────────────────────────────────────────────────
   function injectChartStyles() {
@@ -8165,7 +8202,25 @@
     if (q) {
       const nameMatch = l.name.toLowerCase().includes(q);
       const codeMatch = (l.code || '').toLowerCase().includes(q);
-      if (!nameMatch && !codeMatch) return false;
+      const aliasMatch = l.aliases && l.aliases.some(alias => alias.toLowerCase().includes(q));
+      const addr1Match = (l.address1 || '').toLowerCase().includes(q);
+      const addr2Match = (l.address2 || '').toLowerCase().includes(q);
+      const addr3Match = (l.address3 || '').toLowerCase().includes(q);
+      const stateMatch = (l.state || '').toLowerCase().includes(q);
+      const countryMatch = (l.country || '').toLowerCase().includes(q);
+      const pincodeMatch = (l.pincode || '').toLowerCase().includes(q);
+      const panMatch = (l.pan || '').toLowerCase().includes(q);
+      const gstMatch = (l.gst || '').toLowerCase().includes(q);
+      const bankAccNameMatch = (l.bankAccName || '').toLowerCase().includes(q);
+      const bankNameMatch = (l.bankName || '').toLowerCase().includes(q);
+      const bankAccNoMatch = (l.bankAccNo || '').toLowerCase().includes(q);
+      const bankIfscMatch = (l.bankIfsc || '').toLowerCase().includes(q);
+
+      if (!nameMatch && !codeMatch && !aliasMatch &&
+          !addr1Match && !addr2Match && !addr3Match && !stateMatch && !countryMatch && !pincodeMatch &&
+          !panMatch && !gstMatch && !bankAccNameMatch && !bankNameMatch && !bankAccNoMatch && !bankIfscMatch) {
+        return false;
+      }
     }
     // 2. Type Filter match
     if (_coaFilterType) {
@@ -8184,7 +8239,8 @@
     if (q) {
       const nameMatch = gl.name.toLowerCase().includes(q);
       const codeMatch = (gl.code || '').toLowerCase().includes(q);
-      if (nameMatch || codeMatch) return true;
+      const aliasMatch = gl.aliases && gl.aliases.some(alias => alias.toLowerCase().includes(q));
+      if (nameMatch || codeMatch || aliasMatch) return true;
     } else {
       return true;
     }
@@ -8226,11 +8282,40 @@
   // ── Render one ledger row ────────────────────────────────────────
   function _coaLdgRow(l, indentClass, q) {
     const ic = indentClass || '';
+    let matchedDetails = [];
+    if (q) {
+      if (l.aliases && l.aliases.some(a => a.toLowerCase().includes(q))) {
+        matchedDetails.push(`A.K.A: ${l.aliases.map(a => _coaHl(a, q)).join(', ')}`);
+      }
+      if ((l.gst || '').toLowerCase().includes(q)) matchedDetails.push(`GSTIN: ${_coaHl(l.gst, q)}`);
+      if ((l.pan || '').toLowerCase().includes(q)) matchedDetails.push(`PAN: ${_coaHl(l.pan, q)}`);
+      if ((l.bankName || '').toLowerCase().includes(q)) matchedDetails.push(`Bank: ${_coaHl(l.bankName, q)}`);
+      if ((l.bankAccNo || '').toLowerCase().includes(q)) matchedDetails.push(`A/c: ${_coaHl(l.bankAccNo, q)}`);
+      if ((l.bankIfsc || '').toLowerCase().includes(q)) matchedDetails.push(`IFSC: ${_coaHl(l.bankIfsc, q)}`);
+      if ((l.address1 || '').toLowerCase().includes(q)) matchedDetails.push(`Addr 1: ${_coaHl(l.address1, q)}`);
+      if ((l.address2 || '').toLowerCase().includes(q)) matchedDetails.push(`Addr 2: ${_coaHl(l.address2, q)}`);
+      if ((l.address3 || '').toLowerCase().includes(q)) matchedDetails.push(`Addr 3: ${_coaHl(l.address3, q)}`);
+      if ((l.state || '').toLowerCase().includes(q)) matchedDetails.push(`State: ${_coaHl(l.state, q)}`);
+    } else {
+      if (l.aliases && l.aliases.length > 0) {
+        matchedDetails.push(`A.K.A: ${l.aliases.join(', ')}`);
+      }
+    }
+
+    const sublineHtml = matchedDetails.length > 0
+      ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500; margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px;">${matchedDetails.join(' · ')}</div>`
+      : '';
+
     return `
       <div class="coa-ldg ${ic}">
-        <div class="coa-ldg-dot"></div>
-        <span class="coa-ldg-name">${_coaHl(l.name, q)}</span>
-        ${l.code ? `<span class="coa-ldg-code">${l.code}</span>` : ''}
+        <div class="coa-ldg-dot" style="margin-top: 6px; align-self: flex-start;"></div>
+        <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="coa-ldg-name" style="flex: none;">${_coaHl(l.name, q)}</span>
+            ${l.code ? `<span class="coa-ldg-code">${l.code}</span>` : ''}
+          </div>
+          ${sublineHtml}
+        </div>
         ${l.openingBalance ? `<span class="coa-ldg-bal">₹ ${parseFloat(l.openingBalance||0).toLocaleString('en-IN')}</span>` : ''}
         <div class="coa-ldg-acts">
           <button class="coa-la coa-la-edit" data-coa-edit="${l.id}">Edit</button>
@@ -8279,9 +8364,14 @@
               <path d="M5 3l4 4-4 4" stroke="#d97706" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span class="coa-gl-icon">📁</span>
-            <span class="coa-gl-name">${_coaHl(gl.name, q)}</span>
-            ${gl.code ? `<span class="coa-ldg-code">${gl.code}</span>` : ''}
-            <span class="coa-gl-tag">Group Ledger</span>
+            <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="coa-gl-name" style="flex: none;">${_coaHl(gl.name, q)}</span>
+                ${gl.code ? `<span class="coa-ldg-code">${gl.code}</span>` : ''}
+                <span class="coa-gl-tag">Group Ledger</span>
+              </div>
+              ${gl.aliases && gl.aliases.length > 0 ? `<div style="font-size: 11px; color: #b45309; font-weight: 500; margin-top: 2px;">A.K.A: ${gl.aliases.map(a => _coaHl(a, q)).join(', ')}</div>` : ''}
+            </div>
             <div class="coa-gl-acts">
               <button class="coa-la coa-la-edit" data-coa-edit="${gl.id}" style="font-size:11px">Edit</button>
               <button class="coa-la coa-la-del"  data-coa-del="${gl.id}"  style="font-size:11px">Delete</button>
@@ -8468,6 +8558,7 @@
 
   function showCoaModal(presgId, preGlId, editId) {
     _coaMOpen = true;
+    _coaMAdditionalOpen = false;
     if (editId) {
       const ldg = coaLedgers.find(l => l.id === editId);
       if (ldg) {
@@ -8478,6 +8569,19 @@
         _coaMSgId     = ldg.sgId;
         _coaMGlId     = ldg.glId || '';
         _coaMBal      = ldg.openingBalance || '';
+        _coaMAliases  = ldg.aliases ? [...ldg.aliases] : [];
+        _coaMAddress1     = ldg.address1 || '';
+        _coaMAddress2     = ldg.address2 || '';
+        _coaMAddress3     = ldg.address3 || '';
+        _coaMState        = ldg.state || '';
+        _coaMCountry      = ldg.country || 'India';
+        _coaMPincode      = ldg.pincode || '';
+        _coaMPan          = ldg.pan || '';
+        _coaMGst          = ldg.gst || '';
+        _coaMBankAccName  = ldg.bankAccName || '';
+        _coaMBankName     = ldg.bankName || '';
+        _coaMBankAccNo    = ldg.bankAccNo || '';
+        _coaMBankIfsc     = ldg.bankIfsc || '';
       }
     } else {
       _coaMEditMode = false;
@@ -8487,8 +8591,129 @@
       _coaMSgId     = presgId || (COA_SYS_SGS[0] ? COA_SYS_SGS[0].id : '');
       _coaMGlId     = preGlId || '';
       _coaMBal      = '';
+      _coaMAliases  = [];
+      _coaMAddress1     = '';
+      _coaMAddress2     = '';
+      _coaMAddress3     = '';
+      _coaMState        = '';
+      _coaMCountry      = 'India';
+      _coaMPincode      = '';
+      _coaMPan          = '';
+      _coaMGst          = '';
+      _coaMBankAccName  = '';
+      _coaMBankName     = '';
+      _coaMBankAccNo    = '';
+      _coaMBankIfsc     = '';
     }
     _renderCoaModal();
+  }
+
+  function initCoaSearchableSelect(overlay) {
+    const realSelect = overlay.querySelector('#coaMSubGroup');
+    const trigger = overlay.querySelector('#coaMSubGroupTrigger');
+    const dropdown = overlay.querySelector('#coaMSubGroupDropdown');
+    const searchInput = overlay.querySelector('#coaMSubGroupSearch');
+    const optionsList = overlay.querySelector('#coaMSubGroupOptionsList');
+    const triggerText = overlay.querySelector('#coaMSubGroupTriggerText');
+    if (!realSelect || !trigger || !dropdown || !searchInput || !optionsList || !triggerText) return;
+    
+    const updateTriggerText = () => {
+      const selectedOpt = realSelect.options[realSelect.selectedIndex];
+      if (selectedOpt) {
+        triggerText.textContent = selectedOpt.textContent.trim();
+      } else {
+        triggerText.textContent = 'Select Sub Group';
+      }
+    };
+    updateTriggerText();
+    
+    const populateList = (filter = '') => {
+      optionsList.innerHTML = '';
+      const query = filter.toLowerCase().trim();
+      
+      Array.from(realSelect.options).forEach((opt) => {
+        const text = opt.textContent;
+        const value = opt.value;
+        
+        if (query && !text.toLowerCase().includes(query)) {
+          return;
+        }
+        
+        const item = document.createElement('div');
+        item.style.padding = '8px 12px';
+        item.style.fontSize = '13.5px';
+        item.style.borderRadius = '6px';
+        item.style.cursor = 'pointer';
+        item.style.fontWeight = opt.selected ? '700' : '500';
+        item.style.background = opt.selected ? 'var(--blue-50)' : 'transparent';
+        item.style.color = opt.selected ? 'var(--blue-700)' : 'var(--slate-700)';
+        item.style.whiteSpace = 'pre-wrap';
+        
+        item.textContent = text;
+        
+        item.addEventListener('mouseover', () => {
+          if (!opt.selected) item.style.background = 'var(--slate-50)';
+        });
+        item.addEventListener('mouseout', () => {
+          if (!opt.selected) item.style.background = 'transparent';
+        });
+        
+        item.addEventListener('click', () => {
+          realSelect.value = value;
+          realSelect.dispatchEvent(new Event('change'));
+          updateTriggerText();
+          dropdown.style.display = 'none';
+        });
+        
+        optionsList.appendChild(item);
+      });
+      
+      if (optionsList.children.length === 0) {
+        const noResult = document.createElement('div');
+        noResult.style.padding = '8px 12px';
+        noResult.style.fontSize = '12.5px';
+        noResult.style.color = 'var(--slate-400)';
+        noResult.style.textAlign = 'center';
+        noResult.textContent = 'No matching sub groups';
+        optionsList.appendChild(noResult);
+      }
+    };
+    
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = dropdown.style.display === 'flex';
+      if (isOpen) {
+        dropdown.style.display = 'none';
+      } else {
+        dropdown.style.display = 'flex';
+        searchInput.value = '';
+        populateList();
+        setTimeout(() => searchInput.focus(), 50);
+      }
+    });
+    
+    searchInput.addEventListener('input', () => {
+      populateList(searchInput.value);
+    });
+    
+    dropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+    
+    const handleOutsideClick = (e) => {
+      if (!trigger.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    
+    const observer = new MutationObserver((mutations, obs) => {
+      if (!document.getElementById('coaModalOverlay')) {
+        document.removeEventListener('click', handleOutsideClick);
+        obs.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true });
   }
 
   function _renderCoaModal() {
@@ -8517,67 +8742,153 @@
     overlay.className = 'coa-modal-overlay';
     overlay.id        = 'coaModalOverlay';
     overlay.innerHTML = `
-      <div class="coa-modal-card" id="coaModalCard">
-        <div class="coa-modal-hdr">
+      <div class="coa-modal-card" id="coaModalCard" style="max-height: 90vh; display: flex; flex-direction: column; padding: 24px 28px 20px; box-sizing: border-box;">
+        <div class="coa-modal-hdr" style="flex-shrink: 0; margin-bottom: 16px;">
           <div class="coa-modal-title">${titleText}</div>
           <button class="coa-modal-close" id="coaModalClose">✕</button>
         </div>
 
-        <!-- Slider toggle (disabled in edit mode) -->
-        <div class="coa-slider-wrap" ${_coaMEditMode ? 'style="opacity: 0.6; pointer-events: none;"' : ''}>
-          <div class="coa-slider-bg ${isLedger ? 'ledger-active' : 'group-active'}"></div>
-          <button class="coa-slider-btn${isLedger ? ' active' : ''}" id="coaTogLedger" type="button">Ledger</button>
-          <button class="coa-slider-btn${!isLedger ? ' active' : ''}" id="coaTogGroup"  type="button">Group Ledger</button>
-        </div>
-
-        ${isLedger ? `
-          <!-- LEDGER mode -->
-          <div class="coa-modal-fg">
-            <label class="coa-modal-label">Ledger Name *</label>
-            <input class="coa-modal-inp" id="coaMLedgerName"
-              placeholder="e.g. Cash in Hand"
-              value="${_coaMName.replace(/"/g,'&quot;')}">
+        <div class="coa-modal-scroll-body" style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 16px; display: flex; flex-direction: column; min-height: 0;">
+          <!-- Slider toggle (disabled in edit mode) -->
+          <div class="coa-slider-wrap" ${_coaMEditMode ? 'style="opacity: 0.6; pointer-events: none; flex-shrink: 0;"' : 'style="flex-shrink: 0;"'}>
+            <div class="coa-slider-bg ${isLedger ? 'ledger-active' : 'group-active'}"></div>
+            <button class="coa-slider-btn${isLedger ? ' active' : ''}" id="coaTogLedger" type="button">Ledger</button>
+            <button class="coa-slider-btn${!isLedger ? ' active' : ''}" id="coaTogGroup"  type="button">Group Ledger</button>
           </div>
 
-          <div class="coa-modal-group-box">
+          ${isLedger ? `
+            <!-- LEDGER mode -->
             <div class="coa-modal-fg">
-              <label class="coa-modal-label">Sub Group *</label>
-              <select class="coa-modal-sel" id="coaMSubGroup">${sgOpts}</select>
+              <label class="coa-modal-label">Ledger Name *</label>
+              <input class="coa-modal-inp" id="coaMLedgerName"
+                placeholder="e.g. Cash in Hand"
+                value="${_coaMName.replace(/"/g,'&quot;')}">
             </div>
+
+            <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
+              <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
+              <div id="coaMAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+              <button type="button" class="btn btn-secondary btn-sm" id="coaMAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
+                ＋ Add A.K.A
+              </button>
+            </div>
+
+            <div class="coa-modal-group-box">
+              <div class="coa-modal-fg" style="position: relative;">
+                <label class="coa-modal-label">Sub Group *</label>
+                <select class="coa-modal-sel" id="coaMSubGroup" style="display: none;">${sgOpts}</select>
+                <div class="kya-searchable-select-wrap" id="coaMSubGroupSearchableWrap" style="position: relative; width: 100%;">
+                  <div class="kya-searchable-select-trigger" id="coaMSubGroupTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                    <span id="coaMSubGroupTriggerText">Select Sub Group</span>
+                    <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                  </div>
+                  <div class="kya-searchable-select-dropdown" id="coaMSubGroupDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                    <input type="text" id="coaMSubGroupSearch" placeholder="Search sub group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                    <div id="coaMSubGroupOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="coa-modal-fg">
+                <label class="coa-modal-label">
+                  Group Ledger (Sub Group)
+                  <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(Optional)</span>
+                </label>
+                <select class="coa-modal-sel" id="coaMGroupLedger">${glOpts}</select>
+              </div>
+            </div>
+
             <div class="coa-modal-fg">
               <label class="coa-modal-label">
-                Group Ledger (Sub Group)
+                Opening Balance
                 <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(Optional)</span>
               </label>
-              <select class="coa-modal-sel" id="coaMGroupLedger">${glOpts}</select>
+              <input class="coa-modal-inp" id="coaMBalance"
+                type="number" min="0" step="0.01"
+                placeholder="₹ 0.00" value="${_coaMBal}">
             </div>
-          </div>
 
-          <div class="coa-modal-fg">
-            <label class="coa-modal-label">
-              Opening Balance
-              <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(Optional)</span>
-            </label>
-            <input class="coa-modal-inp" id="coaMBalance"
-              type="number" min="0" step="0.01"
-              placeholder="₹ 0.00" value="${_coaMBal}">
-          </div>
-        ` : `
-          <!-- GROUP LEDGER mode -->
-          <div class="coa-modal-fg">
-            <label class="coa-modal-label">Group Ledger Name *</label>
-            <input class="coa-modal-inp" id="coaMLedgerName"
-              placeholder="e.g. Fixed Assets Group"
-              value="${_coaMName.replace(/"/g,'&quot;')}">
-          </div>
+            <div class="coa-modal-fg" style="margin-top: 16px;">
+              <div id="coaMAdditionalToggle" style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--blue-600); font-weight: 700; font-size: 13px; user-select: none;">
+                <span id="coaMAdditionalChevron">▶</span> Additional Information (Address, GST, Bank)
+              </div>
+              
+              <div id="coaMAdditionalPanel" style="display: none; flex-direction: column; gap: 14px; margin-top: 14px; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 14px; background: var(--slate-50);">
+                <!-- Address Details -->
+                <div>
+                  <label class="coa-modal-label" style="font-size: 10.5px; color: var(--slate-500); margin-bottom: 8px;">Address</label>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <input class="coa-modal-inp" id="coaMAddress1" placeholder="Address Line 1" value="${_coaMAddress1.replace(/"/g,'&quot;')}">
+                    <input class="coa-modal-inp" id="coaMAddress2" placeholder="Address Line 2" value="${_coaMAddress2.replace(/"/g,'&quot;')}">
+                    <input class="coa-modal-inp" id="coaMAddress3" placeholder="Address Line 3" value="${_coaMAddress3.replace(/"/g,'&quot;')}">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                      <input class="coa-modal-inp" id="coaMState" placeholder="State" value="${_coaMState.replace(/"/g,'&quot;')}">
+                      <input class="coa-modal-inp" id="coaMCountry" placeholder="Country" value="${_coaMCountry.replace(/"/g,'&quot;')}">
+                    </div>
+                    <input class="coa-modal-inp" id="coaMPincode" placeholder="Pincode" value="${_coaMPincode.replace(/"/g,'&quot;')}">
+                  </div>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid var(--slate-200); margin: 4px 0;" />
+                
+                <!-- Statutory Details -->
+                <div>
+                  <label class="coa-modal-label" style="font-size: 10.5px; color: var(--slate-500); margin-bottom: 8px;">Statutory Details</label>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <input class="coa-modal-inp" id="coaMPan" placeholder="PAN" value="${_coaMPan.replace(/"/g,'&quot;')}">
+                    <input class="coa-modal-inp" id="coaMGst" placeholder="GSTIN" value="${_coaMGst.replace(/"/g,'&quot;')}">
+                  </div>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid var(--slate-200); margin: 4px 0;" />
+                
+                <!-- Bank Details -->
+                <div>
+                  <label class="coa-modal-label" style="font-size: 10.5px; color: var(--slate-500); margin-bottom: 8px;">Bank Details</label>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <input class="coa-modal-inp" id="coaMBankAccName" placeholder="Account Holder Name" value="${_coaMBankAccName.replace(/"/g,'&quot;')}">
+                    <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 8px;">
+                      <input class="coa-modal-inp" id="coaMBankName" placeholder="Bank Name" value="${_coaMBankName.replace(/"/g,'&quot;')}">
+                      <input class="coa-modal-inp" id="coaMBankIfsc" placeholder="IFSC Code" value="${_coaMBankIfsc.replace(/"/g,'&quot;')}">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ` : `
+            <!-- GROUP LEDGER mode -->
+            <div class="coa-modal-fg">
+              <label class="coa-modal-label">Group Ledger Name *</label>
+              <input class="coa-modal-inp" id="coaMLedgerName"
+                placeholder="e.g. Fixed Assets Group"
+                value="${_coaMName.replace(/"/g,'&quot;')}">
+            </div>
 
-          <div class="coa-modal-fg">
-            <label class="coa-modal-label">Sub Group *</label>
-            <select class="coa-modal-sel" id="coaMSubGroup">${sgOpts}</select>
-          </div>
-        `}
+            <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
+              <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
+              <div id="coaMAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+              <button type="button" class="btn btn-secondary btn-sm" id="coaMAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
+                ＋ Add A.K.A
+              </button>
+            </div>
 
-        <div class="coa-modal-btns">
+            <div class="coa-modal-fg" style="position: relative;">
+              <label class="coa-modal-label">Sub Group *</label>
+              <select class="coa-modal-sel" id="coaMSubGroup" style="display: none;">${sgOpts}</select>
+              <div class="kya-searchable-select-wrap" id="coaMSubGroupSearchableWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="coaMSubGroupTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                  <span id="coaMSubGroupTriggerText">Select Sub Group</span>
+                  <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="coaMSubGroupDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="coaMSubGroupSearch" placeholder="Search sub group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="coaMSubGroupOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+          `}
+        </div>
+
+        <div class="coa-modal-btns" style="flex-shrink: 0; margin-top: 0;">
           <button class="coa-modal-cancel" id="coaModalCancel">Cancel</button>
           <button class="coa-modal-save"   id="coaModalSave">
             ${_coaMEditMode ? 'Save Changes' : (isLedger ? '＋ Add Ledger' : '＋ Add Group Ledger')}
@@ -8587,6 +8898,82 @@
 
     document.body.appendChild(overlay);
     setTimeout(() => overlay.querySelector('#coaMLedgerName')?.focus(), 40);
+    initCoaSearchableSelect(overlay);
+
+    let additionalOpen = _coaMAdditionalOpen;
+    const toggleEl = overlay.querySelector('#coaMAdditionalToggle');
+    const panelEl = overlay.querySelector('#coaMAdditionalPanel');
+    const chevronEl = overlay.querySelector('#coaMAdditionalChevron');
+    if (toggleEl && panelEl && chevronEl) {
+      const updatePanel = () => {
+        panelEl.style.display = additionalOpen ? 'flex' : 'none';
+        chevronEl.textContent = additionalOpen ? '▼' : '▶';
+        _coaMAdditionalOpen = additionalOpen;
+      };
+      updatePanel();
+      toggleEl.addEventListener('click', () => {
+        additionalOpen = !additionalOpen;
+        updatePanel();
+      });
+    }
+
+
+
+    const renderAliasRows = () => {
+      const container = overlay.querySelector('#coaMAliasesContainer');
+      if (!container) return;
+      
+      container.innerHTML = '';
+      _coaMAliases.forEach((alias, idx) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '8px';
+        row.style.alignItems = 'center';
+        
+        const input = document.createElement('input');
+        input.className = 'coa-modal-inp';
+        input.style.flex = '1';
+        input.style.height = '38px';
+        input.placeholder = 'e.g. Alternate name / Code';
+        input.value = alias;
+        input.addEventListener('input', (e) => {
+          _coaMAliases[idx] = e.target.value;
+        });
+        
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.style.background = 'none';
+        delBtn.style.border = 'none';
+        delBtn.style.color = 'var(--red-600)';
+        delBtn.style.cursor = 'pointer';
+        delBtn.style.padding = '8px';
+        delBtn.style.display = 'flex';
+        delBtn.style.alignItems = 'center';
+        delBtn.style.justifyContent = 'center';
+        delBtn.innerHTML = `
+          <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
+            <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        `;
+        delBtn.addEventListener('click', () => {
+          _coaMAliases.splice(idx, 1);
+          renderAliasRows();
+        });
+        
+        row.appendChild(input);
+        row.appendChild(delBtn);
+        container.appendChild(row);
+      });
+    };
+
+    const addAliasBtn = overlay.querySelector('#coaMAddAliasBtn');
+    if (addAliasBtn) {
+      addAliasBtn.addEventListener('click', () => {
+        _coaMAliases.push('');
+        renderAliasRows();
+      });
+    }
+    renderAliasRows();
 
     // ── close helpers ──
     const close = () => { _coaMOpen = false; overlay.remove(); };
@@ -8601,6 +8988,18 @@
       _coaMName = overlay.querySelector('#coaMLedgerName').value;
       _coaMSgId = overlay.querySelector('#coaMSubGroup').value;
       _coaMBal  = overlay.querySelector('#coaMBalance')?.value || '';
+      _coaMAddress1     = overlay.querySelector('#coaMAddress1')?.value || '';
+      _coaMAddress2     = overlay.querySelector('#coaMAddress2')?.value || '';
+      _coaMAddress3     = overlay.querySelector('#coaMAddress3')?.value || '';
+      _coaMState        = overlay.querySelector('#coaMState')?.value || '';
+      _coaMCountry      = overlay.querySelector('#coaMCountry')?.value || 'India';
+      _coaMPincode      = overlay.querySelector('#coaMPincode')?.value || '';
+      _coaMPan          = overlay.querySelector('#coaMPan')?.value || '';
+      _coaMGst          = overlay.querySelector('#coaMGst')?.value || '';
+      _coaMBankAccName  = overlay.querySelector('#coaMBankAccName')?.value || '';
+      _coaMBankName     = overlay.querySelector('#coaMBankName')?.value || '';
+      _coaMBankAccNo    = overlay.querySelector('#coaMBankAccNo')?.value || '';
+      _coaMBankIfsc     = overlay.querySelector('#coaMBankIfsc')?.value || '';
       _renderCoaModal();
     });
     overlay.querySelector('#coaTogGroup').addEventListener('click', () => {
@@ -8608,6 +9007,18 @@
       _coaMName = overlay.querySelector('#coaMLedgerName').value;
       _coaMSgId = overlay.querySelector('#coaMSubGroup').value;
       _coaMBal  = overlay.querySelector('#coaMBalance')?.value || '';
+      _coaMAddress1     = overlay.querySelector('#coaMAddress1')?.value || '';
+      _coaMAddress2     = overlay.querySelector('#coaMAddress2')?.value || '';
+      _coaMAddress3     = overlay.querySelector('#coaMAddress3')?.value || '';
+      _coaMState        = overlay.querySelector('#coaMState')?.value || '';
+      _coaMCountry      = overlay.querySelector('#coaMCountry')?.value || 'India';
+      _coaMPincode      = overlay.querySelector('#coaMPincode')?.value || '';
+      _coaMPan          = overlay.querySelector('#coaMPan')?.value || '';
+      _coaMGst          = overlay.querySelector('#coaMGst')?.value || '';
+      _coaMBankAccName  = overlay.querySelector('#coaMBankAccName')?.value || '';
+      _coaMBankName     = overlay.querySelector('#coaMBankName')?.value || '';
+      _coaMBankAccNo    = overlay.querySelector('#coaMBankAccNo')?.value || '';
+      _coaMBankIfsc     = overlay.querySelector('#coaMBankIfsc')?.value || '';
       _renderCoaModal();
     });
 
@@ -8635,6 +9046,20 @@
       const glId = isLedger ? (overlay.querySelector('#coaMGroupLedger')?.value || '') : '';
       const bal  = overlay.querySelector('#coaMBalance')?.value.trim() || '';
 
+      const aliases = _coaMAliases.map(a => a.trim()).filter(a => a !== '');
+      const address1     = isLedger ? (overlay.querySelector('#coaMAddress1')?.value.trim() || '') : '';
+      const address2     = isLedger ? (overlay.querySelector('#coaMAddress2')?.value.trim() || '') : '';
+      const address3     = isLedger ? (overlay.querySelector('#coaMAddress3')?.value.trim() || '') : '';
+      const state        = isLedger ? (overlay.querySelector('#coaMState')?.value.trim() || '') : '';
+      const country      = isLedger ? (overlay.querySelector('#coaMCountry')?.value.trim() || 'India') : 'India';
+      const pincode      = isLedger ? (overlay.querySelector('#coaMPincode')?.value.trim() || '') : '';
+      const pan          = isLedger ? (overlay.querySelector('#coaMPan')?.value.trim() || '') : '';
+      const gst          = isLedger ? (overlay.querySelector('#coaMGst')?.value.trim() || '') : '';
+      const bankAccName  = isLedger ? (overlay.querySelector('#coaMBankAccName')?.value.trim() || '') : '';
+      const bankName     = isLedger ? (overlay.querySelector('#coaMBankName')?.value.trim() || '') : '';
+      const bankAccNo    = isLedger ? (overlay.querySelector('#coaMBankAccNo')?.value.trim() || '') : '';
+      const bankIfsc     = isLedger ? (overlay.querySelector('#coaMBankIfsc')?.value.trim() || '') : '';
+
       if (_coaMEditMode && _coaMEditId) {
         const ldg = coaLedgers.find(l => l.id === _coaMEditId);
         if (ldg) {
@@ -8643,6 +9068,19 @@
           ldg.glId = glId ? Number(glId) : null;
           ldg.openingBalance = bal;
           ldg.type = _coaMType;
+          ldg.aliases = aliases;
+          ldg.address1 = address1;
+          ldg.address2 = address2;
+          ldg.address3 = address3;
+          ldg.state = state;
+          ldg.country = country;
+          ldg.pincode = pincode;
+          ldg.pan = pan;
+          ldg.gst = gst;
+          ldg.bankAccName = bankAccName;
+          ldg.bankName = bankName;
+          ldg.bankAccNo = bankAccNo;
+          ldg.bankIfsc = bankIfsc;
         }
         showToast(`${_coaMType === 'group-ledger' ? 'Group Ledger' : 'Ledger'} "${name}" updated successfully.`, 'success');
       } else {
@@ -8654,6 +9092,19 @@
           code: '',
           openingBalance: bal,
           type: _coaMType,
+          aliases: aliases,
+          address1,
+          address2,
+          address3,
+          state,
+          country,
+          pincode,
+          pan,
+          gst,
+          bankAccName,
+          bankName,
+          bankAccNo,
+          bankIfsc
         });
 
         const sg = COA_SYS_SGS.find(s => s.id === sgId);
@@ -8706,9 +9157,11 @@
           if (!sg || sg.main !== _coaFilterMg) return false;
         }
         if (q) {
-          const nm = l.name.toLowerCase().includes(q);
-          const cd = (l.code || '').toLowerCase().includes(q);
-          if (!nm && !cd) return false;
+          if (l.type === 'ledger') {
+            return _coaLdgMatchesFilters(l, q);
+          } else {
+            return _coaGlMatchesFilters(l, q);
+          }
         }
         return true;
       }).length;
@@ -10153,8 +10606,8 @@
       desc: 'Manage employee payroll, salaries, deductions, and generate payslips — all from one place.',
       features: ['Payroll Processing', 'Salary Slips', 'TDS & Deductions', 'Pay History'],
     },
-    underledger: {
-      label: 'Under Ledger',
+    miniledger: {
+      label: 'Mini Ledger',
       icon: `<svg width="38" height="38" viewBox="0 0 20 20" fill="none">
         <path d="M4 5h12M4 9h8M4 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
         <circle cx="16" cy="13" r="3.5" stroke="currentColor" stroke-width="1.4"/>
@@ -10177,7 +10630,7 @@
       ohTabEmp:         'emp',
       ohTabBudget:      'budget',
       ohTabPaytrack:    'paytrack',
-      ohTabUnderLedger: 'underledger',
+      ohTabMiniLedger: 'miniledger',
     };
     Object.entries(tabMap).forEach(([btnId, tab]) => {
       const btn = document.getElementById(btnId);
@@ -10197,14 +10650,14 @@
       ['ohTabEmp',         'emp'],
       ['ohTabBudget',      'budget'],
       ['ohTabPaytrack',    'paytrack'],
-      ['ohTabUnderLedger', 'underledger'],
+      ['ohTabMiniLedger', 'miniledger'],
     ];
     const allViews = [
       ['oh-dept-view',        'dept'],
       ['oh-emp-view',         'emp'],
       ['oh-budget-view',      'budget'],
       ['oh-paytrack-view',    'paytrack'],
-      ['oh-underledger-view', 'underledger'],
+      ['oh-miniledger-view', 'miniledger'],
       ['oh-empty-view',       ''],
     ];
 
@@ -10231,7 +10684,7 @@
     const viewIdMap = {
       budget:      'oh-budget-view',
       paytrack:    'oh-paytrack-view',
-      underledger: 'oh-underledger-view',
+      miniledger: 'oh-miniledger-view',
     };
     const wrap = document.getElementById(viewIdMap[key]);
     if (!wrap) return;
@@ -12774,12 +13227,47 @@
     customers.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
-      opt.textContent = c.name;
+      const akaStr = c.aliases && c.aliases.length > 0 ? ` [A.K.A: ${c.aliases.join(', ')}]` : '';
+      opt.textContent = c.name + akaStr;
       if (selectedId && c.id == selectedId) {
         opt.selected = true;
       }
       custSelect.appendChild(opt);
     });
+  }
+
+  function populateSalesExecutives(selectedId = null) {
+    const execSelect = document.getElementById('salesExecutive');
+    if (!execSelect) return;
+    
+    execSelect.innerHTML = '<option value="">&mdash; Select Sales Executive &mdash;</option>';
+    
+    ohEmployees.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = `${e.name} (${e.code})`;
+      if (selectedId && e.id == selectedId) {
+        opt.selected = true;
+      }
+      execSelect.appendChild(opt);
+    });
+  }
+
+  function handleSupplyTypeChange() {
+    const supplyType = document.getElementById('salesSupplyType').value;
+    const isZeroTax = supplyType === 'Export (Zero-Rated / LUT)' || supplyType === 'SEZ Without Tax';
+    
+    salesRows.forEach(row => {
+      if (isZeroTax) {
+        row.tax = 0;
+        const base = currentSalesType === 'Product' ? (row.qty * row.rate) : row.baseAmount;
+        const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+        row.amount = Math.max(0, base - discAmt);
+      }
+    });
+    
+    renderSalesRows();
+    recalculateSalesTotals();
   }
 
   function populateSalesPaymentAccounts(selectedId = null) {
@@ -12880,7 +13368,17 @@
     body.innerHTML = '';
     const incomeLedgers = getIncomeLedgers();
     
+    const supplyTypeEl = document.getElementById('salesSupplyType');
+    const isZeroTax = supplyTypeEl && (supplyTypeEl.value === 'Export (Zero-Rated / LUT)' || supplyTypeEl.value === 'SEZ Without Tax');
+    
     salesRows.forEach((row, index) => {
+      if (isZeroTax) {
+        row.tax = 0;
+        const base = currentSalesType === 'Product' ? (row.qty * row.rate) : row.baseAmount;
+        const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+        row.amount = Math.max(0, base - discAmt);
+      }
+
       let trHtml = '';
       if (currentSalesType === 'Product') {
         trHtml = `
@@ -12904,7 +13402,7 @@
               </div>
             </td>
             <td style="width: 100px;">
-              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none;">
+              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none;" ${isZeroTax ? 'disabled' : ''}>
                 <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
                 <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
                 <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
@@ -12930,7 +13428,10 @@
             <td>
               <select class="sales-row-rev-acc je-input" style="border: none; background: transparent; box-shadow: none;">
                 <option value="">&mdash; Select Revenue Account &mdash;</option>
-                ${incomeLedgers.map(l => `<option value="${l.id}" ${row.revenueLedgerId == l.id ? 'selected' : ''}>${l.name}</option>`).join('')}
+                ${incomeLedgers.map(l => {
+                  const akaStr = l.aliases && l.aliases.length > 0 ? ` [A.K.A: ${l.aliases.join(', ')}]` : '';
+                  return `<option value="${l.id}" ${row.revenueLedgerId == l.id ? 'selected' : ''}>${l.name}${akaStr}</option>`;
+                }).join('')}
               </select>
             </td>
             <td style="width: 150px;">
@@ -12946,7 +13447,7 @@
               </div>
             </td>
             <td style="width: 100px;">
-              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none;">
+              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none;" ${isZeroTax ? 'disabled' : ''}>
                 <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
                 <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
                 <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
@@ -13121,6 +13622,11 @@
     if (amt) amt.value = '';
     
     populateSalesCustomers();
+    populateSalesExecutives();
+    const execEl = document.getElementById('salesExecutive');
+    if (execEl) execEl.value = '';
+    const supplyTypeEl = document.getElementById('salesSupplyType');
+    if (supplyTypeEl) supplyTypeEl.value = 'Intra-State (CGST + SGST)';
     const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     if (notPaidBtn) notPaidBtn.click();
     const payAccEl = document.getElementById('salesPaymentAccount');
@@ -13181,6 +13687,9 @@
     if (dueEl) dueEl.value = inv.dueDate || inv.date;
     
     populateSalesCustomers(inv.customerId);
+    populateSalesExecutives(inv.salesExecutiveId);
+    const supplyTypeEl = document.getElementById('salesSupplyType');
+    if (supplyTypeEl) supplyTypeEl.value = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
     
     const notesEl = document.getElementById('salesNotes');
     if (notesEl) notesEl.value = inv.notes || '';
@@ -13247,6 +13756,8 @@
 
   function saveSalesDraft() {
     const customerId = document.getElementById('salesCustomer').value;
+    const salesExecutiveId = document.getElementById('salesExecutive').value;
+    const salesSupplyType = document.getElementById('salesSupplyType').value;
     const invoiceNo = document.getElementById('salesInvoiceNo').value.trim();
     const date = document.getElementById('salesDate').value;
     const dueDate = document.getElementById('salesDueDate').value;
@@ -13294,6 +13805,8 @@
       mode: currentSalesInvoiceMode,
       invoiceNo: invoiceNo || 'Draft',
       customerId,
+      salesExecutiveId,
+      salesSupplyType,
       date,
       dueDate,
       orderNo,
@@ -13329,6 +13842,8 @@
 
   function postSalesInvoice() {
     const customerId = document.getElementById('salesCustomer').value;
+    const salesExecutiveId = document.getElementById('salesExecutive').value;
+    const salesSupplyType = document.getElementById('salesSupplyType').value;
     if (!customerId) {
       showToast('Please select a Customer.', 'warning');
       return;
@@ -13424,6 +13939,8 @@
     const journalEntryId = postSalesVoucherToJournal({
       invoiceNo,
       customerId,
+      salesExecutiveId,
+      salesSupplyType,
       date,
       dueDate,
       orderNo,
@@ -13446,6 +13963,8 @@
       type: currentSalesType,
       invoiceNo,
       customerId,
+      salesExecutiveId,
+      salesSupplyType,
       date,
       dueDate,
       orderNo,
@@ -13591,15 +14110,51 @@
       totalGst += afterDiscount * (r.tax / 100);
     });
     if (totalGst > 0) {
-      const gstLedgerId = getOrCreateSystemLedger('GST Payable', 'sg-ocl');
-      const gstName = coaLedgers.find(l => l.id == gstLedgerId).name;
-      journalRows.push({
-        id: journalRows.length + 1,
-        type: 'To',
-        particular: gstName,
-        debit: '',
-        credit: totalGst.toFixed(2)
-      });
+      const supplyType = invoice.salesSupplyType || 'Intra-State (CGST + SGST)';
+      if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
+        const cgstAmt = totalGst / 2;
+        const sgstAmt = totalGst / 2;
+        
+        const cgstLedgerId = getOrCreateSystemLedger('Output CGST', 'sg-ocl');
+        const cgstName = coaLedgers.find(l => l.id == cgstLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: cgstName,
+          debit: '',
+          credit: cgstAmt.toFixed(2)
+        });
+        
+        const sgstLedgerId = getOrCreateSystemLedger('Output SGST', 'sg-ocl');
+        const sgstName = coaLedgers.find(l => l.id == sgstLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: sgstName,
+          debit: '',
+          credit: sgstAmt.toFixed(2)
+        });
+      } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
+        const igstLedgerId = getOrCreateSystemLedger('Output IGST', 'sg-ocl');
+        const igstName = coaLedgers.find(l => l.id == igstLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: igstName,
+          debit: '',
+          credit: totalGst.toFixed(2)
+        });
+      } else {
+        const gstLedgerId = getOrCreateSystemLedger('GST Payable', 'sg-ocl');
+        const gstName = coaLedgers.find(l => l.id == gstLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: gstName,
+          debit: '',
+          credit: totalGst.toFixed(2)
+        });
+      }
     }
     
     if (invoice.tdsTcsMode === 'TCS' && invoice.tdsTcsAmount > 0) {
@@ -13626,6 +14181,14 @@
       });
     }
     
+    let execText = '';
+    if (invoice.salesExecutiveId) {
+      const execEmp = ohEmployees.find(e => e.id == invoice.salesExecutiveId);
+      if (execEmp) {
+        execText = ` Sales Executive: ${execEmp.name}.`;
+      }
+    }
+
     const entryId = Date.now();
     const entry = {
       id:             entryId,
@@ -13637,7 +14200,7 @@
       firstParticular: customerName,
       amount:         fmtNum(invoice.total),
       allRows:        journalRows,
-      narration:      `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}. ${invoice.notes || ''}`,
+      narration:      `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`,
     };
     
     postedEntries.unshift(entry);
@@ -13666,11 +14229,19 @@
     
     let rowsHtml = sorted.map(inv => {
       const custName = (coaLedgers.find(l => l.id == inv.customerId) || { name: 'Unknown Customer' }).name;
+      let execName = '&mdash;';
+      if (inv.salesExecutiveId) {
+        const execEmp = ohEmployees.find(e => e.id == inv.salesExecutiveId);
+        if (execEmp) execName = execEmp.name;
+      }
+      const supplyType = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
       return `
         <tr class="sales-row">
           <td style="padding: 14px 16px; font-weight: 700; color: var(--blue-700);">${ohEsc(inv.invoiceNo)}</td>
           <td style="padding: 14px 16px;">${inv.date}</td>
           <td style="padding: 14px 16px; font-weight: 600;">${ohEsc(custName)}</td>
+          <td style="padding: 14px 16px; color: var(--slate-600);">${ohEsc(execName)}</td>
+          <td style="padding: 14px 16px; color: var(--slate-500); font-size: 12.5px;">${ohEsc(supplyType)}</td>
           <td style="padding: 14px 16px;"><span class="badge" style="background: var(--blue-50); color: var(--blue-700); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${inv.type}</span></td>
           <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: var(--slate-900);">₹ ${fmtNum(inv.total)}</td>
           <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
@@ -13689,6 +14260,8 @@
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Invoice No.</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Date</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Customer</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Sales Executive</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Supply Type</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Type</th>
               <th style="padding: 12px 16px; text-align: right; border-bottom: 2px solid var(--slate-100);">Total Amount</th>
               <th style="padding: 12px 16px; text-align: center; border-bottom: 2px solid var(--slate-100);">Actions</th>
@@ -13749,11 +14322,19 @@
     
     let rowsHtml = sorted.map(draft => {
       const custName = draft.customerId ? ((coaLedgers.find(l => l.id == draft.customerId) || { name: 'Unknown Customer' }).name) : '&mdash; No Customer &mdash;';
+      let execName = '&mdash;';
+      if (draft.salesExecutiveId) {
+        const execEmp = ohEmployees.find(e => e.id == draft.salesExecutiveId);
+        if (execEmp) execName = execEmp.name;
+      }
+      const supplyType = draft.salesSupplyType || 'Intra-State (CGST + SGST)';
       return `
         <tr class="sales-row">
           <td style="padding: 14px 16px; font-weight: 700; color: var(--slate-700);">${ohEsc(draft.invoiceNo || 'Draft')}</td>
           <td style="padding: 14px 16px;">${draft.date || '&mdash;'}</td>
           <td style="padding: 14px 16px; font-weight: 600;">${ohEsc(custName)}</td>
+          <td style="padding: 14px 16px; color: var(--slate-600);">${ohEsc(execName)}</td>
+          <td style="padding: 14px 16px; color: var(--slate-500); font-size: 12.5px;">${ohEsc(supplyType)}</td>
           <td style="padding: 14px 16px;"><span class="badge" style="background: var(--slate-100); color: var(--slate-600); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${draft.type}</span></td>
           <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: var(--slate-700);">₹ ${fmtNum(draft.total)}</td>
           <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
@@ -13772,6 +14353,8 @@
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Invoice No.</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Date</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Customer</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Sales Executive</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Supply Type</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Type</th>
               <th style="padding: 12px 16px; text-align: right; border-bottom: 2px solid var(--slate-100);">Total Amount</th>
               <th style="padding: 12px 16px; text-align: center; border-bottom: 2px solid var(--slate-100);">Actions</th>
@@ -13816,6 +14399,14 @@
     if (!inv) return;
     
     const customer = coaLedgers.find(l => l.id == inv.customerId) || { name: 'Unknown Customer' };
+    
+    let execName = '';
+    if (inv.salesExecutiveId) {
+      const execEmp = ohEmployees.find(e => e.id == inv.salesExecutiveId);
+      if (execEmp) {
+        execName = execEmp.name;
+      }
+    }
     
     const overlay = document.createElement('div');
     overlay.className = 'inv-modal-overlay';
@@ -13881,13 +14472,38 @@
       }
     });
     
+    const supplyType = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
     for (const pct in taxSummary) {
-      taxDetailsHtml += `
-        <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-500); margin-top: 4px;">
-          <span>GST @ ${pct}% (on ₹ ${fmtNum(taxSummary[pct].taxable)})</span>
-          <span>₹ ${fmtNum(taxSummary[pct].taxAmt)}</span>
-        </div>
-      `;
+      const taxable = taxSummary[pct].taxable;
+      const taxAmt = taxSummary[pct].taxAmt;
+      if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
+        const halfPct = parseFloat(pct) / 2;
+        const halfAmt = taxAmt / 2;
+        taxDetailsHtml += `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-500); margin-top: 4px;">
+            <span>CGST @ ${halfPct}% (on ₹ ${fmtNum(taxable)})</span>
+            <span>₹ ${fmtNum(halfAmt)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-500); margin-top: 4px;">
+            <span>SGST @ ${halfPct}% (on ₹ ${fmtNum(taxable)})</span>
+            <span>₹ ${fmtNum(halfAmt)}</span>
+          </div>
+        `;
+      } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
+        taxDetailsHtml += `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-500); margin-top: 4px;">
+            <span>IGST @ ${pct}% (on ₹ ${fmtNum(taxable)})</span>
+            <span>₹ ${fmtNum(taxAmt)}</span>
+          </div>
+        `;
+      } else {
+        taxDetailsHtml += `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-500); margin-top: 4px;">
+            <span>GST @ ${pct}% (on ₹ ${fmtNum(taxable)})</span>
+            <span>₹ ${fmtNum(taxAmt)}</span>
+          </div>
+        `;
+      }
     }
     
     overlay.innerHTML = `
@@ -13937,7 +14553,16 @@
             <div>
               <h3 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 700;">Billed To:</h3>
               <div style="font-size: 16px; font-weight: 800; color: var(--slate-900);">${ohEsc(customer.name)}</div>
-              <div style="font-size: 13px; color: var(--slate-500); margin-top: 4px; font-weight: 500;">Trade Receivables Account</div>
+              ${customer.address1 ? `<div style="font-size: 13px; color: var(--slate-600); margin-top: 4px; font-weight: 500;">${ohEsc(customer.address1)}</div>` : ''}
+              ${customer.address2 ? `<div style="font-size: 13px; color: var(--slate-600); font-weight: 500;">${ohEsc(customer.address2)}</div>` : ''}
+              ${customer.address3 ? `<div style="font-size: 13px; color: var(--slate-600); font-weight: 500;">${ohEsc(customer.address3)}</div>` : ''}
+              ${(customer.state || customer.country || customer.pincode) ? `
+                <div style="font-size: 13px; color: var(--slate-600); font-weight: 500;">
+                  ${[customer.state, customer.country, customer.pincode].filter(Boolean).map(ohEsc).join(', ')}
+                </div>
+              ` : ''}
+              ${customer.gst ? `<div style="font-size: 13px; color: var(--slate-700); margin-top: 4px; font-weight: 700;">GSTIN: ${ohEsc(customer.gst)}</div>` : ''}
+              ${customer.pan ? `<div style="font-size: 13px; color: var(--slate-700); font-weight: 600;">PAN: ${ohEsc(customer.pan)}</div>` : ''}
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13.5px;">
               <div>
@@ -13956,6 +14581,16 @@
                 <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Payment Terms:</div>
                 <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">Due on Receipt</div>
               </div>
+              <div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Supply Type:</div>
+                <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${ohEsc(inv.salesSupplyType || 'Intra-State (CGST + SGST)')}</div>
+              </div>
+              ${execName ? `
+              <div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Sales Executive:</div>
+                <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${ohEsc(execName)}</div>
+              </div>
+              ` : ''}
             </div>
           </div>
           
@@ -14287,6 +14922,20 @@
             orderEl.value = '';
           }
         }
+      });
+    }
+    
+    const execEl = document.getElementById('salesExecutive');
+    if (execEl) {
+      execEl.addEventListener('focus', () => {
+        populateSalesExecutives(execEl.value);
+      });
+    }
+    
+    const supplyTypeEl = document.getElementById('salesSupplyType');
+    if (supplyTypeEl) {
+      supplyTypeEl.addEventListener('change', () => {
+        handleSupplyTypeChange();
       });
     }
     
