@@ -4277,7 +4277,7 @@
               <span id="vdStatJE" style="font-size: 24px; font-weight: 800; color: var(--blue-600);">0</span>
             </div>
             <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Sales Invoices</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Sales Vouchers</span>
               <span id="vdStatInv" style="font-size: 24px; font-weight: 800; color: #059669;">0</span>
             </div>
             <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
@@ -4563,8 +4563,8 @@
               <span class="oh-tab-text">PayTrack</span>
             </button>
 
-            <!-- Upcoming: Mini Ledger -->
-            <button class="oh-sub-tab upcoming" id="ohTabMiniLedger" role="tab" aria-selected="false" aria-controls="oh-miniledger-view" title="Coming Soon">
+            <!-- Upcoming: Under Ledger -->
+            <button class="oh-sub-tab upcoming" id="ohTabUnderLedger" role="tab" aria-selected="false" aria-controls="oh-underledger-view" title="Coming Soon">
               <div class="oh-tab-icon-wrap">
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
                   <path d="M4 5h12M4 9h8M4 13h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -4572,7 +4572,7 @@
                   <path d="M15 13h2M16 12v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                 </svg>
               </div>
-              <span class="oh-tab-text">Mini Ledger</span>
+              <span class="oh-tab-text">Under Ledger</span>
             </button>
 
           </div>
@@ -4612,8 +4612,8 @@
             <!-- PayTrack View (Upcoming) -->
             <div id="oh-paytrack-view" role="tabpanel" style="display:none"></div>
 
-            <!-- Mini Ledger View (Upcoming) -->
-            <div id="oh-miniledger-view" role="tabpanel" style="display:none"></div>
+            <!-- Under Ledger View (Upcoming) -->
+            <div id="oh-underledger-view" role="tabpanel" style="display:none"></div>
 
           </div>
         </div>
@@ -4867,9 +4867,21 @@
               <label for="salesDate">Date</label>
               <input type="date" id="salesDate" class="je-input" aria-label="Invoice date" />
             </div>
-            <div class="je-field">
-              <label for="salesInvoiceNo">Invoice No.</label>
+            <div class="je-field" id="salesInvoiceNoContainer">
+              <label for="salesInvoiceNo" id="lblSalesInvoiceNo">Invoice No.</label>
               <input type="text" id="salesInvoiceNo" class="je-input" placeholder="INV-2026-001" aria-label="Invoice number" />
+              
+              <!-- Searchable Select for returns -->
+              <div class="kya-searchable-select-wrap" id="salesInvoiceSelectWrap" style="display: none; position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="salesInvoiceSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                  <span id="salesInvoiceSelectTriggerText">Select Invoice</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="salesInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="salesInvoiceSelectSearch" placeholder="Search invoice..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="salesInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
             </div>
             <div class="je-field">
               <label for="salesCustomer">Customer *</label>
@@ -7136,11 +7148,11 @@
           }
         });
       }
-    } else if (type === 'Invoice') {
+    } else if (type === 'Invoice' || type === 'Return') {
       const isDraft = (window.KYA_STORE.salesVouchersDrafts || []).some(v => v.id === id);
       if (isDraft) {
         showKyaConfirm({
-          title: 'Delete Draft Invoice?',
+          title: 'Delete Draft?',
           message: 'Are you sure you want to delete this draft? This action cannot be undone.',
           confirmLabel: 'Delete',
           okBg: 'var(--red-600)',
@@ -7231,7 +7243,7 @@
         id: e.id,
         date: e.date,
         voucherNo: e.invoiceNo,
-        type: 'Invoice',
+        type: e.isReturn ? 'Return' : 'Invoice',
         particulars: `Customer: ${customerName}`,
         amount: fmtNum(e.total),
         isDraft: false,
@@ -7246,7 +7258,7 @@
         id: e.id,
         date: e.date,
         voucherNo: e.invoiceNo,
-        type: 'Invoice',
+        type: e.isReturn ? 'Return' : 'Invoice',
         particulars: `Customer: ${customerName}`,
         amount: fmtNum(e.total),
         isDraft: true,
@@ -7296,6 +7308,7 @@
               <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
               <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
+              <option value="Return" ${_vdTypeFilter === 'Return' ? 'selected' : ''}>Sales Return</option>
             </select>
           </div>
         </div>
@@ -7324,6 +7337,7 @@
               <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
               <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
+              <option value="Return" ${_vdTypeFilter === 'Return' ? 'selected' : ''}>Sales Return</option>
             </select>
           </div>
         </div>
@@ -7346,13 +7360,15 @@
               ${filtered.map((e, index) => {
                 const typeBadge = e.type === 'Journal'
                    ? `<span class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Journal Entry</span>`
-                   : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`;
+                   : (e.type === 'Return'
+                      ? `<span class="tb-badge" style="background:#fee2e2; color:#b91c1c; border:1.5px solid #fca5a5; font-size:11px; padding:3px 8px; text-transform:none;">Sales Return</span>`
+                      : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`);
 
                 const statusBadge = e.isDraft
                    ? `<span class="tb-badge" style="background:#fffbeb; color:#d97706; border:1.5px solid #fde68a; font-size:11px; padding:3px 8px; text-transform:none;">Draft</span>`
                    : `<span class="tb-badge" style="background:#ecfdf5; color:#059669; border:1.5px solid #a7f3d0; font-size:11px; padding:3px 8px; text-transform:none;">Posted</span>`;
 
-                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : '#059669';
+                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : (e.type === 'Return' ? '#dc2626' : '#059669');
 
                 return `
                   <tr data-id="${e.id}" data-type="${e.type}" class="vd-row">
@@ -7419,7 +7435,7 @@
             ? draftedEntries.find(e => e.id === id)
             : postedEntries.find(e => e.id === id);
           if (entry) showFullJournalModal(entry, isDraft);
-        } else if (type === 'Invoice') {
+        } else if (type === 'Invoice' || type === 'Return') {
           if (isDraft) {
             editSalesDraft(id);
           } else {
@@ -7753,19 +7769,6 @@
   let _coaMBal      = '';
   let _coaMPreSgId  = null;     // pre-selected sgId when opened from tree button
   let _coaMAliases  = [];
-  let _coaMAddress1     = '';
-  let _coaMAddress2     = '';
-  let _coaMAddress3     = '';
-  let _coaMState        = '';
-  let _coaMCountry      = 'India';
-  let _coaMPincode      = '';
-  let _coaMPan          = '';
-  let _coaMGst          = '';
-  let _coaMBankAccName  = '';
-  let _coaMBankName     = '';
-  let _coaMBankAccNo    = '';
-  let _coaMBankIfsc     = '';
-  let _coaMAdditionalOpen = false;
 
   // ── CSS ──────────────────────────────────────────────────────────
   function injectChartStyles() {
@@ -8203,24 +8206,7 @@
       const nameMatch = l.name.toLowerCase().includes(q);
       const codeMatch = (l.code || '').toLowerCase().includes(q);
       const aliasMatch = l.aliases && l.aliases.some(alias => alias.toLowerCase().includes(q));
-      const addr1Match = (l.address1 || '').toLowerCase().includes(q);
-      const addr2Match = (l.address2 || '').toLowerCase().includes(q);
-      const addr3Match = (l.address3 || '').toLowerCase().includes(q);
-      const stateMatch = (l.state || '').toLowerCase().includes(q);
-      const countryMatch = (l.country || '').toLowerCase().includes(q);
-      const pincodeMatch = (l.pincode || '').toLowerCase().includes(q);
-      const panMatch = (l.pan || '').toLowerCase().includes(q);
-      const gstMatch = (l.gst || '').toLowerCase().includes(q);
-      const bankAccNameMatch = (l.bankAccName || '').toLowerCase().includes(q);
-      const bankNameMatch = (l.bankName || '').toLowerCase().includes(q);
-      const bankAccNoMatch = (l.bankAccNo || '').toLowerCase().includes(q);
-      const bankIfscMatch = (l.bankIfsc || '').toLowerCase().includes(q);
-
-      if (!nameMatch && !codeMatch && !aliasMatch &&
-          !addr1Match && !addr2Match && !addr3Match && !stateMatch && !countryMatch && !pincodeMatch &&
-          !panMatch && !gstMatch && !bankAccNameMatch && !bankNameMatch && !bankAccNoMatch && !bankIfscMatch) {
-        return false;
-      }
+      if (!nameMatch && !codeMatch && !aliasMatch) return false;
     }
     // 2. Type Filter match
     if (_coaFilterType) {
@@ -8282,30 +8268,6 @@
   // ── Render one ledger row ────────────────────────────────────────
   function _coaLdgRow(l, indentClass, q) {
     const ic = indentClass || '';
-    let matchedDetails = [];
-    if (q) {
-      if (l.aliases && l.aliases.some(a => a.toLowerCase().includes(q))) {
-        matchedDetails.push(`A.K.A: ${l.aliases.map(a => _coaHl(a, q)).join(', ')}`);
-      }
-      if ((l.gst || '').toLowerCase().includes(q)) matchedDetails.push(`GSTIN: ${_coaHl(l.gst, q)}`);
-      if ((l.pan || '').toLowerCase().includes(q)) matchedDetails.push(`PAN: ${_coaHl(l.pan, q)}`);
-      if ((l.bankName || '').toLowerCase().includes(q)) matchedDetails.push(`Bank: ${_coaHl(l.bankName, q)}`);
-      if ((l.bankAccNo || '').toLowerCase().includes(q)) matchedDetails.push(`A/c: ${_coaHl(l.bankAccNo, q)}`);
-      if ((l.bankIfsc || '').toLowerCase().includes(q)) matchedDetails.push(`IFSC: ${_coaHl(l.bankIfsc, q)}`);
-      if ((l.address1 || '').toLowerCase().includes(q)) matchedDetails.push(`Addr 1: ${_coaHl(l.address1, q)}`);
-      if ((l.address2 || '').toLowerCase().includes(q)) matchedDetails.push(`Addr 2: ${_coaHl(l.address2, q)}`);
-      if ((l.address3 || '').toLowerCase().includes(q)) matchedDetails.push(`Addr 3: ${_coaHl(l.address3, q)}`);
-      if ((l.state || '').toLowerCase().includes(q)) matchedDetails.push(`State: ${_coaHl(l.state, q)}`);
-    } else {
-      if (l.aliases && l.aliases.length > 0) {
-        matchedDetails.push(`A.K.A: ${l.aliases.join(', ')}`);
-      }
-    }
-
-    const sublineHtml = matchedDetails.length > 0
-      ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500; margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px;">${matchedDetails.join(' · ')}</div>`
-      : '';
-
     return `
       <div class="coa-ldg ${ic}">
         <div class="coa-ldg-dot" style="margin-top: 6px; align-self: flex-start;"></div>
@@ -8314,7 +8276,7 @@
             <span class="coa-ldg-name" style="flex: none;">${_coaHl(l.name, q)}</span>
             ${l.code ? `<span class="coa-ldg-code">${l.code}</span>` : ''}
           </div>
-          ${sublineHtml}
+          ${l.aliases && l.aliases.length > 0 ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500; margin-top: 2px;">A.K.A: ${l.aliases.map(a => _coaHl(a, q)).join(', ')}</div>` : ''}
         </div>
         ${l.openingBalance ? `<span class="coa-ldg-bal">₹ ${parseFloat(l.openingBalance||0).toLocaleString('en-IN')}</span>` : ''}
         <div class="coa-ldg-acts">
@@ -8558,7 +8520,6 @@
 
   function showCoaModal(presgId, preGlId, editId) {
     _coaMOpen = true;
-    _coaMAdditionalOpen = false;
     if (editId) {
       const ldg = coaLedgers.find(l => l.id === editId);
       if (ldg) {
@@ -8570,18 +8531,6 @@
         _coaMGlId     = ldg.glId || '';
         _coaMBal      = ldg.openingBalance || '';
         _coaMAliases  = ldg.aliases ? [...ldg.aliases] : [];
-        _coaMAddress1     = ldg.address1 || '';
-        _coaMAddress2     = ldg.address2 || '';
-        _coaMAddress3     = ldg.address3 || '';
-        _coaMState        = ldg.state || '';
-        _coaMCountry      = ldg.country || 'India';
-        _coaMPincode      = ldg.pincode || '';
-        _coaMPan          = ldg.pan || '';
-        _coaMGst          = ldg.gst || '';
-        _coaMBankAccName  = ldg.bankAccName || '';
-        _coaMBankName     = ldg.bankName || '';
-        _coaMBankAccNo    = ldg.bankAccNo || '';
-        _coaMBankIfsc     = ldg.bankIfsc || '';
       }
     } else {
       _coaMEditMode = false;
@@ -8592,18 +8541,6 @@
       _coaMGlId     = preGlId || '';
       _coaMBal      = '';
       _coaMAliases  = [];
-      _coaMAddress1     = '';
-      _coaMAddress2     = '';
-      _coaMAddress3     = '';
-      _coaMState        = '';
-      _coaMCountry      = 'India';
-      _coaMPincode      = '';
-      _coaMPan          = '';
-      _coaMGst          = '';
-      _coaMBankAccName  = '';
-      _coaMBankName     = '';
-      _coaMBankAccNo    = '';
-      _coaMBankIfsc     = '';
     }
     _renderCoaModal();
   }
@@ -8742,135 +8679,37 @@
     overlay.className = 'coa-modal-overlay';
     overlay.id        = 'coaModalOverlay';
     overlay.innerHTML = `
-      <div class="coa-modal-card" id="coaModalCard" style="max-height: 90vh; display: flex; flex-direction: column; padding: 24px 28px 20px; box-sizing: border-box;">
-        <div class="coa-modal-hdr" style="flex-shrink: 0; margin-bottom: 16px;">
+      <div class="coa-modal-card" id="coaModalCard">
+        <div class="coa-modal-hdr">
           <div class="coa-modal-title">${titleText}</div>
           <button class="coa-modal-close" id="coaModalClose">✕</button>
         </div>
 
-        <div class="coa-modal-scroll-body" style="flex: 1; overflow-y: auto; padding-right: 6px; margin-bottom: 16px; display: flex; flex-direction: column; min-height: 0;">
-          <!-- Slider toggle (disabled in edit mode) -->
-          <div class="coa-slider-wrap" ${_coaMEditMode ? 'style="opacity: 0.6; pointer-events: none; flex-shrink: 0;"' : 'style="flex-shrink: 0;"'}>
-            <div class="coa-slider-bg ${isLedger ? 'ledger-active' : 'group-active'}"></div>
-            <button class="coa-slider-btn${isLedger ? ' active' : ''}" id="coaTogLedger" type="button">Ledger</button>
-            <button class="coa-slider-btn${!isLedger ? ' active' : ''}" id="coaTogGroup"  type="button">Group Ledger</button>
+        <!-- Slider toggle (disabled in edit mode) -->
+        <div class="coa-slider-wrap" ${_coaMEditMode ? 'style="opacity: 0.6; pointer-events: none;"' : ''}>
+          <div class="coa-slider-bg ${isLedger ? 'ledger-active' : 'group-active'}"></div>
+          <button class="coa-slider-btn${isLedger ? ' active' : ''}" id="coaTogLedger" type="button">Ledger</button>
+          <button class="coa-slider-btn${!isLedger ? ' active' : ''}" id="coaTogGroup"  type="button">Group Ledger</button>
+        </div>
+
+        ${isLedger ? `
+          <!-- LEDGER mode -->
+          <div class="coa-modal-fg">
+            <label class="coa-modal-label">Ledger Name *</label>
+            <input class="coa-modal-inp" id="coaMLedgerName"
+              placeholder="e.g. Cash in Hand"
+              value="${_coaMName.replace(/"/g,'&quot;')}">
           </div>
 
-          ${isLedger ? `
-            <!-- LEDGER mode -->
-            <div class="coa-modal-fg">
-              <label class="coa-modal-label">Ledger Name *</label>
-              <input class="coa-modal-inp" id="coaMLedgerName"
-                placeholder="e.g. Cash in Hand"
-                value="${_coaMName.replace(/"/g,'&quot;')}">
-            </div>
+          <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
+            <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
+            <div id="coaMAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="coaMAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
+              ＋ Add A.K.A
+            </button>
+          </div>
 
-            <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
-              <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
-              <div id="coaMAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
-              <button type="button" class="btn btn-secondary btn-sm" id="coaMAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
-                ＋ Add A.K.A
-              </button>
-            </div>
-
-            <div class="coa-modal-group-box">
-              <div class="coa-modal-fg" style="position: relative;">
-                <label class="coa-modal-label">Sub Group *</label>
-                <select class="coa-modal-sel" id="coaMSubGroup" style="display: none;">${sgOpts}</select>
-                <div class="kya-searchable-select-wrap" id="coaMSubGroupSearchableWrap" style="position: relative; width: 100%;">
-                  <div class="kya-searchable-select-trigger" id="coaMSubGroupTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
-                    <span id="coaMSubGroupTriggerText">Select Sub Group</span>
-                    <span style="font-size: 10px; color: var(--slate-400);">▼</span>
-                  </div>
-                  <div class="kya-searchable-select-dropdown" id="coaMSubGroupDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
-                    <input type="text" id="coaMSubGroupSearch" placeholder="Search sub group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
-                    <div id="coaMSubGroupOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="coa-modal-fg">
-                <label class="coa-modal-label">
-                  Group Ledger (Sub Group)
-                  <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(Optional)</span>
-                </label>
-                <select class="coa-modal-sel" id="coaMGroupLedger">${glOpts}</select>
-              </div>
-            </div>
-
-            <div class="coa-modal-fg">
-              <label class="coa-modal-label">
-                Opening Balance
-                <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(Optional)</span>
-              </label>
-              <input class="coa-modal-inp" id="coaMBalance"
-                type="number" min="0" step="0.01"
-                placeholder="₹ 0.00" value="${_coaMBal}">
-            </div>
-
-            <div class="coa-modal-fg" style="margin-top: 16px;">
-              <div id="coaMAdditionalToggle" style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--blue-600); font-weight: 700; font-size: 13px; user-select: none;">
-                <span id="coaMAdditionalChevron">▶</span> Additional Information (Address, GST, Bank)
-              </div>
-              
-              <div id="coaMAdditionalPanel" style="display: none; flex-direction: column; gap: 14px; margin-top: 14px; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 14px; background: var(--slate-50);">
-                <!-- Address Details -->
-                <div>
-                  <label class="coa-modal-label" style="font-size: 10.5px; color: var(--slate-500); margin-bottom: 8px;">Address</label>
-                  <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <input class="coa-modal-inp" id="coaMAddress1" placeholder="Address Line 1" value="${_coaMAddress1.replace(/"/g,'&quot;')}">
-                    <input class="coa-modal-inp" id="coaMAddress2" placeholder="Address Line 2" value="${_coaMAddress2.replace(/"/g,'&quot;')}">
-                    <input class="coa-modal-inp" id="coaMAddress3" placeholder="Address Line 3" value="${_coaMAddress3.replace(/"/g,'&quot;')}">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                      <input class="coa-modal-inp" id="coaMState" placeholder="State" value="${_coaMState.replace(/"/g,'&quot;')}">
-                      <input class="coa-modal-inp" id="coaMCountry" placeholder="Country" value="${_coaMCountry.replace(/"/g,'&quot;')}">
-                    </div>
-                    <input class="coa-modal-inp" id="coaMPincode" placeholder="Pincode" value="${_coaMPincode.replace(/"/g,'&quot;')}">
-                  </div>
-                </div>
-                
-                <hr style="border: 0; border-top: 1px solid var(--slate-200); margin: 4px 0;" />
-                
-                <!-- Statutory Details -->
-                <div>
-                  <label class="coa-modal-label" style="font-size: 10.5px; color: var(--slate-500); margin-bottom: 8px;">Statutory Details</label>
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <input class="coa-modal-inp" id="coaMPan" placeholder="PAN" value="${_coaMPan.replace(/"/g,'&quot;')}">
-                    <input class="coa-modal-inp" id="coaMGst" placeholder="GSTIN" value="${_coaMGst.replace(/"/g,'&quot;')}">
-                  </div>
-                </div>
-                
-                <hr style="border: 0; border-top: 1px solid var(--slate-200); margin: 4px 0;" />
-                
-                <!-- Bank Details -->
-                <div>
-                  <label class="coa-modal-label" style="font-size: 10.5px; color: var(--slate-500); margin-bottom: 8px;">Bank Details</label>
-                  <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <input class="coa-modal-inp" id="coaMBankAccName" placeholder="Account Holder Name" value="${_coaMBankAccName.replace(/"/g,'&quot;')}">
-                    <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 8px;">
-                      <input class="coa-modal-inp" id="coaMBankName" placeholder="Bank Name" value="${_coaMBankName.replace(/"/g,'&quot;')}">
-                      <input class="coa-modal-inp" id="coaMBankIfsc" placeholder="IFSC Code" value="${_coaMBankIfsc.replace(/"/g,'&quot;')}">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ` : `
-            <!-- GROUP LEDGER mode -->
-            <div class="coa-modal-fg">
-              <label class="coa-modal-label">Group Ledger Name *</label>
-              <input class="coa-modal-inp" id="coaMLedgerName"
-                placeholder="e.g. Fixed Assets Group"
-                value="${_coaMName.replace(/"/g,'&quot;')}">
-            </div>
-
-            <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
-              <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
-              <div id="coaMAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
-              <button type="button" class="btn btn-secondary btn-sm" id="coaMAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
-                ＋ Add A.K.A
-              </button>
-            </div>
-
+          <div class="coa-modal-group-box">
             <div class="coa-modal-fg" style="position: relative;">
               <label class="coa-modal-label">Sub Group *</label>
               <select class="coa-modal-sel" id="coaMSubGroup" style="display: none;">${sgOpts}</select>
@@ -8885,10 +8724,58 @@
                 </div>
               </div>
             </div>
-          `}
-        </div>
+            <div class="coa-modal-fg">
+              <label class="coa-modal-label">
+                Group Ledger (Sub Group)
+                <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(Optional)</span>
+              </label>
+              <select class="coa-modal-sel" id="coaMGroupLedger">${glOpts}</select>
+            </div>
+          </div>
 
-        <div class="coa-modal-btns" style="flex-shrink: 0; margin-top: 0;">
+          <div class="coa-modal-fg">
+            <label class="coa-modal-label">
+              Opening Balance
+              <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(Optional)</span>
+            </label>
+            <input class="coa-modal-inp" id="coaMBalance"
+              type="number" min="0" step="0.01"
+              placeholder="₹ 0.00" value="${_coaMBal}">
+          </div>
+        ` : `
+          <!-- GROUP LEDGER mode -->
+          <div class="coa-modal-fg">
+            <label class="coa-modal-label">Group Ledger Name *</label>
+            <input class="coa-modal-inp" id="coaMLedgerName"
+              placeholder="e.g. Fixed Assets Group"
+              value="${_coaMName.replace(/"/g,'&quot;')}">
+          </div>
+
+          <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
+            <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
+            <div id="coaMAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="coaMAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
+              ＋ Add A.K.A
+            </button>
+          </div>
+
+          <div class="coa-modal-fg" style="position: relative;">
+            <label class="coa-modal-label">Sub Group *</label>
+            <select class="coa-modal-sel" id="coaMSubGroup" style="display: none;">${sgOpts}</select>
+            <div class="kya-searchable-select-wrap" id="coaMSubGroupSearchableWrap" style="position: relative; width: 100%;">
+              <div class="kya-searchable-select-trigger" id="coaMSubGroupTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                <span id="coaMSubGroupTriggerText">Select Sub Group</span>
+                <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+              </div>
+              <div class="kya-searchable-select-dropdown" id="coaMSubGroupDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                <input type="text" id="coaMSubGroupSearch" placeholder="Search sub group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                <div id="coaMSubGroupOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+              </div>
+            </div>
+          </div>
+        `}
+
+        <div class="coa-modal-btns">
           <button class="coa-modal-cancel" id="coaModalCancel">Cancel</button>
           <button class="coa-modal-save"   id="coaModalSave">
             ${_coaMEditMode ? 'Save Changes' : (isLedger ? '＋ Add Ledger' : '＋ Add Group Ledger')}
@@ -8899,25 +8786,6 @@
     document.body.appendChild(overlay);
     setTimeout(() => overlay.querySelector('#coaMLedgerName')?.focus(), 40);
     initCoaSearchableSelect(overlay);
-
-    let additionalOpen = _coaMAdditionalOpen;
-    const toggleEl = overlay.querySelector('#coaMAdditionalToggle');
-    const panelEl = overlay.querySelector('#coaMAdditionalPanel');
-    const chevronEl = overlay.querySelector('#coaMAdditionalChevron');
-    if (toggleEl && panelEl && chevronEl) {
-      const updatePanel = () => {
-        panelEl.style.display = additionalOpen ? 'flex' : 'none';
-        chevronEl.textContent = additionalOpen ? '▼' : '▶';
-        _coaMAdditionalOpen = additionalOpen;
-      };
-      updatePanel();
-      toggleEl.addEventListener('click', () => {
-        additionalOpen = !additionalOpen;
-        updatePanel();
-      });
-    }
-
-
 
     const renderAliasRows = () => {
       const container = overlay.querySelector('#coaMAliasesContainer');
@@ -8988,18 +8856,6 @@
       _coaMName = overlay.querySelector('#coaMLedgerName').value;
       _coaMSgId = overlay.querySelector('#coaMSubGroup').value;
       _coaMBal  = overlay.querySelector('#coaMBalance')?.value || '';
-      _coaMAddress1     = overlay.querySelector('#coaMAddress1')?.value || '';
-      _coaMAddress2     = overlay.querySelector('#coaMAddress2')?.value || '';
-      _coaMAddress3     = overlay.querySelector('#coaMAddress3')?.value || '';
-      _coaMState        = overlay.querySelector('#coaMState')?.value || '';
-      _coaMCountry      = overlay.querySelector('#coaMCountry')?.value || 'India';
-      _coaMPincode      = overlay.querySelector('#coaMPincode')?.value || '';
-      _coaMPan          = overlay.querySelector('#coaMPan')?.value || '';
-      _coaMGst          = overlay.querySelector('#coaMGst')?.value || '';
-      _coaMBankAccName  = overlay.querySelector('#coaMBankAccName')?.value || '';
-      _coaMBankName     = overlay.querySelector('#coaMBankName')?.value || '';
-      _coaMBankAccNo    = overlay.querySelector('#coaMBankAccNo')?.value || '';
-      _coaMBankIfsc     = overlay.querySelector('#coaMBankIfsc')?.value || '';
       _renderCoaModal();
     });
     overlay.querySelector('#coaTogGroup').addEventListener('click', () => {
@@ -9007,18 +8863,6 @@
       _coaMName = overlay.querySelector('#coaMLedgerName').value;
       _coaMSgId = overlay.querySelector('#coaMSubGroup').value;
       _coaMBal  = overlay.querySelector('#coaMBalance')?.value || '';
-      _coaMAddress1     = overlay.querySelector('#coaMAddress1')?.value || '';
-      _coaMAddress2     = overlay.querySelector('#coaMAddress2')?.value || '';
-      _coaMAddress3     = overlay.querySelector('#coaMAddress3')?.value || '';
-      _coaMState        = overlay.querySelector('#coaMState')?.value || '';
-      _coaMCountry      = overlay.querySelector('#coaMCountry')?.value || 'India';
-      _coaMPincode      = overlay.querySelector('#coaMPincode')?.value || '';
-      _coaMPan          = overlay.querySelector('#coaMPan')?.value || '';
-      _coaMGst          = overlay.querySelector('#coaMGst')?.value || '';
-      _coaMBankAccName  = overlay.querySelector('#coaMBankAccName')?.value || '';
-      _coaMBankName     = overlay.querySelector('#coaMBankName')?.value || '';
-      _coaMBankAccNo    = overlay.querySelector('#coaMBankAccNo')?.value || '';
-      _coaMBankIfsc     = overlay.querySelector('#coaMBankIfsc')?.value || '';
       _renderCoaModal();
     });
 
@@ -9047,18 +8891,6 @@
       const bal  = overlay.querySelector('#coaMBalance')?.value.trim() || '';
 
       const aliases = _coaMAliases.map(a => a.trim()).filter(a => a !== '');
-      const address1     = isLedger ? (overlay.querySelector('#coaMAddress1')?.value.trim() || '') : '';
-      const address2     = isLedger ? (overlay.querySelector('#coaMAddress2')?.value.trim() || '') : '';
-      const address3     = isLedger ? (overlay.querySelector('#coaMAddress3')?.value.trim() || '') : '';
-      const state        = isLedger ? (overlay.querySelector('#coaMState')?.value.trim() || '') : '';
-      const country      = isLedger ? (overlay.querySelector('#coaMCountry')?.value.trim() || 'India') : 'India';
-      const pincode      = isLedger ? (overlay.querySelector('#coaMPincode')?.value.trim() || '') : '';
-      const pan          = isLedger ? (overlay.querySelector('#coaMPan')?.value.trim() || '') : '';
-      const gst          = isLedger ? (overlay.querySelector('#coaMGst')?.value.trim() || '') : '';
-      const bankAccName  = isLedger ? (overlay.querySelector('#coaMBankAccName')?.value.trim() || '') : '';
-      const bankName     = isLedger ? (overlay.querySelector('#coaMBankName')?.value.trim() || '') : '';
-      const bankAccNo    = isLedger ? (overlay.querySelector('#coaMBankAccNo')?.value.trim() || '') : '';
-      const bankIfsc     = isLedger ? (overlay.querySelector('#coaMBankIfsc')?.value.trim() || '') : '';
 
       if (_coaMEditMode && _coaMEditId) {
         const ldg = coaLedgers.find(l => l.id === _coaMEditId);
@@ -9069,18 +8901,6 @@
           ldg.openingBalance = bal;
           ldg.type = _coaMType;
           ldg.aliases = aliases;
-          ldg.address1 = address1;
-          ldg.address2 = address2;
-          ldg.address3 = address3;
-          ldg.state = state;
-          ldg.country = country;
-          ldg.pincode = pincode;
-          ldg.pan = pan;
-          ldg.gst = gst;
-          ldg.bankAccName = bankAccName;
-          ldg.bankName = bankName;
-          ldg.bankAccNo = bankAccNo;
-          ldg.bankIfsc = bankIfsc;
         }
         showToast(`${_coaMType === 'group-ledger' ? 'Group Ledger' : 'Ledger'} "${name}" updated successfully.`, 'success');
       } else {
@@ -9092,19 +8912,7 @@
           code: '',
           openingBalance: bal,
           type: _coaMType,
-          aliases: aliases,
-          address1,
-          address2,
-          address3,
-          state,
-          country,
-          pincode,
-          pan,
-          gst,
-          bankAccName,
-          bankName,
-          bankAccNo,
-          bankIfsc
+          aliases: aliases
         });
 
         const sg = COA_SYS_SGS.find(s => s.id === sgId);
@@ -9157,11 +8965,9 @@
           if (!sg || sg.main !== _coaFilterMg) return false;
         }
         if (q) {
-          if (l.type === 'ledger') {
-            return _coaLdgMatchesFilters(l, q);
-          } else {
-            return _coaGlMatchesFilters(l, q);
-          }
+          const nm = l.name.toLowerCase().includes(q);
+          const cd = (l.code || '').toLowerCase().includes(q);
+          if (!nm && !cd) return false;
         }
         return true;
       }).length;
@@ -10606,8 +10412,8 @@
       desc: 'Manage employee payroll, salaries, deductions, and generate payslips — all from one place.',
       features: ['Payroll Processing', 'Salary Slips', 'TDS & Deductions', 'Pay History'],
     },
-    miniledger: {
-      label: 'Mini Ledger',
+    underledger: {
+      label: 'Under Ledger',
       icon: `<svg width="38" height="38" viewBox="0 0 20 20" fill="none">
         <path d="M4 5h12M4 9h8M4 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
         <circle cx="16" cy="13" r="3.5" stroke="currentColor" stroke-width="1.4"/>
@@ -10630,7 +10436,7 @@
       ohTabEmp:         'emp',
       ohTabBudget:      'budget',
       ohTabPaytrack:    'paytrack',
-      ohTabMiniLedger: 'miniledger',
+      ohTabUnderLedger: 'underledger',
     };
     Object.entries(tabMap).forEach(([btnId, tab]) => {
       const btn = document.getElementById(btnId);
@@ -10650,14 +10456,14 @@
       ['ohTabEmp',         'emp'],
       ['ohTabBudget',      'budget'],
       ['ohTabPaytrack',    'paytrack'],
-      ['ohTabMiniLedger', 'miniledger'],
+      ['ohTabUnderLedger', 'underledger'],
     ];
     const allViews = [
       ['oh-dept-view',        'dept'],
       ['oh-emp-view',         'emp'],
       ['oh-budget-view',      'budget'],
       ['oh-paytrack-view',    'paytrack'],
-      ['oh-miniledger-view', 'miniledger'],
+      ['oh-underledger-view', 'underledger'],
       ['oh-empty-view',       ''],
     ];
 
@@ -10684,7 +10490,7 @@
     const viewIdMap = {
       budget:      'oh-budget-view',
       paytrack:    'oh-paytrack-view',
-      miniledger: 'oh-miniledger-view',
+      underledger: 'oh-underledger-view',
     };
     const wrap = document.getElementById(viewIdMap[key]);
     if (!wrap) return;
@@ -12535,6 +12341,7 @@
       window.KYA_STORE.salesVouchers = window.KYA_STORE.salesVouchers || [];
       window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
       window.KYA_STORE.salesInvoiceCtr = window.KYA_STORE.salesInvoiceCtr || 1;
+      window.KYA_STORE.salesReturnCtr = window.KYA_STORE.salesReturnCtr || 1;
 
       if (!quiet) {
         showToast('Data restored successfully.', 'success');
@@ -13186,6 +12993,7 @@
   let currentSalesType = 'Product';
   let salesRows = [];
   let currentSalesInvoiceMode = 'Auto'; // 'Auto' | 'Manual'
+  let currentSalesVoucherSubtype = 'Invoice'; // 'Invoice' | 'Return'
 
   // Initialize store for future features
   if (!window.KYA_STORE) {
@@ -13194,11 +13002,17 @@
   window.KYA_STORE.salesVouchers = window.KYA_STORE.salesVouchers || [];
   window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
   window.KYA_STORE.salesInvoiceCtr = window.KYA_STORE.salesInvoiceCtr || 1;
+  window.KYA_STORE.salesReturnCtr = window.KYA_STORE.salesReturnCtr || 1;
 
   function getNextAutoInvoiceNumber() {
     const year = new Date().getFullYear();
-    const ctr = window.KYA_STORE.salesInvoiceCtr || 1;
-    return `INV-${year}-${String(ctr).padStart(3, '0')}`;
+    if (currentSalesVoucherSubtype === 'Return') {
+      const ctr = window.KYA_STORE.salesReturnCtr || 1;
+      return `RET-${year}-${String(ctr).padStart(3, '0')}`;
+    } else {
+      const ctr = window.KYA_STORE.salesInvoiceCtr || 1;
+      return `INV-${year}-${String(ctr).padStart(3, '0')}`;
+    }
   }
 
   function setInvoiceNoMode(mode) {
@@ -13594,7 +13408,206 @@
     if (totalEl) totalEl.textContent = '₹ ' + fmtNum(total);
   }
 
+  function updateVoucherSubtypeUI() {
+    const newSalesBtn = document.getElementById('btnNewSales');
+    const returnBtn = document.getElementById('btnSalesReturn');
+    const cardTitle = document.querySelector('#panel-sales-voucher .je-card-title-text');
+    const cardSubtitle = document.querySelector('#panel-sales-voucher .je-card-subtitle-text');
+    const invoiceNoLabel = document.getElementById('lblSalesInvoiceNo');
+    const invoiceNoInput = document.getElementById('salesInvoiceNo');
+    const selectWrap = document.getElementById('salesInvoiceSelectWrap');
+
+    if (invoiceNoLabel) invoiceNoLabel.textContent = 'Invoice No.';
+
+    if (currentSalesVoucherSubtype === 'Return') {
+      if (newSalesBtn) {
+        newSalesBtn.className = 'btn-sales-action';
+        newSalesBtn.style.background = 'var(--white)';
+        newSalesBtn.style.color = 'var(--slate-600)';
+        newSalesBtn.style.borderColor = 'var(--slate-200)';
+      }
+      if (returnBtn) {
+        returnBtn.className = 'btn btn-primary';
+        returnBtn.style.background = 'var(--blue-700)';
+        returnBtn.style.color = '#fff';
+        returnBtn.style.borderColor = 'var(--blue-700)';
+      }
+      if (cardTitle) cardTitle.textContent = 'Sales Return';
+      if (cardSubtitle) cardSubtitle.textContent = 'Record sales returns and customer credits';
+      if (invoiceNoInput) invoiceNoInput.style.display = 'none';
+      if (selectWrap) {
+        selectWrap.style.display = 'block';
+        refreshSalesInvoiceDropdownOptions();
+      }
+    } else {
+      if (newSalesBtn) {
+        newSalesBtn.className = 'btn btn-primary';
+        newSalesBtn.style.background = 'var(--blue-700)';
+        newSalesBtn.style.color = '#fff';
+        newSalesBtn.style.borderColor = 'var(--blue-700)';
+      }
+      if (returnBtn) {
+        returnBtn.className = 'btn-sales-action';
+        returnBtn.style.background = 'var(--white)';
+        returnBtn.style.color = 'var(--slate-600)';
+        returnBtn.style.borderColor = 'var(--slate-200)';
+      }
+      if (cardTitle) cardTitle.textContent = 'Sales Invoice';
+      if (cardSubtitle) cardSubtitle.textContent = 'Record sales transactions and customer receivables';
+      if (invoiceNoInput) {
+        invoiceNoInput.style.display = 'block';
+        invoiceNoInput.placeholder = 'INV-2026-001';
+      }
+      if (selectWrap) selectWrap.style.display = 'none';
+    }
+  }
+
+  function refreshSalesInvoiceDropdownOptions(filter = '') {
+    const optionsList = document.getElementById('salesInvoiceSelectOptionsList');
+    const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
+    if (!optionsList || !triggerText) return;
+
+    optionsList.innerHTML = '';
+    
+    // Get all posted invoices that are NOT returns
+    const invoices = (window.KYA_STORE.salesVouchers || []).filter(v => !v.isReturn);
+    
+    const query = filter.toLowerCase().trim();
+    let matchCount = 0;
+    
+    invoices.forEach(inv => {
+      const custName = inv.customerId ? ((coaLedgers.find(l => l.id == inv.customerId) || { name: 'Customer' }).name) : 'No Customer';
+      const text = `${inv.invoiceNo} - ${custName} (${inv.date}) - ₹${fmtNum(inv.total)}`;
+      if (query && !text.toLowerCase().includes(query)) {
+        return;
+      }
+      matchCount++;
+      
+      const item = document.createElement('div');
+      item.style.padding = '8px 12px';
+      item.style.fontSize = '13px';
+      item.style.borderRadius = '6px';
+      item.style.cursor = 'pointer';
+      item.style.fontWeight = '500';
+      item.style.color = 'var(--slate-700)';
+      item.style.whiteSpace = 'nowrap';
+      item.style.overflow = 'hidden';
+      item.style.textOverflow = 'ellipsis';
+      
+      item.textContent = text;
+      
+      item.addEventListener('mouseover', () => {
+        item.style.background = 'var(--slate-50)';
+      });
+      item.addEventListener('mouseout', () => {
+        item.style.background = 'transparent';
+      });
+      
+      item.addEventListener('click', () => {
+        triggerText.textContent = inv.invoiceNo;
+        
+        const invoiceNoInput = document.getElementById('salesInvoiceNo');
+        if (invoiceNoInput) {
+          invoiceNoInput.value = inv.invoiceNo;
+        }
+        
+        autoFillFormFromInvoice(inv);
+        
+        const dropdown = document.getElementById('salesInvoiceSelectDropdown');
+        if (dropdown) dropdown.style.display = 'none';
+      });
+      
+      optionsList.appendChild(item);
+    });
+    
+    if (matchCount === 0) {
+      const noResult = document.createElement('div');
+      noResult.style.padding = '8px 12px';
+      noResult.style.fontSize = '12px';
+      noResult.style.color = 'var(--slate-400)';
+      noResult.style.textAlign = 'center';
+      noResult.textContent = 'No matching invoices';
+      optionsList.appendChild(noResult);
+    }
+  }
+
+  function autoFillFormFromInvoice(inv) {
+    const custEl = document.getElementById('salesCustomer');
+    if (custEl) {
+      custEl.value = inv.customerId;
+      populateSalesCustomers(inv.customerId);
+    }
+    
+    const execEl = document.getElementById('salesExecutive');
+    if (execEl) {
+      execEl.value = inv.salesExecutiveId || '';
+      populateSalesExecutives(inv.salesExecutiveId);
+    }
+    
+    const supplyTypeEl = document.getElementById('salesSupplyType');
+    if (supplyTypeEl) {
+      supplyTypeEl.value = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
+    }
+    
+    const notesEl = document.getElementById('salesNotes');
+    if (notesEl) {
+      notesEl.value = `Return against invoice ${inv.invoiceNo}. ${inv.notes || ''}`;
+    }
+    
+    const adjEl = document.getElementById('salesAdjustments');
+    if (adjEl) {
+      adjEl.value = inv.adjustments || '';
+    }
+    
+    const noneBtn = document.getElementById('salesTdsTcsNone');
+    const tdsBtn = document.getElementById('salesTdsTcsTDS');
+    const tcsBtn = document.getElementById('salesTdsTcsTCS');
+    if (inv.tdsTcsMode === 'TDS' && tdsBtn) tdsBtn.click();
+    else if (inv.tdsTcsMode === 'TCS' && tcsBtn) tcsBtn.click();
+    else if (noneBtn) noneBtn.click();
+    
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    const customInput = document.getElementById('salesTdsTcsRateCustom');
+    const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
+    const rateVal = inv.tdsTcsRate || 0;
+    if (rateSelect) {
+      if (rateSelect.querySelector(`option[value="${rateVal}"]`)) {
+        rateSelect.value = String(rateVal);
+        if (customWrap) customWrap.style.display = 'none';
+      } else {
+        rateSelect.value = 'custom';
+        if (customInput) customInput.value = rateVal;
+        if (customWrap) customWrap.style.display = 'block';
+      }
+    }
+    
+    currentSalesType = inv.type;
+    const prodBtn = document.getElementById('salesTypeProduct');
+    const servBtn = document.getElementById('salesTypeService');
+    const typeBg = document.getElementById('salesTypeBg');
+    if (inv.type === 'Product') {
+      if (prodBtn) prodBtn.classList.add('active');
+      if (servBtn) servBtn.classList.remove('active');
+      if (typeBg) {
+        typeBg.classList.add('prod-active');
+        typeBg.classList.remove('serv-active');
+      }
+    } else {
+      if (servBtn) servBtn.classList.add('active');
+      if (prodBtn) prodBtn.classList.remove('active');
+      if (typeBg) {
+        typeBg.classList.add('serv-active');
+        typeBg.classList.remove('prod-active');
+      }
+    }
+    
+    salesRows = JSON.parse(JSON.stringify(inv.rows));
+    renderSalesRows();
+    recalculateSalesTotals();
+  }
+
   function initSalesForm() {
+    updateVoucherSubtypeUI();
     const today = new Date().toISOString().split('T')[0];
     const dateEl = document.getElementById('salesDate');
     const dueEl = document.getElementById('salesDueDate');
@@ -13646,12 +13659,18 @@
       typeBg.classList.remove('serv-active');
     }
     
+    const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
+    if (triggerText) triggerText.textContent = 'Select Invoice';
+
     salesRows = [];
     addSalesRow();
   }
 
   function loadSalesInvoice(inv, isDraft) {
     openTab('sales_voucher');
+    
+    currentSalesVoucherSubtype = inv.isReturn ? 'Return' : 'Invoice';
+    updateVoucherSubtypeUI();
     
     currentSalesType = inv.type;
     const prodBtn = document.getElementById('salesTypeProduct');
@@ -13676,8 +13695,12 @@
     setInvoiceNoMode(inv.mode || 'Manual');
     const invNoEl = document.getElementById('salesInvoiceNo');
     const chipEl = document.getElementById('salesVoucherChipDisplay');
+    const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
     if (invNoEl) invNoEl.value = inv.invoiceNo;
     if (chipEl) chipEl.textContent = inv.invoiceNo;
+    if (triggerText && inv.isReturn) {
+      triggerText.textContent = inv.invoiceNo;
+    }
     
     const orderEl = document.getElementById('salesOrderNo');
     const dateEl = document.getElementById('salesDate');
@@ -13804,6 +13827,7 @@
       type: currentSalesType,
       mode: currentSalesInvoiceMode,
       invoiceNo: invoiceNo || 'Draft',
+      isReturn: currentSalesVoucherSubtype === 'Return',
       customerId,
       salesExecutiveId,
       salesSupplyType,
@@ -13833,8 +13857,9 @@
       window.KYA_STORE.salesVouchersDrafts.push(draftData);
     }
     
-    showToast('Sales Invoice Draft saved successfully.', 'success');
+    showToast(currentSalesVoucherSubtype === 'Return' ? 'Sales Return Draft saved successfully.' : 'Sales Invoice Draft saved successfully.', 'success');
     window._editingSalesInvoice = null;
+    currentSalesVoucherSubtype = 'Invoice';
     initSalesForm();
     openTab('sales_drafted');
     triggerAutoBackup();
@@ -13856,9 +13881,9 @@
     }
     
     window.KYA_STORE.salesVouchers = window.KYA_STORE.salesVouchers || [];
-    const dup = window.KYA_STORE.salesVouchers.some(v => v.invoiceNo.toLowerCase() === invoiceNo.toLowerCase() && (!window._editingSalesInvoice || window._editingSalesInvoice.isDraft || v.id !== window._editingSalesInvoice.id));
+    const dup = window.KYA_STORE.salesVouchers.some(v => v.invoiceNo.toLowerCase() === invoiceNo.toLowerCase() && (!!v.isReturn === (currentSalesVoucherSubtype === 'Return')) && (!window._editingSalesInvoice || window._editingSalesInvoice.isDraft || v.id !== window._editingSalesInvoice.id));
     if (dup) {
-      showToast(`Invoice No. "${invoiceNo}" has already been posted. Please use a unique number.`, 'danger');
+      showToast(`${currentSalesVoucherSubtype === 'Return' ? 'Return' : 'Invoice'} No. "${invoiceNo}" has already been posted. Please use a unique number.`, 'danger');
       return;
     }
     
@@ -13938,6 +13963,7 @@
 
     const journalEntryId = postSalesVoucherToJournal({
       invoiceNo,
+      isReturn: currentSalesVoucherSubtype === 'Return',
       customerId,
       salesExecutiveId,
       salesSupplyType,
@@ -13962,6 +13988,7 @@
       id: Date.now(),
       type: currentSalesType,
       invoiceNo,
+      isReturn: currentSalesVoucherSubtype === 'Return',
       customerId,
       salesExecutiveId,
       salesSupplyType,
@@ -13990,11 +14017,16 @@
     window.KYA_STORE.salesVouchers.push(invoiceData);
     
     if (currentSalesInvoiceMode === 'Auto') {
-      window.KYA_STORE.salesInvoiceCtr = (window.KYA_STORE.salesInvoiceCtr || 1) + 1;
+      if (currentSalesVoucherSubtype === 'Return') {
+        window.KYA_STORE.salesReturnCtr = (window.KYA_STORE.salesReturnCtr || 1) + 1;
+      } else {
+        window.KYA_STORE.salesInvoiceCtr = (window.KYA_STORE.salesInvoiceCtr || 1) + 1;
+      }
     }
     
-    showToast(`Invoice "${invoiceNo}" posted successfully.`, 'success');
+    showToast(currentSalesVoucherSubtype === 'Return' ? `Sales Return "${invoiceNo}" posted successfully.` : `Invoice "${invoiceNo}" posted successfully.`, 'success');
     window._editingSalesInvoice = null;
+    currentSalesVoucherSubtype = 'Invoice';
     initSalesForm();
     openTab('sales_voucher');
     triggerAutoBackup();
@@ -14014,171 +14046,344 @@
     }
     const unpaidAmount = invoice.total - paidAmount;
     
-    if (unpaidAmount > 0) {
-      journalRows.push({
-        id: journalRows.length + 1,
-        type: 'By',
-        particular: customerName,
-        debit: unpaidAmount.toFixed(2),
-        credit: ''
-      });
-    }
+    const isRet = !!invoice.isReturn;
     
-    if (paidAmount > 0) {
-      const payAccount = coaLedgers.find(l => l.id == invoice.paymentAccountId);
-      const payAccountName = payAccount ? payAccount.name : 'Cash Account';
-      
-      journalRows.push({
-        id: journalRows.length + 1,
-        type: 'By',
-        particular: payAccountName,
-        debit: paidAmount.toFixed(2),
-        credit: ''
-      });
-    }
-    
-    if (invoice.tdsTcsMode === 'TDS' && invoice.tdsTcsAmount > 0) {
-      const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
-      const tdsName = coaLedgers.find(l => l.id == tdsLedgerId).name;
-      journalRows.push({
-        id: journalRows.length + 1,
-        type: 'By',
-        particular: tdsName,
-        debit: invoice.tdsTcsAmount.toFixed(2),
-        credit: ''
-      });
-    }
-    
-    if (invoice.adjustments < 0) {
-      const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
-      const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
-      journalRows.push({
-        id: journalRows.length + 1,
-        type: 'By',
-        particular: adjName,
-        debit: Math.abs(invoice.adjustments).toFixed(2),
-        credit: ''
-      });
-    }
-    
-    if (invoice.type === 'Product') {
-      let totalRevenue = 0;
-      invoice.rows.forEach(r => {
-        const base = r.qty * r.rate;
-        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
-        totalRevenue += Math.max(0, base - discAmt);
-      });
-      if (totalRevenue > 0) {
-        const salesLedgerId = getOrCreateSystemLedger('Sales Account', 'sg-rfo');
-        const salesName = coaLedgers.find(l => l.id == salesLedgerId).name;
+    if (isRet) {
+      // SALES RETURN JOURNAL ENTRIES (Debit Sales Returns & tax, Credit Customer/Cash)
+      if (unpaidAmount > 0) {
         journalRows.push({
           id: journalRows.length + 1,
           type: 'To',
-          particular: salesName,
+          particular: customerName,
           debit: '',
-          credit: totalRevenue.toFixed(2)
+          credit: unpaidAmount.toFixed(2)
         });
       }
-    } else {
-      const revenueByLedger = {};
-      invoice.rows.forEach(r => {
-        const base = r.baseAmount;
-        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
-        const amt = Math.max(0, base - discAmt);
-        revenueByLedger[r.revenueLedgerId] = (revenueByLedger[r.revenueLedgerId] || 0) + amt;
-      });
-      for (const ledgId in revenueByLedger) {
-        const revAmt = revenueByLedger[ledgId];
-        if (revAmt > 0) {
-          const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
+      
+      if (paidAmount > 0) {
+        const payAccount = coaLedgers.find(l => l.id == invoice.paymentAccountId);
+        const payAccountName = payAccount ? payAccount.name : 'Cash Account';
+        
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: payAccountName,
+          debit: '',
+          credit: paidAmount.toFixed(2)
+        });
+      }
+      
+      if (invoice.tdsTcsMode === 'TDS' && invoice.tdsTcsAmount > 0) {
+        const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
+        const tdsName = coaLedgers.find(l => l.id == tdsLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: tdsName,
+          debit: '',
+          credit: invoice.tdsTcsAmount.toFixed(2)
+        });
+      }
+      
+      if (invoice.adjustments < 0) {
+        const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+        const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: adjName,
+          debit: '',
+          credit: Math.abs(invoice.adjustments).toFixed(2)
+        });
+      }
+      
+      if (invoice.type === 'Product') {
+        let totalRevenue = 0;
+        invoice.rows.forEach(r => {
+          const base = r.qty * r.rate;
+          const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+          totalRevenue += Math.max(0, base - discAmt);
+        });
+        if (totalRevenue > 0) {
+          const salesReturnLedgerId = getOrCreateSystemLedger('Sales Returns', 'sg-rfo');
+          const salesReturnName = coaLedgers.find(l => l.id == salesReturnLedgerId).name;
           journalRows.push({
             id: journalRows.length + 1,
-            type: 'To',
-            particular: ledgerName,
-            debit: '',
-            credit: revAmt.toFixed(2)
+            type: 'By',
+            particular: salesReturnName,
+            debit: totalRevenue.toFixed(2),
+            credit: ''
+          });
+        }
+      } else {
+        const revenueByLedger = {};
+        invoice.rows.forEach(r => {
+          const base = r.baseAmount;
+          const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+          const amt = Math.max(0, base - discAmt);
+          revenueByLedger[r.revenueLedgerId] = (revenueByLedger[r.revenueLedgerId] || 0) + amt;
+        });
+        for (const ledgId in revenueByLedger) {
+          const revAmt = revenueByLedger[ledgId];
+          if (revAmt > 0) {
+            const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
+            journalRows.push({
+              id: journalRows.length + 1,
+              type: 'By',
+              particular: ledgerName,
+              debit: revAmt.toFixed(2),
+              credit: ''
+            });
+          }
+        }
+      }
+      
+      let totalGst = 0;
+      invoice.rows.forEach(r => {
+        const base = invoice.type === 'Product' ? (r.qty * r.rate) : r.baseAmount;
+        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+        const afterDiscount = Math.max(0, base - discAmt);
+        totalGst += afterDiscount * (r.tax / 100);
+      });
+      if (totalGst > 0) {
+        const supplyType = invoice.salesSupplyType || 'Intra-State (CGST + SGST)';
+        if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
+          const cgstAmt = totalGst / 2;
+          const sgstAmt = totalGst / 2;
+          
+          const cgstLedgerId = getOrCreateSystemLedger('Output CGST', 'sg-ocl');
+          const cgstName = coaLedgers.find(l => l.id == cgstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'By',
+            particular: cgstName,
+            debit: cgstAmt.toFixed(2),
+            credit: ''
+          });
+          
+          const sgstLedgerId = getOrCreateSystemLedger('Output SGST', 'sg-ocl');
+          const sgstName = coaLedgers.find(l => l.id == sgstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'By',
+            particular: sgstName,
+            debit: sgstAmt.toFixed(2),
+            credit: ''
+          });
+        } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
+          const igstLedgerId = getOrCreateSystemLedger('Output IGST', 'sg-ocl');
+          const igstName = coaLedgers.find(l => l.id == igstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'By',
+            particular: igstName,
+            debit: totalGst.toFixed(2),
+            credit: ''
+          });
+        } else {
+          const gstLedgerId = getOrCreateSystemLedger('GST Payable', 'sg-ocl');
+          const gstName = coaLedgers.find(l => l.id == gstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'By',
+            particular: gstName,
+            debit: totalGst.toFixed(2),
+            credit: ''
           });
         }
       }
-    }
-    
-    let totalGst = 0;
-    invoice.rows.forEach(r => {
-      const base = invoice.type === 'Product' ? (r.qty * r.rate) : r.baseAmount;
-      const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
-      const afterDiscount = Math.max(0, base - discAmt);
-      totalGst += afterDiscount * (r.tax / 100);
-    });
-    if (totalGst > 0) {
-      const supplyType = invoice.salesSupplyType || 'Intra-State (CGST + SGST)';
-      if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
-        const cgstAmt = totalGst / 2;
-        const sgstAmt = totalGst / 2;
-        
-        const cgstLedgerId = getOrCreateSystemLedger('Output CGST', 'sg-ocl');
-        const cgstName = coaLedgers.find(l => l.id == cgstLedgerId).name;
+      
+      if (invoice.tdsTcsMode === 'TCS' && invoice.tdsTcsAmount > 0) {
+        const tcsLedgerId = getOrCreateSystemLedger('TCS Payable', 'sg-ocl');
+        const tcsName = coaLedgers.find(l => l.id == tcsLedgerId).name;
         journalRows.push({
           id: journalRows.length + 1,
-          type: 'To',
-          particular: cgstName,
-          debit: '',
-          credit: cgstAmt.toFixed(2)
-        });
-        
-        const sgstLedgerId = getOrCreateSystemLedger('Output SGST', 'sg-ocl');
-        const sgstName = coaLedgers.find(l => l.id == sgstLedgerId).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: sgstName,
-          debit: '',
-          credit: sgstAmt.toFixed(2)
-        });
-      } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
-        const igstLedgerId = getOrCreateSystemLedger('Output IGST', 'sg-ocl');
-        const igstName = coaLedgers.find(l => l.id == igstLedgerId).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: igstName,
-          debit: '',
-          credit: totalGst.toFixed(2)
-        });
-      } else {
-        const gstLedgerId = getOrCreateSystemLedger('GST Payable', 'sg-ocl');
-        const gstName = coaLedgers.find(l => l.id == gstLedgerId).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: gstName,
-          debit: '',
-          credit: totalGst.toFixed(2)
+          type: 'By',
+          particular: tcsName,
+          debit: invoice.tdsTcsAmount.toFixed(2),
+          credit: ''
         });
       }
-    }
-    
-    if (invoice.tdsTcsMode === 'TCS' && invoice.tdsTcsAmount > 0) {
-      const tcsLedgerId = getOrCreateSystemLedger('TCS Payable', 'sg-ocl');
-      const tcsName = coaLedgers.find(l => l.id == tcsLedgerId).name;
-      journalRows.push({
-        id: journalRows.length + 1,
-        type: 'To',
-        particular: tcsName,
-        debit: '',
-        credit: invoice.tdsTcsAmount.toFixed(2)
+      
+      if (invoice.adjustments > 0) {
+        const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+        const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'By',
+          particular: adjName,
+          debit: invoice.adjustments.toFixed(2),
+          credit: ''
+        });
+      }
+    } else {
+      // ORIGINAL SALES INVOICE Posting (existing code)
+      if (unpaidAmount > 0) {
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'By',
+          particular: customerName,
+          debit: unpaidAmount.toFixed(2),
+          credit: ''
+        });
+      }
+      
+      if (paidAmount > 0) {
+        const payAccount = coaLedgers.find(l => l.id == invoice.paymentAccountId);
+        const payAccountName = payAccount ? payAccount.name : 'Cash Account';
+        
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'By',
+          particular: payAccountName,
+          debit: paidAmount.toFixed(2),
+          credit: ''
+        });
+      }
+      
+      if (invoice.tdsTcsMode === 'TDS' && invoice.tdsTcsAmount > 0) {
+        const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
+        const tdsName = coaLedgers.find(l => l.id == tdsLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'By',
+          particular: tdsName,
+          debit: invoice.tdsTcsAmount.toFixed(2),
+          credit: ''
+        });
+      }
+      
+      if (invoice.adjustments < 0) {
+        const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+        const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'By',
+          particular: adjName,
+          debit: Math.abs(invoice.adjustments).toFixed(2),
+          credit: ''
+        });
+      }
+      
+      if (invoice.type === 'Product') {
+        let totalRevenue = 0;
+        invoice.rows.forEach(r => {
+          const base = r.qty * r.rate;
+          const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+          totalRevenue += Math.max(0, base - discAmt);
+        });
+        if (totalRevenue > 0) {
+          const salesLedgerId = getOrCreateSystemLedger('Sales Account', 'sg-rfo');
+          const salesName = coaLedgers.find(l => l.id == salesLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'To',
+            particular: salesName,
+            debit: '',
+            credit: totalRevenue.toFixed(2)
+          });
+        }
+      } else {
+        const revenueByLedger = {};
+        invoice.rows.forEach(r => {
+          const base = r.baseAmount;
+          const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+          const amt = Math.max(0, base - discAmt);
+          revenueByLedger[r.revenueLedgerId] = (revenueByLedger[r.revenueLedgerId] || 0) + amt;
+        });
+        for (const ledgId in revenueByLedger) {
+          const revAmt = revenueByLedger[ledgId];
+          if (revAmt > 0) {
+            const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
+            journalRows.push({
+              id: journalRows.length + 1,
+              type: 'To',
+              particular: ledgerName,
+              debit: '',
+              credit: revAmt.toFixed(2)
+            });
+          }
+        }
+      }
+      
+      let totalGst = 0;
+      invoice.rows.forEach(r => {
+        const base = invoice.type === 'Product' ? (r.qty * r.rate) : r.baseAmount;
+        const discAmt = r.discountType === 'pct' ? (base * (r.discount / 100)) : r.discount;
+        const afterDiscount = Math.max(0, base - discAmt);
+        totalGst += afterDiscount * (r.tax / 100);
       });
-    }
-    
-    if (invoice.adjustments > 0) {
-      const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
-      const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
-      journalRows.push({
-        id: journalRows.length + 1,
-        type: 'To',
-        particular: adjName,
-        debit: '',
-        credit: invoice.adjustments.toFixed(2)
-      });
+      if (totalGst > 0) {
+        const supplyType = invoice.salesSupplyType || 'Intra-State (CGST + SGST)';
+        if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
+          const cgstAmt = totalGst / 2;
+          const sgstAmt = totalGst / 2;
+          
+          const cgstLedgerId = getOrCreateSystemLedger('Output CGST', 'sg-ocl');
+          const cgstName = coaLedgers.find(l => l.id == cgstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'To',
+            particular: cgstName,
+            debit: '',
+            credit: cgstAmt.toFixed(2)
+          });
+          
+          const sgstLedgerId = getOrCreateSystemLedger('Output SGST', 'sg-ocl');
+          const sgstName = coaLedgers.find(l => l.id == sgstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'To',
+            particular: sgstName,
+            debit: '',
+            credit: sgstAmt.toFixed(2)
+          });
+        } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
+          const igstLedgerId = getOrCreateSystemLedger('Output IGST', 'sg-ocl');
+          const igstName = coaLedgers.find(l => l.id == igstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'To',
+            particular: igstName,
+            debit: '',
+            credit: totalGst.toFixed(2)
+          });
+        } else {
+          const gstLedgerId = getOrCreateSystemLedger('GST Payable', 'sg-ocl');
+          const gstName = coaLedgers.find(l => l.id == gstLedgerId).name;
+          journalRows.push({
+            id: journalRows.length + 1,
+            type: 'To',
+            particular: gstName,
+            debit: '',
+            credit: totalGst.toFixed(2)
+          });
+        }
+      }
+      
+      if (invoice.tdsTcsMode === 'TCS' && invoice.tdsTcsAmount > 0) {
+        const tcsLedgerId = getOrCreateSystemLedger('TCS Payable', 'sg-ocl');
+        const tcsName = coaLedgers.find(l => l.id == tcsLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: tcsName,
+          debit: '',
+          credit: invoice.tdsTcsAmount.toFixed(2)
+        });
+      }
+      
+      if (invoice.adjustments > 0) {
+        const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+        const adjName = coaLedgers.find(l => l.id == adjustmentsLedgerId).name;
+        journalRows.push({
+          id: journalRows.length + 1,
+          type: 'To',
+          particular: adjName,
+          debit: '',
+          credit: invoice.adjustments.toFixed(2)
+        });
+      }
     }
     
     let execText = '';
@@ -14193,14 +14398,16 @@
     const entry = {
       id:             entryId,
       date:           invoice.date,
-      voucherNo:      `SV-${invoice.invoiceNo}`,
+      voucherNo:      isRet ? `SR-${invoice.invoiceNo}` : `SV-${invoice.invoiceNo}`,
       preparedBy:     'Sales Module',
       departmentId:   '',
       isBudget:       false,
       firstParticular: customerName,
       amount:         fmtNum(invoice.total),
       allRows:        journalRows,
-      narration:      `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`,
+      narration:      isRet
+        ? `Sales Return No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`
+        : `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`,
     };
     
     postedEntries.unshift(entry);
@@ -14219,7 +14426,7 @@
           <div style="font-size: 40px; margin-bottom: 12px;">📄</div>
           <div style="font-weight: 600; font-size: 15px; color: var(--slate-500);">No Posted Invoices Yet</div>
           <p style="font-size: 13px; margin: 4px 0 16px;">Post a Sales Voucher to see it here.</p>
-          <button class="btn btn-primary" onclick="openTab('sales_voucher')">Create Invoice</button>
+          <button class="btn btn-primary" onclick="currentSalesVoucherSubtype = 'Invoice'; window._editingSalesInvoice = null; initSalesForm(); openTab('sales_voucher');">Create Invoice</button>
         </div>
       `;
       return;
@@ -14235,6 +14442,7 @@
         if (execEmp) execName = execEmp.name;
       }
       const supplyType = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
+      const isRet = !!inv.isReturn;
       return `
         <tr class="sales-row">
           <td style="padding: 14px 16px; font-weight: 700; color: var(--blue-700);">${ohEsc(inv.invoiceNo)}</td>
@@ -14242,8 +14450,11 @@
           <td style="padding: 14px 16px; font-weight: 600;">${ohEsc(custName)}</td>
           <td style="padding: 14px 16px; color: var(--slate-600);">${ohEsc(execName)}</td>
           <td style="padding: 14px 16px; color: var(--slate-500); font-size: 12.5px;">${ohEsc(supplyType)}</td>
-          <td style="padding: 14px 16px;"><span class="badge" style="background: var(--blue-50); color: var(--blue-700); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${inv.type}</span></td>
-          <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: var(--slate-900);">₹ ${fmtNum(inv.total)}</td>
+          <td style="padding: 14px 16px;">
+            <span class="badge" style="background: ${isRet ? 'var(--red-50)' : 'var(--blue-50)'}; color: ${isRet ? 'var(--red-700)' : 'var(--blue-700)'}; font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-right: 4px;">${isRet ? 'Return' : 'Invoice'}</span>
+            <span class="badge" style="background: var(--slate-100); color: var(--slate-700); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${inv.type}</span>
+          </td>
+          <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: ${isRet ? '#dc2626' : 'var(--slate-900)'};">₹ ${fmtNum(inv.total)}</td>
           <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
             <button class="btn btn-secondary btn-sm" onclick="viewPrintInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px;">View / Print</button>
             <button class="btn btn-danger btn-sm" onclick="deleteSalesInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
@@ -14257,7 +14468,7 @@
         <table class="sales-table" style="border-spacing: 0;">
           <thead>
             <tr style="border-bottom: 2px solid var(--slate-100);">
-              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Invoice No.</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Voucher No.</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Date</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Customer</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Sales Executive</th>
@@ -14276,17 +14487,20 @@
   }
 
   function deleteSalesInvoice(id) {
+    const list = window.KYA_STORE.salesVouchers || [];
+    const index = list.findIndex(v => v.id === id);
+    if (index === -1) return;
+    const invoice = list[index];
+    const isRet = !!invoice.isReturn;
+    
     showKyaConfirm({
-      title: 'Delete Posted Invoice?',
-      message: 'Are you sure you want to delete this sales invoice? This will also delete the corresponding journal entry and cannot be undone.',
+      title: isRet ? 'Delete Posted Return?' : 'Delete Posted Invoice?',
+      message: isRet
+        ? 'Are you sure you want to delete this sales return? This will also delete the corresponding journal entry and cannot be undone.'
+        : 'Are you sure you want to delete this sales invoice? This will also delete the corresponding journal entry and cannot be undone.',
       confirmLabel: 'Delete',
       okBg: 'var(--red-600)',
       onConfirm: () => {
-        const list = window.KYA_STORE.salesVouchers || [];
-        const index = list.findIndex(v => v.id === id);
-        if (index === -1) return;
-        
-        const invoice = list[index];
         list.splice(index, 1);
         window.KYA_STORE.salesVouchers = list;
         
@@ -14294,7 +14508,7 @@
           postedEntries = postedEntries.filter(e => e.id !== invoice.journalEntryId);
         }
         
-        showToast(`Invoice "${invoice.invoiceNo}" deleted.`, 'success');
+        showToast(isRet ? `Sales Return "${invoice.invoiceNo}" deleted.` : `Invoice "${invoice.invoiceNo}" deleted.`, 'success');
         renderSalesPostedPanel();
         refreshAllReports();
         triggerAutoBackup();
@@ -14328,6 +14542,7 @@
         if (execEmp) execName = execEmp.name;
       }
       const supplyType = draft.salesSupplyType || 'Intra-State (CGST + SGST)';
+      const isRet = !!draft.isReturn;
       return `
         <tr class="sales-row">
           <td style="padding: 14px 16px; font-weight: 700; color: var(--slate-700);">${ohEsc(draft.invoiceNo || 'Draft')}</td>
@@ -14335,8 +14550,11 @@
           <td style="padding: 14px 16px; font-weight: 600;">${ohEsc(custName)}</td>
           <td style="padding: 14px 16px; color: var(--slate-600);">${ohEsc(execName)}</td>
           <td style="padding: 14px 16px; color: var(--slate-500); font-size: 12.5px;">${ohEsc(supplyType)}</td>
-          <td style="padding: 14px 16px;"><span class="badge" style="background: var(--slate-100); color: var(--slate-600); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${draft.type}</span></td>
-          <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: var(--slate-700);">₹ ${fmtNum(draft.total)}</td>
+          <td style="padding: 14px 16px;">
+            <span class="badge" style="background: ${isRet ? 'var(--red-50)' : 'var(--blue-50)'}; color: ${isRet ? 'var(--red-700)' : 'var(--blue-700)'}; font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-right: 4px;">${isRet ? 'Return' : 'Invoice'}</span>
+            <span class="badge" style="background: var(--slate-100); color: var(--slate-600); font-weight: 600; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${draft.type}</span>
+          </td>
+          <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: ${isRet ? '#dc2626' : 'var(--slate-700)'};">₹ ${fmtNum(draft.total)}</td>
           <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
             <button class="btn btn-primary btn-sm" onclick="editSalesDraft(${draft.id})" style="padding: 6px 12px; font-size: 12px;">Edit / Load</button>
             <button class="btn btn-danger btn-sm" onclick="deleteSalesDraft(${draft.id})" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
@@ -14350,7 +14568,7 @@
         <table class="sales-table" style="border-spacing: 0;">
           <thead>
             <tr style="border-bottom: 2px solid var(--slate-100);">
-              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Invoice No.</th>
+              <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Voucher No.</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Date</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Customer</th>
               <th style="padding: 12px 16px; border-bottom: 2px solid var(--slate-100);">Sales Executive</th>
@@ -14509,7 +14727,7 @@
     overlay.innerHTML = `
       <div class="inv-modal-card" style="padding: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1.5px solid var(--slate-100); background: var(--slate-50); border-radius: 20px 20px 0 0;">
-          <div style="font-weight: 700; color: var(--slate-800);">Invoice Preview</div>
+          <div style="font-weight: 700; color: var(--slate-800);">${inv.isReturn ? 'Sales Return Preview' : 'Invoice Preview'}</div>
           <div style="display: flex; gap: 12px;">
             <button class="btn btn-secondary" id="btnPrintInvoiceAction" style="padding: 8px 16px;">
               <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px; margin-right: 6px; display: inline-block; vertical-align: middle;">
@@ -14544,7 +14762,7 @@
               </div>
             </div>
             <div style="text-align: right;">
-              <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: var(--slate-800); margin: 0; letter-spacing: -0.5px;">Tax Invoice</h1>
+              <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: var(--slate-800); margin: 0; letter-spacing: -0.5px;">${inv.isReturn ? 'Credit Note / Sales Return' : 'Tax Invoice'}</h1>
               <div style="font-size: 14px; font-weight: 700; color: var(--blue-700); margin-top: 4px;"># ${ohEsc(inv.invoiceNo)}</div>
             </div>
           </div>
@@ -14553,20 +14771,11 @@
             <div>
               <h3 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 700;">Billed To:</h3>
               <div style="font-size: 16px; font-weight: 800; color: var(--slate-900);">${ohEsc(customer.name)}</div>
-              ${customer.address1 ? `<div style="font-size: 13px; color: var(--slate-600); margin-top: 4px; font-weight: 500;">${ohEsc(customer.address1)}</div>` : ''}
-              ${customer.address2 ? `<div style="font-size: 13px; color: var(--slate-600); font-weight: 500;">${ohEsc(customer.address2)}</div>` : ''}
-              ${customer.address3 ? `<div style="font-size: 13px; color: var(--slate-600); font-weight: 500;">${ohEsc(customer.address3)}</div>` : ''}
-              ${(customer.state || customer.country || customer.pincode) ? `
-                <div style="font-size: 13px; color: var(--slate-600); font-weight: 500;">
-                  ${[customer.state, customer.country, customer.pincode].filter(Boolean).map(ohEsc).join(', ')}
-                </div>
-              ` : ''}
-              ${customer.gst ? `<div style="font-size: 13px; color: var(--slate-700); margin-top: 4px; font-weight: 700;">GSTIN: ${ohEsc(customer.gst)}</div>` : ''}
-              ${customer.pan ? `<div style="font-size: 13px; color: var(--slate-700); font-weight: 600;">PAN: ${ohEsc(customer.pan)}</div>` : ''}
+              <div style="font-size: 13px; color: var(--slate-500); margin-top: 4px; font-weight: 500;">Trade Receivables Account</div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13.5px;">
               <div>
-                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Invoice Date:</div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">${inv.isReturn ? 'Return Date:' : 'Invoice Date:'}</div>
                 <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${inv.date}</div>
               </div>
               <div>
@@ -14614,7 +14823,7 @@
           <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; margin-top: 30px;">
             <div>
               <h4 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 700;">Terms & Notes:</h4>
-              <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${ohEsc(inv.notes) || 'Thank you for your business! Please settle this invoice by the due date.'}</div>
+              <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${ohEsc(inv.notes) || (inv.isReturn ? 'Sales Return / Credit Note processed.' : 'Thank you for your business! Please settle this invoice by the due date.')}</div>
             </div>
             
             <div>
@@ -14665,7 +14874,7 @@
           </div>
           
           <div style="margin-top: 60px; border-top: 1px solid var(--slate-100); padding-top: 20px; text-align: center; font-size: 11.5px; color: var(--slate-400); font-weight: 500;">
-            This is a system generated tax invoice. No signature required.
+            This is a system generated document. No signature required.
           </div>
         </div>
       </div>
@@ -14724,6 +14933,40 @@
   }
 
   function setupSalesVoucherEventListeners() {
+    // Searchable dropdown for sales returns
+    const selectTrigger = document.getElementById('salesInvoiceSelectTrigger');
+    const selectDropdown = document.getElementById('salesInvoiceSelectDropdown');
+    const selectSearch = document.getElementById('salesInvoiceSelectSearch');
+    
+    if (selectTrigger && selectDropdown && selectSearch) {
+      selectTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = selectDropdown.style.display === 'flex';
+        if (isOpen) {
+          selectDropdown.style.display = 'none';
+        } else {
+          selectDropdown.style.display = 'flex';
+          selectSearch.value = '';
+          refreshSalesInvoiceDropdownOptions();
+          setTimeout(() => selectSearch.focus(), 50);
+        }
+      });
+      
+      selectSearch.addEventListener('input', () => {
+        refreshSalesInvoiceDropdownOptions(selectSearch.value);
+      });
+      
+      selectSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      
+      document.addEventListener('click', (e) => {
+        if (!selectTrigger.contains(e.target) && !selectDropdown.contains(e.target)) {
+          selectDropdown.style.display = 'none';
+        }
+      });
+    }
+
     const invNoEl = document.getElementById('salesInvoiceNo');
     const chipEl = document.getElementById('salesVoucherChipDisplay');
     if (invNoEl && chipEl) {
@@ -14817,6 +15060,7 @@
     if (newSalesBtn) {
       newSalesBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        currentSalesVoucherSubtype = 'Invoice';
         window._editingSalesInvoice = null;
         initSalesForm();
       });
@@ -15015,8 +15259,11 @@
     const rejectionBtn = document.getElementById('btnSalesRejection');
     
     if (returnBtn) {
-      returnBtn.addEventListener('click', () => {
-        showToast('Return is an upcoming feature!', 'info');
+      returnBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentSalesVoucherSubtype = 'Return';
+        window._editingSalesInvoice = null;
+        initSalesForm();
       });
     }
     if (orderBtn) {
@@ -15036,6 +15283,9 @@
       openTab('journal');
     });
     document.getElementById('vdNewInvBtn')?.addEventListener('click', () => {
+      currentSalesVoucherSubtype = 'Invoice';
+      window._editingSalesInvoice = null;
+      initSalesForm();
       openTab('sales_voucher');
     });
 
