@@ -4317,6 +4317,23 @@
       <!-- Balance Sheet Panel -->
       <div id="panel-balance" role="region" aria-label="Balance Sheet" style="display:none">
 
+        <!-- Layout Switcher Option (Vertical / Horizontal) -->
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 20px;">
+          <button id="bsLayoutVertical" class="btn btn-primary" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+            <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+              <rect x="2" y="2" width="12" height="5" rx="1" stroke="currentColor" stroke-width="1.8"/>
+              <rect x="2" y="9" width="12" height="5" rx="1" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+            Vertical
+          </button>
+          <button id="bsLayoutHorizontal" class="btn-sales-action" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+            <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+              <rect x="2" y="2" width="5" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
+              <rect x="9" y="2" width="5" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+            Horizontal
+          </button>
+        </div>
 
         <!-- Balance Sheet Card -->
         <div class="table-card" style="padding: 24px 28px;">
@@ -4434,6 +4451,23 @@
       <!-- Profit & Loss Panel -->
       <div id="panel-pnl" role="region" aria-label="Profit and Loss Statement" style="display:none">
 
+        <!-- Layout Switcher Option (Vertical / Horizontal) -->
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 20px;">
+          <button id="pnlLayoutVertical" class="btn btn-primary" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+            <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+              <rect x="2" y="2" width="12" height="5" rx="1" stroke="currentColor" stroke-width="1.8"/>
+              <rect x="2" y="9" width="12" height="5" rx="1" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+            Vertical
+          </button>
+          <button id="pnlLayoutHorizontal" class="btn-sales-action" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+            <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+              <rect x="2" y="2" width="5" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
+              <rect x="9" y="2" width="5" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+            Horizontal
+          </button>
+        </div>
 
         <!-- P&L Card -->
         <div class="table-card" style="padding: 24px 28px;">
@@ -4563,7 +4597,7 @@
               <span class="oh-tab-text">PayTrack</span>
             </button>
 
-            <!-- Upcoming: Under Ledger -->
+            <!-- Upcoming: Mini Ledger -->
             <button class="oh-sub-tab upcoming" id="ohTabUnderLedger" role="tab" aria-selected="false" aria-controls="oh-underledger-view" title="Coming Soon">
               <div class="oh-tab-icon-wrap">
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
@@ -4572,7 +4606,7 @@
                   <path d="M15 13h2M16 12v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                 </svg>
               </div>
-              <span class="oh-tab-text">Under Ledger</span>
+              <span class="oh-tab-text">Mini Ledger</span>
             </button>
 
           </div>
@@ -5596,6 +5630,40 @@
     jeCounter = 1;
     addRow('By');    // first row is always "By" by default
     refreshTotals();
+    window._editingJournalEntry = null;
+  }
+
+  function loadJournalEntry(entry, isDraft) {
+    openTab('journal');
+    
+    document.getElementById('jeDate').value = entry.date || '';
+    document.getElementById('jeVoucherNo').value = entry.voucherNo || '';
+    document.getElementById('jeVoucherChipDisplay').textContent = entry.voucherNo || '—';
+    document.getElementById('jeNarration').value = entry.narration || '';
+    
+    const prepEl = document.getElementById('jePreparedBy');
+    if (prepEl) prepEl.value = entry.preparedBy || '';
+    
+    populateJeDepartments();
+    const deptSel = document.getElementById('jeDepartment');
+    if (deptSel) deptSel.value = entry.departmentId || '';
+    
+    const tog = document.getElementById('jeBudgetToggle');
+    if (tog) {
+      tog.checked = !!entry.isBudget;
+      updateJeBudgetToggleUI();
+    }
+    
+    jeRows = JSON.parse(JSON.stringify(entry.allRows));
+    jeCounter = 1;
+    jeRows.forEach(row => {
+      row.id = jeCounter++;
+    });
+    
+    renderRows();
+    refreshTotals();
+    
+    window._editingJournalEntry = { id: entry.id, isDraft: isDraft };
   }
 
   // ── Sync voucher chip with input ──────────────────────────────────
@@ -6102,8 +6170,12 @@
     }
     const firstRow = jeRows[0] || {};
     const amt      = parseAmt(firstRow.debit) || parseAmt(firstRow.credit);
-    draftedEntries.unshift({
-      id:              Date.now(),
+    
+    const isEditDraft = window._editingJournalEntry && window._editingJournalEntry.isDraft;
+    const entryId = isEditDraft ? window._editingJournalEntry.id : Date.now();
+    
+    const draftData = {
+      id:              entryId,
       date:            dateVal,
       voucherNo:       voucherVal,
       preparedBy:      document.getElementById('jePreparedBy').value,
@@ -6113,9 +6185,24 @@
       amount:          fmtNum(amt),
       allRows:         JSON.parse(JSON.stringify(jeRows)),
       narration:       document.getElementById('jeNarration').value,
-    });
-    showToast('Draft saved successfully.', 'info');
-    jvCounter++;
+    };
+    
+    if (isEditDraft) {
+      const idx = draftedEntries.findIndex(e => e.id === entryId);
+      if (idx > -1) {
+        draftedEntries[idx] = draftData;
+      } else {
+        draftedEntries.unshift(draftData);
+      }
+    } else {
+      draftedEntries.unshift(draftData);
+    }
+    
+    showToast(isEditDraft ? 'Draft updated successfully.' : 'Draft saved successfully.', 'info');
+    if (!isEditDraft) {
+      jvCounter++;
+    }
+    window._editingJournalEntry = null;
     triggerAutoBackup();
     setTimeout(initFormDefaults, 900);
   });
@@ -6544,14 +6631,19 @@
                 <td style="font-weight:500;color:#1e293b">${e.firstParticular || '—'}</td>
                 <td style="text-align:right"><span class="pt-amt">₹&thinsp;${e.amount}</span></td>
                 <td style="text-align:center;white-space:nowrap">
-                  <button class="pt-row-del-btn pt-row-del" data-id="${e.id}" title="Delete this entry" style="margin-right:4px">
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2l-9 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  <button class="pt-view-btn pt-edit" data-id="${e.id}" title="Edit journal entry" style="margin-right:4px">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M11 2l3 3M3 10v3h3l8.5-8.5-3-3L3 10z" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                   </button>
-                  <button class="pt-view-btn pt-view" data-id="${e.id}" title="View full journal entry">
+                  <button class="pt-view-btn pt-view" data-id="${e.id}" title="View full journal entry" style="margin-right:4px">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                       <ellipse cx="7.5" cy="7.5" rx="6" ry="4.5" stroke="currentColor" stroke-width="1.4"/>
                       <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.4"/>
                     </svg>
+                  </button>
+                  <button class="pt-row-del-btn pt-row-del" data-id="${e.id}" title="Delete this entry">
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2l-9 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
                   </button>
                 </td>
               </tr>`).join('')}
@@ -6642,6 +6734,13 @@
       btn.addEventListener('click', () => {
         const entry = postedEntries.find(e => e.id === Number(btn.dataset.id));
         if (entry) showFullJournalModal(entry);
+      });
+    });
+
+    wrap.querySelectorAll('.pt-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const entry = postedEntries.find(e => e.id === Number(btn.dataset.id));
+        if (entry) loadJournalEntry(entry, false);
       });
     });
 
@@ -6850,14 +6949,19 @@
                   <button class="dt-post-btn dt-post" data-id="${e.id}" title="Post this draft entry" style="margin-right:4px">
                     <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5l3 3 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </button>
-                  <button class="pt-row-del-btn dt-row-del" data-id="${e.id}" title="Delete this draft entry" style="margin-right:4px">
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2l-9 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  <button class="pt-view-btn dt-edit" data-id="${e.id}" title="Edit draft journal entry" style="margin-right:4px;">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M11 2l3 3M3 10v3h3l8.5-8.5-3-3L3 10z" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                   </button>
-                  <button class="pt-view-btn dt-view" data-id="${e.id}" title="View full draft journal entry">
+                  <button class="pt-view-btn dt-view" data-id="${e.id}" title="View full draft journal entry" style="margin-right:4px">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                       <ellipse cx="7.5" cy="7.5" rx="6" ry="4.5" stroke="currentColor" stroke-width="1.4"/>
                       <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.4"/>
                     </svg>
+                  </button>
+                  <button class="pt-row-del-btn dt-row-del" data-id="${e.id}" title="Delete this draft entry">
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2l-9 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
                   </button>
                 </td>
               </tr>`).join('')}
@@ -6985,6 +7089,13 @@
       });
     });
 
+    wrap.querySelectorAll('.dt-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const entry = draftedEntries.find(e => e.id === Number(btn.dataset.id));
+        if (entry) loadJournalEntry(entry, true);
+      });
+    });
+
     // Restore search focus & caret
     if (isSearchFocused) {
       const searchInput = document.getElementById('dtSearch');
@@ -7088,8 +7199,16 @@
     // Capture full entry snapshot before form resets
     const firstRow = jeRows[0] || {};
     const amt      = parseAmt(firstRow.debit) || parseAmt(firstRow.credit);
-    postedEntries.unshift({
-      id:             Date.now(),
+    
+    if (window._editingJournalEntry && window._editingJournalEntry.isDraft) {
+      draftedEntries = draftedEntries.filter(e => e.id !== window._editingJournalEntry.id);
+    }
+    
+    const isEditPosted = window._editingJournalEntry && !window._editingJournalEntry.isDraft;
+    const entryId = isEditPosted ? window._editingJournalEntry.id : Date.now();
+    
+    const postData = {
+      id:             entryId,
       date:           document.getElementById('jeDate').value,
       voucherNo:      document.getElementById('jeVoucherNo').value,
       preparedBy:     document.getElementById('jePreparedBy').value,
@@ -7099,10 +7218,24 @@
       amount:         fmtNum(amt),
       allRows:        JSON.parse(JSON.stringify(jeRows)),
       narration:      document.getElementById('jeNarration').value,
-    });
+    };
 
-    showToast('Journal entry posted successfully!', 'success');
-    jvCounter++;
+    if (isEditPosted) {
+      const idx = postedEntries.findIndex(e => e.id === entryId);
+      if (idx > -1) {
+        postedEntries[idx] = postData;
+      } else {
+        postedEntries.unshift(postData);
+      }
+    } else {
+      postedEntries.unshift(postData);
+    }
+
+    showToast(isEditPosted ? 'Journal entry updated successfully!' : 'Journal entry posted successfully!', 'success');
+    if (!isEditPosted) {
+      jvCounter++;
+    }
+    window._editingJournalEntry = null;
     refreshAllReports();
     triggerAutoBackup();
     setTimeout(initFormDefaults, 900);
@@ -7386,6 +7519,11 @@
                           <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.4"/>
                         </svg>
                       </button>
+                      <button class="pt-view-btn vd-edit" data-id="${e.id}" data-type="${e.type}" data-draft="${e.isDraft}" title="Edit Voucher" style="margin-right:4px;">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                          <path d="M11 2l3 3M3 10v3h3l8.5-8.5-3-3L3 10z" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
                       <button class="pt-row-del-btn vd-delete" data-id="${e.id}" data-type="${e.type}" title="Delete Voucher" style="width:32px;height:32px;border:1.5px solid #fecaca;border-radius:8px;background:#fff5f5;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:#dc2626;flex-shrink:0;">
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="display:block;flex-shrink:0;">
                           <path d="M2 2l9 9M11 2l-9 9" stroke="#dc2626" stroke-width="1.7" stroke-linecap="round"/>
@@ -7440,6 +7578,31 @@
             editSalesDraft(id);
           } else {
             viewPrintInvoice(id);
+          }
+        }
+      });
+    });
+
+    wrap.querySelectorAll('.vd-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.id);
+        const type = btn.dataset.type;
+        const isDraft = btn.dataset.draft === 'true';
+
+        if (type === 'Journal') {
+          const entry = isDraft
+            ? draftedEntries.find(e => e.id === id)
+            : postedEntries.find(e => e.id === id);
+          if (entry) {
+            loadJournalEntry(entry, isDraft);
+          }
+        } else if (type === 'Invoice' || type === 'Return') {
+          const list = isDraft
+            ? (window.KYA_STORE.salesVouchersDrafts || [])
+            : (window.KYA_STORE.salesVouchers || []);
+          const inv = list.find(v => v.id === id);
+          if (inv) {
+            loadSalesInvoice(inv, isDraft);
           }
         }
       });
@@ -9195,6 +9358,7 @@
   // ══════════════════════════════════════════════════════════════════
   let _bsStyleDone = false;
   let _bsExpanded = new Set();
+  let _bsLayoutMode = 'Vertical';
 
   function injectBalanceSheetStyles() {
     if (_bsStyleDone) return;
@@ -9417,16 +9581,51 @@
     // Opening Difference computed from Trial Balance balances
     const openingDiff = calculateOpeningDifferenceFromTrial(ledgerBalances);
 
-    let treeHtml = '<div class="bs-tree">';
+    const btnVert = document.getElementById('bsLayoutVertical');
+    const btnHoriz = document.getElementById('bsLayoutHorizontal');
+    if (btnVert && btnHoriz) {
+      if (_bsLayoutMode === 'Vertical') {
+        btnVert.className = 'btn btn-primary';
+        btnVert.style.background = 'var(--blue-700)';
+        btnVert.style.color = '#fff';
+        btnVert.style.borderColor = 'var(--blue-700)';
+        
+        btnHoriz.className = 'btn-sales-action';
+        btnHoriz.style.background = 'var(--white)';
+        btnHoriz.style.color = 'var(--slate-600)';
+        btnHoriz.style.borderColor = 'var(--slate-200)';
+      } else {
+        btnHoriz.className = 'btn btn-primary';
+        btnHoriz.style.background = 'var(--blue-700)';
+        btnHoriz.style.color = '#fff';
+        btnHoriz.style.borderColor = 'var(--blue-700)';
+        
+        btnVert.className = 'btn-sales-action';
+        btnVert.style.background = 'var(--white)';
+        btnVert.style.color = 'var(--slate-600)';
+        btnVert.style.borderColor = 'var(--slate-200)';
+      }
+    }
 
-    COA_MAIN_GROUPS.forEach(mg => {
-      if (mg.id !== 'assets' && mg.id !== 'equity-liabilities') return;
+    let treeHtml = '';
+    if (_bsLayoutMode === 'Horizontal') {
+      treeHtml = '<div class="bs-tree horizontal-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; align-items: stretch;">';
+    } else {
+      treeHtml = '<div class="bs-tree">';
+    }
+
+    const mainGroupsToRender = _bsLayoutMode === 'Horizontal'
+      ? [COA_MAIN_GROUPS.find(mg => mg.id === 'equity-liabilities'), COA_MAIN_GROUPS.find(mg => mg.id === 'assets')]
+      : [COA_MAIN_GROUPS.find(mg => mg.id === 'assets'), COA_MAIN_GROUPS.find(mg => mg.id === 'equity-liabilities')];
+
+    mainGroupsToRender.forEach(mg => {
+      if (!mg) return;
 
       const mgBal = getNodeBalance(mg.id, 'mg', ledgerBalances, profitAmt, openingDiff, priorProfit);
       const isMgOpen = _bsExpanded.has('mg-' + mg.id);
 
       treeHtml += `
-        <div class="bs-mg-card">
+        <div class="bs-mg-card" style="${_bsLayoutMode === 'Horizontal' ? 'display: flex; flex-direction: column; height: 100%;' : ''}">
           <div class="bs-row bs-row-l0 bs-indent-l0" data-bs-toggle="mg-${mg.id}">
             <div class="bs-name-col">
               <svg class="bs-chevron${isMgOpen ? ' open' : ''}" width="16" height="16" viewBox="0 0 18 18" fill="none">
@@ -9436,7 +9635,7 @@
             </div>
             <div class="bs-amt-col">₹ ${fmtNum(mgBal)}</div>
           </div>
-          <div id="bsBody-mg-${mg.id}" style="${isMgOpen ? '' : 'display:none'}">
+          <div id="bsBody-mg-${mg.id}" style="${isMgOpen ? '' : 'display:none'} ${(_bsLayoutMode === 'Horizontal' && isMgOpen) ? '; display: flex; flex-direction: column; flex-grow: 1;' : ''}">
       `;
 
       const l1Sgs = COA_SYS_SGS.filter(s => s.main === mg.id && s.parent === null);
@@ -9489,7 +9688,7 @@
       });
 
       treeHtml += `
-            <div class="bs-row bs-grandtotal bs-indent-l0">
+            <div class="bs-row bs-grandtotal bs-indent-l0" style="${_bsLayoutMode === 'Horizontal' ? 'margin-top: auto;' : ''}">
               <span style="text-transform: uppercase;">Total ${mg.name}</span>
               <div class="bs-amt-col">₹ ${fmtNum(mgBal)}</div>
             </div>
@@ -9669,12 +9868,23 @@
     renderBalanceSheetPanel();
   });
 
+  document.getElementById('bsLayoutVertical')?.addEventListener('click', () => {
+    _bsLayoutMode = 'Vertical';
+    renderBalanceSheetPanel();
+  });
+
+  document.getElementById('bsLayoutHorizontal')?.addEventListener('click', () => {
+    _bsLayoutMode = 'Horizontal';
+    renderBalanceSheetPanel();
+  });
+
 
   // ══════════════════════════════════════════════════════════════════
   //  PROFIT & LOSS STATEMENT
   // ══════════════════════════════════════════════════════════════════
   let _pnlStyleDone = false;
   let _pnlExpanded = new Set();
+  let _pnlLayoutMode = 'Vertical';
 
   function injectPnlStyles() {
     if (_pnlStyleDone) return;
@@ -9808,93 +10018,248 @@
     const taxBal = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances);
     const pat = pbt - taxBal;
 
-    let treeHtml = '<div class="pnl-tree">';
-
-    treeHtml += `
-      <div class="pnl-card">
-        <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
-          <span>I. Revenue</span>
-          <span>Amount (₹)</span>
-        </div>
-    `;
-    const incSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'income');
-    incSubgroups.forEach(sg => {
-      const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
-      const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
-
-      treeHtml += `
-        <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
-          <div class="pnl-name-col">
-            <svg class="pnl-caret${isSgOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
-              <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="pnl-name-text">${sg.name}</span>
-          </div>
-          <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
-        </div>
-        <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
-          ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
-        </div>
-      `;
-    });
-
-    treeHtml += `
-        <div class="pnl-row pnl-total-row pnl-indent-hdr">
-          <span>Total Revenue (I)</span>
-          <div class="pnl-amt-col">₹ ${fmtNum(totalRevenue)}</div>
-        </div>
-      </div>
-    `;
-
-    treeHtml += `
-      <div class="pnl-card">
-        <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
-          <span>II. Expenses</span>
-          <span>Amount (₹)</span>
-        </div>
-    `;
-    expSubgroups.forEach(sg => {
-      const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
-      const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
-
-      treeHtml += `
-        <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
-          <div class="pnl-name-col">
-            <svg class="pnl-caret${isSgOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
-              <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="pnl-name-text">${sg.name}</span>
-          </div>
-          <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
-        </div>
-        <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
-          ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
-        </div>
-      `;
-    });
-
-    treeHtml += `
-        <div class="pnl-row pnl-total-row pnl-indent-hdr">
-          <span>Total Expenses (II)</span>
-          <div class="pnl-amt-col">₹ ${fmtNum(totalExpenses)}</div>
-        </div>
-      </div>
-    `;
-
-    treeHtml += `
-      <div class="pnl-card">
-        <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
-          <span>III. Profitability</span>
-          <span>Amount (₹)</span>
-        </div>
+    const btnVert = document.getElementById('pnlLayoutVertical');
+    const btnHoriz = document.getElementById('pnlLayoutHorizontal');
+    if (btnVert && btnHoriz) {
+      if (_pnlLayoutMode === 'Vertical') {
+        btnVert.className = 'btn btn-primary';
+        btnVert.style.background = 'var(--blue-700)';
+        btnVert.style.color = '#fff';
+        btnVert.style.borderColor = 'var(--blue-700)';
         
-        <div class="pnl-row pnl-total-row pnl-indent-l1">
-          <div class="pnl-name-col">
-            <span class="pnl-caret-empty"></span>
-            <span class="pnl-name-text" style="font-weight:700;">Profit Before Tax (PBT) (I - II)</span>
+        btnHoriz.className = 'btn-sales-action';
+        btnHoriz.style.background = 'var(--white)';
+        btnHoriz.style.color = 'var(--slate-600)';
+        btnHoriz.style.borderColor = 'var(--slate-200)';
+      } else {
+        btnHoriz.className = 'btn btn-primary';
+        btnHoriz.style.background = 'var(--blue-700)';
+        btnHoriz.style.color = '#fff';
+        btnHoriz.style.borderColor = 'var(--blue-700)';
+        
+        btnVert.className = 'btn-sales-action';
+        btnVert.style.background = 'var(--white)';
+        btnVert.style.color = 'var(--slate-600)';
+        btnVert.style.borderColor = 'var(--slate-200)';
+      }
+    }
+
+    let treeHtml = '';
+    if (_pnlLayoutMode === 'Horizontal') {
+      treeHtml = '<div class="pnl-tree horizontal-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; align-items: stretch;">';
+
+      // 1. Left Card: Expenses & Tax
+      let leftHtml = `
+        <div class="pnl-card" style="display: flex; flex-direction: column; height: 100%; margin-bottom: 0;">
+          <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
+            <span>II. Expenses &amp; Profit</span>
+            <span>Amount (₹)</span>
           </div>
-          <div class="pnl-amt-col">₹ ${fmtNum(pbt)}</div>
+          <div style="display: flex; flex-direction: column; flex-grow: 1;">
+      `;
+
+      expSubgroups.forEach(sg => {
+        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
+        leftHtml += `
+          <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
+            <div class="pnl-name-col">
+              <svg class="pnl-caret${isSgOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="pnl-name-text">${sg.name}</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+          </div>
+          <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+          </div>
+        `;
+      });
+
+      const taxSg = COA_SYS_SGS.find(sg => sg.id === 'sg-tax');
+      if (taxSg) {
+        const isTaxOpen = _pnlExpanded.has('sg-sg-tax');
+        leftHtml += `
+          <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-sg-tax">
+            <div class="pnl-name-col">
+              <svg class="pnl-caret${isTaxOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="pnl-name-text">Tax Expense</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(taxBal)}</div>
+          </div>
+          <div id="pnlBody-sg-sg-tax" style="${isTaxOpen ? '' : 'display:none'}">
+            ${renderPnlSubgroupLeafs('sg-tax', ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+          </div>
+        `;
+      }
+
+      if (pat > 0) {
+        leftHtml += `
+          <div class="pnl-row pnl-row-l1 pnl-indent-l1" style="background: #f0fdf4; color: #16a34a; font-weight: 700; cursor: default;">
+            <div class="pnl-name-col">
+              <span class="pnl-caret-empty"></span>
+              <span class="pnl-name-text">Profit After Tax (PAT)</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(pat)}</div>
+          </div>
+        `;
+      }
+
+      const leftTotal = totalExpenses + taxBal + (pat > 0 ? pat : 0);
+      leftHtml += `
+            <div class="pnl-row pnl-total-row pnl-indent-hdr" style="margin-top: auto;">
+              <span>Total Expenses &amp; Profit</span>
+              <div class="pnl-amt-col">₹ ${fmtNum(leftTotal)}</div>
+            </div>
+          </div>
         </div>
+      `;
+
+      // 2. Right Card: Revenue & Loss
+      let rightHtml = `
+        <div class="pnl-card" style="display: flex; flex-direction: column; height: 100%; margin-bottom: 0;">
+          <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
+            <span>I. Revenue &amp; Income</span>
+            <span>Amount (₹)</span>
+          </div>
+          <div style="display: flex; flex-direction: column; flex-grow: 1;">
+      `;
+
+      const incSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'income');
+      incSubgroups.forEach(sg => {
+        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
+        rightHtml += `
+          <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
+            <div class="pnl-name-col">
+              <svg class="pnl-caret${isSgOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="pnl-name-text">${sg.name}</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+          </div>
+          <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+          </div>
+        `;
+      });
+
+      if (pat < 0) {
+        rightHtml += `
+          <div class="pnl-row pnl-row-l1 pnl-indent-l1" style="background: #fef2f2; color: #dc2626; font-weight: 700; cursor: default;">
+            <div class="pnl-name-col">
+              <span class="pnl-caret-empty"></span>
+              <span class="pnl-name-text">Loss After Tax</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(Math.abs(pat))}</div>
+          </div>
+        `;
+      }
+
+      const rightTotal = totalRevenue + (pat < 0 ? Math.abs(pat) : 0);
+      rightHtml += `
+            <div class="pnl-row pnl-total-row pnl-indent-hdr" style="margin-top: auto;">
+              <span>Total Revenue &amp; Loss</span>
+              <div class="pnl-amt-col">₹ ${fmtNum(rightTotal)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      treeHtml += leftHtml + rightHtml + '</div>';
+
+    } else {
+      treeHtml = '<div class="pnl-tree">';
+
+      treeHtml += `
+        <div class="pnl-card">
+          <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
+            <span>I. Revenue</span>
+            <span>Amount (₹)</span>
+          </div>
+      `;
+      const incSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'income');
+      incSubgroups.forEach(sg => {
+        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
+
+        treeHtml += `
+          <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
+            <div class="pnl-name-col">
+              <svg class="pnl-caret${isSgOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="pnl-name-text">${sg.name}</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+          </div>
+          <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+          </div>
+        `;
+      });
+
+      treeHtml += `
+          <div class="pnl-row pnl-total-row pnl-indent-hdr">
+            <span>Total Revenue (I)</span>
+            <div class="pnl-amt-col">₹ ${fmtNum(totalRevenue)}</div>
+          </div>
+        </div>
+      `;
+
+      treeHtml += `
+        <div class="pnl-card">
+          <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
+            <span>II. Expenses</span>
+            <span>Amount (₹)</span>
+          </div>
+      `;
+      expSubgroups.forEach(sg => {
+        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
+
+        treeHtml += `
+          <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
+            <div class="pnl-name-col">
+              <svg class="pnl-caret${isSgOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="pnl-name-text">${sg.name}</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+          </div>
+          <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+          </div>
+        `;
+      });
+
+      treeHtml += `
+          <div class="pnl-row pnl-total-row pnl-indent-hdr">
+            <span>Total Expenses (II)</span>
+            <div class="pnl-amt-col">₹ ${fmtNum(totalExpenses)}</div>
+          </div>
+        </div>
+      `;
+
+      treeHtml += `
+        <div class="pnl-card">
+          <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
+            <span>III. Profitability</span>
+            <span>Amount (₹)</span>
+          </div>
+          
+          <div class="pnl-row pnl-total-row pnl-indent-l1">
+            <div class="pnl-name-col">
+              <span class="pnl-caret-empty"></span>
+              <span class="pnl-name-text" style="font-weight:700;">Profit Before Tax (PBT) (I - II)</span>
+            </div>
+            <div class="pnl-amt-col">₹ ${fmtNum(pbt)}</div>
+          </div>
       `;
 
       const taxSg = COA_SYS_SGS.find(sg => sg.id === 'sg-tax');
@@ -9917,14 +10282,15 @@
       }
 
       treeHtml += `
-        <div class="pnl-row pnl-grandtotal pnl-indent-hdr">
-          <span>Profit After Tax (PAT)</span>
-          <div class="pnl-amt-col">₹ ${fmtNum(pat)}</div>
+          <div class="pnl-row pnl-grandtotal pnl-indent-hdr">
+            <span>Profit After Tax (PAT)</span>
+            <div class="pnl-amt-col">₹ ${fmtNum(pat)}</div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    treeHtml += '</div>';
+      treeHtml += '</div>';
+    }
     wrap.innerHTML = treeHtml;
 
     wrap.querySelectorAll('[data-pnl-toggle]').forEach(el => {
@@ -10014,6 +10380,16 @@
 
   document.getElementById('pnlCollapseAll')?.addEventListener('click', () => {
     _pnlExpanded = new Set();
+    renderPnlPanel();
+  });
+
+  document.getElementById('pnlLayoutVertical')?.addEventListener('click', () => {
+    _pnlLayoutMode = 'Vertical';
+    renderPnlPanel();
+  });
+
+  document.getElementById('pnlLayoutHorizontal')?.addEventListener('click', () => {
+    _pnlLayoutMode = 'Horizontal';
     renderPnlPanel();
   });
 
@@ -10413,7 +10789,7 @@
       features: ['Payroll Processing', 'Salary Slips', 'TDS & Deductions', 'Pay History'],
     },
     underledger: {
-      label: 'Under Ledger',
+      label: 'Mini Ledger',
       icon: `<svg width="38" height="38" viewBox="0 0 20 20" fill="none">
         <path d="M4 5h12M4 9h8M4 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
         <circle cx="16" cy="13" r="3.5" stroke="currentColor" stroke-width="1.4"/>
@@ -12995,6 +13371,244 @@
   let currentSalesInvoiceMode = 'Auto'; // 'Auto' | 'Manual'
   let currentSalesVoucherSubtype = 'Invoice'; // 'Invoice' | 'Return'
 
+  function isSalesReturnInvoiceSelected() {
+    if (currentSalesVoucherSubtype !== 'Return') return false;
+    const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
+    return triggerText && triggerText.textContent !== 'Select Invoice';
+  }
+
+  function getInvoiceRemainingRows(origInv, excludeReturnId = null) {
+    if (!origInv || !origInv.rows) return [];
+    const postedReturns = (window.KYA_STORE.salesVouchers || []).filter(v => 
+      v.isReturn && 
+      v.returnAgainstInvoice === origInv.invoiceNo && 
+      (excludeReturnId === null || v.id !== excludeReturnId)
+    );
+    const remainingRows = JSON.parse(JSON.stringify(origInv.rows));
+    postedReturns.forEach(ret => {
+      if (!ret.rows) return;
+      ret.rows.forEach(retRow => {
+        if (origInv.type === 'Product') {
+          const match = remainingRows.find(r => r.item === retRow.item);
+          if (match) {
+            match.qty = Math.max(0, match.qty - (retRow.qty || 0));
+            if (match.discountType !== 'pct') {
+              match.discount = Math.max(0, match.discount - (retRow.discount || 0));
+            }
+          }
+        } else {
+          const match = remainingRows.find(r => r.revenueLedgerId == retRow.revenueLedgerId);
+          if (match) {
+            match.baseAmount = Math.max(0, match.baseAmount - (retRow.baseAmount || 0));
+            if (match.discountType !== 'pct') {
+              match.discount = Math.max(0, match.discount - (retRow.discount || 0));
+            }
+          }
+        }
+      });
+    });
+    return remainingRows;
+  }
+
+  function getOriginalInvoiceForReturn() {
+    if (currentSalesVoucherSubtype !== 'Return') return null;
+    const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
+    if (!triggerText || triggerText.textContent === 'Select Invoice') return null;
+    const invNo = triggerText.textContent.trim();
+    return (window.KYA_STORE.salesVouchers || []).find(v => v.invoiceNo === invNo && !v.isReturn);
+  }
+
+  function updateSalesReturnLockState() {
+    const isLocked = isSalesReturnInvoiceSelected();
+    
+    const custEl = document.getElementById('salesCustomer');
+    if (custEl) {
+      custEl.disabled = isLocked;
+      custEl.style.backgroundColor = isLocked ? 'var(--slate-50)' : '';
+      custEl.style.cursor = isLocked ? 'not-allowed' : '';
+    }
+    
+    const supplyTypeEl = document.getElementById('salesSupplyType');
+    if (supplyTypeEl) {
+      supplyTypeEl.disabled = isLocked;
+      supplyTypeEl.style.backgroundColor = isLocked ? 'var(--slate-50)' : '';
+      supplyTypeEl.style.cursor = isLocked ? 'not-allowed' : '';
+    }
+    
+    const orderEl = document.getElementById('salesOrderNo');
+    if (orderEl) {
+      orderEl.disabled = isLocked;
+      orderEl.style.backgroundColor = 'var(--slate-50)';
+      orderEl.style.color = isLocked ? 'var(--slate-400)' : 'var(--slate-700)';
+    }
+    
+    const execEl = document.getElementById('salesExecutive');
+    if (execEl) {
+      execEl.disabled = isLocked;
+      execEl.style.backgroundColor = isLocked ? 'var(--slate-50)' : '';
+      execEl.style.cursor = isLocked ? 'not-allowed' : '';
+    }
+    
+    const prodBtn = document.getElementById('salesTypeProduct');
+    const servBtn = document.getElementById('salesTypeService');
+    if (prodBtn && servBtn) {
+      prodBtn.disabled = isLocked;
+      servBtn.disabled = isLocked;
+      prodBtn.style.cursor = isLocked ? 'not-allowed' : '';
+      servBtn.style.cursor = isLocked ? 'not-allowed' : '';
+      if (isLocked) {
+        prodBtn.style.opacity = '0.7';
+        servBtn.style.opacity = '0.7';
+      } else {
+        prodBtn.style.opacity = '';
+        servBtn.style.opacity = '';
+      }
+    }
+    
+    const addRowBtn = document.getElementById('salesAddRow');
+    if (addRowBtn) {
+      addRowBtn.disabled = isLocked;
+      addRowBtn.style.cursor = isLocked ? 'not-allowed' : '';
+      if (isLocked) {
+        addRowBtn.style.opacity = '0.5';
+        addRowBtn.style.pointerEvents = 'none';
+      } else {
+        addRowBtn.style.opacity = '';
+        addRowBtn.style.pointerEvents = '';
+      }
+    }
+
+    // Payment Status Buttons
+    const payNotPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
+    const payFullBtn = document.getElementById('salesPaymentStatusFull');
+    const payPartialBtn = document.getElementById('salesPaymentStatusPartial');
+    
+    if (payNotPaidBtn) { payNotPaidBtn.disabled = false; payNotPaidBtn.style.cursor = ''; payNotPaidBtn.style.opacity = ''; }
+    if (payFullBtn) { payFullBtn.disabled = false; payFullBtn.style.cursor = ''; payFullBtn.style.opacity = ''; }
+    if (payPartialBtn) { payPartialBtn.disabled = false; payPartialBtn.style.cursor = ''; payPartialBtn.style.opacity = ''; }
+    
+    // TDS/TCS Buttons
+    const tdsTcsNoneBtn = document.getElementById('salesTdsTcsNone');
+    const tdsTcsTdsBtn = document.getElementById('salesTdsTcsTds');
+    const tdsTcsTcsBtn = document.getElementById('salesTdsTcsTcs');
+    
+    if (tdsTcsNoneBtn) { tdsTcsNoneBtn.disabled = false; tdsTcsNoneBtn.style.cursor = ''; tdsTcsNoneBtn.style.opacity = ''; }
+    if (tdsTcsTdsBtn) { tdsTcsTdsBtn.disabled = false; tdsTcsTdsBtn.style.cursor = ''; tdsTcsTdsBtn.style.opacity = ''; }
+    if (tdsTcsTcsBtn) { tdsTcsTcsBtn.disabled = false; tdsTcsTcsBtn.style.cursor = ''; tdsTcsTcsBtn.style.opacity = ''; }
+
+    const payAmtEl = document.getElementById('salesPaymentAmount');
+    if (payAmtEl) {
+      payAmtEl.removeAttribute('max');
+    }
+
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    const customRateInput = document.getElementById('salesTdsTcsRateCustom');
+    
+    if (rateSelect) {
+      rateSelect.disabled = false;
+      rateSelect.style.backgroundColor = '';
+      rateSelect.style.cursor = '';
+    }
+    if (customRateInput) {
+      customRateInput.disabled = false;
+      customRateInput.style.backgroundColor = '';
+      customRateInput.style.cursor = '';
+    }
+
+    const origInv = getOriginalInvoiceForReturn();
+    if (origInv) {
+      if (origInv.paymentStatus === 'Not Paid') {
+        if (payNotPaidBtn && !payNotPaidBtn.classList.contains('active')) {
+          payNotPaidBtn.click();
+        }
+        if (payFullBtn) {
+          payFullBtn.disabled = true;
+          payFullBtn.style.cursor = 'not-allowed';
+          payFullBtn.style.opacity = '0.5';
+        }
+        if (payPartialBtn) {
+          payPartialBtn.disabled = true;
+          payPartialBtn.style.cursor = 'not-allowed';
+          payPartialBtn.style.opacity = '0.5';
+        }
+      } else if (origInv.paymentStatus === 'Full Payment' || origInv.paymentStatus === 'Partial Payment') {
+        let origPaidAmt = 0;
+        if (origInv.paymentStatus === 'Full Payment') {
+          origPaidAmt = origInv.total;
+        } else if (origInv.paymentStatus === 'Partial Payment') {
+          origPaidAmt = origInv.paymentAmount || 0;
+        }
+        if (payAmtEl) {
+          payAmtEl.max = origPaidAmt;
+        }
+      }
+
+      if (!origInv.tdsTcsMode || origInv.tdsTcsMode === 'None') {
+        if (tdsTcsNoneBtn && !tdsTcsNoneBtn.classList.contains('active')) {
+          tdsTcsNoneBtn.click();
+        }
+        if (tdsTcsTdsBtn) {
+          tdsTcsTdsBtn.disabled = true;
+          tdsTcsTdsBtn.style.cursor = 'not-allowed';
+          tdsTcsTdsBtn.style.opacity = '0.5';
+        }
+        if (tdsTcsTcsBtn) {
+          tdsTcsTcsBtn.disabled = true;
+          tdsTcsTcsBtn.style.cursor = 'not-allowed';
+          tdsTcsTcsBtn.style.opacity = '0.5';
+        }
+      } else if (origInv.tdsTcsMode === 'TDS') {
+        if (tdsTcsTdsBtn && !tdsTcsTdsBtn.classList.contains('active')) {
+          tdsTcsTdsBtn.click();
+        }
+        if (tdsTcsNoneBtn) {
+          tdsTcsNoneBtn.disabled = true;
+          tdsTcsNoneBtn.style.cursor = 'not-allowed';
+          tdsTcsNoneBtn.style.opacity = '0.5';
+        }
+        if (tdsTcsTcsBtn) {
+          tdsTcsTcsBtn.disabled = true;
+          tdsTcsTcsBtn.style.cursor = 'not-allowed';
+          tdsTcsTcsBtn.style.opacity = '0.5';
+        }
+        if (rateSelect) {
+          rateSelect.disabled = true;
+          rateSelect.style.backgroundColor = 'var(--slate-50)';
+          rateSelect.style.cursor = 'not-allowed';
+        }
+        if (customRateInput) {
+          customRateInput.disabled = true;
+          customRateInput.style.backgroundColor = 'var(--slate-50)';
+          customRateInput.style.cursor = 'not-allowed';
+        }
+      } else if (origInv.tdsTcsMode === 'TCS') {
+        if (tdsTcsTcsBtn && !tdsTcsTcsBtn.classList.contains('active')) {
+          tdsTcsTcsBtn.click();
+        }
+        if (tdsTcsNoneBtn) {
+          tdsTcsNoneBtn.disabled = true;
+          tdsTcsNoneBtn.style.cursor = 'not-allowed';
+          tdsTcsNoneBtn.style.opacity = '0.5';
+        }
+        if (tdsTcsTdsBtn) {
+          tdsTcsTdsBtn.disabled = true;
+          tdsTcsTdsBtn.style.cursor = 'not-allowed';
+          tdsTcsTdsBtn.style.opacity = '0.5';
+        }
+        if (rateSelect) {
+          rateSelect.disabled = true;
+          rateSelect.style.backgroundColor = 'var(--slate-50)';
+          rateSelect.style.cursor = 'not-allowed';
+        }
+        if (customRateInput) {
+          customRateInput.disabled = true;
+          customRateInput.style.backgroundColor = 'var(--slate-50)';
+          customRateInput.style.cursor = 'not-allowed';
+        }
+      }
+    }
+  }
+
   // Initialize store for future features
   if (!window.KYA_STORE) {
     window.KYA_STORE = {};
@@ -13181,6 +13795,7 @@
     
     body.innerHTML = '';
     const incomeLedgers = getIncomeLedgers();
+    const isLocked = isSalesReturnInvoiceSelected();
     
     const supplyTypeEl = document.getElementById('salesSupplyType');
     const isZeroTax = supplyTypeEl && (supplyTypeEl.value === 'Export (Zero-Rated / LUT)' || supplyTypeEl.value === 'SEZ Without Tax');
@@ -13198,7 +13813,7 @@
         trHtml = `
           <tr class="sales-row" data-row-index="${index}">
             <td>
-              <input type="text" class="sales-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Item Description" style="border: none; background: transparent; box-shadow: none;" />
+              <input type="text" class="sales-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Item Description" style="border: none; background: transparent; box-shadow: none; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'readonly' : ''} />
             </td>
             <td style="width: 80px;">
               <input type="number" class="sales-row-qty je-input" value="${row.qty}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right;" />
@@ -13209,7 +13824,7 @@
             <td style="width: 140px;">
               <div style="display: flex; gap: 4px; align-items: center;">
                 <input type="number" class="sales-row-discount je-input" value="${row.discount === 0 ? '' : row.discount}" placeholder="0.00" min="0" step="0.01" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 70px;" />
-                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 45px; padding: 0 2px; font-weight: 600; cursor: pointer;">
+                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 45px; padding: 0 2px; font-weight: 600; cursor: pointer; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'disabled' : ''}>
                   <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
                   <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
                 </select>
@@ -13240,7 +13855,7 @@
         trHtml = `
           <tr class="sales-row" data-row-index="${index}">
             <td>
-              <select class="sales-row-rev-acc je-input" style="border: none; background: transparent; box-shadow: none;">
+              <select class="sales-row-rev-acc je-input" style="border: none; background: transparent; box-shadow: none; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'disabled' : ''}>
                 <option value="">&mdash; Select Revenue Account &mdash;</option>
                 ${incomeLedgers.map(l => {
                   const akaStr = l.aliases && l.aliases.length > 0 ? ` [A.K.A: ${l.aliases.join(', ')}]` : '';
@@ -13254,7 +13869,7 @@
             <td style="width: 140px;">
               <div style="display: flex; gap: 4px; align-items: center;">
                 <input type="number" class="sales-row-discount je-input" value="${row.discount === 0 ? '' : row.discount}" placeholder="0.00" min="0" step="0.01" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 70px;" />
-                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 45px; padding: 0 2px; font-weight: 600; cursor: pointer;">
+                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 45px; padding: 0 2px; font-weight: 600; cursor: pointer; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'disabled' : ''}>
                   <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
                   <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
                 </select>
@@ -13312,9 +13927,32 @@
     
     if (currentSalesType === 'Product') {
       row.item = tr.querySelector('.sales-row-item').value;
-      row.qty = parseFloat(tr.querySelector('.sales-row-qty').value) || 0;
-      row.rate = parseFloat(tr.querySelector('.sales-row-rate').value) || 0;
-      row.discount = parseFloat(tr.querySelector('.sales-row-discount').value) || 0;
+      
+      let qty = parseFloat(tr.querySelector('.sales-row-qty').value) || 0;
+      let rate = parseFloat(tr.querySelector('.sales-row-rate').value) || 0;
+      let discount = parseFloat(tr.querySelector('.sales-row-discount').value) || 0;
+      
+      if (currentSalesVoucherSubtype === 'Return' && row.origQty !== undefined) {
+        if (qty > row.origQty) {
+          qty = row.origQty;
+          tr.querySelector('.sales-row-qty').value = qty;
+          showToast(`Quantity cannot exceed remaining quantity of ${row.origQty}.`, 'warning');
+        }
+        if (rate > row.origRate) {
+          rate = row.origRate;
+          tr.querySelector('.sales-row-rate').value = rate === 0 ? '' : rate;
+          showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
+        }
+        if (discount > row.origDiscount) {
+          discount = row.origDiscount;
+          tr.querySelector('.sales-row-discount').value = discount === 0 ? '' : discount;
+          showToast(`Discount cannot exceed remaining discount of ${row.origDiscountType === 'pct' ? '' : '₹'}${fmtNum(row.origDiscount)}${row.origDiscountType === 'pct' ? '%' : ''}.`, 'warning');
+        }
+      }
+      
+      row.qty = qty;
+      row.rate = rate;
+      row.discount = discount;
       row.discountType = tr.querySelector('.sales-row-discount-type').value;
       row.tax = parseFloat(tr.querySelector('.sales-row-tax').value) || 0;
       
@@ -13325,8 +13963,25 @@
       row.amount = afterDiscount + taxAmt;
     } else {
       row.revenueLedgerId = tr.querySelector('.sales-row-rev-acc').value;
-      row.baseAmount = parseFloat(tr.querySelector('.sales-row-base').value) || 0;
-      row.discount = parseFloat(tr.querySelector('.sales-row-discount').value) || 0;
+      
+      let baseAmount = parseFloat(tr.querySelector('.sales-row-base').value) || 0;
+      let discount = parseFloat(tr.querySelector('.sales-row-discount').value) || 0;
+      
+      if (currentSalesVoucherSubtype === 'Return' && row.origBaseAmount !== undefined) {
+        if (baseAmount > row.origBaseAmount) {
+          baseAmount = row.origBaseAmount;
+          tr.querySelector('.sales-row-base').value = baseAmount === 0 ? '' : baseAmount;
+          showToast(`Base Amount cannot exceed remaining base amount of ₹${fmtNum(row.origBaseAmount)}.`, 'warning');
+        }
+        if (discount > row.origDiscount) {
+          discount = row.origDiscount;
+          tr.querySelector('.sales-row-discount').value = discount === 0 ? '' : discount;
+          showToast(`Discount cannot exceed remaining discount of ${row.origDiscountType === 'pct' ? '' : '₹'}${fmtNum(row.origDiscount)}${row.origDiscountType === 'pct' ? '%' : ''}.`, 'warning');
+        }
+      }
+      
+      row.baseAmount = baseAmount;
+      row.discount = discount;
       row.discountType = tr.querySelector('.sales-row-discount-type').value;
       row.tax = parseFloat(tr.querySelector('.sales-row-tax').value) || 0;
       
@@ -13406,6 +14061,23 @@
     
     const totalEl = document.getElementById('salesTotal');
     if (totalEl) totalEl.textContent = '₹ ' + fmtNum(total);
+
+    // Adjust Payment Amount in real-time if it exceeds the new Grand Total
+    const payAmtEl = document.getElementById('salesPaymentAmount');
+    if (payAmtEl && payAmtEl.value) {
+      const currentVal = parseFloat(payAmtEl.value) || 0;
+      let maxVal = total;
+      if (currentSalesVoucherSubtype === 'Return' && payAmtEl.max) {
+        const maxPaid = parseFloat(payAmtEl.max);
+        if (!isNaN(maxPaid)) {
+          maxVal = Math.min(total, maxPaid);
+        }
+      }
+      if (currentVal > maxVal) {
+        payAmtEl.value = maxVal.toFixed(2);
+        showToast(`Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the Grand Total.`, 'warning');
+      }
+    }
   }
 
   function updateVoucherSubtypeUI() {
@@ -13469,8 +14141,16 @@
 
     optionsList.innerHTML = '';
     
-    // Get all posted invoices that are NOT returns
-    const invoices = (window.KYA_STORE.salesVouchers || []).filter(v => !v.isReturn);
+    // Get all posted invoices that are NOT returns and NOT completely returned
+    const invoices = (window.KYA_STORE.salesVouchers || []).filter(v => {
+      if (v.isReturn) return false;
+      const remainingRows = getInvoiceRemainingRows(v);
+      if (v.type === 'Product') {
+        return remainingRows.some(row => row.qty > 0);
+      } else {
+        return remainingRows.some(row => row.baseAmount > 0);
+      }
+    });
     
     const query = filter.toLowerCase().trim();
     let matchCount = 0;
@@ -13505,11 +14185,6 @@
       
       item.addEventListener('click', () => {
         triggerText.textContent = inv.invoiceNo;
-        
-        const invoiceNoInput = document.getElementById('salesInvoiceNo');
-        if (invoiceNoInput) {
-          invoiceNoInput.value = inv.invoiceNo;
-        }
         
         autoFillFormFromInvoice(inv);
         
@@ -13601,9 +14276,24 @@
       }
     }
     
-    salesRows = JSON.parse(JSON.stringify(inv.rows));
+    const remainingRows = getInvoiceRemainingRows(inv);
+    salesRows = remainingRows.filter(row => {
+      if (inv.type === 'Product') {
+        return row.qty > 0;
+      } else {
+        return row.baseAmount > 0;
+      }
+    });
+    salesRows.forEach(row => {
+      row.origQty = row.qty;
+      row.origRate = row.rate;
+      row.origDiscount = row.discount;
+      row.origDiscountType = row.discountType;
+      row.origBaseAmount = row.baseAmount;
+    });
     renderSalesRows();
     recalculateSalesTotals();
+    updateSalesReturnLockState();
   }
 
   function initSalesForm() {
@@ -13664,6 +14354,7 @@
 
     salesRows = [];
     addSalesRow();
+    updateSalesReturnLockState();
   }
 
   function loadSalesInvoice(inv, isDraft) {
@@ -13699,7 +14390,12 @@
     if (invNoEl) invNoEl.value = inv.invoiceNo;
     if (chipEl) chipEl.textContent = inv.invoiceNo;
     if (triggerText && inv.isReturn) {
-      triggerText.textContent = inv.invoiceNo;
+      let retAgainst = inv.returnAgainstInvoice;
+      if (!retAgainst && inv.notes) {
+        const match = inv.notes.match(/Return against invoice\s+([^\s\.]+)/i);
+        if (match) retAgainst = match[1];
+      }
+      triggerText.textContent = retAgainst || 'Select Invoice';
     }
     
     const orderEl = document.getElementById('salesOrderNo');
@@ -13771,10 +14467,38 @@
     if (payAmtEl) payAmtEl.value = inv.paymentAmount !== undefined ? inv.paymentAmount : '';
     
     salesRows = JSON.parse(JSON.stringify(inv.rows));
+    if (inv.isReturn) {
+      const orig = getOriginalInvoiceForReturn();
+      if (orig) {
+        const remainingRows = getInvoiceRemainingRows(orig, isDraft ? null : inv.id);
+        salesRows.forEach((row, i) => {
+          let match = null;
+          if (inv.type === 'Product') {
+            match = remainingRows.find(r => r.item === row.item);
+          } else {
+            match = remainingRows.find(r => r.revenueLedgerId == row.revenueLedgerId);
+          }
+          if (match) {
+            row.origQty = match.qty;
+            row.origRate = match.rate;
+            row.origDiscount = match.discount;
+            row.origDiscountType = match.discountType;
+            row.origBaseAmount = match.baseAmount;
+          } else {
+            row.origQty = row.origQty !== undefined ? row.origQty : row.qty;
+            row.origRate = row.origRate !== undefined ? row.origRate : row.rate;
+            row.origDiscount = row.origDiscount !== undefined ? row.origDiscount : row.discount;
+            row.origDiscountType = row.origDiscountType !== undefined ? row.origDiscountType : row.discountType;
+            row.origBaseAmount = row.origBaseAmount !== undefined ? row.origBaseAmount : row.baseAmount;
+          }
+        });
+      }
+    }
     renderSalesRows();
     recalculateSalesTotals();
     
     window._editingSalesInvoice = { id: inv.id, isDraft: isDraft };
+    updateSalesReturnLockState();
   }
 
   function saveSalesDraft() {
@@ -13822,12 +14546,23 @@
       paymentAmount = parseFloat(document.getElementById('salesPaymentAmount').value) || 0;
     }
 
+    if (currentSalesVoucherSubtype === 'Return') {
+      const origInv = getOriginalInvoiceForReturn();
+      if (origInv) {
+        if (date < origInv.date) {
+          showToast(`Return date cannot be before the sale date (${origInv.date}).`, 'warning');
+          return;
+        }
+      }
+    }
+
     const draftData = {
       id: (window._editingSalesInvoice && window._editingSalesInvoice.isDraft) ? window._editingSalesInvoice.id : Date.now(),
       type: currentSalesType,
       mode: currentSalesInvoiceMode,
       invoiceNo: invoiceNo || 'Draft',
       isReturn: currentSalesVoucherSubtype === 'Return',
+      returnAgainstInvoice: currentSalesVoucherSubtype === 'Return' ? (document.getElementById('salesInvoiceSelectTriggerText')?.textContent.trim() || '') : '',
       customerId,
       salesExecutiveId,
       salesSupplyType,
@@ -13906,7 +14641,45 @@
       }
     }
     
+    if (currentSalesVoucherSubtype === 'Return') {
+      for (let i = 0; i < salesRows.length; i++) {
+        const r = salesRows[i];
+        if (currentSalesType === 'Product') {
+          if (r.origQty !== undefined && r.qty > r.origQty) {
+            showToast(`Row ${i + 1}: Quantity exceeds remaining quantity of ${r.origQty}.`, 'warning');
+            return;
+          }
+          if (r.origRate !== undefined && r.rate > r.origRate) {
+            showToast(`Row ${i + 1}: Rate exceeds original invoice rate of ₹${fmtNum(r.origRate)}.`, 'warning');
+            return;
+          }
+          if (r.origDiscount !== undefined && r.discount > r.origDiscount) {
+            showToast(`Row ${i + 1}: Discount exceeds remaining discount.`, 'warning');
+            return;
+          }
+        } else {
+          if (r.origBaseAmount !== undefined && r.baseAmount > r.origBaseAmount) {
+            showToast(`Row ${i + 1}: Base Amount exceeds remaining base amount of ₹${fmtNum(r.origBaseAmount)}.`, 'warning');
+            return;
+          }
+          if (r.origDiscount !== undefined && r.discount > r.origDiscount) {
+            showToast(`Row ${i + 1}: Discount exceeds remaining discount.`, 'warning');
+            return;
+          }
+        }
+      }
+    }
+    
     const date = document.getElementById('salesDate').value;
+    if (currentSalesVoucherSubtype === 'Return') {
+      const origInv = getOriginalInvoiceForReturn();
+      if (origInv) {
+        if (date < origInv.date) {
+          showToast(`Return date cannot be before the sale date (${origInv.date}).`, 'warning');
+          return;
+        }
+      }
+    }
     const dueDate = document.getElementById('salesDueDate').value;
     const orderNo = document.getElementById('salesOrderNo').value.trim();
     const notes = document.getElementById('salesNotes').value;
@@ -13958,8 +14731,26 @@
           showToast('Payment Amount cannot exceed the Grand Total.', 'warning');
           return;
         }
+        if (currentSalesVoucherSubtype === 'Return') {
+          const origInv = getOriginalInvoiceForReturn();
+          if (origInv) {
+            let origPaidAmt = 0;
+            if (origInv.paymentStatus === 'Full Payment') {
+              origPaidAmt = origInv.total;
+            } else if (origInv.paymentStatus === 'Partial Payment') {
+              origPaidAmt = origInv.paymentAmount || 0;
+            }
+            if (paymentAmount > origPaidAmt) {
+              showToast(`Payment Amount cannot exceed the original invoice paid amount of ₹${fmtNum(origPaidAmt)}.`, 'warning');
+              return;
+            }
+          }
+        }
       }
     }
+
+    const isEditPosted = window._editingSalesInvoice && !window._editingSalesInvoice.isDraft;
+    const existingJournalEntryId = isEditPosted ? (window.KYA_STORE.salesVouchers.find(v => v.id === window._editingSalesInvoice.id)?.journalEntryId) : null;
 
     const journalEntryId = postSalesVoucherToJournal({
       invoiceNo,
@@ -13981,14 +14772,16 @@
       paymentAccountId,
       paymentAmount,
       rows: salesRows,
-      type: currentSalesType
+      type: currentSalesType,
+      journalEntryId: existingJournalEntryId
     });
     
     const invoiceData = {
-      id: Date.now(),
+      id: isEditPosted ? window._editingSalesInvoice.id : Date.now(),
       type: currentSalesType,
       invoiceNo,
       isReturn: currentSalesVoucherSubtype === 'Return',
+      returnAgainstInvoice: currentSalesVoucherSubtype === 'Return' ? (document.getElementById('salesInvoiceSelectTriggerText')?.textContent.trim() || '') : '',
       customerId,
       salesExecutiveId,
       salesSupplyType,
@@ -14007,16 +14800,25 @@
       paymentAmount,
       rows: JSON.parse(JSON.stringify(salesRows)),
       journalEntryId,
-      postedAt: Date.now()
+      postedAt: isEditPosted ? (window.KYA_STORE.salesVouchers.find(v => v.id === window._editingSalesInvoice.id)?.postedAt || Date.now()) : Date.now()
     };
     
     if (window._editingSalesInvoice && window._editingSalesInvoice.isDraft) {
       window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts.filter(d => d.id !== window._editingSalesInvoice.id);
     }
     
-    window.KYA_STORE.salesVouchers.push(invoiceData);
+    if (isEditPosted) {
+      const idx = window.KYA_STORE.salesVouchers.findIndex(v => v.id === window._editingSalesInvoice.id);
+      if (idx > -1) {
+        window.KYA_STORE.salesVouchers[idx] = invoiceData;
+      } else {
+        window.KYA_STORE.salesVouchers.push(invoiceData);
+      }
+    } else {
+      window.KYA_STORE.salesVouchers.push(invoiceData);
+    }
     
-    if (currentSalesInvoiceMode === 'Auto') {
+    if (currentSalesInvoiceMode === 'Auto' && !isEditPosted) {
       if (currentSalesVoucherSubtype === 'Return') {
         window.KYA_STORE.salesReturnCtr = (window.KYA_STORE.salesReturnCtr || 1) + 1;
       } else {
@@ -14394,7 +15196,7 @@
       }
     }
 
-    const entryId = Date.now();
+    const entryId = invoice.journalEntryId || Date.now();
     const entry = {
       id:             entryId,
       date:           invoice.date,
@@ -14410,7 +15212,16 @@
         : `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`,
     };
     
-    postedEntries.unshift(entry);
+    if (invoice.journalEntryId) {
+      const idx = postedEntries.findIndex(e => e.id === invoice.journalEntryId);
+      if (idx > -1) {
+        postedEntries[idx] = entry;
+      } else {
+        postedEntries.unshift(entry);
+      }
+    } else {
+      postedEntries.unshift(entry);
+    }
     refreshAllReports();
     return entryId;
   }
@@ -14456,6 +15267,7 @@
           </td>
           <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: ${isRet ? '#dc2626' : 'var(--slate-900)'};">₹ ${fmtNum(inv.total)}</td>
           <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
+            <button class="btn btn-secondary btn-sm" onclick="loadSalesInvoice((window.KYA_STORE.salesVouchers || []).find(v => v.id === ${inv.id}), false)" style="padding: 6px 12px; font-size: 12px; border: 1.5px solid var(--blue-200); color: var(--blue-600); background: #fff;">Edit</button>
             <button class="btn btn-secondary btn-sm" onclick="viewPrintInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px;">View / Print</button>
             <button class="btn btn-danger btn-sm" onclick="deleteSalesInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
           </td>
@@ -14896,6 +15708,7 @@
   window.deleteSalesInvoice = deleteSalesInvoice;
   window.editSalesDraft = editSalesDraft;
   window.deleteSalesDraft = deleteSalesDraft;
+  window.loadSalesInvoice = loadSalesInvoice;
 
   function updateDueDateHelper() {
     const dateEl = document.getElementById('salesDate');
@@ -15253,6 +16066,51 @@
       });
     }
     
+    const payAmtEl = document.getElementById('salesPaymentAmount');
+    if (payAmtEl) {
+      payAmtEl.addEventListener('input', () => {
+        const subTotal = calculateSubtotal();
+        let tdsTcsMode = 'None';
+        const tdsBtn = document.getElementById('salesTdsTcsTds');
+        const tcsBtn = document.getElementById('salesTdsTcsTcs');
+        if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
+        if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
+        
+        const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+        let rate = 0;
+        if (tdsTcsMode !== 'None' && rateSelect) {
+          if (rateSelect.value === 'custom') {
+            const customInput = document.getElementById('salesTdsTcsRateCustom');
+            rate = customInput ? (parseFloat(customInput.value) || 0) : 0;
+          } else {
+            rate = parseFloat(rateSelect.value) || 0;
+          }
+        }
+        
+        const amountInput = document.getElementById('salesTdsTcsAmount');
+        const tdsTcsAmount = amountInput ? (parseFloat(amountInput.value) || 0) : 0;
+        const adjustmentsInput = document.getElementById('salesAdjustments');
+        const adjustments = adjustmentsInput ? (parseFloat(adjustmentsInput.value) || 0) : 0;
+        
+        let total = subTotal;
+        if (tdsTcsMode === 'TDS') total = subTotal - tdsTcsAmount;
+        else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
+        total += adjustments;
+        
+        let maxVal = total;
+        if (currentSalesVoucherSubtype === 'Return' && payAmtEl.max) {
+          const maxPaid = parseFloat(payAmtEl.max);
+          if (!isNaN(maxPaid)) {
+            maxVal = Math.min(total, maxPaid);
+          }
+        }
+        
+        if (parseFloat(payAmtEl.value) > maxVal) {
+          payAmtEl.value = maxVal.toFixed(2);
+          showToast(`Payment Amount cannot exceed the Grand Total of ₹${fmtNum(maxVal)}.`, 'warning');
+        }
+      });
+    }
 
     const returnBtn = document.getElementById('btnSalesReturn');
     const orderBtn = document.getElementById('btnSalesOrder');
