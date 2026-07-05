@@ -2073,6 +2073,9 @@
       align-items: start;
       margin-top: 8px;
     }
+    .oh-layout.full-width {
+      grid-template-columns: 1fr;
+    }
     .oh-content-area {
       min-width: 0;
       flex-grow: 1;
@@ -3588,7 +3591,8 @@
     .pt-table tbody tr.pt-sel-row { background:#eff6ff !important; }
     .pt-table tbody td { padding:11px 14px; color:#475569; vertical-align:middle; }
     .pt-cb { width:16px; height:16px; accent-color:#2563eb; cursor:pointer; }
-    .pt-vbadge { background:#dbeafe; color:#1d4ed8; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px; }
+    .pt-vbadge { background:#dbeafe; color:#1d4ed8; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px; cursor:pointer; transition:all 0.15s ease; }
+    .pt-vbadge:hover { background:#bfdbfe; color:#1e40af; }
     .pt-amt { font-weight:700; color:#2563eb; font-size:14px; }
     .pt-view-btn {
       width:32px; height:32px; border:1.5px solid #e2e8f0; border-radius:8px;
@@ -3602,6 +3606,21 @@
       justify-content:center; color:#dc2626; transition:all .15s;
     }
     .pt-row-del-btn:hover { background:#fee2e2; border-color:#f87171; }
+
+    .je-row-act-btn {
+      opacity: 0.8;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      padding: 4px;
+    }
+    .je-row-act-btn:hover {
+      opacity: 1;
+      transform: scale(1.15);
+      background: #f1f5f9;
+    }
 
     /* Shared KYA confirmation popup */
     .kya-confirm-overlay {
@@ -3828,13 +3847,6 @@
         <span class="nav-label">Voucher Desk</span>
       </div>
 
-      <div class="nav-item" id="nav-ledger" data-panel="welcome" role="button" tabindex="0" aria-label="General Ledger">
-        <!-- List icon -->
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-          <path d="M4 5h12M4 10h8M4 15h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-        </svg>
-        <span class="nav-label">General Ledger</span>
-      </div>
 
       <div class="nav-item" id="nav-chart" data-panel="chart" role="button" tabindex="0" aria-label="Chart of Accounts">
         <!-- Tree icon -->
@@ -3975,16 +3987,16 @@
             <div class="qs-card-title">Journal Entry</div>
             <div class="qs-card-desc">Record debits &amp; credits</div>
           </div>
-          <div class="qs-card" role="button" tabindex="0" aria-label="View Ledger">
+          <div class="qs-card" id="qs-ledgers" role="button" tabindex="0" aria-label="View Ledgers">
             <div class="qs-icon">
               <svg viewBox="0 0 20 20" fill="none">
                 <path d="M4 5h12M4 10h8M4 15h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
               </svg>
             </div>
-            <div class="qs-card-title">General Ledger</div>
+            <div class="qs-card-title">Ledgers</div>
             <div class="qs-card-desc">View all accounts</div>
           </div>
-          <div class="qs-card" role="button" tabindex="0" aria-label="Run Reports">
+          <div class="qs-card" id="qs-pnl" role="button" tabindex="0" aria-label="Run Reports">
             <div class="qs-icon">
               <svg viewBox="0 0 20 20" fill="none">
                 <path d="M3 14l4-5 3 3 4-6 3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -4293,8 +4305,30 @@
 
       <!-- Chart of Accounts Panel -->
       <div id="panel-chart" role="region" aria-label="Chart of Accounts" style="display:none">
+        <!-- Page header -->
+        <div class="panel-header" style="border-bottom: 1.5px solid var(--slate-100); padding-bottom: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%;">
+          <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-primary active" id="btnCoaOverview" type="button" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                <rect x="3" y="3" width="7" height="9"></rect>
+                <rect x="14" y="3" width="7" height="5"></rect>
+                <rect x="14" y="12" width="7" height="9"></rect>
+                <rect x="3" y="16" width="7" height="5"></rect>
+              </svg>
+              Overview
+            </button>
+            <button class="btn btn-secondary" id="btnCoaLedger" type="button" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              Ledger
+            </button>
+          </div>
+        </div>
 
-        <div class="table-card" style="padding: 24px 28px;">
+        <!-- 1. COA Overview Container -->
+        <div id="coaOverviewContainer" class="table-card" style="padding: 24px 28px;">
           <!-- Colored header strip -->
           <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
             <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
@@ -4311,6 +4345,143 @@
             </div>
           </div>
           <div id="chartWrap"></div>
+        </div>
+
+        <!-- 2. COA Ledger Container -->
+        <div id="coaLedgerContainer" class="table-card" style="padding: 24px 28px; display: none;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M4 5h12M4 10h8M4 15h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Ledgers</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">View, create and alter ledger accounts</div>
+              </div>
+            </div>
+            <div class="panel-actions" id="ledgerHeaderActions" style="display: flex; gap: 8px; align-items: center;"></div>
+          </div>
+
+          <div class="oh-layout" id="ledgerLayoutContainer">
+            <!-- Sub-tabs -->
+            <div class="oh-sub-tabs" id="ledgerSubTabsNav" role="tablist" aria-label="Ledger sections">
+              <!-- Ledgers tab -->
+              <button class="oh-sub-tab active" id="ledgerTabList" role="tab" aria-selected="true" aria-controls="ledger-list-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 5h12M4 10h8M4 15h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Ledgers</span>
+              </button>
+
+              <!-- Add Ledgers tab -->
+              <button class="oh-sub-tab" id="ledgerTabAdd" role="tab" aria-selected="false" aria-controls="ledger-add-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Add Ledgers</span>
+              </button>
+
+              <!-- Alter Ledgers tab -->
+              <button class="oh-sub-tab" id="ledgerTabAlter" role="tab" aria-selected="false" aria-controls="ledger-alter-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Alter Ledgers</span>
+              </button>
+            </div>
+
+            <!-- Content views area -->
+            <div class="oh-content-area">
+              <!-- Ledgers list view -->
+              <div id="ledger-list-view" role="tabpanel">
+                <div style="margin-bottom: 16px; max-width: 400px; position: relative;">
+                  <input type="text" id="ledgerSearchInput" placeholder="Search ledgers..." class="je-input" style="width: 100%; padding: 8px 12px 8px 36px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;" />
+                  <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; color: var(--slate-400); pointer-events: none;">
+                    <svg width="14" height="14" viewBox="0 0 17 17" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.8"/>
+                      <path d="M11.5 11.5l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                </div>
+                <div id="ledgerListWrap"></div>
+              </div>
+
+              <!-- Add Ledgers view -->
+              <div id="ledger-add-view" role="tabpanel" style="display:none">
+                <div style="margin-bottom: 20px;">
+                  <h3 style="font-size: 16px; font-weight: 700; color: var(--slate-800); margin: 0;">Add New Ledger</h3>
+                </div>
+                <div id="ledgerAddWrap"></div>
+              </div>
+
+              <!-- Alter Ledgers view -->
+              <div id="ledger-alter-view" role="tabpanel" style="display:none">
+                <div style="margin-bottom: 20px;">
+                  <h3 style="font-size: 16px; font-weight: 700; color: var(--slate-800); margin: 0;">Alter Ledger Details</h3>
+                </div>
+                <div id="ledgerAlterWrap"></div>
+              </div>
+
+              <!-- Ledger Statement view -->
+              <div id="ledger-statement-view" role="tabpanel" style="display:none">
+                <!-- Back button and Date filter bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                  <button class="btn btn-secondary" id="btnBackToLedgerList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
+                    ← Back to Ledgers
+                  </button>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">From:</label>
+                      <input type="date" id="statementDateFrom" class="je-input" style="height: 38px; padding: 0 10px;" />
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">To:</label>
+                      <input type="date" id="statementDateTo" class="je-input" style="height: 38px; padding: 0 10px;" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Table Card -->
+                <div class="table-card" style="padding: 0; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 20px;">
+                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center; background: var(--slate-50);">
+                    <h3 id="statementLedgerName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Account Ledger</h3>
+                    <span id="statementSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Subgroup</span>
+                  </div>
+                  
+                  <div id="statementTableWrap" style="overflow-x: auto;">
+                    <!-- Table goes here -->
+                  </div>
+                </div>
+
+                <!-- Balances Summary Area below the table -->
+                <div style="display: flex; justify-content: flex-end; gap: 24px; padding: 16px 20px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; margin-top: 16px; flex-wrap: wrap;">
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Opening Balance</span>
+                    <span id="statementOpeningBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Current Balance (Period Net)</span>
+                    <span id="statementCurrentBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Closing Balance</span>
+                    <span id="statementClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">₹0.00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -5251,7 +5422,6 @@
   // ── ROUTING SYSTEM ──────────────────────────────────────────────────
   const ROUTE_SECTIONS = {
     dashboard: { tabId: null, navId: 'nav-dashboard' },
-    ledger:    { tabId: null, navId: 'nav-ledger' },
     journal:   { tabId: 'journal' },
     voucher_desk: { tabId: 'voucher_desk' },
     chart:     { tabId: 'chart' },
@@ -5265,7 +5435,6 @@
 
   const NAV_ID_TO_ROUTE = {
     'nav-dashboard': 'dashboard',
-    'nav-ledger': 'ledger',
     'nav-voucher-desk': 'voucher_desk',
     'nav-chart': 'chart',
     'nav-trial': 'trial',
@@ -5281,6 +5450,11 @@
 
   function navigateTo(sectionId) {
     let target = sectionId;
+    if (target === 'ledger') {
+      _coaActiveTab = 'ledger';
+      target = 'chart';
+    }
+
     if (!ROUTE_SECTIONS[target]) {
       target = 'dashboard';
     }
@@ -5382,7 +5556,7 @@
       // Load panel specific data
       if (activeTabId === 'journal') populateJeDepartments();
       if (activeTabId === 'voucher_desk') renderVoucherDeskPanel();
-      if (activeTabId === 'chart') renderChartPanel();
+      if (activeTabId === 'chart') switchCoaTab(_coaActiveTab);
       if (activeTabId === 'balance') renderBalanceSheetPanel();
       if (activeTabId === 'pnl') renderPnlPanel();
       if (activeTabId === 'trial') renderTrialBalancePanel();
@@ -5448,6 +5622,9 @@
     if (el) {
       const handler = (e) => {
         if (e) e.preventDefault();
+        if (route === 'chart') {
+          _coaActiveTab = 'overview';
+        }
         window.location.hash = '#' + route;
       };
       el.addEventListener('click', handler);
@@ -5459,6 +5636,22 @@
     }
   });
 
+  // Chart of Accounts header buttons
+  const btnCoaOverview = document.getElementById('btnCoaOverview');
+  if (btnCoaOverview) {
+    btnCoaOverview.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchCoaTab('overview');
+    });
+  }
+  const btnCoaLedger = document.getElementById('btnCoaLedger');
+  if (btnCoaLedger) {
+    btnCoaLedger.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchCoaTab('ledger');
+    });
+  }
+
   // Quick-start card → journal (New Entry)
   if (qsJournal) {
     qsJournal.addEventListener('click', () => {
@@ -5466,6 +5659,27 @@
     });
     qsJournal.addEventListener('keydown', e => {
       if (e.key === 'Enter') qsJournal.click();
+    });
+  }
+
+  const qsLedgers = document.getElementById('qs-ledgers');
+  if (qsLedgers) {
+    qsLedgers.addEventListener('click', () => {
+      _coaActiveTab = 'ledger';
+      window.location.hash = '#chart';
+    });
+    qsLedgers.addEventListener('keydown', e => {
+      if (e.key === 'Enter') qsLedgers.click();
+    });
+  }
+
+  const qsPnl = document.getElementById('qs-pnl');
+  if (qsPnl) {
+    qsPnl.addEventListener('click', () => {
+      window.location.hash = '#pnl';
+    });
+    qsPnl.addEventListener('keydown', e => {
+      if (e.key === 'Enter') qsPnl.click();
     });
   }
 
@@ -7136,12 +7350,26 @@
 
     overlay.innerHTML = `
       <div class="fj-card">
-        <div class="fj-head" style="background:${headGrad}">
+        <div class="fj-head" style="background:${headGrad}; display: flex; justify-content: space-between; align-items: center;">
           <div>
             <div class="fj-head-title">Journal Voucher — ${entry.voucherNo || '—'}</div>
             <div class="fj-head-sub">${statusText}</div>
           </div>
-          <button class="fj-close-btn" id="fjClose">✕</button>
+          <div style="display: flex; align-items: center; gap: 12px; margin-left: auto; margin-right: 16px;">
+            <button onclick="editVoucherFromDetails(${entry.id}, ${!!isDraft}); document.getElementById('fjOverlay')?.remove();" title="Edit Entry" style="background: rgba(255,255,255,0.15); border: none; border-radius: 6px; padding: 6px; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button onclick="deleteVoucherFromDetails(${entry.id}, ${!!isDraft}); document.getElementById('fjOverlay')?.remove();" title="Delete Entry" style="background: rgba(255,255,255,0.15); border: none; border-radius: 6px; padding: 6px; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+          <button class="fj-close-btn" id="fjClose" style="margin-left: 0;">✕</button>
         </div>
         <div class="fj-body">
           ${draftBanner}
@@ -7913,6 +8141,7 @@
 
   let _coaLedgerCtr  = 1;
   initDefaultLedgers();
+  let _coaActiveTab  = 'overview'; // 'overview' | 'ledger'
   let _coaExpanded   = new Set(['assets','equity-liabilities','income','expense']);
   let _coaSearch     = '';
   let _coaStyleDone  = false;
@@ -8436,7 +8665,7 @@
         <div class="coa-ldg-dot" style="margin-top: 6px; align-self: flex-start;"></div>
         <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="coa-ldg-name" style="flex: none;">${_coaHl(l.name, q)}</span>
+            <span class="coa-ldg-name" style="flex: none; cursor: pointer; text-decoration: underline dotted;" onclick="viewLedgerFromTree(${l.id})" title="Click to view ledger statement">${_coaHl(l.name, q)}</span>
             ${l.code ? `<span class="coa-ldg-code">${l.code}</span>` : ''}
           </div>
           ${l.aliases && l.aliases.length > 0 ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500; margin-top: 2px;">A.K.A: ${l.aliases.map(a => _coaHl(a, q)).join(', ')}</div>` : ''}
@@ -9099,6 +9328,30 @@
     overlay.querySelector('#coaMLedgerName').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); overlay.querySelector('#coaModalSave').click(); }
     });
+  }
+
+  function switchCoaTab(tab) {
+    _coaActiveTab = tab;
+    const btnOverview = document.getElementById('btnCoaOverview');
+    const btnLedger = document.getElementById('btnCoaLedger');
+    const viewOverview = document.getElementById('coaOverviewContainer');
+    const viewLedger = document.getElementById('coaLedgerContainer');
+
+    if (btnOverview && btnLedger && viewOverview && viewLedger) {
+      if (tab === 'overview') {
+        btnOverview.className = 'btn btn-primary active';
+        btnLedger.className = 'btn btn-secondary';
+        viewOverview.style.display = '';
+        viewLedger.style.display = 'none';
+        renderChartPanel();
+      } else {
+        btnOverview.className = 'btn btn-secondary';
+        btnLedger.className = 'btn btn-primary active';
+        viewOverview.style.display = 'none';
+        viewLedger.style.display = '';
+        renderLedgerPanel();
+      }
+    }
   }
 
   // ── Main render ───────────────────────────────────────────────────
@@ -11927,7 +12180,7 @@
         }
 
         html += `
-          <tr class="${b.isPaused ? 'oh-budget-row-paused' : ''}">
+          <tr class="${b.isPaused ? 'oh-budget-row-paused' : ''}" data-bid="${b.id}" style="cursor:pointer;" title="Click to view transactions">
             <td style="white-space:nowrap; font-weight:500;">
               ${b.fromDate} &rarr; ${b.toDate}
             </td>
@@ -11943,18 +12196,11 @@
             <td style="text-align:right; font-variant-numeric: tabular-nums;">
               ${ohFmtAmt(expVal)}
             </td>
-            <td style="text-align:right; font-variant-numeric: tabular-nums;" class="oh-budget-variance ${remainVal >= 0 ? 'positive' : 'negative'}">
+            <td style="text-align:right; font-variant-numeric: tabular-nums; white-space:nowrap;" class="oh-budget-variance ${remainVal >= 0 ? 'positive' : 'negative'}">
               ${remainVal >= 0 ? '+' : ''}${ohFmtAmt(remainVal)}
             </td>
-            <td>
-              <div class="oh-budget-progress-wrap">
-                <div class="oh-budget-progress-bar">
-                  <div class="oh-budget-progress-fill" style="width: ${pct}%; background: ${barColor};"></div>
-                </div>
-                <div class="oh-budget-progress-text">
-                  <span>${b.isPaused ? 'Paused' : realPct.toFixed(0) + '% spent'}</span>
-                </div>
-              </div>
+            <td style="text-align:center; font-variant-numeric: tabular-nums; font-weight:600; color:${barColor}; font-size:13px;">
+              ${b.isPaused ? '—' : realPct.toFixed(0) + '%'}
             </td>
             <td>
               ${statusBadge}
@@ -11964,25 +12210,23 @@
                 ${b.isPaused ? `
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                  </svg> Resume
+                  </svg>
                 ` : `
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;">
                     <rect x="6" y="4" width="4" height="16"></rect>
                     <rect x="14" y="4" width="4" height="16"></rect>
-                  </svg> Pause
+                  </svg>
                 `}
               </button>
               <button class="oh-action-btn oh-budget-edit-btn" data-id="${b.id}" title="Edit Budget">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
                   <path d="M11 2l3 3M3 10v3h3l8.5-8.5-3-3L3 10z" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Edit
               </button>
               <button class="oh-action-btn danger oh-budget-del-btn" data-id="${b.id}" title="Delete Budget" style="margin-left:4px;">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
                   <path d="M2 4h12M4 4v9a2 2 0 002 2h4a2 2 0 002-2V4M6 7v5M10 7v5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Delete
               </button>
             </td>
           </tr>
@@ -12030,6 +12274,127 @@
         renderOhBudgetView();
       });
     });
+
+    // Row click → show transactions
+    wrap.querySelectorAll('tr[data-bid]').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('button')) return; // ignore action btn clicks
+        showBudgetTransactions(Number(row.dataset.bid));
+      });
+    });
+  }
+
+  function showBudgetTransactions(budgetId) {
+    const b = ohBudgets.find(x => x.id === budgetId);
+    if (!b) return;
+
+    const ledgerIds = b.ledgerIds !== undefined ? b.ledgerIds : (b.ledgerId !== undefined ? b.ledgerId : 'all');
+    const deptIds   = b.deptIds   !== undefined ? b.deptIds   : (b.deptId   !== undefined ? b.deptId   : 'all');
+    const expenseLedgers = coaLedgers.filter(l => l.type === 'ledger' && getLedgerMainGroup(l) === 'expense');
+
+    let ledgersToSum;
+    if (ledgerIds === 'all') {
+      ledgersToSum = expenseLedgers;
+    } else {
+      const ids = Array.isArray(ledgerIds) ? ledgerIds : [Number(ledgerIds)];
+      ledgersToSum = expenseLedgers.filter(l => ids.includes(l.id));
+    }
+    const ledgerNames = ledgersToSum.map(l => l.name.trim());
+
+    // Collect matching transactions
+    const rows = [];
+    postedEntries.forEach(entry => {
+      if (entry.isBudget !== true) return;
+      if (b.fromDate && entry.date < b.fromDate) return;
+      if (b.toDate   && entry.date > b.toDate)   return;
+      if (deptIds !== 'all') {
+        const ids = Array.isArray(deptIds) ? deptIds : [Number(deptIds)];
+        const ed  = entry.departmentId !== undefined ? entry.departmentId : 'all';
+        if (ed !== 'all' && !ids.includes(Number(ed))) return;
+      }
+      (entry.allRows || []).forEach(row => {
+        if (!ledgerNames.includes(row.particular.trim())) return;
+        const dr = parseAmt(row.debit);
+        const cr = parseAmt(row.credit);
+        if (dr > 0 || cr > 0) {
+          rows.push({
+            date:       entry.date,
+            particular: row.particular.trim(),
+            voucherNo:  entry.voucherNo || '—',
+            entryId:    entry.id,
+            debit:      dr,
+            credit:     cr
+          });
+        }
+      });
+    });
+    rows.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Ledger label for title
+    const ledgerLabel = ledgerIds === 'all' ? 'All Expenses'
+      : ledgersToSum.map(l => l.name).join(', ');
+
+    // Build modal
+    document.getElementById('budgetTxOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'budgetTxOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+
+    let bodyHtml = '';
+    if (rows.length === 0) {
+      bodyHtml = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--slate-400);">No budget transactions found for this period.</td></tr>`;
+    } else {
+      let totDr = 0, totCr = 0;
+      rows.forEach(r => { totDr += r.debit; totCr += r.credit; });
+      bodyHtml = rows.map(r => `
+        <tr style="border-bottom:1px solid var(--slate-100); cursor:pointer;" onclick="viewVoucherFromStatement(${r.entryId})" title="Click to view voucher">
+          <td style="padding:10px 14px;white-space:nowrap;color:var(--slate-500);font-size:13px;">${r.date}</td>
+          <td style="padding:10px 14px;font-weight:500;">${ohEsc(r.particular)}</td>
+          <td style="padding:10px 14px;"><span class="pt-vbadge">${ohEsc(r.voucherNo)}</span></td>
+          <td style="padding:10px 14px;text-align:right;font-weight:600;color:var(--blue-700);font-variant-numeric:tabular-nums;">${r.debit  ? '₹\u202F' + r.debit.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
+          <td style="padding:10px 14px;text-align:right;font-weight:600;color:var(--red-600);font-variant-numeric:tabular-nums;">${r.credit ? '₹\u202F' + r.credit.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
+        </tr>
+      `).join('');
+      bodyHtml += `
+        <tr style="background:var(--slate-50);font-weight:700;border-top:2px solid var(--slate-200);">
+          <td colspan="3" style="padding:10px 14px;">Total</td>
+          <td style="padding:10px 14px;text-align:right;color:var(--blue-700);font-variant-numeric:tabular-nums;">${totDr ? '₹\u202F' + totDr.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
+          <td style="padding:10px 14px;text-align:right;color:var(--red-600);font-variant-numeric:tabular-nums;">${totCr ? '₹\u202F' + totCr.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
+        </tr>
+      `;
+    }
+
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:18px;box-shadow:0 24px 64px rgba(0,0,0,.18);width:100%;max-width:820px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+        <!-- Header -->
+        <div style="background:linear-gradient(90deg,#2563eb,#3b82f6);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+          <div>
+            <div style="color:#fff;font-size:17px;font-weight:700;">Budget Transactions</div>
+            <div style="color:rgba(255,255,255,.75);font-size:12.5px;margin-top:3px;">${ohEsc(ledgerLabel)} &nbsp;·&nbsp; ${b.fromDate} → ${b.toDate}</div>
+          </div>
+          <button id="budgetTxClose" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;">✕</button>
+        </div>
+        <!-- Table -->
+        <div style="overflow-y:auto;flex:1;">
+          <table style="width:100%;border-collapse:collapse;font-family:Inter,sans-serif;font-size:13.5px;">
+            <thead>
+              <tr style="background:var(--slate-50);border-bottom:2px solid var(--slate-200);">
+                <th style="padding:10px 14px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-500);white-space:nowrap;">Date</th>
+                <th style="padding:10px 14px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-500);">Particular</th>
+                <th style="padding:10px 14px;text-align:left;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-500);">Voucher No</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-500);">Debit</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-500);">Credit</th>
+              </tr>
+            </thead>
+            <tbody>${bodyHtml}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.querySelector('#budgetTxClose').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
   let _activeDropdownType = null;
@@ -12635,12 +13000,957 @@
     return key + '_' + p.trim();
   }
 
+  // ── LEDGERS MODULE ──────────────────────────────────────────
+  let _ledgerActiveTab = 'list'; // 'list', 'add', 'alter'
+  let _ledgerEditId = null; // ID of ledger being edited/altered
+  let _ledgerAddAliases = [];
+  let _ledgerAlterAliases = [];
+  let _ledgerSearchQuery = '';
+  let _ledgerStatementId = null;
 
+  function renderLedgerPanel() {
+    switchLedgerTab(_ledgerActiveTab);
+
+    // Wire sub-tabs
+    const tabMap = {
+      ledgerTabList: 'list',
+      ledgerTabAdd:  'add',
+      ledgerTabAlter: 'alter',
+    };
+    Object.entries(tabMap).forEach(([btnId, tab]) => {
+      const btn = document.getElementById(btnId);
+      if (btn && !btn._wired) {
+        btn._wired = true;
+        btn.addEventListener('click', (e) => {
+          if (e) e.preventDefault();
+          if (tab === 'alter' && !_ledgerEditId) {
+            const firstLedger = coaLedgers.find(l => l.type === 'ledger');
+            _ledgerEditId = firstLedger ? firstLedger.id : null;
+          }
+          switchLedgerTab(tab);
+        });
+      }
+    });
+
+    const btnBack = document.getElementById('btnBackToLedgerList');
+    if (btnBack && !btnBack._wired) {
+      btnBack._wired = true;
+      btnBack.addEventListener('click', (e) => {
+        if (e) e.preventDefault();
+        switchLedgerTab('list');
+      });
+    }
+  }
+
+  function switchLedgerTab(tab) {
+    _ledgerActiveTab = tab;
+
+    const allTabs = [
+      ['ledgerTabList',  'list'],
+      ['ledgerTabAdd',   'add'],
+      ['ledgerTabAlter', 'alter'],
+    ];
+    const allViews = [
+      ['ledger-list-view',  'list'],
+      ['ledger-add-view',   'add'],
+      ['ledger-alter-view', 'alter'],
+      ['ledger-statement-view', 'statement'],
+    ];
+
+    allTabs.forEach(([btnId, t]) => {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      const isActive = t === tab;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive);
+    });
+
+    allViews.forEach(([viewId, t]) => {
+      const view = document.getElementById(viewId);
+      if (view) view.style.display = t === tab ? '' : 'none';
+    });
+
+    // Toggle full-width layout & hide/show sub-tabs sidebar
+    const subTabsNav = document.getElementById('ledgerSubTabsNav');
+    if (subTabsNav) {
+      subTabsNav.style.display = tab === 'statement' ? 'none' : '';
+    }
+    const layoutContainer = document.getElementById('ledgerLayoutContainer');
+    if (layoutContainer) {
+      layoutContainer.classList.toggle('full-width', tab === 'statement');
+    }
+
+    if (tab === 'list') {
+      renderLedgerListView();
+    } else if (tab === 'add') {
+      renderLedgerAddView();
+    } else if (tab === 'alter') {
+      renderLedgerAlterView();
+    } else if (tab === 'statement') {
+      renderLedgerStatementView();
+    }
+  }
+
+  function renderLedgerListView() {
+    const wrap = document.getElementById('ledgerListWrap');
+    if (!wrap) return;
+
+    // Wire search input event listener once
+    const searchInput = document.getElementById('ledgerSearchInput');
+    if (searchInput && !searchInput._wired) {
+      searchInput._wired = true;
+      searchInput.addEventListener('input', (e) => {
+        _ledgerSearchQuery = e.target.value;
+        renderLedgerListView();
+      });
+    }
+
+    if (coaLedgers.length === 0) {
+      wrap.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--slate-400);">No ledgers found.</div>`;
+      return;
+    }
+
+    const q = _ledgerSearchQuery.toLowerCase().trim();
+    const filteredLedgers = coaLedgers.filter(l => {
+      const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
+      const sgName = sg ? sg.name : '';
+      const nameMatch = l.name.toLowerCase().includes(q);
+      const sgMatch = sgName.toLowerCase().includes(q);
+      const aliasMatch = l.aliases && l.aliases.some(a => a.toLowerCase().includes(q));
+      return nameMatch || sgMatch || aliasMatch;
+    });
+
+    if (filteredLedgers.length === 0) {
+      wrap.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--slate-400);">No matching ledgers found.</div>`;
+      return;
+    }
+
+    let rowsHtml = '';
+    let index = 1;
+    
+    // Sort ledgers by name
+    const sortedLedgers = [...filteredLedgers].sort((a, b) => a.name.localeCompare(b.name));
+
+    sortedLedgers.forEach(l => {
+      const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
+      const sgName = sg ? sg.name : (l.sgId || '-');
+
+      rowsHtml += `
+        <tr onclick="viewLedgerStatement(${l.id})" style="cursor: pointer;" title="Click to view statement">
+          <td class="sl-col">${index++}</td>
+          <td class="particulars-col">
+            <span style="font-weight: 600; color: var(--slate-800);">${ohEsc(l.name)}</span>
+          </td>
+          <td>${ohEsc(sgName)}</td>
+        </tr>
+      `;
+    });
+
+    wrap.innerHTML = `
+      <table class="tb-table">
+        <thead>
+          <tr>
+            <th class="sl-col">#</th>
+            <th>Ledger Name</th>
+            <th>Sub Group</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `;
+  }
+
+  window.editLedgerFromList = function(id) {
+    _ledgerEditId = id;
+    switchLedgerTab('alter');
+  };
+
+  window.viewLedgerStatement = function(id) {
+    _ledgerStatementId = id;
+    switchLedgerTab('statement');
+  };
+
+  window.viewLedgerFromTree = function(id) {
+    _coaActiveTab = 'ledger';
+    _ledgerActiveTab = 'statement';
+    _ledgerStatementId = id;
+    switchCoaTab('ledger');
+    navigateTo('chart');
+  };
+
+  window.viewVoucherFromStatement = function(id) {
+    const entry = postedEntries.find(e => e.id === id);
+    if (!entry) return;
+
+    const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
+    if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
+      const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
+      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+      if (salesVoucher) {
+        viewPrintInvoice(salesVoucher.id);
+        return;
+      }
+    }
+
+    // Default fallback to Journal view modal
+    showFullJournalModal(entry, false);
+  };
+
+  window.editVoucherFromStatement = function(id) {
+    const entry = postedEntries.find(e => e.id === id);
+    if (!entry) return;
+
+    const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
+    if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
+      const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
+      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+      if (salesVoucher) {
+        loadSalesInvoice(salesVoucher, false);
+        return;
+      }
+    }
+
+    // Default fallback to Journal edit
+    loadJournalEntry(entry, false);
+  };
+
+  window.deleteVoucherFromStatement = function(id) {
+    const entry = postedEntries.find(e => e.id === id);
+    if (!entry) return;
+
+    const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
+    if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
+      const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
+      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+      if (salesVoucher) {
+        const isRet = !!salesVoucher.isReturn;
+        showKyaConfirm({
+          title: isRet ? 'Delete Posted Return?' : 'Delete Posted Invoice?',
+          message: isRet
+            ? 'Are you sure you want to delete this sales return? This will also delete the corresponding journal entry and cannot be undone.'
+            : 'Are you sure you want to delete this sales invoice? This will also delete the corresponding journal entry and cannot be undone.',
+          confirmLabel: 'Delete',
+          okBg: 'var(--red-600)',
+          onConfirm: () => {
+            const list = window.KYA_STORE.salesVouchers || [];
+            const idx = list.findIndex(v => v.id === salesVoucher.id);
+            if (idx > -1) list.splice(idx, 1);
+            window.KYA_STORE.salesVouchers = list;
+            
+            postedEntries = postedEntries.filter(e => e.id !== entry.id);
+            
+            showToast(isRet ? `Sales Return "${salesVoucher.invoiceNo}" deleted.` : `Invoice "${salesVoucher.invoiceNo}" deleted.`, 'success');
+            renderLedgerStatementView();
+            refreshAllReports();
+            triggerAutoBackup();
+          }
+        });
+        return;
+      }
+    }
+
+    // Default fallback to Journal delete
+    showKyaConfirm({
+      title: 'Delete this journal entry?',
+      message: `Permanently delete voucher <strong>${entry.voucherNo || '—'}</strong>?<br>This action cannot be undone.`,
+      confirmLabel: '✕ Delete',
+      iconBg: '#fee2e2', iconColor: '#dc2626',
+      iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      okBg: '#dc2626',
+      onConfirm: () => {
+        postedEntries = postedEntries.filter(e => e.id !== id);
+        showToast(`Journal voucher "${entry.voucherNo}" deleted.`, 'success');
+        renderLedgerStatementView();
+        refreshAllReports();
+        triggerAutoBackup();
+      }
+    });
+  };
+
+  window.editVoucherFromDetails = function(id, isDraft) {
+    // Close every possible overlay before navigating
+    ['fjOverlay', 'budgetTxOverlay', 'salesInvoicePrintOverlay'].forEach(oid => {
+      document.getElementById(oid)?.remove();
+    });
+
+    if (isDraft) {
+      const entry = draftedEntries.find(e => e.id === id);
+      if (entry) loadJournalEntry(entry, true);
+    } else {
+      const entry = postedEntries.find(e => e.id === id);
+      if (entry) {
+        const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
+        if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
+          const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
+          const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+          if (salesVoucher) {
+            loadSalesInvoice(salesVoucher, false);
+            return;
+          }
+        }
+        loadJournalEntry(entry, false);
+      }
+    }
+  };
+
+  window.deleteVoucherFromDetails = function(id, isDraft) {
+    // Close every possible overlay before acting
+    ['fjOverlay', 'budgetTxOverlay', 'salesInvoicePrintOverlay'].forEach(oid => {
+      document.getElementById(oid)?.remove();
+    });
+    if (isDraft) {
+      showKyaConfirm({
+        title: 'Delete this draft?',
+        message: 'Are you sure you want to permanently delete this draft journal entry? This action cannot be undone.',
+        confirmLabel: '✕ Delete',
+        okBg: '#dc2626',
+        onConfirm: () => {
+          draftedEntries = draftedEntries.filter(e => e.id !== id);
+          showToast('Draft deleted successfully.', 'success');
+          renderDraftedPanel();
+          triggerAutoBackup();
+        }
+      });
+    } else {
+      const entry = postedEntries.find(e => e.id === id);
+      if (entry) {
+        const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
+        if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
+          const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
+          const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+          if (salesVoucher) {
+            const isRet = !!salesVoucher.isReturn;
+            showKyaConfirm({
+              title: isRet ? 'Delete Posted Return?' : 'Delete Posted Invoice?',
+              message: isRet
+                ? 'Are you sure you want to delete this sales return? This will also delete the corresponding journal entry and cannot be undone.'
+                : 'Are you sure you want to delete this sales invoice? This will also delete the corresponding journal entry and cannot be undone.',
+              confirmLabel: 'Delete',
+              okBg: 'var(--red-600)',
+              onConfirm: () => {
+                const list = window.KYA_STORE.salesVouchers || [];
+                const idx = list.findIndex(v => v.id === salesVoucher.id);
+                if (idx > -1) list.splice(idx, 1);
+                window.KYA_STORE.salesVouchers = list;
+                postedEntries = postedEntries.filter(e => e.id !== entry.id);
+                showToast(isRet ? `Sales Return "${salesVoucher.invoiceNo}" deleted.` : `Invoice "${salesVoucher.invoiceNo}" deleted.`, 'success');
+                renderLedgerStatementView();
+                refreshAllReports();
+                triggerAutoBackup();
+              }
+            });
+            return;
+          }
+        }
+        showKyaConfirm({
+          title: 'Delete this journal entry?',
+          message: `Permanently delete voucher <strong>${entry.voucherNo || '—'}</strong>?<br>This action cannot be undone.`,
+          confirmLabel: '✕ Delete',
+          okBg: '#dc2626',
+          onConfirm: () => {
+            postedEntries = postedEntries.filter(e => e.id !== id);
+            showToast(`Journal voucher "${entry.voucherNo}" deleted.`, 'success');
+            renderLedgerStatementView();
+            refreshAllReports();
+            triggerAutoBackup();
+          }
+        });
+      }
+    }
+  };
+
+  function getOppositeParticulars(entry, currentLedgerName, isDebit) {
+    const opposites = [];
+    (entry.allRows || []).forEach(r => {
+      if (r.particular.trim() !== currentLedgerName.trim()) {
+        const dr = parseFloat(r.debit) || 0;
+        const cr = parseFloat(r.credit) || 0;
+        if (isDebit && cr > 0) {
+          opposites.push(r.particular.trim());
+        } else if (!isDebit && dr > 0) {
+          opposites.push(r.particular.trim());
+        }
+      }
+    });
+    if (opposites.length === 0) {
+      (entry.allRows || []).forEach(r => {
+        if (r.particular.trim() !== currentLedgerName.trim()) {
+          opposites.push(r.particular.trim());
+        }
+      });
+    }
+    return opposites[0] || '';
+  }
+
+  function calculateLedgerBalances(ledger, dateFrom, dateTo) {
+    const mainGroup = getLedgerMainGroup(ledger);
+    const initialOpening = parseFloat(ledger.openingBalance) || 0;
+
+    let preDebitSum = 0;
+    let preCreditSum = 0;
+    let periodDebitSum = 0;
+    let periodCreditSum = 0;
+
+    postedEntries.forEach(entry => {
+      (entry.allRows || []).forEach(row => {
+        if (row.particular.trim() === ledger.name.trim()) {
+          const dr = parseFloat(row.debit) || 0;
+          const cr = parseFloat(row.credit) || 0;
+          
+          if (dateFrom && entry.date < dateFrom) {
+            preDebitSum += dr;
+            preCreditSum += cr;
+          } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
+            periodDebitSum += dr;
+            periodCreditSum += cr;
+          }
+        }
+      });
+    });
+
+    let openingBalance = 0;
+    if (mainGroup === 'assets' || mainGroup === 'expense') {
+      openingBalance = initialOpening + preDebitSum - preCreditSum;
+    } else {
+      openingBalance = initialOpening + preCreditSum - preDebitSum;
+    }
+
+    let periodNet = 0;
+    if (mainGroup === 'assets' || mainGroup === 'expense') {
+      periodNet = periodDebitSum - periodCreditSum;
+    } else {
+      periodNet = periodCreditSum - periodDebitSum;
+    }
+
+    const closingBalance = openingBalance + periodNet;
+
+    return {
+      openingBalance,
+      periodNet,
+      closingBalance,
+      periodDebitSum,
+      periodCreditSum
+    };
+  }
+
+  function renderLedgerStatementView() {
+    const wrap = document.getElementById('statementTableWrap');
+    if (!wrap) return;
+
+    const ledger = coaLedgers.find(l => l.id === _ledgerStatementId);
+    if (!ledger) {
+      wrap.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--slate-400);">Account not found.</div>`;
+      return;
+    }
+
+    // Set header labels
+    document.getElementById('statementLedgerName').textContent = ledger.name;
+    const sg = COA_SYS_SGS.find(s => s.id === ledger.sgId);
+    document.getElementById('statementSubGroupName').textContent = sg ? sg.name : (ledger.sgId || '-');
+
+    // Get date values
+    const fromInp = document.getElementById('statementDateFrom');
+    const toInp = document.getElementById('statementDateTo');
+    const dateFrom = fromInp ? fromInp.value : '';
+    const dateTo = toInp ? toInp.value : '';
+
+    // Wire input listeners once
+    if (fromInp && !fromInp._wired) {
+      fromInp._wired = true;
+      fromInp.addEventListener('change', renderLedgerStatementView);
+    }
+    if (toInp && !toInp._wired) {
+      toInp._wired = true;
+      toInp.addEventListener('change', renderLedgerStatementView);
+    }
+
+    // Calculate balances
+    const balances = calculateLedgerBalances(ledger, dateFrom, dateTo);
+
+    // Filter transactions
+    const ledgerTrans = [];
+    postedEntries.forEach(entry => {
+      if (dateFrom && entry.date < dateFrom) return;
+      if (dateTo && entry.date > dateTo) return;
+
+      (entry.allRows || []).forEach(row => {
+        if (row.particular.trim() === ledger.name.trim()) {
+          const dr = parseFloat(row.debit) || 0;
+          const cr = parseFloat(row.credit) || 0;
+          if (dr > 0 || cr > 0) {
+            ledgerTrans.push({
+              id: entry.id,
+              date: entry.date,
+              voucherNo: entry.voucherNo || '-',
+              particulars: getOppositeParticulars(entry, ledger.name, dr > 0),
+              debit: dr,
+              credit: cr
+            });
+          }
+        }
+      });
+    });
+
+    // Sort transactions by date (oldest first for statement)
+    ledgerTrans.sort((a, b) => a.date.localeCompare(b.date));
+
+    let rowsHtml = '';
+    
+    // Show opening balance row
+    const mainGroup = getLedgerMainGroup(ledger);
+    const mainGroupLabel = (mainGroup === 'assets' || mainGroup === 'expense') ? 'Dr' : 'Cr';
+    const opBalLabel = balances.openingBalance < 0 ? (mainGroupLabel === 'Dr' ? 'Cr' : 'Dr') : mainGroupLabel;
+    const opBalText = `₹${fmtNum(Math.abs(balances.openingBalance).toFixed(2))} ${opBalLabel}`;
+
+    rowsHtml += `
+      <tr style="background: var(--slate-50); font-style: italic;">
+        <td>-</td>
+        <td>Opening Balance</td>
+        <td>-</td>
+        <td class="num-col">${(balances.openingBalance >= 0 && mainGroupLabel === 'Dr') || (balances.openingBalance < 0 && mainGroupLabel === 'Cr') ? opBalText : '-'}</td>
+        <td class="num-col">${(balances.openingBalance >= 0 && mainGroupLabel === 'Cr') || (balances.openingBalance < 0 && mainGroupLabel === 'Dr') ? opBalText : '-'}</td>
+      </tr>
+    `;
+
+    ledgerTrans.forEach(tr => {
+      const drText = tr.debit ? `₹${fmtNum(tr.debit.toFixed(2))}` : '-';
+      const crText = tr.credit ? `₹${fmtNum(tr.credit.toFixed(2))}` : '-';
+
+      rowsHtml += `
+        <tr>
+          <td>${tr.date}</td>
+          <td>${ohEsc(tr.particulars)}</td>
+          <td><span class="pt-vbadge" onclick="viewVoucherFromStatement(${tr.id})" title="Click to view details">${ohEsc(tr.voucherNo)}</span></td>
+          <td class="num-col">${drText}</td>
+          <td class="num-col">${crText}</td>
+        </tr>
+      `;
+    });
+
+    if (ledgerTrans.length === 0 && balances.openingBalance === 0) {
+      rowsHtml += `
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 20px; color: var(--slate-400);">No transactions found in this period.</td>
+        </tr>
+      `;
+    }
+
+    wrap.innerHTML = `
+      <table class="tb-table">
+        <thead>
+          <tr>
+            <th style="width: 110px;">Date</th>
+            <th>Particular</th>
+            <th style="width: 140px;">Voucher No</th>
+            <th class="num-col" style="width: 130px;">Debit</th>
+            <th class="num-col" style="width: 130px;">Credit</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `;
+
+    // Display summary balances
+    const opBalFormatted = `₹${fmtNum(Math.abs(balances.openingBalance).toFixed(2))} ${balances.openingBalance < 0 ? (mainGroupLabel === 'Dr' ? 'Cr' : 'Dr') : mainGroupLabel}`;
+    const curBalFormatted = `₹${fmtNum(Math.abs(balances.periodNet).toFixed(2))} ${balances.periodNet < 0 ? 'Cr' : 'Dr'}`;
+    const clBalFormatted = `₹${fmtNum(Math.abs(balances.closingBalance).toFixed(2))} ${balances.closingBalance < 0 ? (mainGroupLabel === 'Dr' ? 'Cr' : 'Dr') : mainGroupLabel}`;
+
+    document.getElementById('statementOpeningBal').textContent = opBalFormatted;
+    document.getElementById('statementCurrentBal').textContent = curBalFormatted;
+    document.getElementById('statementClosingBal').textContent = clBalFormatted;
+  }
+
+  function renderLedgerAddView() {
+    const wrap = document.getElementById('ledgerAddWrap');
+    if (!wrap) return;
+
+    _ledgerAddAliases = []; // reset aliases
+
+    const sgOpts = COA_SYS_SGS.map(sg => {
+      const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
+      return `<option value="${sg.id}">${indent}${sg.name}</option>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white);">
+        <div class="coa-modal-fg">
+          <label class="coa-modal-label">Ledger Name *</label>
+          <input class="coa-modal-inp" id="ldgAddName" placeholder="e.g. Cash in Hand">
+        </div>
+
+        <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
+          <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
+          <div id="ldgAddAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+          <button type="button" class="btn btn-secondary btn-sm" id="ldgAddAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
+            ＋ Add A.K.A
+          </button>
+        </div>
+
+        <div class="coa-modal-group-box" style="background: var(--slate-50); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+          <div class="coa-modal-fg" style="margin-bottom: 12px;">
+            <label class="coa-modal-label">Sub Group *</label>
+            <select class="coa-modal-sel" id="ldgAddSubGroup" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
+              ${sgOpts}
+            </select>
+          </div>
+          <div class="coa-modal-fg">
+            <label class="coa-modal-label">Group Ledger (Optional)</label>
+            <select class="coa-modal-sel" id="ldgAddGroupLedger" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
+              <option value="">— None —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="coa-modal-fg" style="margin-bottom: 20px;">
+          <label class="coa-modal-label">Opening Balance (Optional)</label>
+          <input class="coa-modal-inp" id="ldgAddBalance" type="number" min="0" step="0.01" placeholder="₹ 0.00">
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <button class="btn btn-primary" id="ldgAddSaveBtn" style="height: 38px;">＋ Add Ledger</button>
+          <button class="btn btn-secondary" id="ldgAddCancelBtn" style="height: 38px;">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    // Handle subgroup change to filter group ledgers
+    const sgSel = document.getElementById('ldgAddSubGroup');
+    const glSel = document.getElementById('ldgAddGroupLedger');
+
+    const updateGlOptions = () => {
+      const selectedSg = sgSel.value;
+      const filteredGls = coaLedgers.filter(l => l.sgId === selectedSg && l.type === 'group-ledger');
+      glSel.innerHTML = ['<option value="">— None —</option>',
+        ...filteredGls.map(gl => `<option value="${gl.id}">${gl.name}</option>`)
+      ].join('');
+    };
+
+    sgSel.addEventListener('change', updateGlOptions);
+    updateGlOptions(); // initial run
+
+    // Aliases functionality
+    const container = document.getElementById('ldgAddAliasesContainer');
+    const addAliasBtn = document.getElementById('ldgAddAddAliasBtn');
+
+    const renderAliases = () => {
+      container.innerHTML = '';
+      _ledgerAddAliases.forEach((alias, idx) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '8px';
+        row.style.alignItems = 'center';
+
+        const input = document.createElement('input');
+        input.className = 'coa-modal-inp';
+        input.style.flex = '1';
+        input.style.height = '38px';
+        input.placeholder = 'Alternate name / Code';
+        input.value = alias;
+        input.addEventListener('input', (e) => {
+          _ledgerAddAliases[idx] = e.target.value;
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.style.background = 'none';
+        delBtn.style.border = 'none';
+        delBtn.style.color = 'var(--red-600)';
+        delBtn.style.cursor = 'pointer';
+        delBtn.style.padding = '8px';
+        delBtn.innerHTML = `
+          <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
+            <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        `;
+        delBtn.addEventListener('click', () => {
+          _ledgerAddAliases.splice(idx, 1);
+          renderAliases();
+        });
+
+        row.appendChild(input);
+        row.appendChild(delBtn);
+        container.appendChild(row);
+      });
+    };
+
+    addAliasBtn.addEventListener('click', () => {
+      _ledgerAddAliases.push('');
+      renderAliases();
+    });
+
+    // Save and Cancel buttons
+    document.getElementById('ldgAddCancelBtn').addEventListener('click', () => {
+      switchLedgerTab('list');
+    });
+
+    document.getElementById('ldgAddSaveBtn').addEventListener('click', () => {
+      const nameEl = document.getElementById('ldgAddName');
+      const name = nameEl.value.trim();
+      if (!name) {
+        nameEl.style.borderColor = 'var(--red-600)';
+        nameEl.focus();
+        return;
+      }
+      nameEl.style.borderColor = '';
+
+      const sgId = sgSel.value;
+      const glId = glSel.value;
+      const bal = document.getElementById('ldgAddBalance').value.trim();
+      const aliases = _ledgerAddAliases.map(a => a.trim()).filter(a => a !== '');
+
+      coaLedgers.push({
+        id: Date.now() + _coaLedgerCtr++,
+        sgId,
+        glId: glId ? Number(glId) : null,
+        name,
+        code: '',
+        openingBalance: bal,
+        type: 'ledger',
+        aliases: aliases
+      });
+
+      // Expand COA tree for the added item
+      const sg = COA_SYS_SGS.find(s => s.id === sgId);
+      if (sg) {
+        _coaExpanded.add(sgId);
+        if (sg.parent) _coaExpanded.add(sg.parent);
+        _coaExpanded.add(sg.main);
+        if (glId) _coaExpanded.add('gl-' + glId);
+      }
+
+      showToast(`Ledger "${name}" added successfully.`, 'success');
+      renderChartPanel();
+      refreshAllReports();
+      triggerAutoBackup();
+
+      switchLedgerTab('list');
+    });
+  }
+
+  function renderLedgerAlterView() {
+    const wrap = document.getElementById('ledgerAlterWrap');
+    if (!wrap) return;
+
+    const ledgersList = [...coaLedgers].sort((a, b) => a.name.localeCompare(b.name));
+    
+    if (ledgersList.length === 0) {
+      wrap.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--slate-400);">No ledgers available to alter.</div>`;
+      return;
+    }
+
+    if (!_ledgerEditId || !coaLedgers.some(l => l.id === _ledgerEditId)) {
+      _ledgerEditId = ledgersList[0].id;
+    }
+
+    const currentLedger = coaLedgers.find(l => l.id === _ledgerEditId);
+    _ledgerAlterAliases = currentLedger.aliases ? [...currentLedger.aliases] : [];
+
+    const ldgSelectorOpts = ledgersList.map(l => {
+      return `<option value="${l.id}" ${l.id === _ledgerEditId ? 'selected' : ''}>${l.name} (${l.type === 'group-ledger' ? 'Group Ledger' : 'Ledger'})</option>`;
+    }).join('');
+
+    const sgOpts = COA_SYS_SGS.map(sg => {
+      const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
+      return `<option value="${sg.id}" ${sg.id === currentLedger.sgId ? 'selected' : ''}>${indent}${sg.name}</option>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div style="margin-bottom: 20px; max-width: 600px;">
+        <label class="coa-modal-label">Select Account to Alter</label>
+        <select id="ldgAlterSelector" style="width: 100%; height: 42px; border: 1.5px solid var(--slate-300); border-radius: 8px; padding: 0 12px; font-weight: 600; color: var(--slate-800); background-color: var(--white); box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+          ${ldgSelectorOpts}
+        </select>
+      </div>
+
+      <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white);">
+        <div class="coa-modal-fg">
+          <label class="coa-modal-label">Name *</label>
+          <input class="coa-modal-inp" id="ldgAlterName" placeholder="e.g. Cash in Hand" value="${currentLedger.name.replace(/"/g,'&quot;')}">
+        </div>
+
+        <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
+          <label class="coa-modal-label">Also Known As (A.K.A) / Aliases</label>
+          <div id="ldgAlterAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+          <button type="button" class="btn btn-secondary btn-sm" id="ldgAlterAddAliasBtn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; color: var(--slate-600);">
+            ＋ Add A.K.A
+          </button>
+        </div>
+
+        <div class="coa-modal-group-box" style="background: var(--slate-50); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+          <div class="coa-modal-fg" style="margin-bottom: 12px;">
+            <label class="coa-modal-label">Sub Group *</label>
+            <select class="coa-modal-sel" id="ldgAlterSubGroup" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
+              ${sgOpts}
+            </select>
+          </div>
+          ${currentLedger.type === 'ledger' ? `
+          <div class="coa-modal-fg">
+            <label class="coa-modal-label">Group Ledger (Optional)</label>
+            <select class="coa-modal-sel" id="ldgAlterGroupLedger" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
+              <option value="">— None —</option>
+            </select>
+          </div>
+          ` : ''}
+        </div>
+
+        ${currentLedger.type === 'ledger' ? `
+        <div class="coa-modal-fg" style="margin-bottom: 20px;">
+          <label class="coa-modal-label">Opening Balance (Optional)</label>
+          <input class="coa-modal-inp" id="ldgAlterBalance" type="number" min="0" step="0.01" placeholder="₹ 0.00" value="${currentLedger.openingBalance || ''}">
+        </div>
+        ` : ''}
+
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <button class="btn btn-primary" id="ldgAlterSaveBtn" style="height: 38px;">Save Changes</button>
+          <button class="btn btn-secondary" id="ldgAlterCancelBtn" style="height: 38px;">Cancel</button>
+          <button class="btn btn-secondary" id="ldgAlterDeleteBtn" style="height: 38px; background: var(--white); color: var(--red-600); border-color: var(--red-200); margin-left: auto; display: flex; align-items: center; gap: 4px; border: 1.5px solid var(--red-200); cursor: pointer;">
+            <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;"><path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Delete
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('ldgAlterSelector').addEventListener('change', (e) => {
+      _ledgerEditId = Number(e.target.value);
+      renderLedgerAlterView();
+    });
+
+    const sgSel = document.getElementById('ldgAlterSubGroup');
+    const glSel = document.getElementById('ldgAlterGroupLedger');
+
+    if (glSel) {
+      const updateGlOptions = () => {
+        const selectedSg = sgSel.value;
+        const filteredGls = coaLedgers.filter(l => l.sgId === selectedSg && l.type === 'group-ledger' && l.id !== _ledgerEditId);
+        glSel.innerHTML = ['<option value="">— None —</option>',
+          ...filteredGls.map(gl => `<option value="${gl.id}" ${gl.id == currentLedger.glId ? 'selected' : ''}>${gl.name}</option>`)
+        ].join('');
+      };
+
+      sgSel.addEventListener('change', updateGlOptions);
+      updateGlOptions(); // initial run
+    }
+
+    // Aliases functionality
+    const container = document.getElementById('ldgAlterAliasesContainer');
+    const addAliasBtn = document.getElementById('ldgAlterAddAliasBtn');
+
+    const renderAliases = () => {
+      container.innerHTML = '';
+      _ledgerAlterAliases.forEach((alias, idx) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '8px';
+        row.style.alignItems = 'center';
+
+        const input = document.createElement('input');
+        input.className = 'coa-modal-inp';
+        input.style.flex = '1';
+        input.style.height = '38px';
+        input.placeholder = 'Alternate name / Code';
+        input.value = alias;
+        input.addEventListener('input', (e) => {
+          _ledgerAlterAliases[idx] = e.target.value;
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.style.background = 'none';
+        delBtn.style.border = 'none';
+        delBtn.style.color = 'var(--red-600)';
+        delBtn.style.cursor = 'pointer';
+        delBtn.style.padding = '8px';
+        delBtn.innerHTML = `
+          <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
+            <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        `;
+        delBtn.addEventListener('click', () => {
+          _ledgerAlterAliases.splice(idx, 1);
+          renderAliases();
+        });
+
+        row.appendChild(input);
+        row.appendChild(delBtn);
+        container.appendChild(row);
+      });
+    };
+
+    addAliasBtn.addEventListener('click', () => {
+      _ledgerAlterAliases.push('');
+      renderAliases();
+    });
+    renderAliases();
+
+    document.getElementById('ldgAlterCancelBtn').addEventListener('click', () => {
+      switchLedgerTab('list');
+    });
+
+    document.getElementById('ldgAlterDeleteBtn').addEventListener('click', () => {
+      const confirmDelete = confirm(`Are you sure you want to delete "${currentLedger.name}"? This action cannot be undone.`);
+      if (confirmDelete) {
+        const idx = coaLedgers.findIndex(l => l.id === _ledgerEditId);
+        if (idx !== -1) {
+          coaLedgers.splice(idx, 1);
+          showToast(`Account "${currentLedger.name}" deleted successfully.`, 'success');
+          
+          _ledgerEditId = null;
+          
+          renderChartPanel();
+          refreshAllReports();
+          triggerAutoBackup();
+          switchLedgerTab('list');
+        }
+      }
+    });
+
+    document.getElementById('ldgAlterSaveBtn').addEventListener('click', () => {
+      const nameEl = document.getElementById('ldgAlterName');
+      const name = nameEl.value.trim();
+      if (!name) {
+        nameEl.style.borderColor = 'var(--red-600)';
+        nameEl.focus();
+        return;
+      }
+      nameEl.style.borderColor = '';
+
+      const sgId = sgSel.value;
+      const glId = glSel ? glSel.value : '';
+      const bal = document.getElementById('ldgAlterBalance') ? document.getElementById('ldgAlterBalance').value.trim() : '';
+      const aliases = _ledgerAlterAliases.map(a => a.trim()).filter(a => a !== '');
+
+      const ldg = coaLedgers.find(l => l.id === _ledgerEditId);
+      if (ldg) {
+        ldg.name = name;
+        ldg.sgId = sgId;
+        if (ldg.type === 'ledger') {
+          ldg.glId = glId ? Number(glId) : null;
+          ldg.openingBalance = bal;
+        }
+        ldg.aliases = aliases;
+      }
+
+      showToast(`Account "${name}" updated successfully.`, 'success');
+      renderChartPanel();
+      refreshAllReports();
+      triggerAutoBackup();
+
+      switchLedgerTab('list');
+    });
+  }
 
   function refreshAllActivePanels() {
     if (activeTabId === 'posted') renderPostedPanel();
     if (activeTabId === 'drafted') renderDraftedPanel();
-    if (activeTabId === 'chart') renderChartPanel();
+    if (activeTabId === 'chart') {
+      if (_coaActiveTab === 'overview') renderChartPanel();
+      else renderLedgerPanel();
+    }
     if (activeTabId === 'balance') renderBalanceSheetPanel();
     if (activeTabId === 'pnl') renderPnlPanel();
     if (activeTabId === 'trial') renderTrialBalancePanel();
@@ -15540,7 +16850,19 @@
       <div class="inv-modal-card" style="padding: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1.5px solid var(--slate-100); background: var(--slate-50); border-radius: 20px 20px 0 0;">
           <div style="font-weight: 700; color: var(--slate-800);">${inv.isReturn ? 'Sales Return Preview' : 'Invoice Preview'}</div>
-          <div style="display: flex; gap: 12px;">
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <button onclick="loadSalesInvoice((window.KYA_STORE.salesVouchers || []).find(v => v.id === ${inv.id}), false); document.getElementById('salesInvoicePrintOverlay')?.remove();" title="Edit Invoice" style="background: var(--blue-50); border: 1.5px solid var(--blue-100); border-radius: 6px; padding: 8px; cursor: pointer; color: var(--blue-600); display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-100)'" onmouseout="this.style.background='var(--blue-50)'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button onclick="deleteSalesInvoice(${inv.id}); document.getElementById('salesInvoicePrintOverlay')?.remove();" title="Delete Invoice" style="background: var(--red-50); border: 1.5px solid var(--red-100); border-radius: 6px; padding: 8px; cursor: pointer; color: var(--red-600); display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='var(--red-100)'" onmouseout="this.style.background='var(--red-50)'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
             <button class="btn btn-secondary" id="btnPrintInvoiceAction" style="padding: 8px 16px;">
               <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px; margin-right: 6px; display: inline-block; vertical-align: middle;">
                 <path d="M4 5v-3h8v3M2 5h12v7h-3v3H5v-3H2V5zm3 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
