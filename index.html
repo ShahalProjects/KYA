@@ -733,6 +733,11 @@
       font-weight: 600;
       box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
     }
+    .topbar-tab.dragging {
+      opacity: 0.45;
+      border: 1px dashed var(--blue-400);
+      background: var(--blue-50);
+    }
     .topbar-tab:focus-visible {
       outline: 2px solid var(--blue-300);
       outline-offset: 1px;
@@ -4419,17 +4424,11 @@
 
               <!-- Add Ledgers view -->
               <div id="ledger-add-view" role="tabpanel" style="display:none">
-                <div style="margin-bottom: 20px;">
-                  <h3 style="font-size: 16px; font-weight: 700; color: var(--slate-800); margin: 0;">Add New Ledger</h3>
-                </div>
                 <div id="ledgerAddWrap"></div>
               </div>
 
               <!-- Alter Ledgers view -->
               <div id="ledger-alter-view" role="tabpanel" style="display:none">
-                <div style="margin-bottom: 20px;">
-                  <h3 style="font-size: 16px; font-weight: 700; color: var(--slate-800); margin: 0;">Alter Ledger Details</h3>
-                </div>
                 <div id="ledgerAlterWrap"></div>
               </div>
 
@@ -4455,7 +4454,12 @@
                 <!-- Table Card -->
                 <div class="table-card" style="padding: 0; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 20px;">
                   <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center; background: var(--slate-50);">
-                    <h3 id="statementLedgerName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Account Ledger</h3>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <h3 id="statementLedgerName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Account Ledger</h3>
+                      <button class="btn btn-secondary btn-sm" id="btnEditLedgerFromStatement" style="padding: 4px 8px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 6px; background: #fff; cursor: pointer; color: var(--slate-600); height: 24px;">
+                        ✎ Alter Details
+                      </button>
+                    </div>
                     <span id="statementSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Subgroup</span>
                   </div>
                   
@@ -4587,10 +4591,6 @@
                 <input type="date" id="trialDateTo" class="rpt-date-inp">
               </div>
               <div class="rpt-sep"></div>
-              <button class="rpt-btn rpt-btn-danger" id="trialClearFilters">
-                <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                Clear Filters
-              </button>
               <div class="rpt-col-wrap">
                 <button class="rpt-btn" id="trialColToggleBtn">
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -4605,6 +4605,10 @@
                   <label><input type="checkbox" id="col-plbs-check"> PL / BS</label>
                 </div>
               </div>
+              <button class="rpt-btn rpt-btn-danger" id="trialClearFilters">
+                <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                Clear Filters
+              </button>
               <div class="rpt-sep"></div>
               <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none; margin: 0 4px; height: 32px;">
                 <input type="checkbox" id="trialShowAllCheck" style="accent-color: var(--blue-600); width: 14px; height: 14px; cursor: pointer; margin: 0;" />
@@ -5405,15 +5409,69 @@
   };
 
   const TAB_DEFS = {
-    journal: { id: 'journal', label: 'New Journal Entry', panelId: 'panel-journal', navId: 'nav-je-new' },
-    voucher_desk: { id: 'voucher_desk', label: 'Voucher Desk', panelId: 'panel-voucher-desk', navId: 'nav-voucher-desk' },
-    chart:   { id: 'chart',   label: 'Chart of Accounts', panelId: 'panel-chart',   navId: 'nav-chart' },
-    balance: { id: 'balance', label: 'Balance Sheet',    panelId: 'panel-balance', navId: 'nav-balance' },
-    pnl:     { id: 'pnl',     label: 'Profit & Loss',     panelId: 'panel-pnl',     navId: 'nav-pnl' },
-    trial:   { id: 'trial',   label: 'Trial Balance',     panelId: 'panel-trial',   navId: 'nav-trial' },
-    onehub:  { id: 'onehub',  label: 'KeepOne',           panelId: 'panel-onehub',  navId: 'nav-onehub' },
-    settings: { id: 'settings', label: 'Settings',        panelId: 'panel-settings', navId: 'nav-settings' },
-    sales_voucher: { id: 'sales_voucher', label: 'New Invoice', panelId: 'panel-sales-voucher', navId: 'nav-sales-new' },
+    journal: { 
+      id: 'journal', 
+      label: 'New Journal Entry', 
+      panelId: 'panel-journal', 
+      navId: 'nav-je-new',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="3" y="2" width="13" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="2" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/><line x1="9.5" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="9.5" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="9.5" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`
+    },
+    voucher_desk: { 
+      id: 'voucher_desk', 
+      label: 'Voucher Desk', 
+      panelId: 'panel-voucher-desk', 
+      navId: 'nav-voucher-desk',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="3" y="4" width="14" height="12" rx="1.5" stroke="currentColor" stroke-width="1.6"/><line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="1.6"/><path d="M7 10v2a1 1 0 001 1h4a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    },
+    chart:   { 
+      id: 'chart',   
+      label: 'Chart of Accounts', 
+      panelId: 'panel-chart',   
+      navId: 'nav-chart',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="2" y="7" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="3" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="13" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M7 9h3M10 9V5h3M10 9v6h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
+    },
+    balance: { 
+      id: 'balance', 
+      label: 'Balance Sheet',    
+      panelId: 'panel-balance', 
+      navId: 'nav-balance',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="8" x2="18" y2="8" stroke="currentColor" stroke-width="1.4"/><line x1="10" y1="8" x2="10" y2="17" stroke="currentColor" stroke-width="1.4"/></svg>`
+    },
+    pnl:     { 
+      id: 'pnl',     
+      label: 'Profit & Loss',     
+      panelId: 'panel-pnl',     
+      navId: 'nav-pnl',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M3 14l4-5 3 3 4-6 3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    },
+    trial:   { 
+      id: 'trial',   
+      label: 'Trial Balance',     
+      panelId: 'panel-trial',   
+      navId: 'nav-trial',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M10 3v14M6 10l4-7 4 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`
+    },
+    onehub:  { 
+      id: 'onehub',  
+      label: 'KeepOne',           
+      panelId: 'panel-onehub',  
+      navId: 'nav-onehub',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M10 2a8 8 0 100 16A8 8 0 0010 2z" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.5 2.5"/><path d="M10 6v8M6 10h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`
+    },
+    settings: { 
+      id: 'settings', 
+      label: 'Settings',        
+      panelId: 'panel-settings', 
+      navId: 'nav-settings',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
+    },
+    sales_voucher: { 
+      id: 'sales_voucher', 
+      label: 'New Invoice', 
+      panelId: 'panel-sales-voucher', 
+      navId: 'nav-sales-new',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="14" cy="16" r="1.5" fill="currentColor"/></svg>`
+    },
   };
 
   let openTabs = [];
@@ -5599,8 +5657,8 @@
       const def = TAB_DEFS[tabId];
       const isActive = tabId === activeTabId;
       return `
-        <div class="topbar-tab ${isActive ? 'active' : ''}" data-tab-id="${tabId}" role="tab" aria-selected="${isActive}">
-          <span class="tab-label">${def.label}</span>
+        <div class="topbar-tab ${isActive ? 'active' : ''}" data-tab-id="${tabId}" role="tab" aria-selected="${isActive}" title="${def.label}" draggable="true">
+          <span class="tab-label">${def.icon}</span>
           <button class="tab-close" data-tab-close="${tabId}" aria-label="Close tab">×</button>
         </div>
       `;
@@ -5609,10 +5667,58 @@
     // Add event listeners
     tabsContainer.querySelectorAll('.topbar-tab').forEach(tabEl => {
       const tabId = tabEl.dataset.tabId;
-      tabEl.addEventListener('click', () => openTab(tabId));
+      
+      // Click handlers
+      tabEl.addEventListener('click', (e) => {
+        // Prevent action if clicking the close button or dragging
+        if (e.target.closest('.tab-close') || tabEl.classList.contains('dragging')) return;
+        openTab(tabId);
+      });
       
       const closeEl = tabEl.querySelector('.tab-close');
-      closeEl.addEventListener('click', (e) => closeTab(tabId, e));
+      closeEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeTab(tabId, e);
+      });
+
+      // Drag & Drop reordering
+      tabEl.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', tabId);
+        // Delay adding class slightly so the drag ghost image is unaffected
+        setTimeout(() => tabEl.classList.add('dragging'), 0);
+      });
+
+      tabEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggingEl = tabsContainer.querySelector('.dragging');
+        if (!draggingEl || draggingEl === tabEl) return;
+
+        const rect = tabEl.getBoundingClientRect();
+        const midpoint = rect.left + rect.width / 2;
+        if (e.clientX < midpoint) {
+          tabsContainer.insertBefore(draggingEl, tabEl);
+        } else {
+          tabsContainer.insertBefore(draggingEl, tabEl.nextSibling);
+        }
+      });
+
+      tabEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        
+        // Rebuild openTabs based on current DOM order in tabsContainer
+        const newOrder = [];
+        tabsContainer.querySelectorAll('.topbar-tab').forEach(el => {
+          newOrder.push(el.dataset.tabId);
+        });
+        openTabs = newOrder;
+        
+        triggerAutoBackup();
+      });
+
+      tabEl.addEventListener('dragend', () => {
+        tabEl.classList.remove('dragging');
+        renderTabs(); // Redraw tabs to ensure consistent visual state
+      });
     });
   }
 
@@ -7999,9 +8105,10 @@
       { name: 'Trade Receivables', sgId: 'sg-tr' },
 
       // Cash and Cash Equivalents (sg-cce)
-      { name: 'Cash in Hand', sgId: 'sg-cce' },
-      { name: 'Bank Accounts', sgId: 'sg-cce' },
-      { name: 'Petty Cash', sgId: 'sg-cce' },
+      { name: 'Cash in Hand', sgId: 'sg-cce', type: 'group-ledger' },
+      { name: 'Bank Account', sgId: 'sg-cce', type: 'group-ledger' },
+      { name: 'Cash', sgId: 'sg-cce', parentGlName: 'Cash in Hand' },
+      { name: 'Petty Cash', sgId: 'sg-cce', parentGlName: 'Cash in Hand' },
 
       // Short-Term Loans and Advances (sg-stla)
       { name: 'Advances to Suppliers', sgId: 'sg-stla' },
@@ -8135,8 +8242,18 @@
       name: d.name,
       code: '',
       openingBalance: 0,
-      type: 'ledger'
+      type: d.type || 'ledger'
     }));
+
+    // Resolve parent group-ledger relationships
+    defaults.forEach((d, index) => {
+      if (d.parentGlName) {
+        const parentGl = coaLedgers.find(l => l.name === d.parentGlName && l.type === 'group-ledger');
+        if (parentGl) {
+          coaLedgers[index].glId = parentGl.id;
+        }
+      }
+    });
   }
 
   let _coaLedgerCtr  = 1;
@@ -8671,10 +8788,6 @@
           ${l.aliases && l.aliases.length > 0 ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500; margin-top: 2px;">A.K.A: ${l.aliases.map(a => _coaHl(a, q)).join(', ')}</div>` : ''}
         </div>
         ${l.openingBalance ? `<span class="coa-ldg-bal">₹ ${parseFloat(l.openingBalance||0).toLocaleString('en-IN')}</span>` : ''}
-        <div class="coa-ldg-acts">
-          <button class="coa-la coa-la-edit" data-coa-edit="${l.id}">Edit</button>
-          <button class="coa-la coa-la-del"  data-coa-del="${l.id}">Delete</button>
-        </div>
       </div>`;
   }
 
@@ -8706,11 +8819,7 @@
       for (const ch of matchingChildren) {
         childHtml += _coaLdgRow(ch, gi, q);
       }
-      if (!q && !_coaFilterType && !_coaFilterBal) {
-        childHtml += `<div class="coa-add-row ${gi}">
-          <button class="coa-add-btn" data-coa-modal-sg="${sgId}" data-coa-modal-gl="${gl.id}">＋ Add Ledger</button>
-        </div>`;
-      }
+
       html += `
         <div class="coa-gl" data-gl-node="${gl.id}">
           <div class="coa-gl-hdr ${bi}" data-coa-toggle="gl-${gl.id}">
@@ -8744,12 +8853,7 @@
       html += _coaLdgRow(l, bi, q);
     }
 
-    // 3. "Add Ledger" quick button
-    if (!q && !_coaFilterType && !_coaFilterBal) {
-      html += `<div class="coa-add-row ${bi}">
-        <button class="coa-add-btn" data-coa-modal-sg="${sgId}">＋ Add Ledger</button>
-      </div>`;
-    }
+
     return html;
   }
 
@@ -8937,24 +9041,23 @@
     _renderCoaModal();
   }
 
-  function initCoaSearchableSelect(overlay) {
-    const realSelect = overlay.querySelector('#coaMSubGroup');
-    const trigger = overlay.querySelector('#coaMSubGroupTrigger');
-    const dropdown = overlay.querySelector('#coaMSubGroupDropdown');
-    const searchInput = overlay.querySelector('#coaMSubGroupSearch');
-    const optionsList = overlay.querySelector('#coaMSubGroupOptionsList');
-    const triggerText = overlay.querySelector('#coaMSubGroupTriggerText');
-    if (!realSelect || !trigger || !dropdown || !searchInput || !optionsList || !triggerText) return;
+  function initGenericSearchableSelect(container, prefix, placeholderText = 'Search...') {
+    const realSelect = container.querySelector('#' + prefix);
+    const trigger = container.querySelector('#' + prefix + 'Trigger');
+    const dropdown = container.querySelector('#' + prefix + 'Dropdown');
+    const searchInput = container.querySelector('#' + prefix + 'Search');
+    const optionsList = container.querySelector('#' + prefix + 'OptionsList');
+    const triggerText = container.querySelector('#' + prefix + 'TriggerText');
+    if (!realSelect || !trigger || !dropdown || !searchInput || !optionsList || !triggerText) return null;
     
     const updateTriggerText = () => {
       const selectedOpt = realSelect.options[realSelect.selectedIndex];
       if (selectedOpt) {
         triggerText.textContent = selectedOpt.textContent.trim();
       } else {
-        triggerText.textContent = 'Select Sub Group';
+        triggerText.textContent = placeholderText;
       }
     };
-    updateTriggerText();
     
     const populateList = (filter = '') => {
       optionsList.innerHTML = '';
@@ -9003,7 +9106,7 @@
         noResult.style.fontSize = '12.5px';
         noResult.style.color = 'var(--slate-400)';
         noResult.style.textAlign = 'center';
-        noResult.textContent = 'No matching sub groups';
+        noResult.textContent = 'No matching options';
         optionsList.appendChild(noResult);
       }
     };
@@ -9037,12 +9140,26 @@
     document.addEventListener('click', handleOutsideClick);
     
     const observer = new MutationObserver((mutations, obs) => {
-      if (!document.getElementById('coaModalOverlay')) {
+      if (!container.contains(realSelect)) {
         document.removeEventListener('click', handleOutsideClick);
         obs.disconnect();
       }
     });
-    observer.observe(document.body, { childList: true });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    updateTriggerText();
+    populateList();
+    
+    return {
+      refresh: () => {
+        updateTriggerText();
+        populateList();
+      }
+    };
+  }
+
+  function initCoaSearchableSelect(overlay) {
+    initGenericSearchableSelect(overlay, 'coaMSubGroup', 'Select Sub Group');
   }
 
   function _renderCoaModal() {
@@ -9179,6 +9296,13 @@
     setTimeout(() => overlay.querySelector('#coaMLedgerName')?.focus(), 40);
     initCoaSearchableSelect(overlay);
 
+    const addAliasBtn = overlay.querySelector('#coaMAddAliasBtn');
+    const updateAddBtnVisibility = () => {
+      if (!addAliasBtn) return;
+      const hasEmpty = _coaMAliases.some(a => a.trim() === '');
+      addAliasBtn.style.display = hasEmpty ? 'none' : '';
+    };
+
     const renderAliasRows = () => {
       const container = overlay.querySelector('#coaMAliasesContainer');
       if (!container) return;
@@ -9198,6 +9322,7 @@
         input.value = alias;
         input.addEventListener('input', (e) => {
           _coaMAliases[idx] = e.target.value;
+          updateAddBtnVisibility();
         });
         
         const delBtn = document.createElement('button');
@@ -9224,9 +9349,9 @@
         row.appendChild(delBtn);
         container.appendChild(row);
       });
+      updateAddBtnVisibility();
     };
 
-    const addAliasBtn = overlay.querySelector('#coaMAddAliasBtn');
     if (addAliasBtn) {
       addAliasBtn.addEventListener('click', () => {
         _coaMAliases.push('');
@@ -9420,13 +9545,6 @@
             <span class="coa-result-dot"></span>
             ${_coaMatchCount !== null ? `${_coaMatchCount} result${_coaMatchCount !== 1 ? 's' : ''}` : ''}
           </div>
-
-          <button class="coa-tb-add" id="coaTbAdd">
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-              <path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Add Ledger
-          </button>
         </div>
 
         <!-- Row 2: Filter chips + Expand/Collapse + Clear All -->
@@ -9435,7 +9553,7 @@
           <div class="coa-chip-group" id="coaChipGroupMg">
             <button class="coa-chip ${_coaFilterMg===''?'active':''}" data-mg-chip="">All</button>
             <button class="coa-chip ${_coaFilterMg==='assets'?'active':''}" data-mg-chip="assets"><span class="coa-chip-dot" style="background:#3b82f6"></span>Assets</button>
-            <button class="coa-chip ${_coaFilterMg==='equity-liabilities'?'active':''}" data-mg-chip="equity-liabilities"><span class="coa-chip-dot" style="background:#8b5cf6"></span>Equity & Liab.</button>
+            <button class="coa-chip ${_coaFilterMg==='equity-liabilities'?'active':''}" data-mg-chip="equity-liabilities"><span class="coa-chip-dot" style="background:#8b5cf6"></span>Equity & Liability</button>
             <button class="coa-chip ${_coaFilterMg==='income'?'active':''}" data-mg-chip="income"><span class="coa-chip-dot" style="background:#10b981"></span>Income</button>
             <button class="coa-chip ${_coaFilterMg==='expense'?'active':''}" data-mg-chip="expense"><span class="coa-chip-dot" style="background:#f59e0b"></span>Expense</button>
           </div>
@@ -9486,9 +9604,6 @@
       `}</div>`;
 
     // ── Wire events ────────────────────────────────────────────────
-
-    // Add Ledger
-    wrap.querySelector('#coaTbAdd').addEventListener('click', () => showCoaModal('', ''));
 
     // Search input – live filter
     const coaInp = wrap.querySelector('#coaSearch');
@@ -13024,7 +13139,7 @@
         btn.addEventListener('click', (e) => {
           if (e) e.preventDefault();
           if (tab === 'alter' && !_ledgerEditId) {
-            const firstLedger = coaLedgers.find(l => l.type === 'ledger');
+            const firstLedger = coaLedgers[0];
             _ledgerEditId = firstLedger ? firstLedger.id : null;
           }
           switchLedgerTab(tab);
@@ -13450,6 +13565,18 @@
     const sg = COA_SYS_SGS.find(s => s.id === ledger.sgId);
     document.getElementById('statementSubGroupName').textContent = sg ? sg.name : (ledger.sgId || '-');
 
+    // Wire Alter Details button
+    const btnEdit = document.getElementById('btnEditLedgerFromStatement');
+    if (btnEdit) {
+      const newBtn = btnEdit.cloneNode(true);
+      btnEdit.parentNode.replaceChild(newBtn, btnEdit);
+      newBtn.addEventListener('click', (e) => {
+        if (e) e.preventDefault();
+        _ledgerEditId = ledger.id;
+        switchLedgerTab('alter');
+      });
+    }
+
     // Get date values
     const fromInp = document.getElementById('statementDateFrom');
     const toInp = document.getElementById('statementDateTo');
@@ -13506,7 +13633,7 @@
 
     rowsHtml += `
       <tr style="background: var(--slate-50); font-style: italic;">
-        <td>-</td>
+        <td style="white-space: nowrap;">-</td>
         <td>Opening Balance</td>
         <td>-</td>
         <td class="num-col">${(balances.openingBalance >= 0 && mainGroupLabel === 'Dr') || (balances.openingBalance < 0 && mainGroupLabel === 'Cr') ? opBalText : '-'}</td>
@@ -13518,9 +13645,17 @@
       const drText = tr.debit ? `₹${fmtNum(tr.debit.toFixed(2))}` : '-';
       const crText = tr.credit ? `₹${fmtNum(tr.credit.toFixed(2))}` : '-';
 
+      let formattedDate = tr.date;
+      if (tr.date && tr.date.includes('-')) {
+        const parts = tr.date.split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+          formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+
       rowsHtml += `
         <tr>
-          <td>${tr.date}</td>
+          <td style="white-space: nowrap;">${formattedDate}</td>
           <td>${ohEsc(tr.particulars)}</td>
           <td><span class="pt-vbadge" onclick="viewVoucherFromStatement(${tr.id})" title="Click to view details">${ohEsc(tr.voucherNo)}</span></td>
           <td class="num-col">${drText}</td>
@@ -13541,7 +13676,7 @@
       <table class="tb-table">
         <thead>
           <tr>
-            <th style="width: 110px;">Date</th>
+            <th style="width: 110px; white-space: nowrap;">Date</th>
             <th>Particular</th>
             <th style="width: 140px;">Voucher No</th>
             <th class="num-col" style="width: 130px;">Debit</th>
@@ -13570,15 +13705,17 @@
 
     _ledgerAddAliases = []; // reset aliases
 
-    const sgOpts = COA_SYS_SGS.map(sg => {
-      const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
-      return `<option value="${sg.id}">${indent}${sg.name}</option>`;
-    }).join('');
-
     wrap.innerHTML = `
       <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white);">
+        <!-- Slider toggle -->
+        <div class="coa-slider-wrap">
+          <div class="coa-slider-bg ledger-active" id="ldgAddSliderBg"></div>
+          <button class="coa-slider-btn active" id="ldgAddTogLedger" type="button">Ledger</button>
+          <button class="coa-slider-btn" id="ldgAddTogGroup" type="button">Group Ledger</button>
+        </div>
+
         <div class="coa-modal-fg">
-          <label class="coa-modal-label">Ledger Name *</label>
+          <label class="coa-modal-label" id="ldgAddNameLabel">Ledger Name *</label>
           <input class="coa-modal-inp" id="ldgAddName" placeholder="e.g. Cash in Hand">
         </div>
 
@@ -13591,21 +13728,23 @@
         </div>
 
         <div class="coa-modal-group-box" style="background: var(--slate-50); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-          <div class="coa-modal-fg" style="margin-bottom: 12px;">
-            <label class="coa-modal-label">Sub Group *</label>
-            <select class="coa-modal-sel" id="ldgAddSubGroup" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
-              ${sgOpts}
-            </select>
-          </div>
-          <div class="coa-modal-fg">
-            <label class="coa-modal-label">Group Ledger (Optional)</label>
-            <select class="coa-modal-sel" id="ldgAddGroupLedger" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
-              <option value="">— None —</option>
-            </select>
+          <div class="coa-modal-fg" style="position: relative;">
+            <label class="coa-modal-label" id="ldgAddParentLabel">Sub Group / Group Ledger *</label>
+            <select class="coa-modal-sel" id="ldgAddParentSelector" style="display: none;"></select>
+            <div class="kya-searchable-select-wrap" id="ldgAddParentSelectorSearchableWrap" style="position: relative; width: 100%;">
+              <div class="kya-searchable-select-trigger" id="ldgAddParentSelectorTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                <span id="ldgAddParentSelectorTriggerText">Select Sub Group / Group Ledger</span>
+                <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+              </div>
+              <div class="kya-searchable-select-dropdown" id="ldgAddParentSelectorDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                <input type="text" id="ldgAddParentSelectorSearch" placeholder="Search..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                <div id="ldgAddParentSelectorOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="coa-modal-fg" style="margin-bottom: 20px;">
+        <div class="coa-modal-fg" id="ldgAddBalanceContainer" style="margin-bottom: 20px;">
           <label class="coa-modal-label">Opening Balance (Optional)</label>
           <input class="coa-modal-inp" id="ldgAddBalance" type="number" min="0" step="0.01" placeholder="₹ 0.00">
         </div>
@@ -13617,24 +13756,93 @@
       </div>
     `;
 
-    // Handle subgroup change to filter group ledgers
-    const sgSel = document.getElementById('ldgAddSubGroup');
-    const glSel = document.getElementById('ldgAddGroupLedger');
+    let searchableControl = null;
 
-    const updateGlOptions = () => {
-      const selectedSg = sgSel.value;
-      const filteredGls = coaLedgers.filter(l => l.sgId === selectedSg && l.type === 'group-ledger');
-      glSel.innerHTML = ['<option value="">— None —</option>',
-        ...filteredGls.map(gl => `<option value="${gl.id}">${gl.name}</option>`)
-      ].join('');
+    const parentSel = document.getElementById('ldgAddParentSelector');
+    const parentLabel = document.getElementById('ldgAddParentLabel');
+
+    const populateParentOptions = (type) => {
+      const options = [];
+      if (type === 'ledger') {
+        parentLabel.textContent = 'Sub Group / Group Ledger *';
+        COA_SYS_SGS.forEach(sg => {
+          const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
+          options.push(`<option value="sg:${sg.id}">${indent}${sg.name}</option>`);
+
+          const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger');
+          gls.forEach(gl => {
+            const glIndent = indent + '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0';
+            options.push(`<option value="gl:${gl.id}">${glIndent}📁 ${gl.name} (Group Ledger)</option>`);
+          });
+        });
+      } else {
+        parentLabel.textContent = 'Sub Group *';
+        COA_SYS_SGS.forEach(sg => {
+          const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
+          options.push(`<option value="sg:${sg.id}">${indent}${sg.name}</option>`);
+        });
+      }
+      parentSel.innerHTML = options.join('');
+      if (searchableControl) searchableControl.refresh();
     };
 
-    sgSel.addEventListener('change', updateGlOptions);
-    updateGlOptions(); // initial run
+    // Handle slider toggling
+    let selectedType = 'ledger';
+    const sliderBg = document.getElementById('ldgAddSliderBg');
+    const togLedger = document.getElementById('ldgAddTogLedger');
+    const togGroup = document.getElementById('ldgAddTogGroup');
+    const nameLabel = document.getElementById('ldgAddNameLabel');
+    const nameInp = document.getElementById('ldgAddName');
+    const balContainer = document.getElementById('ldgAddBalanceContainer');
+    const saveBtn = document.getElementById('ldgAddSaveBtn');
+
+    const updateTypeUI = () => {
+      if (selectedType === 'ledger') {
+        sliderBg.className = 'coa-slider-bg ledger-active';
+        togLedger.classList.add('active');
+        togGroup.classList.remove('active');
+        nameLabel.textContent = 'Ledger Name *';
+        nameInp.placeholder = 'e.g. Cash in Hand';
+        balContainer.style.display = '';
+        saveBtn.textContent = '＋ Add Ledger';
+        populateParentOptions('ledger');
+      } else {
+        sliderBg.className = 'coa-slider-bg group-active';
+        togLedger.classList.remove('active');
+        togGroup.classList.add('active');
+        nameLabel.textContent = 'Group Ledger Name *';
+        nameInp.placeholder = 'e.g. Fixed Assets Group';
+        balContainer.style.display = 'none';
+        saveBtn.textContent = '＋ Add Group Ledger';
+        populateParentOptions('group-ledger');
+      }
+    };
+
+    togLedger.addEventListener('click', () => {
+      selectedType = 'ledger';
+      updateTypeUI();
+    });
+
+    togGroup.addEventListener('click', () => {
+      selectedType = 'group-ledger';
+      updateTypeUI();
+    });
+
+    // Initialize searchable select
+    searchableControl = initGenericSearchableSelect(wrap, 'ldgAddParentSelector', 'Select Sub Group / Group Ledger');
+
+    // Initial population
+    updateTypeUI();
 
     // Aliases functionality
     const container = document.getElementById('ldgAddAliasesContainer');
     const addAliasBtn = document.getElementById('ldgAddAddAliasBtn');
+
+    const updateAddBtnVisibility = () => {
+      if (!addAliasBtn) return;
+      const hasEmpty = _ledgerAddAliases.some(a => a.trim() === '');
+      addAliasBtn.style.display = hasEmpty ? 'none' : '';
+    };
 
     const renderAliases = () => {
       container.innerHTML = '';
@@ -13652,6 +13860,7 @@
         input.value = alias;
         input.addEventListener('input', (e) => {
           _ledgerAddAliases[idx] = e.target.value;
+          updateAddBtnVisibility();
         });
 
         const delBtn = document.createElement('button');
@@ -13675,6 +13884,7 @@
         row.appendChild(delBtn);
         container.appendChild(row);
       });
+      updateAddBtnVisibility();
     };
 
     addAliasBtn.addEventListener('click', () => {
@@ -13697,19 +13907,41 @@
       }
       nameEl.style.borderColor = '';
 
-      const sgId = sgSel.value;
-      const glId = glSel.value;
-      const bal = document.getElementById('ldgAddBalance').value.trim();
+      const parentVal = parentSel.value;
+      if (!parentVal) {
+        showToast('Please select a Sub Group or Group Ledger.', 'error');
+        return;
+      }
+
+      const [pType, pId] = parentVal.split(':');
+      let sgId = '';
+      let glId = null;
+
+      if (pType === 'sg') {
+        sgId = pId;
+        glId = null;
+      } else if (pType === 'gl') {
+        const parentGl = coaLedgers.find(l => l.id === Number(pId));
+        if (parentGl) {
+          sgId = parentGl.sgId;
+          glId = parentGl.id;
+        } else {
+          showToast('Invalid Group Ledger selected.', 'error');
+          return;
+        }
+      }
+
+      const bal = selectedType === 'ledger' ? document.getElementById('ldgAddBalance').value.trim() : '';
       const aliases = _ledgerAddAliases.map(a => a.trim()).filter(a => a !== '');
 
       coaLedgers.push({
         id: Date.now() + _coaLedgerCtr++,
         sgId,
-        glId: glId ? Number(glId) : null,
+        glId: glId,
         name,
         code: '',
-        openingBalance: bal,
-        type: 'ledger',
+        openingBalance: selectedType === 'ledger' ? bal : 0,
+        type: selectedType,
         aliases: aliases
       });
 
@@ -13722,7 +13954,7 @@
         if (glId) _coaExpanded.add('gl-' + glId);
       }
 
-      showToast(`Ledger "${name}" added successfully.`, 'success');
+      showToast(`${selectedType === 'group-ledger' ? 'Group Ledger' : 'Ledger'} "${name}" added successfully.`, 'success');
       renderChartPanel();
       refreshAllReports();
       triggerAutoBackup();
@@ -13735,41 +13967,111 @@
     const wrap = document.getElementById('ledgerAlterWrap');
     if (!wrap) return;
 
-    const ledgersList = [...coaLedgers].sort((a, b) => a.name.localeCompare(b.name));
-    
-    if (ledgersList.length === 0) {
-      wrap.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--slate-400);">No ledgers available to alter.</div>`;
+    if (coaLedgers.length === 0) {
+      wrap.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--slate-400);">No accounts available to alter.</div>`;
       return;
     }
 
-    if (!_ledgerEditId || !coaLedgers.some(l => l.id === _ledgerEditId)) {
-      _ledgerEditId = ledgersList[0].id;
+    // Resolve current type based on _ledgerEditId, defaulting to 'ledger'
+    let currentLedger = coaLedgers.find(l => l.id === _ledgerEditId);
+    let selectedType = currentLedger ? currentLedger.type : 'ledger';
+
+    // If the edit ID is not set or doesn't match selected type, default to first of selected type
+    const ledgersOfType = coaLedgers.filter(l => l.type === selectedType);
+    if (!currentLedger || currentLedger.type !== selectedType) {
+      currentLedger = ledgersOfType.length > 0 ? ledgersOfType[0] : null;
+      _ledgerEditId = currentLedger ? currentLedger.id : null;
     }
 
-    const currentLedger = coaLedgers.find(l => l.id === _ledgerEditId);
-    _ledgerAlterAliases = currentLedger.aliases ? [...currentLedger.aliases] : [];
+    _ledgerAlterAliases = currentLedger ? (currentLedger.aliases ? [...currentLedger.aliases] : []) : [];
+
+    // Filter selector options based on selected type
+    const ledgersList = [...coaLedgers]
+      .filter(l => l.type === selectedType)
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     const ldgSelectorOpts = ledgersList.map(l => {
-      return `<option value="${l.id}" ${l.id === _ledgerEditId ? 'selected' : ''}>${l.name} (${l.type === 'group-ledger' ? 'Group Ledger' : 'Ledger'})</option>`;
+      return `<option value="${l.id}" ${l.id === _ledgerEditId ? 'selected' : ''}>${l.name}</option>`;
     }).join('');
 
-    const sgOpts = COA_SYS_SGS.map(sg => {
-      const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
-      return `<option value="${sg.id}" ${sg.id === currentLedger.sgId ? 'selected' : ''}>${indent}${sg.name}</option>`;
-    }).join('');
+    // Build combined list of Sub Groups and Group Ledgers for the selector
+    const parentOptions = [];
+    const isLedger = selectedType === 'ledger';
+    const parentLabelText = isLedger ? 'Sub Group / Group Ledger *' : 'Sub Group *';
+
+    if (currentLedger) {
+      COA_SYS_SGS.forEach(sg => {
+        const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
+        const isSelected = (!currentLedger.glId && sg.id === currentLedger.sgId);
+        parentOptions.push(`<option value="sg:${sg.id}" ${isSelected ? 'selected' : ''}>${indent}${sg.name}</option>`);
+
+        if (isLedger) {
+          const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger' && l.id !== currentLedger.id);
+          gls.forEach(gl => {
+            const glIndent = indent + '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0';
+            const isGlSelected = (gl.id === currentLedger.glId);
+            parentOptions.push(`<option value="gl:${gl.id}" ${isGlSelected ? 'selected' : ''}>${glIndent}📁 ${gl.name} (Group Ledger)</option>`);
+          });
+        }
+      });
+    }
+    const parentOptsHtml = parentOptions.join('');
+
+
+
+    if (!currentLedger) {
+      wrap.innerHTML = `
+        <!-- Slider toggle -->
+        <div class="coa-slider-wrap" style="margin-bottom: 20px; max-width: 600px;">
+          <div class="coa-slider-bg ${selectedType === 'ledger' ? 'ledger-active' : 'group-active'}" id="ldgAlterSliderBg"></div>
+          <button class="coa-slider-btn${selectedType === 'ledger' ? ' active' : ''}" id="ldgAlterTogLedger" type="button">Ledger</button>
+          <button class="coa-slider-btn${selectedType === 'group-ledger' ? ' active' : ''}" id="ldgAlterTogGroup" type="button">Group Ledger</button>
+        </div>
+        <div style="padding: 20px; text-align: center; color: var(--slate-400);">No ${selectedType === 'group-ledger' ? 'group ledgers' : 'ledgers'} available.</div>
+      `;
+      // Wire slider toggles
+      document.getElementById('ldgAlterTogLedger').addEventListener('click', () => {
+        const firstLedger = coaLedgers.find(l => l.type === 'ledger');
+        _ledgerEditId = firstLedger ? firstLedger.id : null;
+        renderLedgerAlterView();
+      });
+      document.getElementById('ldgAlterTogGroup').addEventListener('click', () => {
+        const firstGl = coaLedgers.find(l => l.type === 'group-ledger');
+        _ledgerEditId = firstGl ? firstGl.id : null;
+        renderLedgerAlterView();
+      });
+      return;
+    }
 
     wrap.innerHTML = `
-      <div style="margin-bottom: 20px; max-width: 600px;">
+      <!-- Slider toggle -->
+      <div class="coa-slider-wrap" style="margin-bottom: 20px; max-width: 600px;">
+        <div class="coa-slider-bg ${selectedType === 'ledger' ? 'ledger-active' : 'group-active'}" id="ldgAlterSliderBg"></div>
+        <button class="coa-slider-btn${selectedType === 'ledger' ? ' active' : ''}" id="ldgAlterTogLedger" type="button">Ledger</button>
+        <button class="coa-slider-btn${selectedType === 'group-ledger' ? ' active' : ''}" id="ldgAlterTogGroup" type="button">Group Ledger</button>
+      </div>
+
+      <div style="margin-bottom: 20px; max-width: 600px; position: relative;">
         <label class="coa-modal-label">Select Account to Alter</label>
-        <select id="ldgAlterSelector" style="width: 100%; height: 42px; border: 1.5px solid var(--slate-300); border-radius: 8px; padding: 0 12px; font-weight: 600; color: var(--slate-800); background-color: var(--white); box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <select id="ldgAlterSelector" style="display: none;">
           ${ldgSelectorOpts}
         </select>
+        <div class="kya-searchable-select-wrap" id="ldgAlterSelectorSearchableWrap" style="position: relative; width: 100%;">
+          <div class="kya-searchable-select-trigger" id="ldgAlterSelectorTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+            <span id="ldgAlterSelectorTriggerText">Select Account to Alter</span>
+            <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+          </div>
+          <div class="kya-searchable-select-dropdown" id="ldgAlterSelectorDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+            <input type="text" id="ldgAlterSelectorSearch" placeholder="Search..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+            <div id="ldgAlterSelectorOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+          </div>
+        </div>
       </div>
 
       <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white);">
         <div class="coa-modal-fg">
-          <label class="coa-modal-label">Name *</label>
-          <input class="coa-modal-inp" id="ldgAlterName" placeholder="e.g. Cash in Hand" value="${currentLedger.name.replace(/"/g,'&quot;')}">
+          <label class="coa-modal-label">${isLedger ? 'Ledger Name *' : 'Group Ledger Name *'}</label>
+          <input class="coa-modal-inp" id="ldgAlterName" placeholder="${isLedger ? 'e.g. Cash in Hand' : 'e.g. Fixed Assets Group'}" value="${currentLedger.name.replace(/"/g,'&quot;')}">
         </div>
 
         <div class="coa-modal-fg" style="margin-top: 12px; margin-bottom: 12px;">
@@ -13781,23 +14083,25 @@
         </div>
 
         <div class="coa-modal-group-box" style="background: var(--slate-50); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-          <div class="coa-modal-fg" style="margin-bottom: 12px;">
-            <label class="coa-modal-label">Sub Group *</label>
-            <select class="coa-modal-sel" id="ldgAlterSubGroup" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
-              ${sgOpts}
+          <div class="coa-modal-fg" style="position: relative;">
+            <label class="coa-modal-label" id="ldgAlterParentLabel">${parentLabelText}</label>
+            <select class="coa-modal-sel" id="ldgAlterParentSelector" style="display: none;">
+              ${parentOptsHtml}
             </select>
+            <div class="kya-searchable-select-wrap" id="ldgAlterParentSelectorSearchableWrap" style="position: relative; width: 100%;">
+              <div class="kya-searchable-select-trigger" id="ldgAlterParentSelectorTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                <span id="ldgAlterParentSelectorTriggerText">Select Sub Group / Group Ledger</span>
+                <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+              </div>
+              <div class="kya-searchable-select-dropdown" id="ldgAlterParentSelectorDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                <input type="text" id="ldgAlterParentSelectorSearch" placeholder="Search..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                <div id="ldgAlterParentSelectorOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+              </div>
+            </div>
           </div>
-          ${currentLedger.type === 'ledger' ? `
-          <div class="coa-modal-fg">
-            <label class="coa-modal-label">Group Ledger (Optional)</label>
-            <select class="coa-modal-sel" id="ldgAlterGroupLedger" style="width: 100%; height: 38px; border: 1.5px solid var(--slate-200); border-radius: 8px; padding: 0 10px; background: #fff;">
-              <option value="">— None —</option>
-            </select>
-          </div>
-          ` : ''}
         </div>
 
-        ${currentLedger.type === 'ledger' ? `
+        ${isLedger ? `
         <div class="coa-modal-fg" style="margin-bottom: 20px;">
           <label class="coa-modal-label">Opening Balance (Optional)</label>
           <input class="coa-modal-inp" id="ldgAlterBalance" type="number" min="0" step="0.01" placeholder="₹ 0.00" value="${currentLedger.openingBalance || ''}">
@@ -13820,25 +14124,33 @@
       renderLedgerAlterView();
     });
 
-    const sgSel = document.getElementById('ldgAlterSubGroup');
-    const glSel = document.getElementById('ldgAlterGroupLedger');
+    // Wire slider toggles
+    document.getElementById('ldgAlterTogLedger').addEventListener('click', () => {
+      const firstLedger = coaLedgers.find(l => l.type === 'ledger');
+      _ledgerEditId = firstLedger ? firstLedger.id : null;
+      renderLedgerAlterView();
+    });
+    document.getElementById('ldgAlterTogGroup').addEventListener('click', () => {
+      const firstGl = coaLedgers.find(l => l.type === 'group-ledger');
+      _ledgerEditId = firstGl ? firstGl.id : null;
+      renderLedgerAlterView();
+    });
 
-    if (glSel) {
-      const updateGlOptions = () => {
-        const selectedSg = sgSel.value;
-        const filteredGls = coaLedgers.filter(l => l.sgId === selectedSg && l.type === 'group-ledger' && l.id !== _ledgerEditId);
-        glSel.innerHTML = ['<option value="">— None —</option>',
-          ...filteredGls.map(gl => `<option value="${gl.id}" ${gl.id == currentLedger.glId ? 'selected' : ''}>${gl.name}</option>`)
-        ].join('');
-      };
+    // Initialize searchable select
+    initGenericSearchableSelect(wrap, 'ldgAlterSelector', 'Select Account to Alter');
+    initGenericSearchableSelect(wrap, 'ldgAlterParentSelector', 'Select Sub Group / Group Ledger');
 
-      sgSel.addEventListener('change', updateGlOptions);
-      updateGlOptions(); // initial run
-    }
+    const parentSel = document.getElementById('ldgAlterParentSelector');
 
     // Aliases functionality
     const container = document.getElementById('ldgAlterAliasesContainer');
     const addAliasBtn = document.getElementById('ldgAlterAddAliasBtn');
+
+    const updateAddBtnVisibility = () => {
+      if (!addAliasBtn) return;
+      const hasEmpty = _ledgerAlterAliases.some(a => a.trim() === '');
+      addAliasBtn.style.display = hasEmpty ? 'none' : '';
+    };
 
     const renderAliases = () => {
       container.innerHTML = '';
@@ -13856,6 +14168,7 @@
         input.value = alias;
         input.addEventListener('input', (e) => {
           _ledgerAlterAliases[idx] = e.target.value;
+          updateAddBtnVisibility();
         });
 
         const delBtn = document.createElement('button');
@@ -13879,6 +14192,7 @@
         row.appendChild(delBtn);
         container.appendChild(row);
       });
+      updateAddBtnVisibility();
     };
 
     addAliasBtn.addEventListener('click', () => {
@@ -13919,8 +14233,30 @@
       }
       nameEl.style.borderColor = '';
 
-      const sgId = sgSel.value;
-      const glId = glSel ? glSel.value : '';
+      const parentVal = parentSel.value;
+      if (!parentVal) {
+        showToast('Please select a Sub Group or Group Ledger.', 'error');
+        return;
+      }
+
+      const [pType, pId] = parentVal.split(':');
+      let sgId = '';
+      let glId = null;
+
+      if (pType === 'sg') {
+        sgId = pId;
+        glId = null;
+      } else if (pType === 'gl') {
+        const parentGl = coaLedgers.find(l => l.id === Number(pId));
+        if (parentGl) {
+          sgId = parentGl.sgId;
+          glId = parentGl.id;
+        } else {
+          showToast('Invalid Group Ledger selected.', 'error');
+          return;
+        }
+      }
+
       const bal = document.getElementById('ldgAlterBalance') ? document.getElementById('ldgAlterBalance').value.trim() : '';
       const aliases = _ledgerAlterAliases.map(a => a.trim()).filter(a => a !== '');
 
@@ -13929,13 +14265,13 @@
         ldg.name = name;
         ldg.sgId = sgId;
         if (ldg.type === 'ledger') {
-          ldg.glId = glId ? Number(glId) : null;
+          ldg.glId = glId;
           ldg.openingBalance = bal;
         }
         ldg.aliases = aliases;
       }
 
-      showToast(`Account "${name}" updated successfully.`, 'success');
+      showToast(`${selectedType === 'group-ledger' ? 'Group Ledger' : 'Ledger'} "${name}" updated successfully.`, 'success');
       renderChartPanel();
       refreshAllReports();
       triggerAutoBackup();
