@@ -19,6 +19,76 @@
       padding: 0;
     }
 
+    /* =======================================
+       COMPANY PROFILE ORGANIZER (VAULT) STYLES
+       ======================================= */
+    .oh-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 28px;
+      margin-top: 8px;
+      align-items: start;
+    }
+    .oh-sub-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1.5px solid #e2e8f0;
+    }
+    .oh-sub-tab {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      height: 38px;
+      padding: 0 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      font-family: Inter, sans-serif;
+      transition: all 0.15s ease-in-out;
+    }
+    .oh-sub-tab:hover {
+      background: #f1f5f9;
+      color: #334155;
+    }
+    .oh-sub-tab.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+    }
+    .oh-tab-icon-wrap {
+      flex-shrink: 0;
+    }
+    .oh-tab-text {
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .oh-content-area {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      min-height: 480px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .co-subpanel-content {
+      animation: fadeInSubtab 0.22s ease-out;
+    }
+    @keyframes fadeInSubtab {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     :root {
       /* Color Palette */
       --blue-50:  #eff6ff;
@@ -577,10 +647,46 @@
 
     /* Sidebar footer */
     .sidebar-footer {
-      padding: 16px 12px;
+      padding: 12px 12px 16px;
       border-top: 1px solid var(--slate-100);
       flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
+
+    /* Company card */
+    .sidebar-company-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: 1.5px solid var(--slate-200);
+      background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+      transition: background var(--duration) var(--ease), border-color var(--duration);
+    }
+    .sidebar-company-card:hover { background: #dbeafe; border-color: var(--blue-300); }
+    .company-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #2563eb, #059669);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+      letter-spacing: -.5px;
+    }
+    .company-info { overflow: hidden; flex: 1; }
+    .company-name { font-size: 12.5px; font-weight: 700; color: var(--slate-800); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    .company-label { font-size: 10.5px; color: var(--blue-600); font-weight: 600; white-space: nowrap; }
+    .company-edit-icon { color: var(--slate-400); flex-shrink: 0; transition: color var(--duration); }
+    .sidebar-company-card:hover .company-edit-icon { color: var(--blue-500); }
 
     .sidebar-user {
       display: flex;
@@ -3596,7 +3702,7 @@
     .pt-table tbody tr.pt-sel-row { background:#eff6ff !important; }
     .pt-table tbody td { padding:11px 14px; color:#475569; vertical-align:middle; }
     .pt-cb { width:16px; height:16px; accent-color:#2563eb; cursor:pointer; }
-    .pt-vbadge { background:#dbeafe; color:#1d4ed8; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px; cursor:pointer; transition:all 0.15s ease; }
+    .pt-vbadge { background:#dbeafe; color:#1d4ed8; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:20px; cursor:pointer; transition:all 0.15s ease; white-space:nowrap; display:inline-block; }
     .pt-vbadge:hover { background:#bfdbfe; color:#1e40af; }
     .pt-amt { font-weight:700; color:#2563eb; font-size:14px; }
     .pt-view-btn {
@@ -3916,17 +4022,13 @@
     </div>
 
     <div class="sidebar-footer">
-      <div class="sidebar-user" role="button" tabindex="0" aria-label="User profile">
-        <div class="user-avatar">KY</div>
-        <div class="user-info">
-          <div class="user-name">Admin User</div>
-          <div class="user-role">Accountant</div>
+      <!-- Company Details Card -->
+      <div class="sidebar-company-card" id="sidebarCompanyCard" role="button" tabindex="0" aria-label="Company Details" title="Click to edit company details">
+        <div class="company-avatar" id="sidebarCompanyAvatar">KY</div>
+        <div class="company-info">
+          <div class="company-name" id="sidebarCompanyName">Your Company</div>
+          <div class="company-label">Company Details</div>
         </div>
-        <svg class="user-more" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="4" r="1" fill="currentColor"/>
-          <circle cx="8" cy="8" r="1" fill="currentColor"/>
-          <circle cx="8" cy="12" r="1" fill="currentColor"/>
-        </svg>
       </div>
     </div>
   </nav>
@@ -5331,6 +5433,9 @@
         <div id="salesDraftedTableWrap"></div>
       </div>
 
+      <!-- Company Details Panel -->
+      <div id="panel-company" role="region" aria-label="Company Details" style="display:none"></div>
+
     </main>
   </div>
 </div>
@@ -5399,6 +5504,196 @@
 
 
   /* ======================
+     COMPANY DETAILS
+  ====================== */
+  const KYA_COMPANY_KEY = 'kya_company_details';
+  const COMPANY_AVATAR_PRESETS = {
+    'blue-green': 'linear-gradient(135deg, #2563eb, #059669)',
+    'indigo-purple': 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+    'rose-red': 'linear-gradient(135deg, #e11d48, #be123c)',
+    'amber-orange': 'linear-gradient(135deg, #f59e0b, #d97706)',
+    'emerald-teal': 'linear-gradient(135deg, #10b981, #047857)',
+    'dark-slate': 'linear-gradient(135deg, #475569, #1e293b)'
+  };
+
+  function getCompanyDetails() {
+    try {
+      return JSON.parse(localStorage.getItem(KYA_COMPANY_KEY)) || {};
+    } catch { return {}; }
+  }
+
+  function saveCompanyDetails(data) {
+    localStorage.setItem(KYA_COMPANY_KEY, JSON.stringify(data));
+  }
+
+  function getCompanyInitials(name) {
+    if (!name) return 'KY';
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  function updateSidebarCompany() {
+    const co = getCompanyDetails();
+    const displayName = co.displayName || co.name || 'Your Company';
+
+    const avatarEl = document.getElementById('sidebarCompanyAvatar');
+    const nameEl   = document.getElementById('sidebarCompanyName');
+
+    if (avatarEl) {
+      if (co.iconImage) {
+        avatarEl.textContent = '';
+        avatarEl.style.backgroundImage = `url(${co.iconImage})`;
+        avatarEl.style.backgroundSize = 'cover';
+        avatarEl.style.backgroundPosition = 'center';
+      } else {
+        const text = co.iconText || getCompanyInitials(co.name || displayName);
+        const bgPreset = co.iconColor || 'blue-green';
+        const bgStyle = COMPANY_AVATAR_PRESETS[bgPreset] || COMPANY_AVATAR_PRESETS['blue-green'];
+        avatarEl.textContent = text;
+        avatarEl.style.backgroundImage = 'none';
+        avatarEl.style.background = bgStyle;
+      }
+    }
+    if (nameEl)   nameEl.textContent   = displayName;
+  }
+
+  function openCompanyModal() {
+    document.getElementById('kyaCompanyOverlay')?.remove();
+    const co = getCompanyDetails();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'kyaCompanyOverlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;z-index:10010;
+      background:rgba(15,23,42,.55);backdrop-filter:blur(6px);
+      display:flex;align-items:center;justify-content:center;
+      font-family:Inter,sans-serif;animation:jePopIn .18s cubic-bezier(.34,1.3,.64,1);
+    `;
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:20px;padding:32px 32px 28px;max-width:440px;width:92%;
+                  box-shadow:0 30px 70px rgba(0,0,0,.22);position:relative;box-sizing:border-box;">
+        <button id="kyaCompanyClose" style="position:absolute;top:16px;right:16px;border:none;background:none;
+          font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;width:32px;height:32px;
+          border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s;">×</button>
+
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
+          <div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#2563eb,#059669);
+                      display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;" id="kyaCompanyModalAvatar">
+            ${getCompanyInitials(co.name)}
+          </div>
+          <div>
+            <div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.3px;">Company Details</div>
+            <div style="font-size:12.5px;color:#64748b;margin-top:2px;">Your business information</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:5px;">Company / Firm Name *</label>
+            <input id="kyaCoName" placeholder="e.g. Acme Enterprises Pvt Ltd" value="${ohEsc(co.name || '')}"
+              style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 13px;
+                     font-size:13.5px;font-weight:600;color:#0f172a;outline:none;box-sizing:border-box;
+                     font-family:Inter,sans-serif;transition:border-color .18s;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:5px;">GSTIN / Tax ID</label>
+            <input id="kyaCoGstin" placeholder="e.g. 22AAAAA0000A1Z5" value="${ohEsc(co.gstin || '')}"
+              style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 13px;
+                     font-size:13.5px;font-weight:500;color:#334155;outline:none;box-sizing:border-box;
+                     font-family:Inter,sans-serif;transition:border-color .18s;letter-spacing:.04em;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:5px;">Business Address</label>
+            <textarea id="kyaCoAddress" placeholder="Street, City, State, PIN" rows="2"
+              style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 13px;
+                     font-size:13px;font-weight:500;color:#334155;outline:none;resize:vertical;
+                     box-sizing:border-box;font-family:Inter,sans-serif;transition:border-color .18s;">${ohEsc(co.address || '')}</textarea>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:5px;">Phone</label>
+            <input id="kyaCoPhone" placeholder="e.g. +91 98765 43210" value="${ohEsc(co.phone || '')}"
+              style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 13px;
+                     font-size:13.5px;font-weight:500;color:#334155;outline:none;box-sizing:border-box;
+                     font-family:Inter,sans-serif;transition:border-color .18s;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;display:block;margin-bottom:5px;">Email</label>
+            <input id="kyaCoEmail" type="email" placeholder="e.g. accounts@company.com" value="${ohEsc(co.email || '')}"
+              style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 13px;
+                     font-size:13.5px;font-weight:500;color:#334155;outline:none;box-sizing:border-box;
+                     font-family:Inter,sans-serif;transition:border-color .18s;">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:22px;">
+          <button id="kyaCompanySave" style="flex:1;height:42px;border:none;border-radius:11px;
+            background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:13.5px;font-weight:700;
+            cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 4px 14px rgba(37,99,235,.3);transition:filter .15s;">
+            Save Details
+          </button>
+          <button id="kyaCompanyCancel" style="flex:0 0 90px;height:42px;border:1.5px solid #e2e8f0;border-radius:11px;
+            background:#fff;color:#475569;font-size:13px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:background .15s;">
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Focus border effect on inputs
+    overlay.querySelectorAll('input, textarea').forEach(inp => {
+      inp.addEventListener('focus', () => inp.style.borderColor = '#3b82f6');
+      inp.addEventListener('blur',  () => inp.style.borderColor = '#e2e8f0');
+    });
+
+    // Update avatar preview while typing name
+    const nameInp = overlay.querySelector('#kyaCoName');
+    const modalAvatar = overlay.querySelector('#kyaCompanyModalAvatar');
+    nameInp.addEventListener('input', () => {
+      modalAvatar.textContent = getCompanyInitials(nameInp.value);
+    });
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#kyaCompanyClose').addEventListener('click', close);
+    overlay.querySelector('#kyaCompanyCancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    overlay.querySelector('#kyaCompanySave').addEventListener('click', () => {
+      const name = nameInp.value.trim();
+      if (!name) {
+        nameInp.style.borderColor = '#ef4444';
+        nameInp.focus();
+        showToast('Please enter a company name.', 'warning');
+        return;
+      }
+      saveCompanyDetails({
+        name,
+        gstin:   overlay.querySelector('#kyaCoGstin').value.trim(),
+        address: overlay.querySelector('#kyaCoAddress').value.trim(),
+        phone:   overlay.querySelector('#kyaCoPhone').value.trim(),
+        email:   overlay.querySelector('#kyaCoEmail').value.trim(),
+      });
+      updateSidebarCompany();
+      showToast(`Company details saved for "${name}".`, 'success');
+      close();
+    });
+
+    setTimeout(() => nameInp.focus(), 60);
+  }
+
+  // Wire company card — navigate to full panel
+  document.getElementById('sidebarCompanyCard')?.addEventListener('click', () => openTab('company'));
+  document.getElementById('sidebarCompanyCard')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTab('company'); }
+  });
+
+  // Initialise sidebar with saved company
+  updateSidebarCompany();
+
+
+  /* ======================
      NAVIGATION
   ====================== */
   const navItems        = document.querySelectorAll('.nav-item');
@@ -5423,6 +5718,7 @@
     onehub:  panelOneHub,
     settings: panelSettings,
     sales_voucher: document.getElementById('panel-sales-voucher'),
+    company: document.getElementById('panel-company'),
   };
 
   const TAB_DEFS = {
@@ -5430,7 +5726,7 @@
       id: 'journal', 
       label: 'New Journal Entry', 
       panelId: 'panel-journal', 
-      navId: 'nav-je-new',
+      navId: 'nav-journal',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="3" y="2" width="13" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="2" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/><line x1="9.5" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="9.5" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="9.5" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`
     },
     voucher_desk: { 
@@ -5486,8 +5782,15 @@
       id: 'sales_voucher', 
       label: 'New Invoice', 
       panelId: 'panel-sales-voucher', 
-      navId: 'nav-sales-new',
+      navId: 'nav-sales',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="14" cy="16" r="1.5" fill="currentColor"/></svg>`
+    },
+    company: {
+      id: 'company',
+      label: 'Company Details',
+      panelId: 'panel-company',
+      navId: 'sidebarCompanyCard',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="2" y="7" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 7V5a4 4 0 018 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
     },
   };
 
@@ -5506,6 +5809,7 @@
     onehub:    { tabId: 'onehub' },
     settings:  { tabId: 'settings' },
     sales_voucher: { tabId: 'sales_voucher' },
+    company:   { tabId: 'company' },
   };
 
   const NAV_ID_TO_ROUTE = {
@@ -5638,10 +5942,15 @@
       if (activeTabId === 'onehub') renderOneHubPanel();
       if (activeTabId === 'settings') renderSettingsPanel();
       if (activeTabId === 'sales_voucher') initSalesForm();
+      if (activeTabId === 'company') renderCompanyPanel();
 
       // Highlight sidebar nav item
       const navEl = document.getElementById(def.navId);
       if (navEl) navEl.classList.add('active');
+      // Also highlight the company card specifically
+      if (activeTabId === 'company') {
+        document.getElementById('sidebarCompanyCard')?.classList.add('active');
+      }
 
     } else {
       // Show Dashboard (welcome panel)
@@ -5807,7 +6116,14 @@
   }
 
   // Home link (KYA breadcrumb label) click handler
-  document.getElementById('breadcrumbHome')?.addEventListener('click', () => {
+  document.getElementById('breadcrumbHome')?.addEventListener('click', (e) => {
+    if (e.detail === 3) {
+      openTabs = [];
+      activeTabId = null;
+      renderTabs();
+      switchToActivePanel();
+      showToast('All tabs closed.', 'success');
+    }
     window.location.hash = '#dashboard';
   });
 
@@ -13689,7 +14005,7 @@
         <tr>
           <td style="white-space: nowrap;">${formattedDate}</td>
           <td>${ohEsc(tr.particulars)}</td>
-          <td><span class="pt-vbadge" onclick="viewVoucherFromStatement(${tr.id})" title="Click to view details">${ohEsc(tr.voucherNo)}</span></td>
+          <td style="white-space: nowrap;"><span class="pt-vbadge" onclick="viewVoucherFromStatement(${tr.id})" title="Click to view details">${ohEsc(tr.voucherNo)}</span></td>
           <td class="num-col">${drText}</td>
           <td class="num-col">${crText}</td>
         </tr>
@@ -13710,7 +14026,7 @@
           <tr>
             <th style="width: 110px; white-space: nowrap;">Date</th>
             <th>Particular</th>
-            <th style="width: 140px;">Voucher No</th>
+            <th style="width: 140px; white-space: nowrap;">Voucher No</th>
             <th class="num-col" style="width: 130px;">Debit</th>
             <th class="num-col" style="width: 130px;">Credit</th>
           </tr>
@@ -14649,6 +14965,9 @@
     }
   }
 
+  function renderCompanyPanel() {
+    renderCompanyPanelOrganizer();
+  }
   function renderSettingsPanel() {
     switchSettingsTab(_settingsActiveTab);
 
@@ -15317,8 +15636,10 @@
   }
 
   function updateSalesPaymentUI() {
+    const payNotPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     const payFullBtn = document.getElementById('salesPaymentStatusFull');
-    if (!payFullBtn) return;
+    const payPartialBtn = document.getElementById('salesPaymentStatusPartial');
+    if (!payFullBtn || !payNotPaidBtn || !payPartialBtn) return;
     
     const subTotal = calculateSubtotal();
     let tdsTcsMode = 'None';
@@ -15350,22 +15671,40 @@
     const maxVal = getSalesPaymentMax(total);
     
     const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
+    let orderAdvanceAmount = 0;
+    let isOrderLinked = false;
     if (currentSalesVoucherSubtype === 'Invoice' && orderNo) {
       const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
       if (linkedOrder) {
-        let orderAdvanceAmount = 0;
+        isOrderLinked = true;
         if (linkedOrder.paymentStatus === 'Full Payment') {
           orderAdvanceAmount = linkedOrder.total;
         } else if (linkedOrder.paymentStatus === 'Partial Payment') {
           orderAdvanceAmount = linkedOrder.paymentAmount || 0;
         }
-        if (orderAdvanceAmount > 0) {
-          payFullBtn.textContent = `Full Payment (₹${fmtNum(maxVal)})`;
-          return;
-        }
       }
     }
-    payFullBtn.textContent = 'Full Payment';
+
+    const excessAmount = isOrderLinked ? Math.max(0, orderAdvanceAmount - total) : 0;
+
+    if (excessAmount > 0) {
+      payNotPaidBtn.textContent = 'Not Refunded';
+      payFullBtn.textContent = `Full Refund (₹${fmtNum(excessAmount)})`;
+      payPartialBtn.textContent = 'Partial Refund';
+      
+      const payAmtEl = document.getElementById('salesPaymentAmount');
+      if (payAmtEl) {
+        payAmtEl.max = excessAmount;
+      }
+    } else {
+      payNotPaidBtn.textContent = 'Not Paid';
+      payPartialBtn.textContent = 'Partial Payment';
+      if (isOrderLinked && orderAdvanceAmount > 0) {
+        payFullBtn.textContent = `Full Payment (₹${fmtNum(maxVal)})`;
+      } else {
+        payFullBtn.textContent = 'Full Payment';
+      }
+    }
   }
 
   // Initialize store for future features
@@ -15490,9 +15829,58 @@
   function getSalesPaymentStatus() {
     const fullBtn = document.getElementById('salesPaymentStatusFull');
     const partBtn = document.getElementById('salesPaymentStatusPartial');
-    if (fullBtn && fullBtn.classList.contains('active')) return 'Full Payment';
-    if (partBtn && partBtn.classList.contains('active')) return 'Partial Payment';
-    return 'Not Paid';
+    
+    const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
+    let orderAdvanceAmount = 0;
+    let total = calculateSubtotal();
+    let tdsTcsMode = 'None';
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
+    if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    let rate = 0;
+    if (tdsTcsMode !== 'None' && rateSelect) {
+      if (rateSelect.value === 'custom') {
+        const customInput = document.getElementById('salesTdsTcsRateCustom');
+        rate = customInput ? (parseFloat(customInput.value) || 0) : 0;
+      } else {
+        rate = parseFloat(rateSelect.value) || 0;
+      }
+    }
+    const amountInput = document.getElementById('salesTdsTcsAmount');
+    const tdsTcsAmount = amountInput ? (parseFloat(amountInput.value) || 0) : 0;
+    const adjustmentsInput = document.getElementById('salesAdjustments');
+    const adjustments = adjustmentsInput ? (parseFloat(adjustmentsInput.value) || 0) : 0;
+    
+    let grandTotal = total;
+    if (tdsTcsMode === 'TDS') grandTotal = total - tdsTcsAmount;
+    else if (tdsTcsMode === 'TCS') grandTotal = total + tdsTcsAmount;
+    grandTotal += adjustments;
+
+    let isOrderLinked = false;
+    if (currentSalesVoucherSubtype === 'Invoice' && orderNo) {
+      const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
+      if (linkedOrder) {
+        isOrderLinked = true;
+        if (linkedOrder.paymentStatus === 'Full Payment') {
+          orderAdvanceAmount = linkedOrder.total;
+        } else if (linkedOrder.paymentStatus === 'Partial Payment') {
+          orderAdvanceAmount = linkedOrder.paymentAmount || 0;
+        }
+      }
+    }
+    const excessAmount = isOrderLinked ? Math.max(0, orderAdvanceAmount - grandTotal) : 0;
+
+    if (excessAmount > 0) {
+      if (fullBtn && fullBtn.classList.contains('active')) return 'Full Refund';
+      if (partBtn && partBtn.classList.contains('active')) return 'Partial Refund';
+      return 'Not Refunded';
+    } else {
+      if (fullBtn && fullBtn.classList.contains('active')) return 'Full Payment';
+      if (partBtn && partBtn.classList.contains('active')) return 'Partial Payment';
+      return 'Not Paid';
+    }
   }
 
   function getOrCreateSystemLedger(name, sgId) {
@@ -15840,8 +16228,21 @@
       const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
       const isOrderLinked = (currentSalesVoucherSubtype === 'Invoice' && orderNo);
       
+      let orderAdvanceAmount = 0;
       if (isOrderLinked) {
-        payAmtEl.max = maxVal;
+        const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
+        if (linkedOrder) {
+          if (linkedOrder.paymentStatus === 'Full Payment') {
+            orderAdvanceAmount = linkedOrder.total;
+          } else if (linkedOrder.paymentStatus === 'Partial Payment') {
+            orderAdvanceAmount = linkedOrder.paymentAmount || 0;
+          }
+        }
+      }
+      const excessAmount = Math.max(0, orderAdvanceAmount - total);
+
+      if (isOrderLinked) {
+        payAmtEl.max = excessAmount > 0 ? excessAmount : maxVal;
       } else if (currentSalesVoucherSubtype === 'Return' && payAmtEl.max) {
         // Keep return logic max as set in updateSalesReturnLockState
       } else {
@@ -15850,11 +16251,14 @@
       
       if (payAmtEl.value) {
         const currentVal = parseFloat(payAmtEl.value) || 0;
-        if (currentVal > maxVal) {
-          payAmtEl.value = maxVal.toFixed(2);
-          const limitMsg = isOrderLinked 
-            ? `Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the balance payment.`
-            : `Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the Grand Total.`;
+        const allowedMax = (isOrderLinked && excessAmount > 0) ? excessAmount : maxVal;
+        if (currentVal > allowedMax) {
+          payAmtEl.value = allowedMax.toFixed(2);
+          const limitMsg = (isOrderLinked && excessAmount > 0)
+            ? `Refund Amount adjusted to ₹${fmtNum(allowedMax)} to not exceed the excess refund amount.`
+            : (isOrderLinked 
+               ? `Payment Amount adjusted to ₹${fmtNum(allowedMax)} to not exceed the balance payment.`
+               : `Payment Amount adjusted to ₹${fmtNum(allowedMax)} to not exceed the Grand Total.`);
           showToast(limitMsg, 'warning');
         }
       }
@@ -15881,14 +16285,18 @@
       
       const excessAmount = Math.max(0, orderAdvanceAmount - total);
       if (isOrderLinked && excessAmount > 0) {
-        payStatusWrapEl.style.display = 'none';
+        payStatusWrapEl.style.display = 'flex';
         refundInfoEl.style.display = 'block';
-        refundInfoEl.textContent = `Refund due: ₹${fmtNum(excessAmount)} (Overpayment from Sales Order). This will be recorded under Refund Payable and will set status to Not Refunded.`;
         
-        // Force the Not Paid state on the form to avoid any conflicting payment inputs
-        const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
-        if (notPaidBtn && !notPaidBtn.classList.contains('active')) {
-          notPaidBtn.click();
+        const payStatus = getSalesPaymentStatus();
+        if (payStatus === 'Full Refund') {
+          refundInfoEl.textContent = `Refund due: ₹${fmtNum(excessAmount)} (Fully Refunded now). This will be paid from the selected Payment Account.`;
+        } else if (payStatus === 'Partial Refund') {
+          const refundAmt = parseFloat(document.getElementById('salesPaymentAmount')?.value) || 0;
+          const remaining = Math.max(0, excessAmount - refundAmt);
+          refundInfoEl.textContent = `Refund due: ₹${fmtNum(excessAmount)} (₹${fmtNum(refundAmt)} refunded now, ₹${fmtNum(remaining)} Refund Payable).`;
+        } else {
+          refundInfoEl.textContent = `Refund due: ₹${fmtNum(excessAmount)} (Refund later). This will be recorded under Refund Payable and will set status to Not Refunded.`;
         }
       } else {
         payStatusWrapEl.style.display = 'flex';
@@ -16477,10 +16885,10 @@
     if (adjEl) adjEl.value = inv.adjustments !== undefined ? inv.adjustments : '';
     
     const payStatus = inv.paymentStatus || 'Not Paid';
-    if (payStatus === 'Full Payment') {
+    if (payStatus === 'Full Payment' || payStatus === 'Full Refund') {
       const fullBtn = document.getElementById('salesPaymentStatusFull');
       if (fullBtn) fullBtn.click();
-    } else if (payStatus === 'Partial Payment') {
+    } else if (payStatus === 'Partial Payment' || payStatus === 'Partial Refund') {
       const partBtn = document.getElementById('salesPaymentStatusPartial');
       if (partBtn) partBtn.click();
     } else {
@@ -16489,7 +16897,13 @@
     }
     populateSalesPaymentAccounts(inv.paymentAccountId);
     const payAmtEl = document.getElementById('salesPaymentAmount');
-    if (payAmtEl) payAmtEl.value = inv.paymentAmount !== undefined ? inv.paymentAmount : '';
+    if (payAmtEl) {
+      if (payStatus === 'Partial Refund') {
+        payAmtEl.value = inv.refundedAmount !== undefined ? inv.refundedAmount : '';
+      } else {
+        payAmtEl.value = inv.paymentAmount !== undefined ? inv.paymentAmount : '';
+      }
+    }
     
     salesRows = JSON.parse(JSON.stringify(inv.rows));
     if (inv.isReturn) {
@@ -16585,11 +16999,17 @@
       }
     }
     const excessAmount = Math.max(0, orderAdvanceAmount - total);
+    let refundedAmount = 0;
     if (excessAmount > 0) {
-      paymentStatus = 'Not Refunded';
-    }
-    
-    if (excessAmount === 0) {
+      if (paymentStatus === 'Full Refund') {
+        refundedAmount = excessAmount;
+      } else if (paymentStatus === 'Partial Refund') {
+        refundedAmount = parseFloat(document.getElementById('salesPaymentAmount').value) || 0;
+      } else {
+        paymentStatus = 'Not Refunded';
+        refundedAmount = 0;
+      }
+    } else {
       if (paymentStatus === 'Full Payment') {
         paymentAmount = getSalesPaymentMax(total);
       } else if (paymentStatus === 'Partial Payment') {
@@ -16631,6 +17051,8 @@
       paymentStatus,
       paymentAccountId,
       paymentAmount,
+      excessAmount: excessAmount > 0 ? excessAmount : undefined,
+      refundedAmount: excessAmount > 0 ? refundedAmount : undefined,
       rows: JSON.parse(JSON.stringify(salesRows)),
       updatedAt: Date.now()
     };
@@ -16822,48 +17244,72 @@
           refundJournalEntryIds = oldInv.refundJournalEntryIds || [];
         }
       }
-      if (refundedAmount >= excessAmount) {
-        paymentStatus = 'Full Refund';
-      } else if (refundedAmount > 0) {
-        paymentStatus = 'Partial Refund';
+      
+      if (paymentStatus === 'Full Refund') {
+        if (!paymentAccountId) {
+          showToast('Please select a Payment Account for the refund.', 'warning');
+          return;
+        }
+        refundedAmount = excessAmount;
+      } else if (paymentStatus === 'Partial Refund') {
+        if (!paymentAccountId) {
+          showToast('Please select a Payment Account for the refund.', 'warning');
+          return;
+        }
+        const refundAmt = parseFloat(document.getElementById('salesPaymentAmount').value) || 0;
+        if (refundAmt <= 0) {
+          showToast('Refund Amount must be greater than zero for Partial Refunds.', 'warning');
+          return;
+        }
+        if (refundAmt > excessAmount) {
+          showToast(`Refund Amount cannot exceed the excess amount of ₹${fmtNum(excessAmount)}.`, 'warning');
+          return;
+        }
+        if (refundAmt === excessAmount) {
+          paymentStatus = 'Full Refund';
+          refundedAmount = excessAmount;
+        } else {
+          refundedAmount = refundAmt;
+        }
       } else {
         paymentStatus = 'Not Refunded';
+        refundedAmount = 0;
       }
-    }
-    
-    if (excessAmount === 0 && paymentStatus !== 'Not Paid') {
-      if (!paymentAccountId) {
-        showToast('Please select a Payment Account.', 'warning');
-        return;
-      }
-      if (paymentStatus === 'Full Payment') {
-        paymentAmount = getSalesPaymentMax(total);
-      } else if (paymentStatus === 'Partial Payment') {
-        paymentAmount = parseFloat(document.getElementById('salesPaymentAmount').value) || 0;
-        if (paymentAmount <= 0) {
-          showToast('Payment Amount must be greater than zero for Partial Payments.', 'warning');
+    } else {
+      if (paymentStatus !== 'Not Paid') {
+        if (!paymentAccountId) {
+          showToast('Please select a Payment Account.', 'warning');
           return;
         }
-        const maxVal = getSalesPaymentMax(total);
-        if (paymentAmount > maxVal) {
-          const limitMsg = (currentSalesVoucherSubtype === 'Invoice' && orderNo)
-            ? `Payment Amount cannot exceed the balance payment of ₹${fmtNum(maxVal)}.`
-            : `Payment Amount cannot exceed the Grand Total of ₹${fmtNum(maxVal)}.`;
-          showToast(limitMsg, 'warning');
-          return;
-        }
-        if (currentSalesVoucherSubtype === 'Return') {
-          const origInv = getOriginalInvoiceForReturn();
-          if (origInv) {
-            let origPaidAmt = 0;
-            if (origInv.paymentStatus === 'Full Payment') {
-              origPaidAmt = origInv.total;
-            } else if (origInv.paymentStatus === 'Partial Payment') {
-              origPaidAmt = origInv.paymentAmount || 0;
-            }
-            if (paymentAmount > origPaidAmt) {
-              showToast(`Payment Amount cannot exceed the original invoice paid amount of ₹${fmtNum(origPaidAmt)}.`, 'warning');
-              return;
+        if (paymentStatus === 'Full Payment') {
+          paymentAmount = getSalesPaymentMax(total);
+        } else if (paymentStatus === 'Partial Payment') {
+          paymentAmount = parseFloat(document.getElementById('salesPaymentAmount').value) || 0;
+          if (paymentAmount <= 0) {
+            showToast('Payment Amount must be greater than zero for Partial Payments.', 'warning');
+            return;
+          }
+          const maxVal = getSalesPaymentMax(total);
+          if (paymentAmount > maxVal) {
+            const limitMsg = (currentSalesVoucherSubtype === 'Invoice' && orderNo)
+              ? `Payment Amount cannot exceed the balance payment of ₹${fmtNum(maxVal)}.`
+              : `Payment Amount cannot exceed the Grand Total of ₹${fmtNum(maxVal)}.`;
+            showToast(limitMsg, 'warning');
+            return;
+          }
+          if (currentSalesVoucherSubtype === 'Return') {
+            const origInv = getOriginalInvoiceForReturn();
+            if (origInv) {
+              let origPaidAmt = 0;
+              if (origInv.paymentStatus === 'Full Payment') {
+                origPaidAmt = origInv.total;
+              } else if (origInv.paymentStatus === 'Partial Payment') {
+                origPaidAmt = origInv.paymentAmount || 0;
+              }
+              if (paymentAmount > origPaidAmt) {
+                showToast(`Payment Amount cannot exceed the original invoice paid amount of ₹${fmtNum(origPaidAmt)}.`, 'warning');
+                return;
+              }
             }
           }
         }
@@ -16872,6 +17318,13 @@
 
     const isEditPosted = window._editingSalesInvoice && !window._editingSalesInvoice.isDraft;
     const existingJournalEntryId = isEditPosted ? (window.KYA_STORE.salesVouchers.find(v => v.id === window._editingSalesInvoice.id)?.journalEntryId) : null;
+
+    if (isEditPosted) {
+      const oldInv = window.KYA_STORE.salesVouchers.find(v => v.id === window._editingSalesInvoice.id);
+      if (oldInv && oldInv.refundJournalEntryIds) {
+        postedEntries = postedEntries.filter(e => !oldInv.refundJournalEntryIds.includes(e.id));
+      }
+    }
 
     const isOrderWithPayment = currentSalesVoucherSubtype === 'Order' && (paymentStatus === 'Full Payment' || paymentStatus === 'Partial Payment') && paymentAmount > 0;
 
@@ -16902,6 +17355,54 @@
 
     if (isEditPosted && existingJournalEntryId && !journalEntryId) {
       postedEntries = postedEntries.filter(e => e.id !== existingJournalEntryId);
+    }
+
+    if (excessAmount > 0 && (paymentStatus === 'Full Refund' || paymentStatus === 'Partial Refund')) {
+      const refundAmt = refundedAmount;
+      if (refundAmt > 0) {
+        const refundEntryId = Date.now() + 1;
+        const payAccount = coaLedgers.find(l => l.id == paymentAccountId);
+        const payAccountName = payAccount ? payAccount.name : 'Cash Account';
+        
+        const refundLedgerId = getOrCreateSystemLedger('Refund Payable', 'sg-ocl');
+        const refundLedgerName = coaLedgers.find(l => l.id == refundLedgerId).name;
+        
+        const refundRows = [
+          {
+            id: 1,
+            type: 'By',
+            particular: refundLedgerName,
+            debit: refundAmt.toFixed(2),
+            credit: ''
+          },
+          {
+            id: 2,
+            type: 'To',
+            particular: payAccountName,
+            debit: '',
+            credit: refundAmt.toFixed(2)
+          }
+        ];
+        
+        const customer = coaLedgers.find(l => l.id == customerId);
+        const customerName = customer ? customer.name : 'Unknown Customer';
+        
+        const refundEntry = {
+          id:             refundEntryId,
+          date:           date,
+          voucherNo:      `RF-${invoiceNo}`,
+          preparedBy:     'Sales Module',
+          departmentId:   '',
+          isBudget:       false,
+          firstParticular: refundLedgerName,
+          amount:         fmtNum(refundAmt),
+          allRows:        refundRows,
+          narration:      `Refund of overpaid advance of ₹${fmtNum(refundAmt)} processed against Sales Invoice ${invoiceNo} for customer ${customerName}. paid via ${payAccountName}.`
+        };
+        
+        postedEntries.unshift(refundEntry);
+        refundJournalEntryIds = [refundEntryId];
+      }
     }
     
     const invoiceData = {
@@ -18157,20 +18658,41 @@
                   <span>₹ ${fmtNum(inv.total)}</span>
                 </div>
                 
-                ${inv.paymentStatus && inv.paymentStatus !== 'Not Paid' ? `
-                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
-                    <span>Paid Amount (${inv.paymentStatus})</span>
-                    <span style="color: #10b981; font-weight: 700;">₹ ${fmtNum(inv.paymentAmount)}</span>
+                ${inv.excessAmount > 0 ? `
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
+                    <span>Order Advance Applied</span>
+                    <span style="color: var(--emerald-700); font-weight: 700;">₹ ${fmtNum(inv.total + inv.excessAmount)}</span>
                   </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 6px; font-weight: 500;">
+                    <span>Refund Status</span>
+                    <span style="font-weight: 700; color: var(--slate-700);">${inv.paymentStatus}</span>
+                  </div>
+                  ${inv.refundedAmount > 0 ? `
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 6px; font-weight: 500;">
+                      <span>Amount Refunded</span>
+                      <span style="color: #10b981; font-weight: 700;">₹ ${fmtNum(inv.refundedAmount)}</span>
+                    </div>
+                  ` : ''}
                   <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 6px; font-weight: 700;">
-                    <span>Balance Due</span>
-                    <span style="color: ${inv.total - inv.paymentAmount > 0 ? '#ef4444' : 'var(--slate-600)'};">₹ ${fmtNum(inv.total - inv.paymentAmount)}</span>
+                    <span>Refund Payable</span>
+                    <span style="color: ${inv.excessAmount - (inv.refundedAmount || 0) > 0 ? '#ef4444' : 'var(--slate-600)'};">₹ ${fmtNum(inv.excessAmount - (inv.refundedAmount || 0))}</span>
                   </div>
                 ` : `
-                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 700;">
-                    <span>Balance Due</span>
-                    <span style="color: #ef4444;">₹ ${fmtNum(inv.total)}</span>
-                  </div>
+                  ${inv.paymentStatus && inv.paymentStatus !== 'Not Paid' ? `
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
+                      <span>Paid Amount (${inv.paymentStatus})</span>
+                      <span style="color: #10b981; font-weight: 700;">₹ ${fmtNum(inv.paymentAmount)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 6px; font-weight: 700;">
+                      <span>Balance Due</span>
+                      <span style="color: ${inv.total - inv.paymentAmount > 0 ? '#ef4444' : 'var(--slate-600)'};">₹ ${fmtNum(inv.total - inv.paymentAmount)}</span>
+                    </div>
+                  ` : `
+                    <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 700;">
+                      <span>Balance Due</span>
+                      <span style="color: #ef4444;">₹ ${fmtNum(inv.total)}</span>
+                    </div>
+                  `}
                 `}
               </div>
             </div>
@@ -18563,6 +19085,7 @@
           wrapper.style.alignItems = 'center';
         }
         updateDueDateHelper();
+        recalculateSalesTotals();
       });
       
       payFullBtn.addEventListener('click', () => {
@@ -18574,6 +19097,7 @@
         payAmtField.style.display = 'none';
         if (payDueDateField) payDueDateField.style.display = 'none';
         populateSalesPaymentAccounts();
+        recalculateSalesTotals();
       });
       
       payPartialBtn.addEventListener('click', () => {
@@ -18592,6 +19116,7 @@
         }
         updateDueDateHelper();
         populateSalesPaymentAccounts();
+        recalculateSalesTotals();
       });
     }
     
@@ -18637,11 +19162,27 @@
         const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
         const isOrderLinked = (currentSalesVoucherSubtype === 'Invoice' && orderNo);
         
-        if (parseFloat(payAmtEl.value) > maxVal) {
-          payAmtEl.value = maxVal.toFixed(2);
-          const limitMsg = isOrderLinked 
-            ? `Payment Amount cannot exceed the balance payment of ₹${fmtNum(maxVal)}.`
-            : `Payment Amount cannot exceed the Grand Total of ₹${fmtNum(maxVal)}.`;
+        let orderAdvanceAmount = 0;
+        if (isOrderLinked) {
+          const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
+          if (linkedOrder) {
+            if (linkedOrder.paymentStatus === 'Full Payment') {
+              orderAdvanceAmount = linkedOrder.total;
+            } else if (linkedOrder.paymentStatus === 'Partial Payment') {
+              orderAdvanceAmount = linkedOrder.paymentAmount || 0;
+            }
+          }
+        }
+        const excessAmount = Math.max(0, orderAdvanceAmount - total);
+        const allowedMax = (isOrderLinked && excessAmount > 0) ? excessAmount : maxVal;
+        
+        if (parseFloat(payAmtEl.value) > allowedMax) {
+          payAmtEl.value = allowedMax.toFixed(2);
+          const limitMsg = (isOrderLinked && excessAmount > 0)
+            ? `Refund Amount cannot exceed the excess refund amount of ₹${fmtNum(allowedMax)}.`
+            : (isOrderLinked 
+               ? `Payment Amount cannot exceed the balance payment of ₹${fmtNum(allowedMax)}.`
+               : `Payment Amount cannot exceed the Grand Total of ₹${fmtNum(allowedMax)}.`);
           showToast(limitMsg, 'warning');
         }
       });
@@ -18694,6 +19235,1037 @@
     });
   }
 
+  function renderCompanyPanelOrganizer() {
+    const wrap = document.getElementById('panel-company');
+    if (!wrap) return;
+
+    // Load initial data
+    let coData = getCompanyDetails();
+    if (!coData.gstins) coData.gstins = [];
+    if (!coData.banks) coData.banks = [];
+    if (!coData.people) coData.people = { directors: [], keyEmployees: [], auditor: {}, taxConsultant: {} };
+    if (!coData.people.directors) coData.people.directors = [];
+    if (!coData.people.keyEmployees) coData.people.keyEmployees = [];
+    if (!coData.people.auditor) coData.people.auditor = {};
+    if (!coData.people.taxConsultant) coData.people.taxConsultant = {};
+    if (!coData.documents) coData.documents = [];
+    if (!coData.insuranceAssets) coData.insuranceAssets = { policies: [], assets: [] };
+    if (!coData.insuranceAssets.policies) coData.insuranceAssets.policies = [];
+    if (!coData.insuranceAssets.assets) coData.insuranceAssets.assets = [];
+    if (!coData.reminders) coData.reminders = [];
+
+    const initials = getCompanyInitials(coData.name);
+
+    // Header layout
+    wrap.innerHTML = `
+      <div class="table-card" style="padding: 24px 28px;">
+        <!-- Header strip -->
+        <div class="je-card-header" style="background:linear-gradient(90deg,#1e40af,#2563eb,#0284c7);border-top-left-radius:12px;border-top-right-radius:12px;margin:-24px -28px 24px -28px;padding:20px 28px;display:flex;align-items:center;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:42px;height:42px;border-radius:11px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+                <line x1="12" y1="12" x2="12" y2="17"/><line x1="9" y1="14.5" x2="15" y2="14.5"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px;">Company Profile & Vault</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:2px;">Organize legal entities, compliance documents, bank accounts, and corporate vault</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="oh-layout">
+          <!-- Left: Sub-Navigation Tabs -->
+          <div class="oh-sub-tabs" role="tablist">
+            <button class="oh-sub-tab active" data-subtab="identity">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <span class="oh-tab-text">Basic Identity</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="registrations">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <span class="oh-tab-text">Legal & Registration</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="compliance">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <span class="oh-tab-text">Tax & Compliance</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="banking">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              </div>
+              <span class="oh-tab-text">Banking</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="people">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <span class="oh-tab-text">Key People</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="vault">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+              </div>
+              <span class="oh-tab-text">Document Vault</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="assets">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              </div>
+              <span class="oh-tab-text">Assets & Insurance</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="reminders">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </div>
+              <span class="oh-tab-text">Reminders & Dates</span>
+            </button>
+          </div>
+
+          <!-- Right: Content Panels Area -->
+          <div class="oh-content-area" id="coPanelContentArea">
+
+            <!-- TAB 1: BASIC IDENTITY -->
+            <div id="coSubpanel-identity" class="co-subpanel-content" style="display:block;">
+              <div style="display:grid;grid-template-columns:1fr 280px;gap:28px;">
+                <div style="display:flex;flex-direction:column;gap:18px;">
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Company / Firm Name <span style="color:#ef4444;">*</span></label>
+                    <input id="coNameInput" value="${ohEsc(coData.name||'')}" placeholder="e.g. Acme Enterprises Pvt Ltd" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;outline:none;box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Sidebar Display Name</label>
+                      <span id="coDisplayNameCounter" style="font-size:10.5px;font-weight:700;color:#94a3b8;">${(coData.displayName||'').length}/22</span>
+                    </div>
+                    <input id="coDisplayNameInput" maxlength="22" value="${ohEsc(coData.displayName||'')}" placeholder="Short name shown in sidebar" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;outline:none;box-sizing:border-box;">
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Business Type</label>
+                      <select id="coBusinessType" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;background:#fff;">
+                        <option value="">Select Business Type</option>
+                        <option value="Proprietorship" ${coData.businessType==='Proprietorship'?'selected':''}>Proprietorship</option>
+                        <option value="Partnership" ${coData.businessType==='Partnership'?'selected':''}>Partnership</option>
+                        <option value="LLP" ${coData.businessType==='LLP'?'selected':''}>LLP (Limited Liability Partnership)</option>
+                        <option value="Pvt Ltd" ${coData.businessType==='Pvt Ltd'?'selected':''}>Pvt Ltd (Private Limited)</option>
+                        <option value="Public Ltd" ${coData.businessType==='Public Ltd'?'selected':''}>Public Ltd (Public Limited)</option>
+                        <option value="OPC" ${coData.businessType==='OPC'?'selected':''}>One Person Company (OPC)</option>
+                        <option value="Trust" ${coData.businessType==='Trust'?'selected':''}>Trust / Society</option>
+                        <option value="Others" ${coData.businessType==='Others'?'selected':''}>Others</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Date of Incorporation</label>
+                      <input type="date" id="coIncDate" value="${ohEsc(coData.incDate||'')}" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                    </div>
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Business Address</label>
+                    <textarea id="coAddressInput" placeholder="Street, City, State, PIN" rows="3" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;color:#334155;outline:none;resize:vertical;font-family:Inter,sans-serif;line-height:1.4;">${ohEsc(coData.address||'')}</textarea>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Phone</label>
+                      <input id="coPhoneInput" value="${ohEsc(coData.phone||'')}" placeholder="+91 98765 43210" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Email</label>
+                      <input id="coEmailInput" type="email" value="${ohEsc(coData.email||'')}" placeholder="accounts@company.com" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                    </div>
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Website</label>
+                    <input id="coWebsiteInput" value="${ohEsc(coData.website||'')}" placeholder="https://www.yourcompany.com" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                  </div>
+                </div>
+
+                <!-- Custom Logo Upload Column -->
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:12px;">Company Logo / Icon</label>
+                  <div style="background:#fafbfc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;">
+                    <div id="coPreviewAvatar" style="width:72px;height:72px;border-radius:16px;background:${coData.iconImage ? `url(${coData.iconImage})` : 'linear-gradient(135deg,#2563eb,#059669)'};background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;">${coData.iconImage ? '' : initials}</div>
+                    
+                    <div style="display:flex;gap:8px;justify-content:center;">
+                      <button type="button" id="coUploadBtn" style="height:32px;padding:0 12px;border:1.5px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:4px;">
+                        Upload Logo
+                      </button>
+                      <button type="button" id="coRemoveImageBtn" style="height:32px;padding:0 10px;border:none;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:${coData.iconImage ? 'block' : 'none'};">
+                        Remove
+                      </button>
+                    </div>
+                    <input type="file" id="coFileInput" accept="image/*" style="display:none;">
+                    <input type="hidden" id="coIconImage" value="${ohEsc(coData.iconImage || '')}">
+                    <div style="font-size:10.5px;color:#94a3b8;line-height:1.3;">JPG, PNG, SVG supported.<br>Square aspect ratio works best.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="identity" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Basic Identity</button>
+              </div>
+            </div>
+
+            <!-- TAB 2: LEGAL & REGISTRATIONS -->
+            <div id="coSubpanel-registrations" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:20px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Permanent Account Number (PAN)</label>
+                    <input id="coPAN" value="${ohEsc(coData.pan||'')}" placeholder="e.g. ABCDE1234F" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Corporate Identification Number (CIN)</label>
+                    <input id="coCIN" value="${ohEsc(coData.cin||'')}" placeholder="e.g. U72200MH2020PTC123456" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Udyam / MSME Registration Number</label>
+                    <input id="coUdyam" value="${ohEsc(coData.udyam||'')}" placeholder="e.g. UDYAM-XX-00-0000000" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Trade License Number</label>
+                    <input id="coTradeLicense" value="${ohEsc(coData.tradeLicense||'')}" placeholder="License Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                  </div>
+                </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Import Export Code (IEC)</label>
+                  <input id="coIEC" value="${ohEsc(coData.iec||'')}" placeholder="10-digit Code" style="width:50%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                </div>
+
+                <!-- GSTIN Registrations List -->
+                <div style="margin-top:16px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">GSTIN Registrations</label>
+                    <button type="button" id="coAddGstinBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                      + Add GSTIN
+                    </button>
+                  </div>
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;min-height:60px;">
+                    <div id="coGstinsListContainer"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="registrations" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Registrations</button>
+              </div>
+            </div>
+
+            <!-- TAB 3: TAX & COMPLIANCE -->
+            <div id="coSubpanel-compliance" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:20px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Tax Deduction Account Number (TAN)</label>
+                    <input id="coTAN" value="${ohEsc(coData.tan||'')}" placeholder="e.g. MUMB12345C" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Professional Tax Reg Number</label>
+                    <input id="coProfTax" value="${ohEsc(coData.profTax||'')}" placeholder="PT Registration Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">ESI / PF Registration Code</label>
+                    <input id="coEsiPf" value="${ohEsc(coData.esiPf||'')}" placeholder="EPF & ESIC Code Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Shop & Establishment License Number</label>
+                    <input id="coShopLicense" value="${ohEsc(coData.shopLicense||'')}" placeholder="Shop License ID" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="compliance" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Compliance Info</button>
+              </div>
+            </div>
+
+            <!-- TAB 4: BANKING -->
+            <div id="coSubpanel-banking" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <div style="font-size:12px;color:#64748b;font-weight:500;">Add and manage all company bank accounts. Specify the primary account for payouts.</div>
+                  <button type="button" id="coAddBankBtn" style="height:32px;padding:0 14px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                    + Add Bank Account
+                  </button>
+                </div>
+                <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;min-height:100px;overflow-x:auto;">
+                  <div id="coBanksListContainer"></div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="banking" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Bank Accounts</button>
+              </div>
+            </div>
+
+            <!-- TAB 5: KEY PEOPLE -->
+            <div id="coSubpanel-people" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:20px;">
+                <!-- Directors / Partners -->
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Directors / Partners / Proprietor</label>
+                    <button type="button" id="coAddDirectorBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
+                      + Add Person
+                    </button>
+                  </div>
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
+                    <div id="coDirectorsListContainer"></div>
+                  </div>
+                </div>
+
+                <!-- Advisors & Partners -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px;">
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;background:#fafbfc;">
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#475569;margin-bottom:12px;">Auditor Details</label>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                      <input id="coAuditorName" value="${ohEsc(coData.people.auditor.name||'')}" placeholder="Auditor Name" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
+                      <input id="coAuditorContact" value="${ohEsc(coData.people.auditor.contact||'')}" placeholder="Phone or Email" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
+                    </div>
+                  </div>
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;background:#fafbfc;">
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#475569;margin-bottom:12px;">CA / Tax Consultant Contact</label>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                      <input id="coConsultantName" value="${ohEsc(coData.people.taxConsultant.name||'')}" placeholder="Consultant Name" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
+                      <input id="coConsultantContact" value="${ohEsc(coData.people.taxConsultant.contact||'')}" placeholder="Phone or Email" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Key Employees -->
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:8px;">
+                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Key Employees</label>
+                    <button type="button" id="coAddEmployeeBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
+                      + Add Employee
+                    </button>
+                  </div>
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
+                    <div id="coEmployeesListContainer"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="people" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Key People</button>
+              </div>
+            </div>
+
+            <!-- TAB 6: DOCUMENT VAULT -->
+            <div id="coSubpanel-vault" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:20px;">
+                <!-- Upload File Box -->
+                <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:20px;background:#fafbfc;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:end;">
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Document Title</label>
+                    <input id="coDocTitle" placeholder="e.g. MOA Document" style="width:100%;height:38px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:13px;outline:none;">
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Category</label>
+                    <select id="coDocCategory" style="width:100%;height:38px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:13px;color:#334155;outline:none;background:#fff;">
+                      <option value="Incorporation">Incorporation / Registration</option>
+                      <option value="PAN_GST">PAN Card & GST Certificates</option>
+                      <option value="Deed_MOA">MOA/AOA / Partnership Deed</option>
+                      <option value="Banking">Cancelled Cheque / Bank Docs</option>
+                      <option value="Property">Rental / Lease Agreements</option>
+                      <option value="Insurance">Insurance Certificates</option>
+                      <option value="Finance">Financials & Audited Reports</option>
+                      <option value="Resolutions">Board Resolutions</option>
+                      <option value="Others">Others</option>
+                    </select>
+                  </div>
+                  <div style="grid-column: span 2; display:flex; gap:16px; align-items:center; margin-top:8px;">
+                    <div style="flex-grow:1;">
+                      <label style="display:block;font-size:11.5px;font-weight:600;color:#64748b;margin-bottom:6px;">File Attachment</label>
+                      <input type="file" id="coDocFileInput" style="font-size:12.5px;color:#475569;">
+                    </div>
+                    <button type="button" id="coDocUploadBtn" style="height:38px;padding:0 20px;border:none;border-radius:8px;background:#0284c7;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">
+                      Upload to Vault
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Vault Documents list -->
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Vault Documents</label>
+                    <input id="coDocSearch" placeholder="Search files..." style="width:200px;height:28px;border:1.5px solid #cbd5e1;border-radius:6px;padding:0 10px;font-size:12px;outline:none;">
+                  </div>
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;min-height:100px;">
+                    <div id="coDocsListContainer"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 7: ASSETS & INSURANCE -->
+            <div id="coSubpanel-assets" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:20px;">
+                <!-- Insurance Policies -->
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Insurance Policies</label>
+                    <button type="button" id="coAddPolicyBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
+                      + Add Policy
+                    </button>
+                  </div>
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
+                    <div id="coPoliciesListContainer"></div>
+                  </div>
+                </div>
+
+                <!-- Major Assets -->
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Major Fixed Assets</label>
+                    <button type="button" id="coAddAssetBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
+                      + Add Asset
+                    </button>
+                  </div>
+                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
+                    <div id="coAssetsListContainer"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="assets" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Assets & Policies</button>
+              </div>
+            </div>
+
+            <!-- TAB 8: REMINDERS & DUE DATES -->
+            <div id="coSubpanel-reminders" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <div style="font-size:12px;color:#64748b;font-weight:500;">Add renewals, statutory deadlines, or tax filings for alert tracking.</div>
+                  <button type="button" id="coAddReminderBtn" style="height:32px;padding:0 14px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:12.5px;font-weight:700;cursor:pointer;">
+                    + Add Due Date/Reminder
+                  </button>
+                </div>
+                <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;min-height:100px;overflow-x:auto;">
+                  <div id="coRemindersListContainer"></div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="reminders" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Reminders</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `;
+
+    // ── SUB-TABS INTERACTIVE NAVIGATION ──
+    const tabs = wrap.querySelectorAll('.oh-sub-tab');
+    const panels = wrap.querySelectorAll('.co-subpanel-content');
+
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const subtab = btn.dataset.subtab;
+        tabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+
+        panels.forEach(p => p.style.display = 'none');
+        const activePanel = wrap.querySelector(`#coSubpanel-${subtab}`);
+        if (activePanel) activePanel.style.display = 'block';
+      });
+    });
+
+    // ── LIVE FORM BINDING & PERSISTENCE ──
+    
+    // Focus styling
+    wrap.querySelectorAll('input,textarea,select').forEach(el => {
+      el.addEventListener('focus', () => { el.style.borderColor='#3b82f6'; el.style.boxShadow='0 0 0 3px rgba(59,130,246,.12)'; });
+      el.addEventListener('blur',  () => { el.style.borderColor='#e2e8f0'; el.style.boxShadow='none'; });
+    });
+
+    // 1. Identity handlers
+    const nameInp = wrap.querySelector('#coNameInput');
+    const dispInp = wrap.querySelector('#coDisplayNameInput');
+    const counter = wrap.querySelector('#coDisplayNameCounter');
+    const previewAvatar = wrap.querySelector('#coPreviewAvatar');
+
+    dispInp.addEventListener('input', () => {
+      counter.textContent = `${dispInp.value.length}/22`;
+      counter.style.color = dispInp.value.length >= 20 ? '#ef4444' : '#94a3b8';
+      wrap.querySelector('#coPreviewAvatar').textContent = coData.iconImage ? '' : getCompanyInitials(nameInp.value || dispInp.value);
+    });
+    nameInp.addEventListener('input', () => {
+      wrap.querySelector('#coPreviewAvatar').textContent = coData.iconImage ? '' : getCompanyInitials(nameInp.value || dispInp.value);
+    });
+
+    // Logo image file upload wiring
+    const fileInp = wrap.querySelector('#coFileInput');
+    const uploadBtn = wrap.querySelector('#coUploadBtn');
+    const removeBtn = wrap.querySelector('#coRemoveImageBtn');
+    const imageInp = wrap.querySelector('#coIconImage');
+
+    uploadBtn.addEventListener('click', () => fileInp.click());
+
+    fileInp.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const base64 = evt.target.result;
+        imageInp.value = base64;
+        coData.iconImage = base64;
+        previewAvatar.textContent = '';
+        previewAvatar.style.backgroundImage = `url(${base64})`;
+        removeBtn.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    removeBtn.addEventListener('click', () => {
+      imageInp.value = '';
+      coData.iconImage = '';
+      fileInp.value = '';
+      previewAvatar.style.backgroundImage = 'none';
+      previewAvatar.textContent = getCompanyInitials(nameInp.value || dispInp.value);
+      removeBtn.style.display = 'none';
+    });
+
+
+    // ── DYNAMIC LIST RENDERING ──
+
+    // 2. GSTINs List
+    const renderGstins = () => {
+      const cont = wrap.querySelector('#coGstinsListContainer');
+      if (coData.gstins.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No GSTIN registrations added.</div>`;
+        return;
+      }
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px 6px;">State / Union Territory</th>
+            <th style="padding:8px 6px;">GSTIN</th>
+            <th style="padding:8px 6px;text-align:right;width:60px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      coData.gstins.forEach((g, idx) => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:6px;"><input data-list="gstins" data-index="${idx}" data-field="state" value="${ohEsc(g.state||'')}" placeholder="e.g. Maharashtra" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="gstins" data-index="${idx}" data-field="gstin" value="${ohEsc(g.gstin||'')}" placeholder="27AAAAA0000A1Z5" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;text-transform:uppercase;outline:none;"></td>
+          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="gstins" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coAddGstinBtn').addEventListener('click', () => {
+      coData.gstins.push({ state: '', gstin: '' });
+      renderGstins();
+    });
+
+    // 4. Banking List
+    const renderBanks = () => {
+      const cont = wrap.querySelector('#coBanksListContainer');
+      if (coData.banks.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:16px 0;">No bank accounts configured.</div>`;
+        return;
+      }
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px;width:150px;">Bank Name</th>
+            <th style="padding:8px;width:160px;">Account Number</th>
+            <th style="padding:8px;width:110px;">IFSC Code</th>
+            <th style="padding:8px;width:120px;">Branch</th>
+            <th style="padding:8px;width:110px;">Type</th>
+            <th style="padding:8px;text-align:center;width:70px;">Primary</th>
+            <th style="padding:8px;text-align:right;width:60px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      coData.banks.forEach((b, idx) => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="bankName" value="${ohEsc(b.bankName||'')}" placeholder="e.g. HDFC Bank" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="accNo" value="${ohEsc(b.accNo||'')}" placeholder="Account No" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="ifsc" value="${ohEsc(b.ifsc||'')}" placeholder="IFSC" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;text-transform:uppercase;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="branch" value="${ohEsc(b.branch||'')}" placeholder="Branch Name" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;">
+            <select data-list="banks" data-index="${idx}" data-field="type" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;background:#fff;">
+              <option value="Current" ${b.type==='Current'?'selected':''}>Current</option>
+              <option value="Savings" ${b.type==='Savings'?'selected':''}>Savings</option>
+              <option value="Overdraft" ${b.type==='Overdraft'?'selected':''}>OD / CC</option>
+            </select>
+          </td>
+          <td style="padding:6px;text-align:center;"><input type="checkbox" data-list="banks" data-index="${idx}" data-field="isPrimary" ${b.isPrimary?'checked':''} style="transform:scale(1.2);cursor:pointer;"></td>
+          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="banks" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coAddBankBtn').addEventListener('click', () => {
+      coData.banks.push({ bankName: '', accNo: '', ifsc: '', branch: '', type: 'Current', isPrimary: coData.banks.length === 0 });
+      renderBanks();
+    });
+
+    // 5. Directors List
+    const renderDirectors = () => {
+      const cont = wrap.querySelector('#coDirectorsListContainer');
+      if (coData.people.directors.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No director/partner details added.</div>`;
+        return;
+      }
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:600px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px;">Name</th>
+            <th style="padding:8px;width:120px;">Role</th>
+            <th style="padding:8px;width:120px;">PAN</th>
+            <th style="padding:8px;width:130px;">Aadhaar</th>
+            <th style="padding:8px;width:110px;">DIN (if applicable)</th>
+            <th style="padding:8px;text-align:right;width:60px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      coData.people.directors.forEach((d, idx) => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="name" value="${ohEsc(d.name||'')}" placeholder="Name" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="role" value="${ohEsc(d.role||'')}" placeholder="e.g. Director" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="pan" value="${ohEsc(d.pan||'')}" placeholder="PAN" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;text-transform:uppercase;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="aadhaar" value="${ohEsc(d.aadhaar||'')}" placeholder="Aadhaar" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="din" value="${ohEsc(d.din||'')}" placeholder="DIN" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="directors" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coAddDirectorBtn').addEventListener('click', () => {
+      coData.people.directors.push({ name: '', role: '', pan: '', aadhaar: '', din: '' });
+      renderDirectors();
+    });
+
+    // 5. Employees List
+    const renderEmployees = () => {
+      const cont = wrap.querySelector('#coEmployeesListContainer');
+      if (coData.people.keyEmployees.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No employee contacts added.</div>`;
+        return;
+      }
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px;">Name</th>
+            <th style="padding:8px;width:160px;">Role</th>
+            <th style="padding:8px;width:150px;">Phone</th>
+            <th style="padding:8px;width:180px;">Email</th>
+            <th style="padding:8px;text-align:right;width:60px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      coData.people.keyEmployees.forEach((e, idx) => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="name" value="${ohEsc(e.name||'')}" placeholder="Name" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="role" value="${ohEsc(e.role||'')}" placeholder="Role" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="phone" value="${ohEsc(e.phone||'')}" placeholder="Phone" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="email" value="${ohEsc(e.email||'')}" placeholder="Email" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="keyEmployees" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coAddEmployeeBtn').addEventListener('click', () => {
+      coData.people.keyEmployees.push({ name: '', role: '', phone: '', email: '' });
+      renderEmployees();
+    });
+
+    // 6. Document Vault List
+    const renderDocumentsList = () => {
+      const cont = wrap.querySelector('#coDocsListContainer');
+      const query = wrap.querySelector('#coDocSearch').value.trim().toLowerCase();
+      
+      const filtered = coData.documents.filter(d => 
+        d.title.toLowerCase().includes(query) || d.category.toLowerCase().includes(query) || d.fileName.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:24px 0;">No documents match your query or have been uploaded.</div>`;
+        return;
+      }
+      
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px;">Document Title</th>
+            <th style="padding:8px;width:180px;">Category</th>
+            <th style="padding:8px;width:220px;">Filename</th>
+            <th style="padding:8px;text-align:right;width:120px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      filtered.forEach((d, idx) => {
+        const actualIdx = coData.documents.findIndex(orig => orig.id === d.id);
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:8px;font-weight:600;color:#0f172a;">${ohEsc(d.title)}</td>
+          <td style="padding:8px;color:#475569;"><span style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">${ohEsc(d.category)}</span></td>
+          <td style="padding:8px;color:#64748b;font-family:monospace;font-size:12px;">${ohEsc(d.fileName)}</td>
+          <td style="padding:8px;text-align:right;">
+            <button type="button" class="co-download-doc-btn" data-index="${actualIdx}" style="border:none;background:none;color:#0284c7;font-size:12.5px;font-weight:700;cursor:pointer;margin-right:12px;">Download</button>
+            <button type="button" class="co-del-list-btn" data-list="documents" data-index="${actualIdx}" style="border:none;background:none;color:#ef4444;font-size:12.5px;font-weight:700;cursor:pointer;">Delete</button>
+          </td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coDocSearch').addEventListener('input', renderDocumentsList);
+
+    wrap.querySelector('#coDocUploadBtn').addEventListener('click', () => {
+      const title = wrap.querySelector('#coDocTitle').value.trim();
+      const cat = wrap.querySelector('#coDocCategory').value;
+      const fileInput = wrap.querySelector('#coDocFileInput');
+      const file = fileInput.files[0];
+      
+      if (!title || !file) {
+        showToast('Please provide a document title and select a file.', 'warning');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        coData.documents.push({
+          id: 'doc_' + Date.now(),
+          title,
+          category: cat,
+          fileName: file.name,
+          fileData: evt.target.result
+        });
+        
+        wrap.querySelector('#coDocTitle').value = '';
+        fileInput.value = '';
+        renderDocumentsList();
+        saveCompanyDetails(coData);
+        showToast('Document uploaded to vault.', 'success');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // 7. Insurance Policies List
+    const renderPolicies = () => {
+      const cont = wrap.querySelector('#coPoliciesListContainer');
+      if (coData.insuranceAssets.policies.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No insurance policies added.</div>`;
+        return;
+      }
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px;width:150px;">Policy Number</th>
+            <th style="padding:8px;width:150px;">Provider</th>
+            <th style="padding:8px;width:120px;">Expiry Date</th>
+            <th style="padding:8px;">Coverage Type</th>
+            <th style="padding:8px;text-align:right;width:60px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      coData.insuranceAssets.policies.forEach((p, idx) => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:6px;"><input data-list="policies" data-index="${idx}" data-field="policyNo" value="${ohEsc(p.policyNo||'')}" placeholder="Policy No" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input data-list="policies" data-index="${idx}" data-field="provider" value="${ohEsc(p.provider||'')}" placeholder="e.g. LIC" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input type="date" data-list="policies" data-index="${idx}" data-field="expiry" value="${ohEsc(p.expiry||'')}" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;"></td>
+          <td style="padding:6px;">
+            <select data-list="policies" data-index="${idx}" data-field="type" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;background:#fff;">
+              <option value="Asset" ${p.type==='Asset'?'selected':''}>Key Asset Insurance</option>
+              <option value="Fire" ${p.type==='Fire'?'selected':''}>Fire Insurance</option>
+              <option value="Theft" ${p.type==='Theft'?'selected':''}>Theft & Burglary</option>
+              <option value="Health" ${p.type==='Health'?'selected':''}>Employee Health / Group</option>
+              <option value="Others" ${p.type==='Others'?'selected':''}>Others</option>
+            </select>
+          </td>
+          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="policies" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coAddPolicyBtn').addEventListener('click', () => {
+      coData.insuranceAssets.policies.push({ policyNo: '', provider: '', expiry: '', type: 'Asset' });
+      renderPolicies();
+    });
+
+    // 7. Assets List
+    const renderAssets = () => {
+      const cont = wrap.querySelector('#coAssetsListContainer');
+      if (coData.insuranceAssets.assets.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No major fixed assets logged.</div>`;
+        return;
+      }
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px;">Asset Name</th>
+            <th style="padding:8px;width:120px;">Purchase Date</th>
+            <th style="padding:8px;width:110px;">Cost (₹)</th>
+            <th style="padding:8px;width:180px;">Invoice File</th>
+            <th style="padding:8px;text-align:right;width:60px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      coData.insuranceAssets.assets.forEach((a, idx) => {
+        html += `<tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:6px;"><input data-list="assets" data-index="${idx}" data-field="assetName" value="${ohEsc(a.assetName||'')}" placeholder="e.g. MacBook Pro" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;"><input type="date" data-list="assets" data-index="${idx}" data-field="purchaseDate" value="${ohEsc(a.purchaseDate||'')}" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;"></td>
+          <td style="padding:6px;"><input type="number" data-list="assets" data-index="${idx}" data-field="purchaseCost" value="${ohEsc(a.purchaseCost||'0')}" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
+          <td style="padding:6px;font-size:11px;color:#64748b;">
+            ${a.purchaseDocName ? `<span style="font-weight:600;color:#0284c7;">${ohEsc(a.purchaseDocName)}</span>` : `<input type="file" class="co-asset-file-uploader" data-index="${idx}" style="width:100%;">`}
+          </td>
+          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="assets" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coAddAssetBtn').addEventListener('click', () => {
+      coData.insuranceAssets.assets.push({ assetName: '', purchaseDate: '', purchaseCost: 0, purchaseDoc: '', purchaseDocName: '' });
+      renderAssets();
+    });
+
+    // 8. Reminders List
+    const renderReminders = () => {
+      const cont = wrap.querySelector('#coRemindersListContainer');
+      if (coData.reminders.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:16px 0;">No reminders logged. Add license renewal dates or tax filings.</div>`;
+        return;
+      }
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
+            <th style="padding:8px;">Reminder / Task Name</th>
+            <th style="padding:8px;width:130px;">Due Date</th>
+            <th style="padding:8px;width:150px;">Category</th>
+            <th style="padding:8px;width:100px;">Status</th>
+            <th style="padding:8px;text-align:right;width:60px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>`;
+      
+      const nowTime = new Date().setHours(0,0,0,0);
+      coData.reminders.forEach((r, idx) => {
+        let isUrgent = false;
+        if (r.dueDate && r.status !== 'Completed') {
+          const dueTime = new Date(r.dueDate).getTime();
+          const diffDays = Math.ceil((dueTime - nowTime) / (1000 * 60 * 60 * 24));
+          if (diffDays <= 7) isUrgent = true;
+        }
+
+        html += `<tr style="border-bottom:1px solid #f1f5f9; background:${isUrgent ? '#fff7ed' : 'transparent'};">
+          <td style="padding:6px;"><input data-list="reminders" data-index="${idx}" data-field="title" value="${ohEsc(r.title||'')}" placeholder="e.g. License renewal" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;font-weight:${isUrgent?'600':'400'};color:${isUrgent?'#c2410c':'#0f172a'};"></td>
+          <td style="padding:6px;"><input type="date" data-list="reminders" data-index="${idx}" data-field="dueDate" value="${ohEsc(r.dueDate||'')}" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;"></td>
+          <td style="padding:6px;">
+            <select data-list="reminders" data-index="${idx}" data-field="category" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;background:#fff;">
+              <option value="Statutory" ${r.category==='Statutory'?'selected':''}>GST/ROC Return Deadline</option>
+              <option value="License" ${r.category==='License'?'selected':''}>License Renewal</option>
+              <option value="Insurance" ${r.category==='Insurance'?'selected':''}>Insurance Expiry</option>
+              <option value="Tax" ${r.category==='Tax'?'selected':''}>Income Tax/Advance Tax</option>
+              <option value="Others" ${r.category==='Others'?'selected':''}>Others</option>
+            </select>
+          </td>
+          <td style="padding:6px;">
+            <select data-list="reminders" data-index="${idx}" data-field="status" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;background:#fff;font-weight:600;color:${r.status==='Completed'?'#16a34a':'#ea580c'}">
+              <option value="Pending" ${r.status==='Pending'?'selected':''}>Pending</option>
+              <option value="Completed" ${r.status==='Completed'?'selected':''}>Completed</option>
+            </select>
+          </td>
+          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="reminders" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      cont.innerHTML = html;
+    };
+
+    wrap.querySelector('#coAddReminderBtn').addEventListener('click', () => {
+      coData.reminders.push({ title: '', dueDate: '', category: 'Statutory', status: 'Pending' });
+      renderReminders();
+    });
+
+
+    // ── DELEGATED LIST EVENT HANDLERS ──
+
+    wrap.addEventListener('input', (e) => {
+      const list = e.target.dataset.list;
+      const index = parseInt(e.target.dataset.index);
+      const field = e.target.dataset.field;
+      if (list && !isNaN(index) && field) {
+        let arr;
+        if (list === 'directors') arr = coData.people.directors;
+        else if (list === 'keyEmployees') arr = coData.people.keyEmployees;
+        else if (list === 'policies') arr = coData.insuranceAssets.policies;
+        else if (list === 'assets') arr = coData.insuranceAssets.assets;
+        else arr = coData[list];
+
+        if (arr && arr[index]) {
+          if (e.target.type === 'checkbox') {
+            arr[index][field] = e.target.checked;
+            if (list === 'banks' && field === 'isPrimary' && e.target.checked) {
+              coData.banks.forEach((b, i) => {
+                if (i !== index) b.isPrimary = false;
+              });
+              renderBanks();
+            }
+          } else {
+            arr[index][field] = e.target.value;
+          }
+        }
+      }
+    });
+
+    wrap.addEventListener('change', (e) => {
+      if (e.target.classList.contains('co-asset-file-uploader')) {
+        const index = parseInt(e.target.dataset.index);
+        const file = e.target.files[0];
+        if (file && !isNaN(index)) {
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            coData.insuranceAssets.assets[index].purchaseDoc = evt.target.result;
+            coData.insuranceAssets.assets[index].purchaseDocName = file.name;
+            renderAssets();
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    });
+
+    wrap.addEventListener('click', (e) => {
+      if (e.target.classList.contains('co-del-list-btn')) {
+        const list = e.target.dataset.list;
+        const index = parseInt(e.target.dataset.index);
+        if (list && !isNaN(index)) {
+          if (list === 'gstins') {
+            coData.gstins.splice(index, 1);
+            renderGstins();
+          } else if (list === 'banks') {
+            coData.banks.splice(index, 1);
+            renderBanks();
+          } else if (list === 'directors') {
+            coData.people.directors.splice(index, 1);
+            renderDirectors();
+          } else if (list === 'keyEmployees') {
+            coData.people.keyEmployees.splice(index, 1);
+            renderEmployees();
+          } else if (list === 'documents') {
+            coData.documents.splice(index, 1);
+            renderDocumentsList();
+            saveCompanyDetails(coData);
+          } else if (list === 'policies') {
+            coData.insuranceAssets.policies.splice(index, 1);
+            renderPolicies();
+          } else if (list === 'assets') {
+            coData.insuranceAssets.assets.splice(index, 1);
+            renderAssets();
+          } else if (list === 'reminders') {
+            coData.reminders.splice(index, 1);
+            renderReminders();
+          }
+        }
+      }
+      
+      if (e.target.classList.contains('co-download-doc-btn')) {
+        const index = parseInt(e.target.dataset.index);
+        const doc = coData.documents[index];
+        if (doc && doc.fileData) {
+          const link = document.createElement('a');
+          link.href = doc.fileData;
+          link.download = doc.fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+    });
+
+
+    // ── INITIALIZING LISTS & LOADS ──
+    renderGstins();
+    renderBanks();
+    renderDirectors();
+    renderEmployees();
+    renderDocumentsList();
+    renderPolicies();
+    renderAssets();
+    renderReminders();
+
+
+    // ── SECTION SAVE BTN LISTENERS ──
+
+    wrap.querySelectorAll('.co-save-section-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const section = btn.dataset.section;
+
+        if (section === 'identity') {
+          const name = wrap.querySelector('#coNameInput').value.trim();
+          if (!name) {
+            wrap.querySelector('#coNameInput').style.borderColor = '#ef4444';
+            wrap.querySelector('#coNameInput').focus();
+            showToast('Please enter a company name.', 'warning');
+            return;
+          }
+          coData.name = name;
+          coData.displayName = wrap.querySelector('#coDisplayNameInput').value.trim();
+          coData.businessType = wrap.querySelector('#coBusinessType').value;
+          coData.incDate = wrap.querySelector('#coIncDate').value;
+          coData.address = wrap.querySelector('#coAddressInput').value.trim();
+          coData.phone = wrap.querySelector('#coPhoneInput').value.trim();
+          coData.email = wrap.querySelector('#coEmailInput').value.trim();
+          coData.website = wrap.querySelector('#coWebsiteInput').value.trim();
+        }
+
+        else if (section === 'registrations') {
+          coData.pan = wrap.querySelector('#coPAN').value.trim().toUpperCase();
+          coData.cin = wrap.querySelector('#coCIN').value.trim().toUpperCase();
+          coData.udyam = wrap.querySelector('#coUdyam').value.trim();
+          coData.tradeLicense = wrap.querySelector('#coTradeLicense').value.trim();
+          coData.iec = wrap.querySelector('#coIEC').value.trim();
+        }
+
+        else if (section === 'compliance') {
+          coData.tan = wrap.querySelector('#coTAN').value.trim().toUpperCase();
+          coData.profTax = wrap.querySelector('#coProfTax').value.trim();
+          coData.esiPf = wrap.querySelector('#coEsiPf').value.trim();
+          coData.shopLicense = wrap.querySelector('#coShopLicense').value.trim();
+        }
+
+        else if (section === 'people') {
+          coData.people.auditor.name = wrap.querySelector('#coAuditorName').value.trim();
+          coData.people.auditor.contact = wrap.querySelector('#coAuditorContact').value.trim();
+          coData.people.taxConsultant.name = wrap.querySelector('#coConsultantName').value.trim();
+          coData.people.taxConsultant.contact = wrap.querySelector('#coConsultantContact').value.trim();
+        }
+
+        // Write coData object to localstorage
+        saveCompanyDetails(coData);
+        updateSidebarCompany();
+        showToast('Company details successfully saved.', 'success');
+      });
+    });
+  }
+
   // Setup and Initial Call
   setupSalesVoucherEventListeners();
   setupVoucherDeskEventListeners();
@@ -18703,4 +20275,5 @@
 
 </body>
 </html>
+
 
