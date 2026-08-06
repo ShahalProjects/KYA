@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KYA – Keep Your Accounts</title>
-  <meta name="description" content="KYA – Keep Your Accounts. A professional accounting software for managing journal entries, ledgers, and financial reports." />
+  <title>KYA</title>
+  <meta name="description" content="KYA. A professional accounting software for managing journal entries, ledgers, and financial reports." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
@@ -358,7 +358,7 @@
               <label for="jeVoucherNo">Journal Voucher No.</label>
               <input type="text" id="jeVoucherNo" class="je-input" placeholder="e.g. JV-2024-001" aria-label="Journal voucher number" />
             </div>
-            <input type="hidden" id="jeFiscalYear" value="2024–25" />
+            <input type="hidden" id="jeFiscalYear" value="2024â€“25" />
             <input type="hidden" id="jePreparedBy" value="Admin User" />
             <div class="je-field">
               <label for="jeDepartment">Department</label>
@@ -412,8 +412,11 @@
 
           <!-- Narration -->
           <div class="je-narration-wrap">
-            <label for="jeNarration" class="je-narration-label">Narration / Description</label>
-            <textarea id="jeNarration" class="je-narration-input" placeholder="Being the entry for…" aria-label="Narration"></textarea>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <label for="jeNarration" class="je-narration-label" style="margin-bottom: 0;">Narration / Description</label>
+              <span style="font-size: 11px; font-weight: 600; color: var(--slate-400);">Press <kbd style="background: var(--slate-100); border: 1px solid var(--slate-300); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-family: inherit;">Ctrl + Enter</kbd> to Post</span>
+            </div>
+            <textarea id="jeNarration" class="je-narration-input" placeholder="Being the entry for..." aria-label="Narration"></textarea>
           </div>
 
           <!-- Totals footer -->
@@ -699,7 +702,7 @@
                 <!-- Back button and Date filter bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
                   <button class="btn btn-secondary" id="btnBackToLedgerList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
-                    ← Back to Ledgers
+                    â† Back to Ledgers
                   </button>
                   <div style="display: flex; gap: 10px; align-items: center;">
                     <div style="display: flex; align-items: center; gap: 6px;">
@@ -719,7 +722,7 @@
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <h3 id="statementLedgerName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Account Ledger</h3>
                       <button class="btn btn-secondary btn-sm" id="btnEditLedgerFromStatement" style="padding: 4px 8px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 6px; background: #fff; cursor: pointer; color: var(--slate-600); height: 24px;">
-                        ✎ Alter Details
+                        âœŽ Alter Details
                       </button>
                     </div>
                     <span id="statementSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Subgroup</span>
@@ -734,15 +737,15 @@
                 <div style="display: flex; justify-content: flex-end; gap: 24px; padding: 16px 20px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; margin-top: 16px; flex-wrap: wrap;">
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Opening Balance</span>
-                    <span id="statementOpeningBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                    <span id="statementOpeningBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">â‚¹0.00</span>
                   </div>
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Current Balance (Period Net)</span>
-                    <span id="statementCurrentBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                    <span id="statementCurrentBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">â‚¹0.00</span>
                   </div>
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Closing Balance</span>
-                    <span id="statementClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">₹0.00</span>
+                    <span id="statementClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">â‚¹0.00</span>
                   </div>
                 </div>
               </div>
@@ -946,7 +949,7 @@
             </div>
             <div class="rpt-tb-right">
               <span style="font-size: 13px; font-weight: 600; color: var(--slate-500); white-space: nowrap;">
-                Fiscal Year: <span style="color: var(--blue-600);">2024–25</span>
+                Fiscal Year: <span style="color: var(--blue-600);">2024â€“25</span>
               </span>
             </div>
           </div>
@@ -1244,9 +1247,9 @@
 
                   <div style="background: var(--blue-50); border: 1px dashed var(--blue-200); border-radius: 8px; padding: 14px; font-size: 13px; color: var(--blue-800); line-height: 1.55;">
                     <strong>Utility & Navigation Helpers:</strong><br/>
-                    • <strong>ArrowUp / ArrowDown</strong>: Navigate focused sidebar items sequentially.<br/>
-                    • <strong>Space + Esc</strong>: Close all currently opened tabs completely.<br/>
-                    • <strong>Ctrl + Space</strong>: Cycle to the next open panel tab at the top.
+                    â€¢ <strong>ArrowUp / ArrowDown</strong>: Navigate focused sidebar items sequentially.<br/>
+                    â€¢ <strong>Space + Esc</strong>: Close all currently opened tabs completely.<br/>
+                    â€¢ <strong>Ctrl + Space</strong>: Cycle to the next open panel tab at the top.
                   </div>
                 </div>
               </div>
@@ -1336,11 +1339,11 @@
                     <div class="vault-stats-list">
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Last Backup Date</span>
-                        <span class="v-stat-val" id="vaultLastDate">—</span>
+                        <span class="v-stat-val" id="vaultLastDate">â€”</span>
                       </div>
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Last Backup Time</span>
-                        <span class="v-stat-val" id="vaultLastTime">—</span>
+                        <span class="v-stat-val" id="vaultLastTime">â€”</span>
                       </div>
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Last Backup Status</span>
@@ -1348,7 +1351,7 @@
                       </div>
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Backup Size</span>
-                        <span class="v-stat-val" id="vaultBackupSize">—</span>
+                        <span class="v-stat-val" id="vaultBackupSize">â€”</span>
                       </div>
                     </div>
                   </div>
@@ -1500,7 +1503,7 @@
             </div>
           </div>
 
-          <div class="je-fields-bar" id="salesTypeBar" style="padding-top: 16px; padding-bottom: 16px; background: #fff; display: flex; align-items: flex-end;">
+          <div class="je-fields-bar" id="salesTypeBar" style="display: none !important;">
             <div class="je-field" style="max-width: 320px; width: 100%;">
               <label>Voucher Type</label>
               <div class="sales-type-wrap" style="height: 42px; width: 100%;">
@@ -1541,9 +1544,9 @@
           <!-- Summary & Totals Grid -->
           <div class="sales-totals-grid">
             <!-- Left side notes & Payment details -->
-            <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
               <!-- Payment Status Sliding selector -->
-              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
                 <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
                   <label id="salesPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment Status</label>
                   <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
@@ -1574,58 +1577,54 @@
                 </div>
               </div>
               
-              <div class="je-narration-wrap" style="padding: 0;">
-                <label for="salesNotes" class="je-narration-label">Notes / Terms</label>
-                <textarea id="salesNotes" class="je-narration-input" placeholder="Payment terms, bank details, delivery terms..." style="min-height: 90px;"></textarea>
+              <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <label for="salesNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <textarea id="salesNotes" class="je-narration-input" placeholder="Payment terms, bank details, delivery terms..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
             <!-- Right side Summary Card -->
-            <div>
-              <div class="sales-summary-card">
+            <div class="sales-totals-right" style="display: flex; flex-direction: column; height: 100%;">
+              <div class="sales-summary-card" style="height: 100%; box-sizing: border-box;">
                 <div class="sales-summary-row">
                   <span>Sub Total</span>
                   <span id="salesSubTotal">₹ 0.00</span>
                 </div>
 
-                <div class="sales-summary-row" style="flex-direction: column; align-items: stretch; gap: 8px; background: var(--white); border: 1.5px solid var(--slate-100); padding: 12px; border-radius: 12px; margin-top: 4px;">
-                  <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <label style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Tax Deduction / Collection</label>
-                      <span style="font-weight: 700; font-size: 12.5px; color: var(--blue-700);" id="salesTdsTcsRateLabel">0%</span>
-                    </div>
-                    <div class="sales-tdstcs-wrap" style="margin-top: 4px; width: 100%;">
-                      <div class="sales-tdstcs-bg none-active" id="salesTdsTcsBg"></div>
-                      <button class="sales-tdstcs-btn active" id="salesTdsTcsNone" type="button">None</button>
-                      <button class="sales-tdstcs-btn" id="salesTdsTcsTds" type="button">TDS</button>
-                      <button class="sales-tdstcs-btn" id="salesTdsTcsTcs" type="button">TCS</button>
-                    </div>
-                  </div>
-                  
-                  <div id="salesTdsTcsRateGroup" style="display: none; flex-direction: column; gap: 8px; margin-top: 4px; border-top: 1px dashed var(--slate-200); padding-top: 8px;">
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Rate</label>
-                        <select id="salesTdsTcsRateSelect" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                          <option value="0.1">0.1%</option>
-                          <option value="1">1%</option>
-                          <option value="2">2%</option>
-                          <option value="5">5%</option>
-                          <option value="10">10%</option>
-                          <option value="custom">Custom...</option>
-                        </select>
-                      </div>
-                      <div id="salesTdsTcsRateCustomWrap" style="flex: 1; display: none; flex-direction: column; gap: 4px;">
-                        <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Custom %</label>
-                        <input type="number" id="salesTdsTcsRateCustom" class="je-input" placeholder="e.g. 1.25" min="0" max="100" step="0.01" style="height: 38px; padding: 0 10px;" />
-                      </div>
-                    </div>
+                <!-- TDS/TCS Toggle -->
+                <div class="sales-summary-row" style="align-items: center;">
+                  <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em;">Tax Deduction / Collection</span>
+                  <div class="sales-tdstcs-wrap" style="width: auto; min-width: 154px;">
+                    <div class="sales-tdstcs-bg none-active" id="salesTdsTcsBg"></div>
+                    <button class="sales-tdstcs-btn active" id="salesTdsTcsNone" type="button">None</button>
+                    <button class="sales-tdstcs-btn" id="salesTdsTcsTds" type="button">TDS</button>
+                    <button class="sales-tdstcs-btn" id="salesTdsTcsTcs" type="button">TCS</button>
                   </div>
                 </div>
 
-                <div class="sales-summary-row" id="salesTdsTcsAmountRow" style="display: none;">
-                  <span id="salesTdsTcsAmountLabel">TDS / TCS Amount</span>
-                  <input type="number" id="salesTdsTcsAmount" class="je-input" placeholder="0.00" style="width: 120px; height: 32px; padding: 0 8px; text-align: right; font-weight: 600;" />
+                <!-- TDS/TCS Amount Row (styled like Round Off) -->
+                <div id="salesTdsTcsAmountRow" style="display: none;">
+                  <div class="sales-roundoff-input-group sales-tdstcs-amount-group">
+                    <!-- Rate dropdown (left, like "Round off" button) -->
+                    <select id="salesTdsTcsRateSelect" class="sales-tdstcs-rate-select" title="Select TDS/TCS rate">
+                      <option value="0.1">0.1%</option>
+                      <option value="1">1%</option>
+                      <option value="2">2%</option>
+                      <option value="5">5%</option>
+                      <option value="10">10%</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    <!-- Custom rate input (shown inline when Custom is selected, clean writing area without box design) -->
+                    <div id="salesTdsTcsRateCustomWrap" class="sales-tdstcs-custom-wrap" style="display: none;">
+                      <input type="number" id="salesTdsTcsRateCustom" class="sales-tdstcs-custom-input" min="0" max="100" step="0.01" placeholder="0" title="Custom percentage" />
+                      <span class="sales-tdstcs-custom-unit">%</span>
+                    </div>
+                    <!-- Divider -->
+                    <div class="sales-tdstcs-divider"></div>
+                    <!-- Amount label + value -->
+                    <span id="salesTdsTcsAmountLabel" class="sales-tdstcs-mode-label">TDS</span>
+                    <input type="number" id="salesTdsTcsAmount" class="sales-roundoff-field" placeholder="0.00" />
+                  </div>
                 </div>
 
                 <div class="sales-roundoff-input-group">
@@ -1638,6 +1637,56 @@
                 <div class="sales-summary-row total-row">
                   <span>Total</span>
                   <span id="salesTotal">₹ 0.00</span>
+                </div>
+
+                <!-- Document Upload Section under Total -->
+                <div class="sales-doc-upload-wrap" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--slate-200);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <label for="salesDocFileInput" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      Upload Document / Attachment
+                    </label>
+                    <span id="salesDocStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+                  </div>
+
+                  <input type="file" id="salesDocFileInput" style="display: none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+                  <div id="salesDocDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--slate-50); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--blue-400)'; this.style.background='var(--blue-50)'" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='var(--slate-50)'">
+                    <div id="salesDocEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; border-radius: 50%; background: #ffffff; border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: var(--blue-600); flex-shrink: 0;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">Click to Choose File</span>
+                        <span style="font-size: 10px; color: var(--slate-400);">PDF, Image, Excel, Word (Max 10MB)</span>
+                      </div>
+                    </div>
+
+                    <div id="salesDocSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                        <div id="salesDocFileIcon" style="width: 26px; height: 26px; border-radius: 6px; background: #dbeafe; color: #1e40af; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase;">PDF</div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                          <span id="salesDocFileName" style="font-size: 12px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">doc.pdf</span>
+                          <span id="salesDocFileSize" style="font-size: 10px; color: var(--slate-500); font-weight: 500;">0 KB</span>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <a id="salesDocPreviewBtn" target="_blank" style="padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; border-radius: 5px; text-decoration: none;" title="Download / View document">View</a>
+                        <button id="salesDocRemoveBtn" type="button" style="background: none; border: none; color: var(--red-600); cursor: pointer; padding: 3px; border-radius: 4px; display: flex; align-items: center;" title="Remove document">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
               </div>

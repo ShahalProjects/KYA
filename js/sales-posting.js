@@ -1,8 +1,6 @@
-  // ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
   //  SALES POSTING — Load/save drafts, post invoice, post to journal
   //  (Split from sales.js for maintainability)
-  // ══════════════════════════════════════════════════════════════════
-
   function loadSalesInvoice(inv, isDraft) {
     openTab('sales_voucher');
     
@@ -77,13 +75,13 @@
       } else {
         rateSelect.value = 'custom';
         if (customInput) customInput.value = rateVal;
-        if (customWrap) customWrap.style.display = 'block';
+        if (customWrap) customWrap.style.display = 'flex';
       }
     }
     if (label) {
       label.textContent = (rateVal % 1 === 0 ? rateVal.toFixed(0) : (rateVal * 10 % 1 === 0 ? rateVal.toFixed(1) : rateVal.toFixed(2))) + '%';
     }
-    if (amt) amt.value = inv.tdsTcsAmount !== undefined ? inv.tdsTcsAmount : '';
+    if (amt) amt.value = inv.tdsTcsAmount !== undefined ? (inv.tdsTcsAmount === 0 ? '' : inv.tdsTcsAmount) : '';
     
     if (tdsTcsMode === 'TDS') {
       const tdsBtn = document.getElementById('salesTdsTcsTds');
@@ -97,7 +95,7 @@
     }
     
     const adjEl = document.getElementById('salesAdjustments');
-    if (adjEl) adjEl.value = inv.adjustments !== undefined ? inv.adjustments : '';
+    if (adjEl) adjEl.value = inv.adjustments !== undefined ? (inv.adjustments === 0 ? '' : inv.adjustments) : '';
     
     const payStatus = inv.paymentStatus || 'Not Paid';
     if (payStatus === 'Full Payment' || payStatus === 'Full Refund') {
@@ -151,6 +149,7 @@
     renderSalesRows();
     updateSalesReturnLockState();
     recalculateSalesTotals();
+    updateSalesDocUI(inv.uploadedDoc || null);
     
     window._editingSalesInvoice = { id: inv.id, isDraft: isDraft };
   }
@@ -269,9 +268,9 @@
       excessAmount: excessAmount > 0 ? excessAmount : undefined,
       refundedAmount: excessAmount > 0 ? refundedAmount : undefined,
       rows: JSON.parse(JSON.stringify(salesRows)),
+      uploadedDoc: window._salesUploadedDoc || null,
       updatedAt: Date.now()
     };
-    
     window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
     
     const existingIndex = window.KYA_STORE.salesVouchersDrafts.findIndex(d => d.id === draftData.id);
@@ -563,6 +562,7 @@
       refundedAmount: excessAmount > 0 ? refundedAmount : undefined,
       refundJournalEntryIds: excessAmount > 0 ? refundJournalEntryIds : undefined,
       rows: JSON.parse(JSON.stringify(salesRows)),
+      uploadedDoc: window._salesUploadedDoc || null,
       journalEntryId: '', 
       postedAt: isEditPosted ? (window.KYA_STORE.salesVouchers.find(v => v.id === window._editingSalesInvoice.id)?.postedAt || Date.now()) : Date.now()
     };

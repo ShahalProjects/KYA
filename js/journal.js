@@ -71,6 +71,21 @@
     if (e.key === 'Enter') { e.preventDefault(); focusFirstParticulars(); }
   });
 
+  // ── Narration → Ctrl+Enter → Post Entry & Auto-grow height ─────────
+  const jeNarrationEl = document.getElementById('jeNarration');
+  if (jeNarrationEl) {
+    jeNarrationEl.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        showSavePopup();
+      }
+    });
+    jeNarrationEl.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(Math.max(this.scrollHeight, 72), 180) + 'px';
+    });
+  }
+
   // ── Department helpers ────────────────────────────────────────────
   function populateJeDepartments() {
     const sel = document.getElementById('jeDepartment');

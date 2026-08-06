@@ -1617,6 +1617,36 @@
     /* Entry table */
     .je-table-wrap { overflow-x: auto; }
 
+    .sales-table-wrap {
+      overflow-x: auto;
+      width: 100%;
+      margin-bottom: 8px;
+      scrollbar-width: thin;
+    }
+    .sales-table {
+      width: 100%;
+      min-width: 920px;
+      border-collapse: separate;
+      border-spacing: 2px 4px;
+      table-layout: fixed;
+    }
+    .sales-table th {
+      padding: 6px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--slate-500);
+      white-space: nowrap;
+    }
+    .sales-table td {
+      padding: 4px 4px;
+      vertical-align: middle;
+      background: var(--white);
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+
     .je-table {
       width: 100%;
       border-collapse: separate;
@@ -2057,12 +2087,15 @@
       padding: 10px 14px;
       font-family: var(--font-main);
       font-size: 13.5px;
+      line-height: 1.5;
       color: var(--slate-900);
       background: var(--white);
       outline: none;
       resize: vertical;
-      min-height: 60px;
-      max-height: 120px;
+      min-height: 72px;
+      max-height: 180px;
+      overflow-y: auto;
+      word-break: break-word;
       transition: border-color var(--duration), box-shadow var(--duration);
       box-sizing: border-box;
       box-shadow: 0 1px 2px rgba(0,0,0,.04);
@@ -3446,12 +3479,14 @@
       align-items: center;
       justify-content: center;
       height: 100%;
-      padding: 0 12px;
+      width: 84px;
+      min-width: 84px;
+      padding: 0 8px;
       background: var(--slate-100, #f1f5f9);
       border: 1px solid var(--slate-200, #e2e8f0);
       border-radius: 6px;
       font-size: 12.5px;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--slate-700, #334155);
       cursor: pointer;
       font-family: var(--font-main, Inter, sans-serif);
@@ -3459,6 +3494,8 @@
       user-select: none;
       white-space: nowrap;
       flex-shrink: 0;
+      box-sizing: border-box;
+      text-align: center;
     }
     .sales-roundoff-btn-inline:hover {
       background: #eff6ff;
@@ -3488,6 +3525,98 @@
       font-family: var(--font-main, Inter, sans-serif);
       box-sizing: border-box;
       min-width: 0;
+    }
+    /* ── TDS/TCS inline amount row (mirrors Round-Off row) ── */
+    .sales-tdstcs-amount-group {
+      gap: 0;
+      overflow: visible;
+    }
+    .sales-tdstcs-rate-select {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      width: 84px;
+      min-width: 84px;
+      padding: 0 8px;
+      background: var(--slate-100, #f1f5f9);
+      border: 1px solid var(--slate-200, #e2e8f0);
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--slate-700, #334155);
+      cursor: pointer;
+      font-family: var(--font-main, Inter, sans-serif);
+      outline: none;
+      flex-shrink: 0;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .sales-tdstcs-rate-select:hover,
+    .sales-tdstcs-rate-select:focus {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      color: var(--blue-700, #1d4ed8);
+    }
+    .sales-tdstcs-custom-wrap {
+      display: flex;
+      align-items: center;
+      padding: 0 2px 0 4px;
+      flex-shrink: 0;
+    }
+    .sales-tdstcs-custom-input {
+      height: 26px;
+      width: 44px;
+      border: none;
+      border-bottom: 1.5px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      outline: none;
+      padding: 0 2px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--blue-700, #1d4ed8);
+      font-family: var(--font-main, Inter, sans-serif);
+      text-align: right;
+      box-sizing: border-box;
+      -moz-appearance: textfield;
+      transition: border-color 0.15s ease;
+    }
+    .sales-tdstcs-custom-input:hover,
+    .sales-tdstcs-custom-input:focus {
+      border-bottom-color: var(--blue-500, #3b82f6);
+      color: var(--blue-800, #1e40af);
+    }
+    .sales-tdstcs-custom-input::-webkit-outer-spin-button,
+    .sales-tdstcs-custom-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .sales-tdstcs-custom-unit {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--blue-700, #1d4ed8);
+      margin-left: 1px;
+      margin-right: 2px;
+      user-select: none;
+    }
+    .sales-tdstcs-divider {
+      width: 1px;
+      height: 60%;
+      background: var(--slate-200, #e2e8f0);
+      flex-shrink: 0;
+      margin: 0 6px;
+    }
+    .sales-tdstcs-mode-label {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: var(--slate-500);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+      padding-right: 4px;
+      white-space: nowrap;
     }
     .sales-summary-row.total-row {
       border-top: 1.5px solid var(--slate-200);
@@ -3570,11 +3699,51 @@
       gap: 24px;
       padding: 24px 28px;
       border-top: 2px solid var(--slate-100);
+      align-items: stretch;
+    }
+    .sales-totals-left {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: 100%;
+    }
+    .sales-totals-right {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .sales-totals-right .sales-summary-card {
+      height: 100%;
+      box-sizing: border-box;
+    }
+    .sales-notes-wrap {
+      padding: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    #salesNotes {
+      flex: 1;
+      width: 100%;
+      min-height: 90px;
+      max-height: none !important;
+      height: 100%;
+      box-sizing: border-box;
+      resize: vertical;
     }
     @media (max-width: 768px) {
       .sales-totals-grid {
         grid-template-columns: 1fr !important;
         padding: 16px 18px !important;
+      }
+      .sales-totals-left, .sales-totals-right {
+        height: auto !important;
+      }
+      #salesNotes {
+        flex: initial !important;
+        height: auto !important;
+        min-height: 90px !important;
       }
       .sales-summary-card {
         max-width: 100% !important;

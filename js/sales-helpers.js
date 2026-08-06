@@ -289,6 +289,15 @@
     return maxVal;
   }
 
+  function calculateSubtotal() {
+    if (typeof salesRows === 'undefined' || !Array.isArray(salesRows)) return 0;
+    let sub = 0;
+    salesRows.forEach(r => {
+      sub += (parseFloat(r.amount) || 0);
+    });
+    return Math.round(sub * 100) / 100;
+  }
+
   function updateSalesPaymentUI() {
     const payNotPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     const payFullBtn = document.getElementById('salesPaymentStatusFull');

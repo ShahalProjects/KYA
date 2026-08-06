@@ -242,6 +242,18 @@
             <div>
               <h4 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 700;">Terms & Notes:</h4>
               <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${ohEsc(inv.notes) || (inv.isReturn ? 'Sales Reversal / Credit Note processed.' : (inv.isOrder ? 'Sales Pre Invoice saved.' : 'Thank you for your business! Please settle this invoice by the due date.'))}</div>
+              ${inv.uploadedDoc && inv.uploadedDoc.fileData ? `
+                <div style="margin-top: 14px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" style="flex-shrink: 0;"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span style="font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ohEsc(inv.uploadedDoc.fileName)} ${inv.uploadedDoc.fileSize ? `<span style="font-size: 11px; color: #64748b;">(${ohEsc(inv.uploadedDoc.fileSize)})</span>` : ''}</span>
+                  </div>
+                  <a href="${inv.uploadedDoc.fileData}" download="${ohEsc(inv.uploadedDoc.fileName)}" style="font-size: 11px; font-weight: 700; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; padding: 4px 9px; border-radius: 6px; text-decoration: none; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download Attachment
+                  </a>
+                </div>
+              ` : ''}
             </div>
             
             <div>
@@ -487,17 +499,15 @@
     const tdsBtn = document.getElementById('salesTdsTcsTds');
     const tcsBtn = document.getElementById('salesTdsTcsTcs');
     const tBg = document.getElementById('salesTdsTcsBg');
-    const rateGroup = document.getElementById('salesTdsTcsRateGroup');
     const amtRow = document.getElementById('salesTdsTcsAmountRow');
     const amtLabel = document.getElementById('salesTdsTcsAmountLabel');
     
-    if (noneBtn && tdsBtn && tcsBtn && tBg && rateGroup && amtRow && amtLabel) {
+    if (noneBtn && tdsBtn && tcsBtn && tBg && amtRow && amtLabel) {
       noneBtn.addEventListener('click', () => {
         noneBtn.classList.add('active');
         tdsBtn.classList.remove('active');
         tcsBtn.classList.remove('active');
         tBg.className = 'sales-tdstcs-bg none-active';
-        rateGroup.style.display = 'none';
         amtRow.style.display = 'none';
         recalculateSalesTotals();
       });
@@ -507,9 +517,8 @@
         noneBtn.classList.remove('active');
         tcsBtn.classList.remove('active');
         tBg.className = 'sales-tdstcs-bg tds-active';
-        rateGroup.style.display = 'block';
-        amtRow.style.display = 'flex';
-        amtLabel.textContent = 'TDS Deducted (Dr)';
+        amtRow.style.display = 'block';
+        amtLabel.textContent = 'TDS';
         recalculateSalesTotals();
       });
       
@@ -518,9 +527,8 @@
         noneBtn.classList.remove('active');
         tdsBtn.classList.remove('active');
         tBg.className = 'sales-tdstcs-bg tcs-active';
-        rateGroup.style.display = 'block';
-        amtRow.style.display = 'flex';
-        amtLabel.textContent = 'TCS Collected (Cr)';
+        amtRow.style.display = 'block';
+        amtLabel.textContent = 'TCS';
         recalculateSalesTotals();
       });
     }
@@ -573,7 +581,7 @@
       rateSelect.addEventListener('change', () => {
         const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
         if (rateSelect.value === 'custom') {
-          if (customWrap) customWrap.style.display = 'block';
+          if (customWrap) customWrap.style.display = 'flex';
         } else {
           if (customWrap) customWrap.style.display = 'none';
         }

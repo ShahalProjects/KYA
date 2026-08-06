@@ -1,7 +1,7 @@
   // ══════════════════════════════════════════════════════════════════
   //  SALES REVENUE-ACCOUNT SEARCH DROPDOWN (recovered — was missing from split)
   // ══════════════════════════════════════════════════════════════════
-﻿    const _salesRevPortal = (() => {
+    const _salesRevPortal = (() => {
     let el = document.getElementById('sales-rev-portal-dropdown');
     if (!el) {
       el = document.createElement('div');
@@ -13,11 +13,11 @@
         border: 1.5px solid #e2e8f0;
         border-radius: 14px;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,.06), 0 12px 32px -4px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.02);
-        max-height: 280px;
+        max-height: 320px;
         overflow-y: auto;
         overflow-x: hidden;
         display: none;
-        min-width: 240px;
+        min-width: 280px;
         font-family: Inter, sans-serif;
         scrollbar-width: thin;
         scrollbar-color: #cbd5e1 transparent;
@@ -41,6 +41,7 @@
     let _activeCb     = null;
     let _highlightIdx = -1;
     let _open         = false;
+    let _activeFilter = 'all';
 
     function _items() { return el.querySelectorAll('.je-drop-item'); }
 
@@ -58,11 +59,11 @@
       const r          = inp.getBoundingClientRect();
       const spaceBelow = window.innerHeight - r.bottom - 8;
       const spaceAbove = r.top - 8;
-      const maxH       = Math.min(280, Math.max(spaceBelow, spaceAbove) - 8);
+      const maxH       = Math.min(320, Math.max(spaceBelow, spaceAbove) - 8);
       el.style.maxHeight = maxH + 'px';
-      el.style.width     = Math.max(r.width, 260) + 'px';
+      el.style.width     = Math.max(r.width, 300) + 'px';
       el.style.left      = r.left + 'px';
-      if (spaceBelow >= 140 || spaceBelow >= spaceAbove) {
+      if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
         el.style.top    = (r.bottom + 6) + 'px';
         el.style.bottom = 'auto';
       } else {
@@ -71,73 +72,161 @@
       }
     }
 
+    function getProductsList() {
+      const set = new Set();
+      set.add('Finished Goods');
+      set.add('Stock Item A');
+      set.add('Raw Materials');
+      set.add('Product Goods');
+      if (window.KYA_STORE && window.KYA_STORE.salesVouchers) {
+        window.KYA_STORE.salesVouchers.forEach(v => {
+          if (v.rows) {
+            v.rows.forEach(r => {
+              if (r.item && (!r.itemType || r.itemType === 'Product')) set.add(r.item);
+            });
+          }
+        });
+      }
+      return Array.from(set).map(name => ({ name, type: 'Product' }));
+    }
+
+    function getServicesList() {
+      return getIncomeLedgers().map(l => ({ name: l.name, type: 'Service', id: l.id, aliases: l.aliases, code: l.code }));
+    }
+
     function open(inp, query, onSelect) {
       _activeInp    = inp;
       _activeCb     = onSelect;
       _highlightIdx = -1;
-      const q = (query || '').toLowerCase().trim();
-
-      const matches = getIncomeLedgers()
-        .filter(l => {
-          const nm = l.name.toLowerCase().includes(q);
-          const ak = l.aliases && l.aliases.some(a => a.toLowerCase().includes(q));
-          return nm || ak;
-        })
-        .sort((a, b) => {
-          const as = a.name.toLowerCase().startsWith(q) ? 0 : 1;
-          const bs = b.name.toLowerCase().startsWith(q) ? 0 : 1;
-          return as - bs || a.name.localeCompare(b.name);
-        });
-
-      el.innerHTML = '';
-
-      if (!matches.length) {
-        el.innerHTML = `
-          <div class="je-drop-empty">
-            <svg class="je-drop-empty-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
-              <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            </svg>
-            <span class="je-drop-empty-txt">No revenue account found</span>
-            <span class="je-drop-empty-sub">Try a different name or add it in Chart of Accounts</span>
-          </div>`;
-      } else {
-        const hdr = document.createElement('div');
-        hdr.className   = 'je-drop-header';
-        hdr.textContent = 'Income / Revenue Accounts';
-        el.appendChild(hdr);
-
-        matches.forEach(acct => {
-          const item = document.createElement('div');
-          item.className = 'je-drop-item';
-          const akaStr = acct.aliases && acct.aliases.length > 0 ? ` [A.K.A: ${acct.aliases.join(', ')}]` : '';
-          
-          const queryHighlight = (text, pat) => {
-            if (!pat) return text;
-            const idx = text.toLowerCase().indexOf(pat.toLowerCase());
-            if (idx < 0) return text;
-            return text.slice(0, idx)
-              + `<span class="je-drop-hl">${text.slice(idx, idx + pat.length)}</span>`
-              + text.slice(idx + pat.length);
-          };
-
-          item.innerHTML = `
-            <span class="je-drop-dot" style="background:#10b981"></span>
-            <span class="je-drop-name">${queryHighlight(acct.name, q)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${queryHighlight(akaStr, q)}</span>` : ''}</span>
-            ${acct.code ? `<span class="je-drop-code">${acct.code}</span>` : ''}
-          `;
-          item.addEventListener('mousedown', e => {
-            e.preventDefault();
-            close();
-            if (_activeCb) _activeCb(acct);
-          });
-          el.appendChild(item);
-        });
-      }
-
       _position(inp);
+      _renderPortalList(query);
       el.classList.add('open');
       _open = true;
+    }
+
+    function _renderPortalList(query) {
+      const q = (query || '').toLowerCase().trim();
+      el.innerHTML = '';
+
+      const filterBar = document.createElement('div');
+      filterBar.className = 'je-drop-filter-bar';
+      filterBar.style.cssText = `
+        display: flex; gap: 4px; padding: 6px 8px; background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0; border-radius: 12px 12px 0 0;
+        position: sticky; top: 0; z-index: 10;
+      `;
+      const tabs = [
+        { id: 'all', label: 'All' },
+        { id: 'product', label: 'Product' },
+        { id: 'service', label: 'Service' }
+      ];
+      tabs.forEach(t => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = t.label;
+        btn.style.cssText = `
+          flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 700;
+          border-radius: 6px; border: 1px solid ${t.id === _activeFilter ? '#3b82f6' : '#cbd5e1'};
+          background: ${t.id === _activeFilter ? '#eff6ff' : '#ffffff'};
+          color: ${t.id === _activeFilter ? '#1d4ed8' : '#475569'};
+          cursor: pointer; font-family: inherit; transition: all 0.12s; text-align: center;
+        `;
+        const handleTabSwitch = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          _activeFilter = t.id;
+          _renderPortalList(_activeInp ? _activeInp.value : '');
+          if (_activeInp) _activeInp.focus();
+        };
+        btn.addEventListener('mousedown', handleTabSwitch);
+        btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+        filterBar.appendChild(btn);
+      });
+      el.appendChild(filterBar);
+
+      let products = _activeFilter === 'service' ? [] : getProductsList();
+      let services = _activeFilter === 'product' ? [] : getServicesList();
+
+      if (q) {
+        products = products.filter(p => p.name.toLowerCase().includes(q));
+        services = services.filter(s => s.name.toLowerCase().includes(q) || (s.aliases && s.aliases.some(a => a.toLowerCase().includes(q))));
+      }
+
+      const queryHighlight = (text, pat) => {
+        if (!pat) return text;
+        const idx = text.toLowerCase().indexOf(pat.toLowerCase());
+        if (idx < 0) return text;
+        return text.slice(0, idx)
+          + `<span class="je-drop-hl">${text.slice(idx, idx + pat.length)}</span>`
+          + text.slice(idx + pat.length);
+      };
+
+      if (!products.length && !services.length) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'je-drop-empty';
+        emptyDiv.innerHTML = `
+          <svg class="je-drop-empty-icon" width="28" height="28" viewBox="0 0 32 32" fill="none">
+            <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span class="je-drop-empty-txt">No product or service found</span>
+          <span class="je-drop-empty-sub">Type custom description directly or filter by category</span>
+        `;
+        el.appendChild(emptyDiv);
+      } else {
+        if (products.length > 0) {
+          const hdr = document.createElement('div');
+          hdr.className = 'je-drop-header';
+          hdr.textContent = 'Products';
+          el.appendChild(hdr);
+          products.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'je-drop-item';
+            item.innerHTML = `
+              <span class="je-drop-dot" style="background:#3b82f6"></span>
+              <span class="je-drop-name" style="flex:1">${queryHighlight(p.name, q)}</span>
+              <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#eff6ff;color:#2563eb;text-transform:uppercase;">Product</span>
+            `;
+            const handleItemSelect = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const sel = p;
+              close();
+              if (_activeCb) _activeCb(sel);
+            };
+            item.addEventListener('mousedown', handleItemSelect);
+            item.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+            el.appendChild(item);
+          });
+        }
+
+        if (services.length > 0) {
+          const hdr = document.createElement('div');
+          hdr.className = 'je-drop-header';
+          hdr.textContent = 'Services';
+          el.appendChild(hdr);
+          services.forEach(s => {
+            const item = document.createElement('div');
+            item.className = 'je-drop-item';
+            const akaStr = s.aliases && s.aliases.length > 0 ? ` [A.K.A: ${s.aliases.join(', ')}]` : '';
+            item.innerHTML = `
+              <span class="je-drop-dot" style="background:#10b981"></span>
+              <span class="je-drop-name" style="flex:1">${queryHighlight(s.name, q)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${queryHighlight(akaStr, q)}</span>` : ''}</span>
+              <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#ecfdf5;color:#059669;text-transform:uppercase;">Service</span>
+            `;
+            const handleItemSelect = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const sel = s;
+              close();
+              if (_activeCb) _activeCb(sel);
+            };
+            item.addEventListener('mousedown', handleItemSelect);
+            item.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+            el.appendChild(item);
+          });
+        }
+      }
     }
 
     function close() {
@@ -170,10 +259,138 @@
     return { open, close, isOpen, moveHighlight, selectHighlighted };
   })();
 
+  const _salesItemPortal = _salesRevPortal;
+
   // ══════════════════════════════════════════════════════════════════
   //  SALES FORM — Row rendering, totals calculation, invoice/order autofill, form init
   //  (Split from sales.js for maintainability)
   // ══════════════════════════════════════════════════════════════════
+
+  window._salesUploadedDoc = null;
+
+  function formatSalesDocBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function updateSalesDocUI(doc) {
+    const emptyState = document.getElementById('salesDocEmptyState');
+    const selectedState = document.getElementById('salesDocSelectedState');
+    const badge = document.getElementById('salesDocStatusBadge');
+    const nameEl = document.getElementById('salesDocFileName');
+    const sizeEl = document.getElementById('salesDocFileSize');
+    const iconEl = document.getElementById('salesDocFileIcon');
+    const previewBtn = document.getElementById('salesDocPreviewBtn');
+    const fileInp = document.getElementById('salesDocFileInput');
+
+    if (!doc || !doc.fileData) {
+      window._salesUploadedDoc = null;
+      if (emptyState) emptyState.style.display = 'flex';
+      if (selectedState) selectedState.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      if (fileInp) fileInp.value = '';
+      return;
+    }
+
+    window._salesUploadedDoc = doc;
+    if (emptyState) emptyState.style.display = 'none';
+    if (selectedState) selectedState.style.display = 'flex';
+    if (badge) badge.style.display = 'inline-block';
+    
+    if (nameEl) nameEl.textContent = doc.fileName || 'Attachment';
+    if (sizeEl) sizeEl.textContent = doc.fileSize || formatSalesDocBytes(doc.fileBytes || 0);
+    
+    const ext = (doc.fileName || '').split('.').pop().toUpperCase();
+    if (iconEl) {
+      iconEl.textContent = ext.substring(0, 4) || 'DOC';
+      if (['PDF'].includes(ext)) {
+        iconEl.style.background = '#fee2e2'; iconEl.style.color = '#991b1b';
+      } else if (['JPG','JPEG','PNG','WEBP'].includes(ext)) {
+        iconEl.style.background = '#e0e7ff'; iconEl.style.color = '#3730a3';
+      } else if (['XLS','XLSX','CSV'].includes(ext)) {
+        iconEl.style.background = '#dcfce7'; iconEl.style.color = '#166534';
+      } else {
+        iconEl.style.background = '#dbeafe'; iconEl.style.color = '#1e40af';
+      }
+    }
+    
+    if (previewBtn) {
+      previewBtn.href = doc.fileData;
+      previewBtn.download = doc.fileName || 'document';
+    }
+  }
+
+  function handleSalesDocUpload(file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('File size exceeds 10MB limit.', 'warning');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const doc = {
+        fileName: file.name,
+        fileSize: formatSalesDocBytes(file.size),
+        fileBytes: file.size,
+        fileData: e.target.result
+      };
+      updateSalesDocUI(doc);
+      showToast(`Document "${file.name}" attached.`, 'success');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function setupSalesDocEventListeners() {
+    const fileInp = document.getElementById('salesDocFileInput');
+    const dropzone = document.getElementById('salesDocDropzone');
+    const removeBtn = document.getElementById('salesDocRemoveBtn');
+
+    if (dropzone && fileInp && !dropzone.dataset.bound) {
+      dropzone.dataset.bound = 'true';
+      dropzone.addEventListener('click', (e) => {
+        if (e.target.closest('#salesDocRemoveBtn') || e.target.closest('#salesDocPreviewBtn')) return;
+        fileInp.click();
+      });
+
+      fileInp.addEventListener('change', () => {
+        if (fileInp.files && fileInp.files[0]) {
+          handleSalesDocUpload(fileInp.files[0]);
+        }
+      });
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--blue-500)';
+        dropzone.style.background = 'var(--blue-50)';
+      });
+
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.style.borderColor = 'var(--slate-300)';
+        dropzone.style.background = 'var(--slate-50)';
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--slate-300)';
+        dropzone.style.background = 'var(--slate-50)';
+        if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
+          handleSalesDocUpload(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    if (removeBtn && !removeBtn.dataset.bound) {
+      removeBtn.dataset.bound = 'true';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        updateSalesDocUI(null);
+        showToast('Attached document removed.', 'info');
+      });
+    }
+  }
 
   function getNextAutoInvoiceNumber() {
     const year = new Date().getFullYear();
@@ -256,7 +473,7 @@
     salesRows.forEach(row => {
       if (isZeroTax) {
         row.tax = 0;
-        const base = currentSalesType === 'Product' ? (row.qty * row.rate) : row.baseAmount;
+        const base = (row.qty || 1) * (row.rate || 0);
         const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
         row.amount = Math.max(0, base - discAmt);
       }
@@ -389,26 +606,17 @@
     const headerRow = document.getElementById('salesTableHeader');
     if (!headerRow) return;
     
-    if (currentSalesType === 'Product') {
-      headerRow.innerHTML = `
-        <th class="col-item">Item Name</th>
-        <th class="col-qty" style="width: 80px; text-align: right;">Qty</th>
-        <th class="col-rate" style="width: 120px; text-align: right;">Rate</th>
-        <th class="col-disc" style="width: 140px; text-align: right;">Discount</th>
-        <th class="col-tax" style="width: 100px; text-align: right; padding-right: 28px;">Tax</th>
-        <th class="col-amt" style="width: 140px; text-align: right;">Amount</th>
-        <th class="col-del" style="width: 50px; text-align: center;"></th>
-      `;
-    } else {
-      headerRow.innerHTML = `
-        <th class="col-item">Revenue Account</th>
-        <th class="col-rate" style="width: 150px; text-align: right;">Base Amount</th>
-        <th class="col-disc" style="width: 140px; text-align: right;">Discount</th>
-        <th class="col-tax" style="width: 100px; text-align: right; padding-right: 28px;">Tax</th>
-        <th class="col-amt" style="width: 140px; text-align: right;">Amount</th>
-        <th class="col-del" style="width: 50px; text-align: center;"></th>
-      `;
-    }
+    headerRow.innerHTML = `
+      <th class="col-item" style="text-align: left; padding-left: 6px;">Description</th>
+      <th class="col-hsn" style="width: 90px; text-align: left;">HSN/SAC</th>
+      <th class="col-qty" style="width: 60px; text-align: right;">Qty</th>
+      <th class="col-unit" style="width: 60px; text-align: center;">Unit</th>
+      <th class="col-rate" style="width: 95px; text-align: right;">Rate / Price</th>
+      <th class="col-disc" style="width: 100px; text-align: right;">Discount</th>
+      <th class="col-tax" style="width: 70px; text-align: right; padding-right: 4px;">Tax</th>
+      <th class="col-amt" style="width: 105px; text-align: right;">Amount</th>
+      <th class="col-del" style="width: 36px; text-align: center;"></th>
+    `;
   }
 
   function renderSalesRows() {
@@ -417,7 +625,6 @@
     if (!body) return;
     
     body.innerHTML = '';
-    const incomeLedgers = getIncomeLedgers();
     const isLocked = isSalesReturnInvoiceSelected();
     
     const supplyTypeEl = document.getElementById('salesSupplyType');
@@ -426,114 +633,93 @@
     salesRows.forEach((row, index) => {
       if (isZeroTax) {
         row.tax = 0;
-        const base = currentSalesType === 'Product' ? (row.qty * row.rate) : row.baseAmount;
+        const base = (row.qty || 1) * (row.rate || 0);
         const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
         row.amount = Math.max(0, base - discAmt);
       }
 
-      let trHtml = '';
-      if (currentSalesType === 'Product') {
-        trHtml = `
-          <tr class="sales-row" data-row-index="${index}">
-            <td>
-              <input type="text" class="sales-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Item Description" style="border: none; background: transparent; box-shadow: none; padding: 0; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'readonly' : ''} />
-            </td>
-            <td style="width: 80px;">
-              <input type="number" class="sales-row-qty je-input" value="${row.qty}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0;" />
-            </td>
-            <td style="width: 120px;">
-              <input type="text" inputmode="decimal" class="sales-row-rate je-input" value="${row.rate === 0 ? '' : (typeof row.rate === 'number' ? row.rate.toFixed(2) : row.rate)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0;" />
-            </td>
-            <td style="width: 140px;">
-              <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-end;">
-                <input type="text" inputmode="decimal" class="sales-row-discount je-input" value="${row.discount === 0 ? '' : (typeof row.discount === 'number' ? row.discount.toFixed(2) : row.discount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 70px; padding: 0;" />
-                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 30px; padding: 0; font-weight: 600; cursor: pointer; text-align: center; text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'disabled' : ''}>
-                  <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
-                  <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
-                </select>
-              </div>
-            </td>
-            <td style="width: 100px;">
-              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 16px;" ${isZeroTax ? 'disabled' : ''}>
-                <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
-                <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
-                <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
-                <option value="18" ${row.tax === 18 ? 'selected' : ''}>18%</option>
-                <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+      const trHtml = `
+        <tr class="sales-row" data-row-index="${index}">
+          <td style="padding: 4px 6px;">
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="text" class="sales-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Select or type Description (Product / Service)" style="border: none; background: transparent; box-shadow: none; padding: 0 16px 0 0; width: 100%; font-weight: 500; font-size: 13.5px; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'readonly' : ''} autocomplete="off" />
+              <span class="sales-row-drop-arrow" style="position: absolute; right: 2px; pointer-events: none; color: #94a3b8; font-size: 10px;">▼</span>
+            </div>
+          </td>
+          <td style="width: 90px; padding: 4px;">
+            <input type="text" class="sales-row-hsn je-input" value="${ohEsc(row.hsn || '')}" placeholder="HSN/SAC" style="border: none; background: transparent; box-shadow: none; padding: 0; font-size: 12.5px; font-family: monospace, inherit;" ${isLocked ? 'readonly' : ''} />
+          </td>
+          <td style="width: 60px; padding: 4px;">
+            <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px;" />
+          </td>
+          <td style="width: 60px; padding: 4px; text-align: center;">
+            <input type="text" class="sales-row-unit je-input" value="${ohEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px;" ${isLocked ? 'readonly' : ''} />
+          </td>
+          <td style="width: 95px; padding: 4px;">
+            <input type="text" inputmode="decimal" class="sales-row-rate je-input" value="${row.rate === 0 || row.rate === undefined ? '' : (typeof row.rate === 'number' ? row.rate.toFixed(2) : row.rate)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px;" />
+          </td>
+          <td style="width: 100px; padding: 4px;">
+            <div style="display: flex; gap: 2px; align-items: center; justify-content: flex-end;">
+              <input type="text" inputmode="decimal" class="sales-row-discount je-input" value="${row.discount === 0 || row.discount === undefined ? '' : (typeof row.discount === 'number' ? row.discount.toFixed(2) : row.discount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 55px; padding: 0; font-weight: 600; font-size: 13px;" />
+              <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 22px; padding: 0; font-weight: 700; cursor: pointer; text-align: center; text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none; font-size: 12px; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'disabled' : ''}>
+                <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
+                <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
               </select>
-            </td>
-            <td style="width: 140px;">
-              <input type="text" inputmode="decimal" class="sales-row-amount-input je-input" value="${row.amount === 0 ? '' : row.amount.toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; width: 100%;" />
-            </td>
-            <td style="width: 50px; text-align: center;">
-              <button type="button" class="sales-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
-                <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
-                  <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                </svg>
-              </button>
-            </td>
-          </tr>
-        `;
-      } else {
-        trHtml = `
-          <tr class="sales-row" data-row-index="${index}">
-            <td>
-              <select class="sales-row-rev-acc je-input" style="border: none; background: transparent; box-shadow: none; padding: 0; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'disabled' : ''}>
-                <option value="">&mdash; Select Revenue Account &mdash;</option>
-                ${incomeLedgers.map(l => {
-                  const akaStr = l.aliases && l.aliases.length > 0 ? ` [A.K.A: ${l.aliases.join(', ')}]` : '';
-                  return `<option value="${l.id}" ${row.revenueLedgerId == l.id ? 'selected' : ''}>${l.name}${akaStr}</option>`;
-                }).join('')}
-              </select>
-            </td>
-            <td style="width: 150px;">
-              <input type="text" inputmode="decimal" class="sales-row-base je-input" value="${row.baseAmount === 0 ? '' : (typeof row.baseAmount === 'number' ? row.baseAmount.toFixed(2) : row.baseAmount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0;" />
-            </td>
-            <td style="width: 140px;">
-              <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-end;">
-                <input type="text" inputmode="decimal" class="sales-row-discount je-input" value="${row.discount === 0 ? '' : (typeof row.discount === 'number' ? row.discount.toFixed(2) : row.discount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 70px; padding: 0;" />
-                <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 30px; padding: 0; font-weight: 600; cursor: pointer; text-align: center; text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none; ${isLocked ? 'cursor: not-allowed; color: var(--slate-500);' : ''}" ${isLocked ? 'disabled' : ''}>
-                  <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
-                  <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
-                </select>
-              </div>
-            </td>
-            <td style="width: 100px;">
-              <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 16px;" ${isZeroTax ? 'disabled' : ''}>
-                <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
-                <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
-                <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
-                <option value="18" ${row.tax === 18 ? 'selected' : ''}>18%</option>
-                <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
-              </select>
-            </td>
-            <td style="width: 140px;">
-              <input type="text" inputmode="decimal" class="sales-row-amount-input je-input" value="${row.amount === 0 ? '' : row.amount.toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; width: 100%;" />
-            </td>
-            <td style="width: 50px; text-align: center;">
-              <button type="button" class="sales-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
-                <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
-                  <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                </svg>
-              </button>
-            </td>
-          </tr>
-        `;
-      }
+            </div>
+          </td>
+          <td style="width: 70px; padding: 4px;">
+            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px;" ${isZeroTax ? 'disabled' : ''}>
+              <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
+              <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
+              <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
+              <option value="18" ${row.tax === 18 || row.tax === undefined ? 'selected' : ''}>18%</option>
+              <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+            </select>
+          </td>
+          <td style="width: 105px; padding: 4px;">
+            <input type="text" inputmode="decimal" class="sales-row-amount-input je-input" value="${row.amount === 0 || row.amount === undefined ? '' : row.amount.toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 700; width: 100%; font-size: 13.5px;" />
+          </td>
+          <td style="width: 36px; padding: 4px; text-align: center;">
+            <button type="button" class="sales-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; margin: 0 auto;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
+              <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px;">
+                <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </td>
+        </tr>
+      `;
       
       const tempDiv = document.createElement('tbody');
       tempDiv.innerHTML = trHtml;
       const tr = tempDiv.firstElementChild;
       body.appendChild(tr);
+
+      const itemInp = tr.querySelector('.sales-row-item');
+      if (itemInp) {
+        const attachPortal = () => {
+          _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
+            itemInp.value = selectedItem.name;
+            salesRows[index].item = selectedItem.name;
+            salesRows[index].itemType = selectedItem.type;
+            if (selectedItem.type === 'Service' && selectedItem.id) {
+              salesRows[index].revenueLedgerId = selectedItem.id;
+            }
+            recalculateSalesTotals();
+          });
+        };
+
+        itemInp.addEventListener('focus', attachPortal);
+        itemInp.addEventListener('click', attachPortal);
+        itemInp.addEventListener('input', () => {
+          salesRows[index].item = itemInp.value;
+          attachPortal();
+        });
+      }
     });
   }
 
   function addSalesRow() {
-    if (currentSalesType === 'Product') {
-      salesRows.push({ item: '', qty: 1, rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
-    } else {
-      salesRows.push({ revenueLedgerId: '', baseAmount: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
-    }
+    salesRows.push({ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
     renderSalesRows();
     recalculateSalesTotals();
   }
@@ -551,161 +737,91 @@
     const amtInput  = tr.querySelector('.sales-row-amount-input');
     const amountEdited = (triggeredBy === 'amount');
 
-    if (currentSalesType === 'Product') {
-      row.item = tr.querySelector('.sales-row-item').value;
+    const itemEl = tr.querySelector('.sales-row-item');
+    if (itemEl) row.item = itemEl.value;
 
-      let qty      = parseFloat(tr.querySelector('.sales-row-qty').value) || 0;
-      let rate     = Math.round(parseSalesAmt(tr.querySelector('.sales-row-rate').value) * 100) / 100;
-      let discount = parseSalesAmt(tr.querySelector('.sales-row-discount').value);
-      row.discountType = tr.querySelector('.sales-row-discount-type').value;
-      row.tax = parseFloat(tr.querySelector('.sales-row-tax').value) || 0;
+    const hsnEl = tr.querySelector('.sales-row-hsn');
+    if (hsnEl) row.hsn = hsnEl.value;
 
-      if (amountEdited) {
-        const enteredAmount = Math.round(parseSalesAmt(amtInput.value) * 100) / 100;
-        if (amtInput && document.activeElement !== amtInput) {
-          amtInput.value = enteredAmount === 0 ? '' : enteredAmount.toFixed(2);
-        }
-        
-        const taxFactor     = 1 + row.tax / 100;
-        const afterDiscount = enteredAmount / taxFactor;
-        let base;
-        if (row.discountType === 'pct') {
-          const pctFactor = 1 - (discount / 100);
-          base = pctFactor > 0 ? afterDiscount / pctFactor : 0;
-        } else {
-          base = afterDiscount + discount;
-        }
-        rate = Math.round((qty > 0 ? base / qty : 0) * 100) / 100;
+    const unitEl = tr.querySelector('.sales-row-unit');
+    if (unitEl) row.unit = unitEl.value;
 
-        if (currentSalesVoucherSubtype === 'Return' && row.origRate !== undefined) {
-          if (rate > row.origRate) {
-            rate = row.origRate;
-            showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
-          }
-        }
+    let qty      = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    let rate     = Math.round(parseSalesAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
+    let discount = parseSalesAmt(tr.querySelector('.sales-row-discount')?.value || '0');
+    row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
+    row.tax = parseFloat(tr.querySelector('.sales-row-tax')?.value) || 0;
 
-        row.qty      = qty;
-        row.rate     = rate;
-        row.discount = discount;
-        row.amount   = enteredAmount;
-
-        const rateInput = tr.querySelector('.sales-row-rate');
-        if (rateInput && document.activeElement !== rateInput) {
-          rateInput.value = rate === 0 ? '' : rate.toFixed(2);
-        }
+    if (amountEdited) {
+      const enteredAmount = Math.round(parseSalesAmt(amtInput.value) * 100) / 100;
+      if (amtInput && document.activeElement !== amtInput) {
+        amtInput.value = enteredAmount === 0 ? '' : enteredAmount.toFixed(2);
+      }
+      
+      const taxFactor     = 1 + row.tax / 100;
+      const afterDiscount = enteredAmount / taxFactor;
+      let base;
+      if (row.discountType === 'pct') {
+        const pctFactor = 1 - (discount / 100);
+        base = pctFactor > 0 ? afterDiscount / pctFactor : 0;
       } else {
-        if (currentSalesVoucherSubtype === 'Return' && row.origQty !== undefined) {
-          if (qty > row.origQty) {
-            qty = row.origQty;
-            tr.querySelector('.sales-row-qty').value = qty;
-            showToast(`Quantity cannot exceed remaining quantity of ${row.origQty}.`, 'warning');
-          }
-          if (rate > row.origRate) {
-            rate = row.origRate;
-            const rateInput = tr.querySelector('.sales-row-rate');
-            if (rateInput && document.activeElement !== rateInput) {
-              rateInput.value = rate === 0 ? '' : rate.toFixed(2);
-            }
-            showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
-          }
-          if (discount > row.origDiscount) {
-            discount = row.origDiscount;
-            tr.querySelector('.sales-row-discount').value = discount === 0 ? '' : discount;
-            showToast(`Discount cannot exceed remaining discount of ${row.origDiscountType === 'pct' ? '' : '₹'}${fmtNum(row.origDiscount)}${row.origDiscountType === 'pct' ? '%' : ''}.`, 'warning');
-          }
-        }
+        base = afterDiscount + discount;
+      }
+      rate = Math.round((qty > 0 ? base / qty : 0) * 100) / 100;
 
-        row.qty      = qty;
-        row.rate     = rate;
-        row.discount = discount;
-
-        const base          = row.qty * row.rate;
-        const discAmt       = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
-        const afterDiscount = Math.max(0, base - discAmt);
-        const taxAmt        = afterDiscount * (row.tax / 100);
-        row.amount          = Math.round((afterDiscount + taxAmt) * 100) / 100;
-
-        if (amtInput && document.activeElement !== amtInput) {
-          amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
+      if (currentSalesVoucherSubtype === 'Return' && row.origRate !== undefined) {
+        if (rate > row.origRate) {
+          rate = row.origRate;
+          showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
         }
       }
+
+      row.qty      = qty;
+      row.rate     = rate;
+      row.discount = discount;
+      row.amount   = enteredAmount;
+
+      const rateInput = tr.querySelector('.sales-row-rate');
+      if (rateInput && document.activeElement !== rateInput) {
+        rateInput.value = rate === 0 ? '' : rate.toFixed(2);
+      }
     } else {
-      row.revenueLedgerId = tr.querySelector('.sales-row-rev-acc').value;
-
-      let baseAmount = Math.round(parseSalesAmt(tr.querySelector('.sales-row-base').value) * 100) / 100;
-      let discount   = parseSalesAmt(tr.querySelector('.sales-row-discount').value);
-      row.discountType = tr.querySelector('.sales-row-discount-type').value;
-      row.tax = parseFloat(tr.querySelector('.sales-row-tax').value) || 0;
-
-      if (amountEdited) {
-        const enteredAmount = Math.round(parseSalesAmt(amtInput.value) * 100) / 100;
-        if (amtInput && document.activeElement !== amtInput) {
-          amtInput.value = enteredAmount === 0 ? '' : enteredAmount.toFixed(2);
+      if (currentSalesVoucherSubtype === 'Return' && row.origQty !== undefined) {
+        if (qty > row.origQty) {
+          qty = row.origQty;
+          if (tr.querySelector('.sales-row-qty')) tr.querySelector('.sales-row-qty').value = qty;
+          showToast(`Quantity cannot exceed remaining quantity of ${row.origQty}.`, 'warning');
         }
-        const taxFactor     = 1 + row.tax / 100;
-        const afterDiscount = enteredAmount / taxFactor;
-        let base;
-        if (row.discountType === 'pct') {
-          const pctFactor = 1 - (discount / 100);
-          base = pctFactor > 0 ? afterDiscount / pctFactor : 0;
-        } else {
-          base = afterDiscount + discount;
-        }
-        baseAmount = Math.round(base * 100) / 100;
-
-        if (currentSalesVoucherSubtype === 'Return' && row.origBaseAmount !== undefined) {
-          if (baseAmount > row.origBaseAmount) {
-            baseAmount = row.origBaseAmount;
-            showToast(`Base Amount cannot exceed remaining base amount of ₹${fmtNum(row.origBaseAmount)}.`, 'warning');
+        if (rate > row.origRate) {
+          rate = row.origRate;
+          const rateInput = tr.querySelector('.sales-row-rate');
+          if (rateInput && document.activeElement !== rateInput) {
+            rateInput.value = rate === 0 ? '' : rate.toFixed(2);
           }
+          showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
         }
-
-        row.baseAmount = baseAmount;
-        row.discount   = discount;
-        row.amount     = enteredAmount;  // already 2dp
-
-        const baseInput = tr.querySelector('.sales-row-base');
-        if (baseInput && document.activeElement !== baseInput) {
-          baseInput.value = baseAmount === 0 ? '' : baseAmount.toFixed(2);
+        if (discount > row.origDiscount) {
+          discount = row.origDiscount;
+          if (tr.querySelector('.sales-row-discount')) tr.querySelector('.sales-row-discount').value = discount === 0 ? '' : discount;
         }
-      } else {
-        if (currentSalesVoucherSubtype === 'Return' && row.origBaseAmount !== undefined) {
-          if (baseAmount > row.origBaseAmount) {
-            baseAmount = row.origBaseAmount;
-            const baseInput = tr.querySelector('.sales-row-base');
-            if (baseInput && document.activeElement !== baseInput) {
-              baseInput.value = baseAmount === 0 ? '' : baseAmount.toFixed(2);
-            }
-            showToast(`Base Amount cannot exceed remaining base amount of ₹${fmtNum(row.origBaseAmount)}.`, 'warning');
-          }
-          if (discount > row.origDiscount) {
-            discount = row.origDiscount;
-            tr.querySelector('.sales-row-discount').value = discount === 0 ? '' : discount;
-            showToast(`Discount cannot exceed remaining discount of ${row.origDiscountType === 'pct' ? '' : '₹'}${fmtNum(row.origDiscount)}${row.origDiscountType === 'pct' ? '%' : ''}.`, 'warning');
-          }
-        }
+      }
 
-        row.baseAmount = baseAmount;
-        row.discount   = discount;
+      row.qty      = qty;
+      row.rate     = rate;
+      row.discount = discount;
 
-        const discAmt       = row.discountType === 'pct' ? (row.baseAmount * (row.discount / 100)) : row.discount;
-        const afterDiscount = Math.max(0, row.baseAmount - discAmt);
-        const taxAmt        = afterDiscount * (row.tax / 100);
-        row.amount          = Math.round((afterDiscount + taxAmt) * 100) / 100;
+      const base          = row.qty * row.rate;
+      const discAmt       = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+      const afterDiscount = Math.max(0, base - discAmt);
+      const taxAmt        = afterDiscount * (row.tax / 100);
+      row.amount          = Math.round((afterDiscount + taxAmt) * 100) / 100;
 
-        if (amtInput) amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
+      if (amtInput && document.activeElement !== amtInput) {
+        amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
       }
     }
 
     recalculateSalesTotals();
-  }
-
-  function calculateSubtotal() {
-    let sub = 0;
-    salesRows.forEach(r => {
-      sub += r.amount || 0;
-    });
-    return sub;
   }
 
   function autoCalculateSalesRoundOff() {
@@ -748,6 +864,15 @@
     }
   }
 
+  function calculateSubtotal() {
+    if (typeof salesRows === 'undefined' || !Array.isArray(salesRows)) return 0;
+    let sub = 0;
+    salesRows.forEach(r => {
+      sub += (parseFloat(r.amount) || 0);
+    });
+    return Math.round(sub * 100) / 100;
+  }
+
   function recalculateSalesTotals() {
     const subTotal = calculateSubtotal();
     const subTotalEl = document.getElementById('salesSubTotal');
@@ -767,7 +892,7 @@
       rate = 0;
     } else if (rateSelect) {
       if (rateSelect.value === 'custom') {
-        if (customWrap) customWrap.style.display = 'block';
+        if (customWrap) customWrap.style.display = 'flex';
         const customInput = document.getElementById('salesTdsTcsRateCustom');
         rate = customInput ? (parseFloat(customInput.value) || 0) : 0;
       } else {
@@ -1094,8 +1219,8 @@
     }
     
     const noneBtn = document.getElementById('salesTdsTcsNone');
-    const tdsBtn = document.getElementById('salesTdsTcsTDS');
-    const tcsBtn = document.getElementById('salesTdsTcsTCS');
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
     if (inv.tdsTcsMode === 'TDS' && tdsBtn) tdsBtn.click();
     else if (inv.tdsTcsMode === 'TCS' && tcsBtn) tcsBtn.click();
     else if (noneBtn) noneBtn.click();
@@ -1111,7 +1236,7 @@
       } else {
         rateSelect.value = 'custom';
         if (customInput) customInput.value = rateVal;
-        if (customWrap) customWrap.style.display = 'block';
+        if (customWrap) customWrap.style.display = 'flex';
       }
     }
     
@@ -1278,8 +1403,8 @@
     }
     
     const noneBtn = document.getElementById('salesTdsTcsNone');
-    const tdsBtn = document.getElementById('salesTdsTcsTDS');
-    const tcsBtn = document.getElementById('salesTdsTcsTCS');
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
     if (order.tdsTcsMode === 'TDS' && tdsBtn) tdsBtn.click();
     else if (order.tdsTcsMode === 'TCS' && tcsBtn) tcsBtn.click();
     else if (noneBtn) noneBtn.click();
@@ -1295,7 +1420,7 @@
       } else {
         rateSelect.value = 'custom';
         if (customInput) customInput.value = rateVal;
-        if (customWrap) customWrap.style.display = 'block';
+        if (customWrap) customWrap.style.display = 'flex';
       }
     }
     
@@ -1387,5 +1512,6 @@
     salesRows = [];
     addSalesRow();
     updateSalesReturnLockState();
+    updateSalesDocUI(null);
+    setupSalesDocEventListeners();
   }
-
