@@ -10,11 +10,49 @@
   /* ======================
      LANDING → APP
   ====================== */
-  const landing     = document.getElementById('landing');
-  const app         = document.getElementById('app');
-  const loadingFill = document.getElementById('loadingFill');
-  const loadingPct  = document.getElementById('loadingPct');
-  const progressBar = document.getElementById('landingProgressBar');
+  const landing         = document.getElementById('landing');
+  const app             = document.getElementById('app');
+  const loadingFill     = document.getElementById('loadingFill');
+  const loadingPct      = document.getElementById('loadingPct');
+  const progressBar     = document.getElementById('landingProgressBar');
+  const landingSubtitleA = document.getElementById('landingSubtitleA');
+  const landingSubtitleB = document.getElementById('landingSubtitleB');
+
+  const PHRASE_SEQUENCE = [
+    { minPct: 0,  text: "Keep Simple",       isFinal: false },
+    { minPct: 28, text: "Keep Professional", isFinal: false },
+    { minPct: 56, text: "Keep Accurate",     isFinal: false },
+    { minPct: 82, text: "KYA Remembers",     isFinal: true }
+  ];
+
+  let currentPhraseStep = 0;
+  let activeLayerIsA = true;
+
+  function transitionToPhrase(stepObj) {
+    const currentActive = activeLayerIsA ? landingSubtitleA : landingSubtitleB;
+    const nextActive    = activeLayerIsA ? landingSubtitleB : landingSubtitleA;
+
+    if (!currentActive || !nextActive) return;
+
+    // 1. Configure next layer content and styles
+    nextActive.textContent = stepObj.text;
+    if (stepObj.isFinal) {
+      nextActive.classList.add('final-glow');
+    } else {
+      nextActive.classList.remove('final-glow');
+    }
+
+    // 2. Trigger cross-fade exit animation on current layer
+    currentActive.classList.remove('active');
+    currentActive.classList.add('exit');
+
+    // 3. Trigger cross-fade entry animation on next layer
+    nextActive.classList.remove('exit');
+    nextActive.classList.add('active');
+
+    // 4. Toggle active layer state
+    activeLayerIsA = !activeLayerIsA;
+  }
 
   function enterApp() {
     landing.classList.add('exit');
@@ -25,30 +63,43 @@
     }, 680);
   }
 
-  // Animate progress from 0 → 100 over ~2.6s (starts after 1.8s CSS delay)
+  // Animate progress from 0 → 100 over ~3.6s
   let pct = 0;
-  const totalMs   = 2600;
+  const totalMs   = 3600;
   const stepMs    = 40;
   const increment = 100 / (totalMs / stepMs);
 
   function tickLoader() {
-    pct = Math.min(100, pct + increment + (Math.random() * increment * 0.4));
+    pct = Math.min(100, pct + increment + (Math.random() * increment * 0.35));
     const rounded = Math.floor(pct);
     loadingFill.style.width = rounded + '%';
     loadingPct.textContent  = rounded + '%';
     progressBar.setAttribute('aria-valuenow', rounded);
+
+    // Sync phrase step based on progress percentage
+    let targetStepIndex = 0;
+    for (let i = PHRASE_SEQUENCE.length - 1; i >= 0; i--) {
+      if (rounded >= PHRASE_SEQUENCE[i].minPct) {
+        targetStepIndex = i;
+        break;
+      }
+    }
+    if (targetStepIndex !== currentPhraseStep) {
+      currentPhraseStep = targetStepIndex;
+      transitionToPhrase(PHRASE_SEQUENCE[targetStepIndex]);
+    }
 
     if (pct < 100) {
       setTimeout(tickLoader, stepMs);
     } else {
       loadingFill.style.width = '100%';
       loadingPct.textContent  = '100%';
-      // Brief pause at 100% then open the app
-      setTimeout(enterApp, 420);
+      // Pause at 100% so user reads "KYA Remembers" before entering app
+      setTimeout(enterApp, 700);
     }
   }
 
-  // Start the loader after the CSS fade-in animation completes (1.8s delay)
+  // Start the loader after the CSS fade-in animation completes (1.85s delay)
   setTimeout(tickLoader, 1850);
 
 
