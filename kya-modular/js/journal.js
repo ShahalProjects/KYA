@@ -126,6 +126,133 @@
     }
   }
 
+  // ── Document Attachment Helpers ────────────────────────────────────
+  window._jeUploadedDoc = null;
+
+  function formatJeDocBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function updateJeDocUI(doc) {
+    const emptyState = document.getElementById('jeDocEmptyState');
+    const selectedState = document.getElementById('jeDocSelectedState');
+    const badge = document.getElementById('jeDocStatusBadge');
+    const nameEl = document.getElementById('jeDocFileName');
+    const sizeEl = document.getElementById('jeDocFileSize');
+    const iconEl = document.getElementById('jeDocFileIcon');
+    const previewBtn = document.getElementById('jeDocPreviewBtn');
+    const fileInp = document.getElementById('jeDocFileInput');
+
+    if (!doc || !doc.fileData) {
+      window._jeUploadedDoc = null;
+      if (emptyState) emptyState.style.display = 'flex';
+      if (selectedState) selectedState.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      if (fileInp) fileInp.value = '';
+      return;
+    }
+
+    window._jeUploadedDoc = doc;
+    if (emptyState) emptyState.style.display = 'none';
+    if (selectedState) selectedState.style.display = 'flex';
+    if (badge) badge.style.display = 'inline-block';
+    
+    if (nameEl) nameEl.textContent = doc.fileName || 'Attachment';
+    if (sizeEl) sizeEl.textContent = doc.fileSize || formatJeDocBytes(doc.fileBytes || 0);
+    
+    const ext = (doc.fileName || '').split('.').pop().toUpperCase();
+    if (iconEl) {
+      iconEl.textContent = ext.substring(0, 4) || 'DOC';
+      if (['PDF'].includes(ext)) {
+        iconEl.style.background = '#fee2e2'; iconEl.style.color = '#991b1b';
+      } else if (['JPG','JPEG','PNG','WEBP'].includes(ext)) {
+        iconEl.style.background = '#e0e7ff'; iconEl.style.color = '#3730a3';
+      } else if (['XLS','XLSX','CSV'].includes(ext)) {
+        iconEl.style.background = '#dcfce7'; iconEl.style.color = '#166534';
+      } else {
+        iconEl.style.background = '#dbeafe'; iconEl.style.color = '#1e40af';
+      }
+    }
+    
+    if (previewBtn) {
+      previewBtn.href = doc.fileData;
+      previewBtn.download = doc.fileName || 'document';
+    }
+  }
+
+  function handleJeDocUpload(file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('File size exceeds 10MB limit.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const doc = {
+        fileName: file.name,
+        fileSize: formatJeDocBytes(file.size),
+        fileBytes: file.size,
+        fileData: e.target.result
+      };
+      updateJeDocUI(doc);
+      showToast(`Document "${file.name}" attached.`, 'success');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function setupJeDocEventListeners() {
+    const fileInp = document.getElementById('jeDocFileInput');
+    const dropzone = document.getElementById('jeDocDropzone');
+    const removeBtn = document.getElementById('jeDocRemoveBtn');
+
+    if (dropzone && fileInp && !dropzone.dataset.bound) {
+      dropzone.dataset.bound = 'true';
+      dropzone.addEventListener('click', (e) => {
+        if (e.target.closest('#jeDocRemoveBtn') || e.target.closest('#jeDocPreviewBtn')) return;
+        fileInp.click();
+      });
+
+      fileInp.addEventListener('change', () => {
+        if (fileInp.files && fileInp.files[0]) {
+          handleJeDocUpload(fileInp.files[0]);
+        }
+      });
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--blue-500)';
+        dropzone.style.background = 'var(--blue-50)';
+      });
+
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.style.borderColor = 'var(--slate-300)';
+        dropzone.style.background = 'var(--white)';
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--slate-300)';
+        dropzone.style.background = 'var(--white)';
+        if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
+          handleJeDocUpload(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    if (removeBtn && !removeBtn.dataset.bound) {
+      removeBtn.dataset.bound = 'true';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        updateJeDocUI(null);
+        showToast('Attached document removed.', 'info');
+      });
+    }
+  }
+
   // ── Initialise form defaults ──────────────────────────────────────
   function initFormDefaults() {
     const d = new Date();
@@ -144,6 +271,8 @@
     jeCounter = 1;
     addRow('By');    // first row is always "By" by default
     refreshTotals();
+    updateJeDocUI(null);
+    setupJeDocEventListeners();
     window._editingJournalEntry = null;
   }
 
@@ -176,6 +305,8 @@
     
     renderRows();
     refreshTotals();
+    updateJeDocUI(entry.uploadedDoc || null);
+    setupJeDocEventListeners();
     
     window._editingJournalEntry = { id: entry.id, isDraft: isDraft };
   }
@@ -339,7 +470,11 @@
       const delBtn = document.createElement('button');
       delBtn.className = 'je-del-btn';
       delBtn.setAttribute('aria-label', 'Delete row');
-      delBtn.innerHTML = `<svg viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+      delBtn.innerHTML = `
+        <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px;">
+          <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      `;
       delBtn.addEventListener('click', () => {
         if (isFirst) {
           // First row: clear fields rather than removing the row
@@ -699,6 +834,7 @@
       amount:          fmtNum(amt),
       allRows:         JSON.parse(JSON.stringify(jeRows)),
       narration:       document.getElementById('jeNarration').value,
+      uploadedDoc:     window._jeUploadedDoc || null,
     };
     
     if (isEditDraft) {
@@ -1140,7 +1276,7 @@
                 <td><input type="checkbox" class="pt-cb pt-rcb" data-id="${e.id}" ${_ptSelected.has(e.id) ? 'checked' : ''}></td>
                 <td style="color:#94a3b8;font-size:12px;font-weight:600">${i + 1}</td>
                 <td style="white-space:nowrap">${e.date}</td>
-                <td><span class="pt-vbadge">${e.voucherNo}</span></td>
+                <td><span class="pt-vbadge">${e.voucherNo}</span>${e.uploadedDoc && e.uploadedDoc.fileData ? `<span title="Attachment: ${typeof ohEsc === 'function' ? ohEsc(e.uploadedDoc.fileName) : e.uploadedDoc.fileName}" style="margin-left: 5px; color: #2563eb; display: inline-flex; vertical-align: middle;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>` : ''}</td>
                 <td>${e.preparedBy}</td>
                 <td style="font-weight:500;color:#1e293b">${e.firstParticular || '—'}</td>
                 <td style="text-align:right"><span class="pt-amt">₹&thinsp;${e.amount}</span></td>
@@ -1455,7 +1591,7 @@
                 <td><input type="checkbox" class="pt-cb dt-rcb" data-id="${e.id}" ${_dtSelected.has(e.id) ? 'checked' : ''}></td>
                 <td style="color:#94a3b8;font-size:12px;font-weight:600">${i + 1}</td>
                 <td style="white-space:nowrap">${e.date || '—'}</td>
-                <td><span class="dt-vbadge">${e.voucherNo || '—'}</span></td>
+                <td><span class="dt-vbadge">${e.voucherNo || '—'}</span>${e.uploadedDoc && e.uploadedDoc.fileData ? `<span title="Attachment: ${typeof ohEsc === 'function' ? ohEsc(e.uploadedDoc.fileName) : e.uploadedDoc.fileName}" style="margin-left: 5px; color: #d97706; display: inline-flex; vertical-align: middle;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>` : ''}</td>
                 <td>${e.preparedBy || '—'}</td>
                 <td style="font-weight:500;color:#1e293b">${e.firstParticular || '—'}</td>
                 <td style="text-align:right"><span class="pt-amt" style="color:#d97706">₹&thinsp;${e.amount}</span></td>
@@ -1710,6 +1846,23 @@
             </tfoot>
           </table>
           ${entry.narration ? `<div class="fj-narration">📝 &nbsp;${entry.narration}</div>` : ''}
+          ${entry.uploadedDoc && entry.uploadedDoc.fileData ? `
+            <div style="margin-top: 16px; padding: 12px 14px; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: #dbeafe; color: #1e40af; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase;">
+                  ${((entry.uploadedDoc.fileName || '').split('.').pop() || 'DOC').toUpperCase().substring(0, 4)}
+                </div>
+                <div style="display: flex; flex-direction: column; overflow: hidden; text-align: left;">
+                  <span style="font-size: 13px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;">${typeof ohEsc === 'function' ? ohEsc(entry.uploadedDoc.fileName) : entry.uploadedDoc.fileName}</span>
+                  <span style="font-size: 11px; color: #64748b; font-weight: 500;">${entry.uploadedDoc.fileSize || ''}</span>
+                </div>
+              </div>
+              <a href="${entry.uploadedDoc.fileData}" download="${typeof ohEsc === 'function' ? ohEsc(entry.uploadedDoc.fileName) : entry.uploadedDoc.fileName}" target="_blank" style="padding: 6px 12px; font-size: 12px; font-weight: 700; color: #2563eb; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; transition: all 0.2s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Attachment
+              </a>
+            </div>
+          ` : ''}
         </div>
       </div>`;
 
@@ -1746,6 +1899,7 @@
       amount:         fmtNum(amt),
       allRows:        JSON.parse(JSON.stringify(jeRows)),
       narration:      document.getElementById('jeNarration').value,
+      uploadedDoc:    window._jeUploadedDoc || null,
     };
 
     if (isEditPosted) {
@@ -2069,8 +2223,7 @@
     { id:'expense',            name:'Expense',                 color:'#dc2626', light:'#fff5f5', badge:'#dc2626' },
   ];
 
-  // parentId:null → L1 sub-group; parentId:'xxx' → L2 sub-group (child of L1)
-  const COA_SYS_SGS = [
+  const DEFAULT_COA_SYS_SGS = [
     // ── Equity and Liabilities ────────────────────────────────────
     { id:'sg-shf',  main:'equity-liabilities', parent:null,     name:"Shareholders' Funds" },
     { id:'sg-sc',   main:'equity-liabilities', parent:'sg-shf', name:'Share Capital' },
@@ -2115,6 +2268,44 @@
     { id:'sg-oe',   main:'expense', parent:null, name:'Other Expenses' },
     { id:'sg-tax',  main:'expense', parent:null, name:'Tax Expense' },
   ];
+
+  function loadCoaSubGroups() {
+    try {
+      const saved = localStorage.getItem('kya_coa_subgroups');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const merged = [...DEFAULT_COA_SYS_SGS];
+          parsed.forEach(p => {
+            if (!merged.some(m => m.id === p.id)) {
+              merged.push(p);
+            }
+          });
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse kya_coa_subgroups from localStorage:', e);
+    }
+    return [...DEFAULT_COA_SYS_SGS];
+  }
+
+  function saveCoaSubGroups() {
+    try {
+      if (typeof COA_SYS_SGS !== 'undefined') {
+        localStorage.setItem('kya_coa_subgroups', JSON.stringify(COA_SYS_SGS));
+      }
+    } catch (e) {
+      console.error('Failed to save kya_coa_subgroups to localStorage:', e);
+    }
+  }
+
+  // parentId:null → L1 sub-group; parentId:'xxx' → L2 sub-group (child of L1)
+  COA_SYS_SGS = loadCoaSubGroups();
+  window.COA_SYS_SGS = COA_SYS_SGS;
+  window.DEFAULT_COA_SYS_SGS = DEFAULT_COA_SYS_SGS;
+  window.saveCoaSubGroups = saveCoaSubGroups;
+  window.loadCoaSubGroups = loadCoaSubGroups;
 
 
   // ── State ────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@
   }
 
   // Each entry: { id, sgId, glId, name, code, openingBalance, type:'ledger'|'group-ledger' }
-  let coaLedgers = [];
+  // coaLedgers is a shared global (window.coaLedgers), pre-initialized in app-shell.js.
 
   function initDefaultLedgers() {
     if (coaLedgers && coaLedgers.length > 0) return;
@@ -711,9 +711,15 @@
     if (!sg) return false;
     if (_coaFilterMg && sg.main !== _coaFilterMg) return false;
 
-    if (q && !_coaFilterType && !_coaFilterBal) {
+    if (!q && !_coaFilterType && !_coaFilterBal) return true;
+
+    if (q) {
       if (sg.name.toLowerCase().includes(q)) return true;
+      if (Array.isArray(sg.aliases) && sg.aliases.some(a => a.toLowerCase().includes(q))) return true;
     }
+
+    const children = COA_SYS_SGS.filter(s => s.parent === sgId);
+    if (children.some(ch => _coaMatchesSg(ch.id, q))) return true;
 
     const sgLedgers = coaLedgers.filter(l => l.sgId === sgId);
     return sgLedgers.some(l => {
@@ -721,16 +727,17 @@
         return _coaLdgMatchesFilters(l, q);
       } else {
         if (_coaGlMatchesFilters(l, q)) return true;
-        const children = coaLedgers.filter(ch => ch.glId === l.id);
-        return children.some(ch => _coaLdgMatchesFilters(ch, q));
+        const glChildren = coaLedgers.filter(ch => ch.glId === l.id);
+        return glChildren.some(ch => _coaLdgMatchesFilters(ch, q));
       }
     });
   }
 
   function _coaMatchesMg(mgId, q) {
     if (_coaFilterMg && mgId !== _coaFilterMg) return false;
+    if (!q && !_coaFilterType && !_coaFilterBal) return true;
 
-    if (q && !_coaFilterType && !_coaFilterBal) {
+    if (q) {
       const mg = COA_MAIN_GROUPS.find(m => m.id === mgId);
       if (mg && mg.name.toLowerCase().includes(q)) return true;
     }
@@ -755,59 +762,73 @@
       </div>`;
   }
 
+  // ── Render group ledger (supports nested group ledgers) ─────────
+  function _coaRenderGl(gl, sgId, q, baseIndent, glIndent) {
+    const bi = baseIndent || '';
+    const gi = glIndent  || '';
+    const children = coaLedgers.filter(ch => ch.glId === gl.id);
+    const matchingChildren = children.filter(ch => {
+      if (ch.type === 'ledger') return _coaLdgMatchesFilters(ch, q);
+      return _coaGlMatchesFilters(ch, q) || coaLedgers.filter(c => c.glId === ch.id).some(c => _coaLdgMatchesFilters(c, q));
+    });
+    const glMatches = _coaGlMatchesFilters(gl, q);
+
+    if (_coaFilterType === 'ledger' || _coaFilterBal) {
+      let ldgHtml = '';
+      for (const ch of matchingChildren) {
+        if (ch.type === 'ledger') ldgHtml += _coaLdgRow(ch, bi, q);
+        else ldgHtml += _coaRenderGl(ch, sgId, q, bi, gi);
+      }
+      return ldgHtml;
+    }
+
+    if (!glMatches && !matchingChildren.length) return '';
+
+    const isOpen = _coaExpanded.has('gl-'+gl.id) || !!q || _coaFilterMg || _coaFilterType || _coaFilterBal;
+    let childHtml = '';
+    for (const ch of matchingChildren) {
+      if (ch.type === 'ledger') {
+        childHtml += _coaLdgRow(ch, gi, q);
+      } else {
+        childHtml += _coaRenderGl(ch, sgId, q, gi, gi + ' gl-nested-indent');
+      }
+    }
+
+    return `
+      <div class="coa-gl" data-gl-node="${gl.id}">
+        <div class="coa-gl-hdr ${bi}" data-coa-toggle="gl-${gl.id}">
+          <svg class="coa-caret${isOpen?' open':''}" width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M5 3l4 4-4 4" stroke="#d97706" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="coa-gl-icon">📁</span>
+          <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="coa-gl-name" style="flex: none;">${_coaHl(gl.name, q)}</span>
+              ${gl.code ? `<span class="coa-ldg-code">${gl.code}</span>` : ''}
+            </div>
+            ${gl.aliases && gl.aliases.length > 0 ? `<div style="font-size: 11px; color: #b45309; font-weight: 500; margin-top: 2px;">A.K.A: ${gl.aliases.map(a => _coaHl(a, q)).join(', ')}</div>` : ''}
+          </div>
+          <div class="coa-gl-acts">
+            <button class="coa-la coa-la-edit" data-coa-edit="${gl.id}" style="font-size:11px">Edit</button>
+            <button class="coa-la coa-la-del"  data-coa-del="${gl.id}"  style="font-size:11px">Delete</button>
+          </div>
+        </div>
+        <div id="coaBody-gl-${gl.id}" style="${isOpen?'':'display:none'}">
+          ${childHtml || `<div style="padding:6px 22px 6px ${gi==='gl1-indent'?'72':'90'}px;font-size:12px;color:#94a3b8;font-style:italic">No ledgers yet.</div>`}
+        </div>
+      </div>`;
+  }
+
   // ── Render ledgers + group-ledgers for a sub-group ───────────────
   function _coaRenderContent(sgId, q, baseIndent, glIndent) {
     const bi = baseIndent || '';
     const gi = glIndent  || '';
     let html = '';
 
-    // 1. Group Ledgers in this sub-group
-    const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
-    for (const gl of groupLdgs) {
-      const children = coaLedgers.filter(ch => ch.glId === gl.id);
-      const matchingChildren = children.filter(ch => _coaLdgMatchesFilters(ch, q));
-      const glMatches = _coaGlMatchesFilters(gl, q);
-
-      // Bypassing folders if only showing ledgers or only showing opening balance filters
-      if (_coaFilterType === 'ledger' || _coaFilterBal) {
-        for (const ch of matchingChildren) {
-          html += _coaLdgRow(ch, bi, q);
-        }
-        continue;
-      }
-
-      if (!glMatches && !matchingChildren.length) continue;
-
-      const isOpen = _coaExpanded.has('gl-'+gl.id) || !!q || _coaFilterMg || _coaFilterType || _coaFilterBal;
-      let childHtml = '';
-      for (const ch of matchingChildren) {
-        childHtml += _coaLdgRow(ch, gi, q);
-      }
-
-      html += `
-        <div class="coa-gl" data-gl-node="${gl.id}">
-          <div class="coa-gl-hdr ${bi}" data-coa-toggle="gl-${gl.id}">
-            <svg class="coa-caret${isOpen?' open':''}" width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <path d="M5 3l4 4-4 4" stroke="#d97706" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="coa-gl-icon">📁</span>
-            <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="coa-gl-name" style="flex: none;">${_coaHl(gl.name, q)}</span>
-                ${gl.code ? `<span class="coa-ldg-code">${gl.code}</span>` : ''}
-                <span class="coa-gl-tag">Group Ledger</span>
-              </div>
-              ${gl.aliases && gl.aliases.length > 0 ? `<div style="font-size: 11px; color: #b45309; font-weight: 500; margin-top: 2px;">A.K.A: ${gl.aliases.map(a => _coaHl(a, q)).join(', ')}</div>` : ''}
-            </div>
-            <div class="coa-gl-acts">
-              <button class="coa-la coa-la-edit" data-coa-edit="${gl.id}" style="font-size:11px">Edit</button>
-              <button class="coa-la coa-la-del"  data-coa-del="${gl.id}"  style="font-size:11px">Delete</button>
-            </div>
-          </div>
-          <div id="coaBody-gl-${gl.id}" style="${isOpen?'':'display:none'}">
-            ${childHtml || `<div style="padding:6px 22px 6px ${gi==='gl1-indent'?'72':'90'}px;font-size:12px;color:#94a3b8;font-style:italic">No ledgers yet.</div>`}
-          </div>
-        </div>`;
+    // 1. Top-level Group Ledgers in this sub-group
+    const topGroupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger' && !l.glId);
+    for (const gl of topGroupLdgs) {
+      html += _coaRenderGl(gl, sgId, q, bi, gi);
     }
 
     // 2. Regular ledgers directly under this sub-group (no group ledger parent)
@@ -816,7 +837,6 @@
     for (const l of matchingDirect) {
       html += _coaLdgRow(l, bi, q);
     }
-
 
     return html;
   }
@@ -833,7 +853,6 @@
             <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <span class="coa-sg2-name">${_coaHl(sg.name, q)}</span>
-          <span class="coa-sys-tag">System</span>
         </div>
         <div id="coaBody-${sg.id}" style="${isOpen?'':'display:none'}">
           ${_coaRenderContent(sg.id, q, '', 'gl-indent')}
@@ -850,9 +869,9 @@
     let bodyHtml = '';
     if (children.length) {
       for (const ch of children) bodyHtml += _coaRenderSg2(ch, q);
-    } else {
-      bodyHtml = _coaRenderContent(sg.id, q, 'l1-indent', 'gl1-indent');
     }
+    bodyHtml += _coaRenderContent(sg.id, q, 'l1-indent', 'gl1-indent');
+    const isCustom = sg.id && sg.id.startsWith('sg-grp-');
     return `
       <div class="coa-sg1" data-sg1="${sg.id}">
         <div class="coa-sg1-hdr" data-coa-toggle="${sg.id}">
@@ -860,7 +879,11 @@
             <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <span class="coa-sg1-name">${_coaHl(sg.name, q)}</span>
-          <span class="coa-sys-tag">System</span>
+          ${isCustom ? `
+            <div class="coa-gl-acts" style="margin-left: auto;">
+              <button class="coa-la coa-la-del" data-coa-del-sg="${sg.id}" style="font-size:11px">Delete</button>
+            </div>
+          ` : ''}
         </div>
         <div id="coaBody-${sg.id}" style="${isOpen?'':'display:none'}">${bodyHtml}</div>
       </div>`;
@@ -908,11 +931,17 @@
   }
 
   function _coaGroupLedgerOptions(sgId, selectedGlId) {
-    const gls = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
-    if (!gls.length) return '<option value="">— None —</option>';
-    return '<option value="">— None —</option>' + gls.map(gl =>
-      `<option value="${gl.id}" ${gl.id == selectedGlId ? 'selected':''}>${gl.name}</option>`
-    ).join('');
+    let opts = '<option value="">— None —</option>';
+    const addGlOpts = (parentId, depth) => {
+      const gls = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger' && (parentId ? l.glId === parentId : !l.glId));
+      gls.forEach(gl => {
+        const indent = '\u00a0\u00a0'.repeat(depth);
+        opts += `<option value="${gl.id}" ${gl.id == selectedGlId ? 'selected':''}>${indent}${gl.name}</option>`;
+        addGlOpts(gl.id, depth + 1);
+      });
+    };
+    addGlOpts(null, 0);
+    return opts;
   }
 
   function showCoaDeleteConfirm(ldg, onConfirm) {
@@ -1667,13 +1696,39 @@
         const isGl = ldg.type === 'group-ledger';
         showCoaDeleteConfirm(ldg, () => {
           // Delete group ledger AND its children
-          if (isGl) coaLedgers = coaLedgers.filter(l => l.glId !== id);
+          if (isGl) {
+            coaLedgers = coaLedgers.filter(l => l.glId !== id);
+            if (ldg.sgId && ldg.sgId.startsWith('sg-grp-')) {
+              const sgIdx = COA_SYS_SGS.findIndex(s => s.id === ldg.sgId);
+              if (sgIdx !== -1) COA_SYS_SGS.splice(sgIdx, 1);
+            }
+          }
           coaLedgers = coaLedgers.filter(l => l.id !== id);
           showToast(`${isGl ? 'Group Ledger' : 'Ledger'} "${ldg.name}" deleted.`, 'info');
           renderChartPanel();
           refreshAllReports();
           triggerAutoBackup();
         });
+      });
+    });
+
+    // Delete custom sub-group
+    wrap.querySelectorAll('[data-coa-del-sg]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const sgId = btn.dataset.coaDelSg;
+        const sg = COA_SYS_SGS.find(s => s.id === sgId);
+        if (!sg) return;
+        const confirmDel = confirm(`Are you sure you want to delete group "${sg.name}" and any ledgers inside it?`);
+        if (confirmDel) {
+          COA_SYS_SGS = COA_SYS_SGS.filter(s => s.id !== sgId && s.parent !== sgId);
+          if (typeof saveCoaSubGroups === 'function') saveCoaSubGroups();
+          coaLedgers = coaLedgers.filter(l => l.sgId !== sgId);
+          showToast(`Group "${sg.name}" deleted.`, 'info');
+          renderChartPanel();
+          refreshAllReports();
+          triggerAutoBackup();
+        }
       });
     });
 
