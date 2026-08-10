@@ -460,7 +460,7 @@
 
     /* Sidebar top gradient accent */
     .sidebar-header {
-      padding: 24px 20px 20px;
+      padding: 18px 16px 12px;
       border-bottom: 1px solid var(--slate-100);
       display: flex;
       align-items: center;
@@ -508,10 +508,71 @@
       white-space: nowrap;
     }
 
+    /* Sidebar Date & Time Widget */
+    .sidebar-date-wrapper {
+      padding: 8px 12px 2px 12px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-date {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+
+    .sidebar-date-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 6px;
+    }
+
+    .sidebar-date-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--slate-600);
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-date-icon {
+      color: var(--blue-600);
+      flex-shrink: 0;
+    }
+
+    .sidebar-time-right {
+      display: flex;
+      align-items: center;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--blue-600);
+      background: var(--blue-50);
+      border: 1px solid var(--blue-100);
+      border-radius: 5px;
+      padding: 1.5px 5px;
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+
     /* Nav section */
     .sidebar-nav {
       flex: 1;
-      padding: 16px 12px;
+      padding: 10px 12px 16px 12px;
       overflow-y: auto;
       overflow-x: hidden;
     }
@@ -1967,21 +2028,20 @@
     .je-del-btn {
       width: 28px;
       height: 28px;
-      border-radius: 7px;
-      background: transparent;
-      border: 1.5px solid transparent;
+      border-radius: 50%;
+      background: none;
+      border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--slate-300);
+      color: var(--red-600);
       margin: 0 auto;
-      transition: background var(--duration), color var(--duration), border-color var(--duration);
+      transition: background var(--duration), color var(--duration);
     }
     .je-del-btn:hover {
-      background: #fee2e2;
-      border-color: #fca5a5;
-      color: var(--danger);
+      background: var(--red-50);
+      color: var(--red-600);
     }
     .je-del-btn svg { width: 13px; height: 13px; }
 
@@ -2019,8 +2079,22 @@
       background: var(--slate-50);
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: space-between;
       gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .je-doc-upload-wrap {
+      flex: 1;
+      max-width: 380px;
+      min-width: 260px;
+    }
+
+    .je-totals-right {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-left: auto;
       flex-wrap: wrap;
     }
 
@@ -2184,7 +2258,7 @@
       }
       #main { margin-left: var(--sidebar-collapsed); }
       .sidebar-brand, .nav-label, .nav-badge, .sidebar-brand-tagline,
-      .nav-section-label, .user-info, .user-more { display: none; }
+      .sidebar-date-wrapper, .nav-section-label, .user-info, .user-more { display: none; }
       .sidebar-header { justify-content: center; padding: 20px 16px; }
       .stats-row { grid-template-columns: 1fr; }
       .panel-header { flex-direction: column; gap: 12px; }
@@ -3810,6 +3884,20 @@
       }
       #panel-sales-voucher .je-actions-bar {
         padding: 16px 18px !important;
+      }
+      .je-totals {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 16px !important;
+        padding: 16px 18px !important;
+      }
+      .je-doc-upload-wrap {
+        max-width: 100% !important;
+      }
+      .je-totals-right {
+        margin-left: 0 !important;
+        justify-content: space-between !important;
+        width: 100% !important;
       }
     }
 

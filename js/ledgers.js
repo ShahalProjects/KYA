@@ -81,6 +81,34 @@
     }
   }
 
+  function resolveLedgerSubgroupName(l) {
+    if (!l) return '-';
+    const sgs = (typeof COA_SYS_SGS !== 'undefined' && Array.isArray(COA_SYS_SGS)) ? COA_SYS_SGS : [];
+    
+    // 1. If it has a glId (parent group ledger), return the group ledger's name
+    if (l.glId) {
+      const gl = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(g => g.id === l.glId);
+      if (gl) return gl.name;
+    }
+    
+    // 2. Look up sgId in COA_SYS_SGS
+    if (l.sgId) {
+      const sg = sgs.find(s => s.id === l.sgId);
+      if (sg) return sg.name;
+
+      // 3. What if sgId is actually a Group Ledger ID in coaLedgers?
+      const glMatch = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(g => String(g.id) === String(l.sgId) || g.id === l.sgId);
+      if (glMatch) return glMatch.name;
+    }
+
+    // 4. Fallback if it's an internal sg-grp- ID that was unmapped
+    if (l.sgId && String(l.sgId).startsWith('sg-grp-')) {
+      return 'Custom Group';
+    }
+
+    return l.sgId || '-';
+  }
+
   function renderLedgerListView() {
     const wrap = document.getElementById('ledgerListWrap');
     if (!wrap) return;
@@ -95,15 +123,16 @@
       });
     }
 
-    if (coaLedgers.length === 0) {
+    const onlyLedgers = coaLedgers.filter(l => l.type !== 'group-ledger');
+
+    if (onlyLedgers.length === 0) {
       wrap.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--slate-400);">No ledgers found.</div>`;
       return;
     }
 
     const q = _ledgerSearchQuery.toLowerCase().trim();
-    const filteredLedgers = coaLedgers.filter(l => {
-      const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
-      const sgName = sg ? sg.name : '';
+    const filteredLedgers = onlyLedgers.filter(l => {
+      const sgName = resolveLedgerSubgroupName(l);
       const nameMatch = l.name.toLowerCase().includes(q);
       const sgMatch = sgName.toLowerCase().includes(q);
       const aliasMatch = l.aliases && l.aliases.some(a => a.toLowerCase().includes(q));
@@ -122,8 +151,7 @@
     const sortedLedgers = [...filteredLedgers].sort((a, b) => a.name.localeCompare(b.name));
 
     sortedLedgers.forEach(l => {
-      const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
-      const sgName = sg ? sg.name : (l.sgId || '-');
+      const sgName = resolveLedgerSubgroupName(l);
 
       rowsHtml += `
         <tr onclick="viewLedgerStatement(${l.id})" style="cursor: pointer;" title="Click to view statement">
@@ -400,8 +428,7 @@
 
     // Set header labels
     document.getElementById('statementLedgerName').textContent = ledger.name;
-    const sg = COA_SYS_SGS.find(s => s.id === ledger.sgId);
-    document.getElementById('statementSubGroupName').textContent = sg ? sg.name : (ledger.sgId || '-');
+    document.getElementById('statementSubGroupName').textContent = resolveLedgerSubgroupName(ledger);
 
     // Wire Alter Details button
     const btnEdit = document.getElementById('btnEditLedgerFromStatement');
@@ -607,17 +634,31 @@
           const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
           options.push(`<option value="sg:${sg.id}">${indent}${sg.name}</option>`);
 
-          const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger');
-          gls.forEach(gl => {
-            const glIndent = indent + '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0';
-            options.push(`<option value="gl:${gl.id}">${glIndent}📁 ${gl.name} (Group Ledger)</option>`);
-          });
+          const addGls = (parentId, depth) => {
+            const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger' && (parentId ? l.glId === parentId : !l.glId));
+            gls.forEach(gl => {
+              const glIndent = indent + '\u00a0\u00a0\u00a0\u00a0' + '\u00a0\u00a0'.repeat(depth);
+              options.push(`<option value="gl:${gl.id}">${glIndent}📁 ${gl.name}</option>`);
+              addGls(gl.id, depth + 1);
+            });
+          };
+          addGls(null, 0);
         });
       } else {
-        parentLabel.textContent = 'Sub Group *';
+        parentLabel.textContent = 'Sub Group / Parent Group *';
         COA_SYS_SGS.forEach(sg => {
           const indent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
           options.push(`<option value="sg:${sg.id}">${indent}${sg.name}</option>`);
+
+          const addGls = (parentId, depth) => {
+            const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger' && (parentId ? l.glId === parentId : !l.glId));
+            gls.forEach(gl => {
+              const glIndent = indent + '\u00a0\u00a0\u00a0\u00a0' + '\u00a0\u00a0'.repeat(depth);
+              options.push(`<option value="gl:${gl.id}">${glIndent}📁 ${gl.name}</option>`);
+              addGls(gl.id, depth + 1);
+            });
+          };
+          addGls(null, 0);
         });
       }
       parentSel.innerHTML = options.join('');
@@ -843,14 +884,16 @@
         const isSelected = (!currentLedger.glId && sg.id === currentLedger.sgId);
         parentOptions.push(`<option value="sg:${sg.id}" ${isSelected ? 'selected' : ''}>${indent}${sg.name}</option>`);
 
-        if (isLedger) {
-          const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger' && l.id !== currentLedger.id);
+        const addAlterGls = (parentId, depth) => {
+          const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger' && l.id !== currentLedger.id && (parentId ? l.glId === parentId : !l.glId));
           gls.forEach(gl => {
-            const glIndent = indent + '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0';
             const isGlSelected = (gl.id === currentLedger.glId);
-            parentOptions.push(`<option value="gl:${gl.id}" ${isGlSelected ? 'selected' : ''}>${glIndent}📁 ${gl.name} (Group Ledger)</option>`);
+            const glIndent = indent + '\u00a0\u00a0\u00a0\u00a0' + '\u00a0\u00a0'.repeat(depth);
+            parentOptions.push(`<option value="gl:${gl.id}" ${isGlSelected ? 'selected' : ''}>${glIndent}📁 ${gl.name}</option>`);
+            addAlterGls(gl.id, depth + 1);
           });
-        }
+        };
+        addAlterGls(null, 0);
       });
     }
     const parentOptsHtml = parentOptions.join('');
@@ -1046,10 +1089,18 @@
     document.getElementById('ldgAlterDeleteBtn').addEventListener('click', () => {
       const confirmDelete = confirm(`Are you sure you want to delete "${currentLedger.name}"? This action cannot be undone.`);
       if (confirmDelete) {
+        const isGl = currentLedger.type === 'group-ledger';
+        if (isGl) {
+          coaLedgers = coaLedgers.filter(l => l.glId !== currentLedger.id);
+          if (currentLedger.sgId && currentLedger.sgId.startsWith('sg-grp-')) {
+            const sgIdx = COA_SYS_SGS.findIndex(s => s.id === currentLedger.sgId);
+            if (sgIdx !== -1) COA_SYS_SGS.splice(sgIdx, 1);
+          }
+        }
         const idx = coaLedgers.findIndex(l => l.id === _ledgerEditId);
         if (idx !== -1) {
           coaLedgers.splice(idx, 1);
-          showToast(`Account "${currentLedger.name}" deleted successfully.`, 'success');
+          showToast(`${isGl ? 'Group' : 'Account'} "${currentLedger.name}" deleted successfully.`, 'success');
           
           _ledgerEditId = null;
           

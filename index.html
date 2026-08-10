@@ -65,6 +65,25 @@
       </div>
     </div>
 
+    <div class="sidebar-date-wrapper" id="sidebarDateWrapper">
+      <div class="sidebar-date" id="topbarDate">
+        <div class="sidebar-date-row">
+          <div class="sidebar-date-left">
+            <svg class="sidebar-date-icon" viewBox="0 0 16 16" fill="none" width="13" height="13">
+              <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/>
+              <line x1="2" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.3"/>
+              <line x1="5" y1="1.5" x2="5" y2="3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <line x1="11" y1="1.5" x2="11" y2="3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            <span id="sidebarDateText"></span>
+          </div>
+          <div class="sidebar-time-right">
+            <span id="sidebarTimeText"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="sidebar-nav">
       <div class="nav-section-label">Overview</div>
 
@@ -77,6 +96,15 @@
         <span class="nav-label">Dashboard</span>
       </div>
 
+      <div class="nav-item" id="nav-master-desk" data-panel="master-desk" role="button" tabindex="0" aria-label="Master Desk">
+        <!-- Master Desk / central grid icon -->
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M3 8h14M8 8v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="nav-label">Master Desk</span>
+      </div>
+
       <div class="nav-section-label">Accounting</div>
 
       <div class="nav-item" id="nav-sales" role="button" tabindex="0" aria-label="Sales Voucher">
@@ -87,6 +115,15 @@
           <circle cx="14" cy="16" r="1.5" fill="currentColor"/>
         </svg>
         <span class="nav-label">Sales Voucher</span>
+      </div>
+
+      <div class="nav-item" id="nav-purchase" role="button" tabindex="0" aria-label="Purchase Voucher">
+        <!-- Shopping bag / receipt / package icon -->
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <path d="M4 6h12l1.5 11H2.5L4 6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M7 8V5a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="nav-label">Purchase Voucher</span>
       </div>
 
       <div class="nav-item" id="nav-journal" role="button" tabindex="0" aria-label="Journal Entry">
@@ -210,7 +247,6 @@
         <div id="topbarTabs" class="topbar-tabs"></div>
       </div>
       <div class="topbar-actions">
-        <div class="topbar-date" id="topbarDate"></div>
         <button class="topbar-btn" aria-label="Notifications">
           <svg viewBox="0 0 16 16" fill="none">
             <path d="M8 2a4.5 4.5 0 00-4.5 4.5v2.25L2 10.5h12l-1.5-1.75V6.5A4.5 4.5 0 008 2zM6.5 12.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -277,6 +313,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Master Desk Panel -->
+      <div id="panel-master-desk" role="region" aria-label="Master Desk" style="display:none"></div>
 
       <!-- Journal Entry Panel -->
       <div id="panel-journal" role="region" aria-label="Journal Entry">
@@ -361,7 +400,7 @@
               <label for="jeVoucherNo">Journal Voucher No.</label>
               <input type="text" id="jeVoucherNo" class="je-input" placeholder="e.g. JV-2024-001" aria-label="Journal voucher number" />
             </div>
-            <input type="hidden" id="jeFiscalYear" value="2024â€“25" />
+            <input type="hidden" id="jeFiscalYear" value="2024-25" />
             <input type="hidden" id="jePreparedBy" value="Admin User" />
             <div class="je-field">
               <label for="jeDepartment">Department</label>
@@ -424,19 +463,72 @@
 
           <!-- Totals footer -->
           <div class="je-totals">
-            <div class="je-total-item">
-              <span class="je-total-label">Total Debit</span>
-              <span class="je-total-value debit" id="jeTotalDebit">0.00</span>
+            <!-- Document Upload Section on the left side -->
+            <div class="je-doc-upload-wrap">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <label for="jeDocFileInput" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                  Upload Document / Attachment
+                </label>
+                <span id="jeDocStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+              </div>
+
+              <input type="file" id="jeDocFileInput" style="display: none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+              <div id="jeDocDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--white); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--blue-400)'; this.style.background='var(--blue-50)'" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='var(--white)'">
+                <div id="jeDocEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <div style="width: 26px; height: 26px; border-radius: 50%; background: var(--slate-50); border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: var(--blue-600); flex-shrink: 0;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                  </div>
+                  <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">Click to Choose File</span>
+                    <span style="font-size: 10px; color: var(--slate-400);">PDF, Image, Excel, Word (Max 10MB)</span>
+                  </div>
+                </div>
+
+                <div id="jeDocSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                    <div id="jeDocFileIcon" style="width: 26px; height: 26px; border-radius: 6px; background: #dbeafe; color: #1e40af; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase;">PDF</div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                      <span id="jeDocFileName" style="font-size: 12px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">doc.pdf</span>
+                      <span id="jeDocFileSize" style="font-size: 10px; color: var(--slate-500); font-weight: 500;">0 KB</span>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                    <a id="jeDocPreviewBtn" target="_blank" style="padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; border-radius: 5px; text-decoration: none;" title="Download / View document">View</a>
+                    <button id="jeDocRemoveBtn" type="button" style="background: none; border: none; color: var(--red-600); cursor: pointer; padding: 3px; border-radius: 4px; display: flex; align-items: center;" title="Remove document">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="je-total-divider"></div>
-            <div class="je-total-item">
-              <span class="je-total-label">Total Credit</span>
-              <span class="je-total-value credit" id="jeTotalCredit">0.00</span>
-            </div>
-            <div class="je-total-divider"></div>
-            <div class="je-balance-indicator unbalanced" id="jeBalanceChip" aria-live="polite">
-              <span class="je-balance-dot"></span>
-              <span id="jeBalanceText">Unbalanced</span>
+
+            <!-- Right side totals & balance -->
+            <div class="je-totals-right">
+              <div class="je-total-item">
+                <span class="je-total-label">Total Debit</span>
+                <span class="je-total-value debit" id="jeTotalDebit">0.00</span>
+              </div>
+              <div class="je-total-divider"></div>
+              <div class="je-total-item">
+                <span class="je-total-label">Total Credit</span>
+                <span class="je-total-value credit" id="jeTotalCredit">0.00</span>
+              </div>
+              <div class="je-total-divider"></div>
+              <div class="je-balance-indicator unbalanced" id="jeBalanceChip" aria-live="polite">
+                <span class="je-balance-dot"></span>
+                <span id="jeBalanceText">Unbalanced</span>
+              </div>
             </div>
           </div>
 
@@ -705,7 +797,11 @@
                 <!-- Back button and Date filter bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
                   <button class="btn btn-secondary" id="btnBackToLedgerList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
-                    â† Back to Ledgers
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="19" y1="12" x2="5" y2="12"></line>
+                      <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Ledgers
                   </button>
                   <div style="display: flex; gap: 10px; align-items: center;">
                     <div style="display: flex; align-items: center; gap: 6px;">
@@ -725,7 +821,11 @@
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <h3 id="statementLedgerName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Account Ledger</h3>
                       <button class="btn btn-secondary btn-sm" id="btnEditLedgerFromStatement" style="padding: 4px 8px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1.5px solid var(--slate-200); border-radius: 6px; background: #fff; cursor: pointer; color: var(--slate-600); height: 24px;">
-                        âœŽ Alter Details
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        Alter Details
                       </button>
                     </div>
                     <span id="statementSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Subgroup</span>
@@ -740,15 +840,15 @@
                 <div style="display: flex; justify-content: flex-end; gap: 24px; padding: 16px 20px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; margin-top: 16px; flex-wrap: wrap;">
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Opening Balance</span>
-                    <span id="statementOpeningBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">â‚¹0.00</span>
+                    <span id="statementOpeningBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
                   </div>
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Current Balance (Period Net)</span>
-                    <span id="statementCurrentBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">â‚¹0.00</span>
+                    <span id="statementCurrentBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
                   </div>
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Closing Balance</span>
-                    <span id="statementClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">â‚¹0.00</span>
+                    <span id="statementClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">₹0.00</span>
                   </div>
                 </div>
               </div>
@@ -952,7 +1052,7 @@
             </div>
             <div class="rpt-tb-right">
               <span style="font-size: 13px; font-weight: 600; color: var(--slate-500); white-space: nowrap;">
-                Fiscal Year: <span style="color: var(--blue-600);">2024â€“25</span>
+                Fiscal Year: <span style="color: var(--blue-600);">2024-25</span>
               </span>
             </div>
           </div>
@@ -1250,9 +1350,9 @@
 
                   <div style="background: var(--blue-50); border: 1px dashed var(--blue-200); border-radius: 8px; padding: 14px; font-size: 13px; color: var(--blue-800); line-height: 1.55;">
                     <strong>Utility & Navigation Helpers:</strong><br/>
-                    â€¢ <strong>ArrowUp / ArrowDown</strong>: Navigate focused sidebar items sequentially.<br/>
-                    â€¢ <strong>Space + Esc</strong>: Close all currently opened tabs completely.<br/>
-                    â€¢ <strong>Ctrl + Space</strong>: Cycle to the next open panel tab at the top.
+                    • <strong>ArrowUp / ArrowDown</strong>: Navigate focused sidebar items sequentially.<br/>
+                    • <strong>Space + Esc</strong>: Close all currently opened tabs completely.<br/>
+                    • <strong>Ctrl + Space</strong>: Cycle to the next open panel tab at the top.
                   </div>
                 </div>
               </div>
@@ -1342,11 +1442,11 @@
                     <div class="vault-stats-list">
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Last Backup Date</span>
-                        <span class="v-stat-val" id="vaultLastDate">â€”</span>
+                        <span class="v-stat-val" id="vaultLastDate">—</span>
                       </div>
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Last Backup Time</span>
-                        <span class="v-stat-val" id="vaultLastTime">â€”</span>
+                        <span class="v-stat-val" id="vaultLastTime">—</span>
                       </div>
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Last Backup Status</span>
@@ -1354,7 +1454,7 @@
                       </div>
                       <div class="vault-stat-item">
                         <span class="v-stat-lbl">Backup Size</span>
-                        <span class="v-stat-val" id="vaultBackupSize">â€”</span>
+                        <span class="v-stat-val" id="vaultBackupSize">—</span>
                       </div>
                     </div>
                   </div>
@@ -1727,6 +1827,281 @@
         </div><!-- /.je-form-card -->
       </div><!-- /#panel-sales-voucher -->
 
+      <!-- Purchase Voucher Panel -->
+      <div id="panel-purchase-voucher" role="region" aria-label="Purchase Voucher" style="display:none">
+        <!-- Page header -->
+        <div class="panel-header" style="border-bottom: 1.5px solid var(--slate-100); padding-bottom: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%;">
+          <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-primary" id="btnNewPurchase" type="button" aria-label="New purchase voucher" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <path d="M3 2h7l4 4v8H3V2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 2v4h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6 9h4M6 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              New Purchase
+            </button>
+          </div>
+        </div>
+
+        <!-- FORM CARD -->
+        <div class="je-form-card">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); flex-wrap: wrap; gap: 12px;">
+            <div class="je-card-header-left">
+              <div class="je-card-icon" aria-hidden="true" style="background: rgba(255,255,255,.18);">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M4 6h12l1.5 11H2.5L4 6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <path d="M7 8V5a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text">Purchase Voucher</div>
+                <div class="je-card-subtitle-text">Record purchase transactions and vendor payables</div>
+              </div>
+            </div>
+            <div class="je-voucher-chip" id="purchaseVoucherChipDisplay" style="background: rgba(255,255,255,.2);">PUR-2026-001</div>
+          </div>
+
+          <!-- Header fields -->
+          <div class="je-fields-bar">
+            <div class="je-field">
+              <label for="purchaseDate">Date</label>
+              <input type="date" id="purchaseDate" class="je-input" aria-label="Purchase date" />
+            </div>
+            <div class="je-field" id="purchaseInvoiceNoContainer">
+              <label for="purchaseInvoiceNo" id="lblPurchaseInvoiceNo">Purchase / Bill No.</label>
+              <input type="text" id="purchaseInvoiceNo" class="je-input" placeholder="PUR-2026-001" aria-label="Purchase number" />
+            </div>
+            <div class="je-field">
+              <label for="purchaseVendor">Vendor / Supplier *</label>
+              <select id="purchaseVendor" class="je-input" aria-label="Vendor Selection">
+                <option value="">&mdash; Select Vendor &mdash;</option>
+              </select>
+            </div>
+            <div class="je-field">
+              <label for="purchaseSupplyType">Supply Type *</label>
+              <select id="purchaseSupplyType" class="je-input" aria-label="Supply Type Selection">
+                <option value="Intra-State (CGST + SGST)">Intra-State (CGST + SGST)</option>
+                <option value="Inter-State (IGST)">Inter-State (IGST)</option>
+                <option value="Import (Customs / Zero-Rated)">Import (Customs / Zero-Rated)</option>
+                <option value="SEZ With Tax">SEZ With Tax</option>
+                <option value="SEZ Without Tax">SEZ Without Tax</option>
+                <option value="Deemed Export">Deemed Export</option>
+              </select>
+            </div>
+            <div class="je-field">
+              <label for="purchaseExecutive">Purchaser / Executive</label>
+              <select id="purchaseExecutive" class="je-input" aria-label="Purchaser Selection">
+                <option value="">&mdash; Select Executive &mdash;</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Line items table section -->
+          <div class="je-table-section">
+            <div class="je-table-label">Line Items</div>
+            <div class="sales-table-wrap">
+              <table class="sales-table" id="purchaseItemTable">
+                <thead>
+                  <tr id="purchaseTableHeader">
+                    <!-- dynamically header columns injected by JS -->
+                  </tr>
+                </thead>
+                <tbody id="purchaseItemBody">
+                  <!-- rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Add row button -->
+          <div class="je-add-row-wrap" style="padding-top: 6px;">
+            <button class="je-add-row-btn" id="purchaseAddRow" aria-label="Add item line">
+              <svg viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Row
+            </button>
+          </div>
+
+          <!-- Summary & Totals Grid -->
+          <div class="sales-totals-grid">
+            <!-- Left side notes & Payment details -->
+            <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
+              <!-- Payment Status Sliding selector -->
+              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                  <label id="purchasePaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment Status</label>
+                  <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
+                    <div class="sales-paystatus-bg notpaid-active" id="purchasePaymentStatusBg"></div>
+                    <button class="sales-paystatus-btn active" id="purchasePaymentStatusNotPaid" type="button">Not Paid</button>
+                    <button class="sales-paystatus-btn" id="purchasePaymentStatusFull" type="button">Full Payment</button>
+                    <button class="sales-paystatus-btn" id="purchasePaymentStatusPartial" type="button">Partial Payment</button>
+                  </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
+                  <div id="purchaseDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
+                    <div id="purchaseDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                      <input type="date" id="purchaseDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                      <span id="purchaseDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
+                    </div>
+                  </div>
+                  <div id="purchasePaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
+                    <select id="purchasePaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
+                  </div>
+                  <div id="purchasePaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
+                    <input type="number" id="purchasePaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
+                  </div>
+                </div>
+              </div>
+              
+              <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <label for="purchaseNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <textarea id="purchaseNotes" class="je-narration-input" placeholder="Payment terms, vendor terms, delivery terms..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+              </div>
+            </div>
+
+            <!-- Right side Summary Card -->
+            <div class="sales-totals-right" style="display: flex; flex-direction: column; height: 100%;">
+              <div class="sales-summary-card" style="height: 100%; box-sizing: border-box;">
+                <div class="sales-summary-row">
+                  <span>Sub Total</span>
+                  <span id="purchaseSubTotal">₹ 0.00</span>
+                </div>
+
+                <!-- TDS/TCS Toggle -->
+                <div class="sales-summary-row" style="align-items: center;">
+                  <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em;">Tax Deduction / Collection</span>
+                  <div class="sales-tdstcs-wrap" style="width: auto; min-width: 154px;">
+                    <div class="sales-tdstcs-bg none-active" id="purchaseTdsTcsBg"></div>
+                    <button class="sales-tdstcs-btn active" id="purchaseTdsTcsNone" type="button">None</button>
+                    <button class="sales-tdstcs-btn" id="purchaseTdsTcsTds" type="button">TDS</button>
+                    <button class="sales-tdstcs-btn" id="purchaseTdsTcsTcs" type="button">TCS</button>
+                  </div>
+                </div>
+
+                <!-- TDS/TCS Amount Row -->
+                <div id="purchaseTdsTcsAmountRow" style="display: none;">
+                  <div class="sales-roundoff-input-group sales-tdstcs-amount-group">
+                    <select id="purchaseTdsTcsRateSelect" class="sales-tdstcs-rate-select" title="Select TDS/TCS rate">
+                      <option value="0.1">0.1%</option>
+                      <option value="1">1%</option>
+                      <option value="2">2%</option>
+                      <option value="5">5%</option>
+                      <option value="10">10%</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    <div id="purchaseTdsTcsRateCustomWrap" class="sales-tdstcs-custom-wrap" style="display: none;">
+                      <input type="number" id="purchaseTdsTcsRateCustom" class="sales-tdstcs-custom-input" min="0" max="100" step="0.01" placeholder="0" title="Custom percentage" />
+                      <span class="sales-tdstcs-custom-unit">%</span>
+                    </div>
+                    <div class="sales-tdstcs-divider"></div>
+                    <span id="purchaseTdsTcsAmountLabel" class="sales-tdstcs-mode-label">TDS</span>
+                    <input type="number" id="purchaseTdsTcsAmount" class="sales-roundoff-field" placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div class="sales-roundoff-input-group">
+                  <button type="button" id="btnPurchaseAutoRoundOff" class="sales-roundoff-btn-inline" title="Click to auto round off total to nearest rupee">
+                    Round off
+                  </button>
+                  <input type="text" inputmode="decimal" id="purchaseAdjustments" class="sales-roundoff-field" placeholder="0.00" />
+                </div>
+
+                <div class="sales-summary-row total-row">
+                  <span>Total</span>
+                  <span id="purchaseTotal">₹ 0.00</span>
+                </div>
+
+                <!-- Document Upload Section under Total -->
+                <div class="sales-doc-upload-wrap" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--slate-200);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <label for="purchaseDocFileInput" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      Upload Document / Attachment
+                    </label>
+                    <span id="purchaseDocStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+                  </div>
+
+                  <input type="file" id="purchaseDocFileInput" style="display: none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+                  <div id="purchaseDocDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--slate-50); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--emerald-400)'; this.style.background='var(--emerald-50)'" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='var(--slate-50)'">
+                    <div id="purchaseDocEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; border-radius: 50%; background: #ffffff; border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: #059669; flex-shrink: 0;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">Click to Choose File</span>
+                        <span style="font-size: 10px; color: var(--slate-400);">PDF, Image, Excel, Word (Max 10MB)</span>
+                      </div>
+                    </div>
+
+                    <div id="purchaseDocSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                        <div id="purchaseDocFileIcon" style="width: 26px; height: 26px; border-radius: 6px; background: #ccfbf1; color: #0f766e; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase;">PDF</div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                          <span id="purchaseDocFileName" style="font-size: 12px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">doc.pdf</span>
+                          <span id="purchaseDocFileSize" style="font-size: 10px; color: var(--slate-500); font-weight: 500;">0 KB</span>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <a id="purchaseDocPreviewBtn" target="_blank" style="padding: 3px 7px; font-size: 11px; font-weight: 600; color: #059669; background: #ecfdf5; border-radius: 5px; text-decoration: none;" title="Download / View document">View</a>
+                        <button id="purchaseDocRemoveBtn" type="button" style="background: none; border: none; color: var(--red-600); cursor: pointer; padding: 3px; border-radius: 4px; display: flex; align-items: center;" title="Remove document">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="je-actions-bar">
+            <div class="je-actions-left">
+              <button class="btn btn-danger" id="btnClearPurchase" aria-label="Clear all fields">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+            <div class="je-actions-right">
+              <button class="btn btn-secondary" id="btnSavePurchaseDraft" aria-label="Save as draft">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M5 2v4h5V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  <path d="M4 8.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Save Draft
+              </button>
+              <button class="btn btn-success" id="btnPostPurchase" aria-label="Save purchase">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Save Purchase
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /.je-form-card -->
+      </div><!-- /#panel-purchase-voucher -->
+
       <!-- Posted Invoices Panel -->
       <div id="panel-sales-posted" role="region" aria-label="Posted Sales Invoices" style="display:none">
         <div class="panel-header">
@@ -1761,6 +2136,7 @@
 
 
 <script src="js/app-shell.js"></script>
+<script src="js/master-desk.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/coa.js"></script>
 <script src="js/reports.js"></script>
@@ -1778,6 +2154,7 @@
 <script src="js/sales-helpers.js"></script>
 <script src="js/sales-records.js"></script>
 <script src="js/sales-print-events.js"></script>
+<script src="js/purchase-form.js"></script>
 <script src="js/company-profile.js"></script>
 <script src="js/cashline-core.js?v=20260723_2"></script>
 <script src="js/cashline-accounts.js?v=20260723_2"></script>

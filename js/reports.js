@@ -59,9 +59,18 @@
   }
 
   function getLedgerMainGroup(ledger) {
-    const sg = COA_SYS_SGS.find(s => s.id === ledger.sgId);
-    if (!sg) return null;
-    return sg.main;
+    if (!ledger) return null;
+    const sgs = (typeof COA_SYS_SGS !== 'undefined' && Array.isArray(COA_SYS_SGS)) ? COA_SYS_SGS : [];
+    let sg = sgs.find(s => s.id === ledger.sgId);
+    if (!sg && ledger.glId && typeof coaLedgers !== 'undefined') {
+      const gl = coaLedgers.find(l => l.id === ledger.glId);
+      if (gl) sg = sgs.find(s => s.id === gl.sgId);
+    }
+    if (!sg && ledger.sgId && typeof coaLedgers !== 'undefined') {
+      const gl = coaLedgers.find(l => String(l.id) === String(ledger.sgId));
+      if (gl) sg = sgs.find(s => s.id === gl.sgId);
+    }
+    return sg ? sg.main : null;
   }
 
   function calculatePnlProfitForPeriod(dateFrom, dateTo) {
@@ -137,8 +146,12 @@
     if (nodeType === 'group-ledger') {
       let sum = 0;
       coaLedgers.forEach(l => {
-        if (l.glId === nodeId && l.type === 'ledger') {
-          sum += getNodeBalance(l.id, 'ledger', ledgerBalances, profitAmount, openingDiffAmount, priorProfit);
+        if (l.glId === nodeId) {
+          if (l.type === 'ledger') {
+            sum += getNodeBalance(l.id, 'ledger', ledgerBalances, profitAmount, openingDiffAmount, priorProfit);
+          } else if (l.type === 'group-ledger') {
+            sum += getNodeBalance(l.id, 'group-ledger', ledgerBalances, profitAmount, openingDiffAmount, priorProfit);
+          }
         }
       });
       return sum;
@@ -152,7 +165,7 @@
         }
       });
       coaLedgers.forEach(l => {
-        if (l.sgId === nodeId && l.type === 'group-ledger') {
+        if (l.sgId === nodeId && l.type === 'group-ledger' && !l.glId) {
           sum += getNodeBalance(l.id, 'group-ledger', ledgerBalances, profitAmount, openingDiffAmount, priorProfit);
         }
       });
@@ -593,8 +606,12 @@
     if (nodeType === 'group-ledger') {
       let sum = 0;
       coaLedgers.forEach(l => {
-        if (l.glId === nodeId && l.type === 'ledger') {
-          sum += getPnlNodeBalance(l.id, 'ledger', ledgerBalances);
+        if (l.glId === nodeId) {
+          if (l.type === 'ledger') {
+            sum += getPnlNodeBalance(l.id, 'ledger', ledgerBalances);
+          } else if (l.type === 'group-ledger') {
+            sum += getPnlNodeBalance(l.id, 'group-ledger', ledgerBalances);
+          }
         }
       });
       return sum;
@@ -603,7 +620,7 @@
     if (nodeType === 'sg') {
       let sum = 0;
       coaLedgers.forEach(l => {
-        if (l.sgId === nodeId && l.type === 'group-ledger') {
+        if (l.sgId === nodeId && l.type === 'group-ledger' && !l.glId) {
           sum += getPnlNodeBalance(l.id, 'group-ledger', ledgerBalances);
         }
       });

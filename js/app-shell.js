@@ -7,6 +7,16 @@
   let _ohEmpCtr     = 1;
   let _ohBudgetCtr  = 1;
 
+  // ── Global data pre-init ── (prevents TypeError when panel-init functions
+  // are called from routing before async data restore has completed)
+  if (!window.coaLedgers) window.coaLedgers = [];
+  if (!window.KYA_STORE)  window.KYA_STORE  = {
+    salesVouchers: [], salesVouchersDrafts: [],
+    salesInvoiceCtr: 1, salesReturnCtr: 1, salesOrderCtr: 1,
+    purchaseVouchers: [], purchaseVouchersDrafts: [],
+    purchaseInvoiceCtr: 1
+  };
+
   /* ======================
      LANDING → APP
   ====================== */
@@ -104,11 +114,31 @@
 
 
   /* ======================
-     DATE IN TOPBAR
+     DATE & TIME IN SIDEBAR
   ====================== */
-  const topbarDate = document.getElementById('topbarDate');
-  const now = new Date();
-  topbarDate.textContent = now.toLocaleDateString('en-US', { weekday:'short', year:'numeric', month:'short', day:'numeric' });
+  function updateSidebarClock() {
+    const topbarDate = document.getElementById('topbarDate');
+    if (!topbarDate) return;
+
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const dateFormatted = `${day}-${month}-${year}`;
+    const timeFormatted = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+    const dateSpan = document.getElementById('sidebarDateText');
+    const timeSpan = document.getElementById('sidebarTimeText');
+
+    if (dateSpan) dateSpan.textContent = dateFormatted;
+    if (timeSpan) timeSpan.textContent = timeFormatted;
+    if (!dateSpan && !timeSpan) {
+      topbarDate.textContent = `${dateFormatted} ${timeFormatted}`;
+    }
+  }
+
+  updateSidebarClock();
+  setInterval(updateSidebarClock, 1000);
 
 
   /* ======================
@@ -326,11 +356,20 @@
     onehub:  panelOneHub,
     settings: panelSettings,
     sales_voucher: document.getElementById('panel-sales-voucher'),
+    purchase_voucher: document.getElementById('panel-purchase-voucher'),
     company: document.getElementById('panel-company'),
     cashline: document.getElementById('panel-cashline'),
+    master_desk: document.getElementById('panel-master-desk'),
   };
 
   const TAB_DEFS = {
+    master_desk: { 
+      id: 'master_desk', 
+      label: 'Master Desk', 
+      panelId: 'panel-master-desk', 
+      navId: 'nav-master-desk',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 8h14M8 8v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
+    },
     journal: { 
       id: 'journal', 
       label: 'New Journal Entry', 
@@ -394,6 +433,13 @@
       navId: 'nav-sales',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="14" cy="16" r="1.5" fill="currentColor"/></svg>`
     },
+    purchase_voucher: { 
+      id: 'purchase_voucher', 
+      label: 'New Purchase', 
+      panelId: 'panel-purchase-voucher', 
+      navId: 'nav-purchase',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M4 6h12l1.5 11H2.5L4 6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 8V5a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
+    },
     company: {
       id: 'company',
       label: 'Company Details',
@@ -416,6 +462,7 @@
   // ── ROUTING SYSTEM ──────────────────────────────────────────────────
   const ROUTE_SECTIONS = {
     dashboard: { tabId: null, navId: 'nav-dashboard' },
+    master_desk: { tabId: 'master_desk' },
     journal:   { tabId: 'journal' },
     voucher_desk: { tabId: 'voucher_desk' },
     chart:     { tabId: 'chart' },
@@ -425,12 +472,14 @@
     onehub:    { tabId: 'onehub' },
     settings:  { tabId: 'settings' },
     sales_voucher: { tabId: 'sales_voucher' },
+    purchase_voucher: { tabId: 'purchase_voucher' },
     company:   { tabId: 'company' },
     cashline:  { tabId: 'cashline' },
   };
 
   const NAV_ID_TO_ROUTE = {
     'nav-dashboard': 'dashboard',
+    'nav-master-desk': 'master_desk',
     'nav-voucher-desk': 'voucher_desk',
     'nav-chart': 'chart',
     'nav-trial': 'trial',
@@ -440,6 +489,7 @@
     'nav-settings': 'settings',
     'nav-journal': 'journal',
     'nav-sales': 'sales_voucher',
+    'nav-purchase': 'purchase_voucher',
     'nav-cashline': 'cashline',
   };
 
@@ -551,17 +601,39 @@
       }
 
       // Load panel specific data
-      if (activeTabId === 'journal') populateJeDepartments();
-      if (activeTabId === 'voucher_desk') renderVoucherDeskPanel();
-      if (activeTabId === 'chart') switchCoaTab(_coaActiveTab);
-      if (activeTabId === 'balance') renderBalanceSheetPanel();
-      if (activeTabId === 'pnl') renderPnlPanel();
-      if (activeTabId === 'trial') renderTrialBalancePanel();
-      if (activeTabId === 'onehub') renderOneHubPanel();
-      if (activeTabId === 'settings') renderSettingsPanel();
-      if (activeTabId === 'sales_voucher') initSalesForm();
-      if (activeTabId === 'company') renderCompanyPanel();
-      if (activeTabId === 'cashline') renderCashlinePanel();
+      if (activeTabId === 'master_desk'   && typeof renderMasterDeskPanel   === 'function') renderMasterDeskPanel();
+      if (activeTabId === 'journal') {
+        if (typeof populateJeDepartments === 'function') populateJeDepartments();
+        if (typeof jeRows !== 'undefined' && jeRows.length === 0 && typeof initFormDefaults === 'function') {
+          initFormDefaults();
+        }
+      }
+      if (activeTabId === 'voucher_desk'  && typeof renderVoucherDeskPanel  === 'function') renderVoucherDeskPanel();
+      if (activeTabId === 'chart'         && typeof switchCoaTab            === 'function') switchCoaTab(_coaActiveTab);
+      if (activeTabId === 'balance'       && typeof renderBalanceSheetPanel === 'function') renderBalanceSheetPanel();
+      if (activeTabId === 'pnl'           && typeof renderPnlPanel          === 'function') renderPnlPanel();
+      if (activeTabId === 'trial'         && typeof renderTrialBalancePanel === 'function') renderTrialBalancePanel();
+      if (activeTabId === 'onehub'        && typeof renderOneHubPanel       === 'function') renderOneHubPanel();
+      if (activeTabId === 'settings'      && typeof renderSettingsPanel     === 'function') renderSettingsPanel();
+      if (activeTabId === 'sales_voucher') {
+        if (typeof salesRows !== 'undefined' && salesRows.length === 0 && typeof initSalesForm === 'function') {
+          initSalesForm();
+        } else {
+          if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
+          if (typeof populateSalesExecutives === 'function') populateSalesExecutives();
+        }
+      }
+      if (activeTabId === 'purchase_voucher') {
+        if (typeof purchaseRows !== 'undefined' && purchaseRows.length === 0 && typeof initPurchaseForm === 'function') {
+          initPurchaseForm();
+        } else {
+          if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
+          if (typeof populatePurchaseExecutives === 'function') populatePurchaseExecutives();
+          if (typeof populatePurchasePaymentAccounts === 'function') populatePurchasePaymentAccounts();
+        }
+      }
+      if (activeTabId === 'company'       && typeof renderCompanyPanel      === 'function') renderCompanyPanel();
+      if (activeTabId === 'cashline'      && typeof renderCashlinePanel     === 'function') renderCashlinePanel();
 
       // Highlight sidebar nav item
       const navEl = document.getElementById(def.navId);
