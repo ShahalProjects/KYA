@@ -430,23 +430,35 @@
     invNoEl.style.color = 'var(--slate-900)';
   }
 
+  let _salesCustSearchControl = null;
+  function getSalesCustSearchControl() {
+    if (!_salesCustSearchControl && typeof initPartySearchableSelect === 'function') {
+      _salesCustSearchControl = initPartySearchableSelect('salesCustomer', '— Select Customer —', 'Customer');
+    }
+    return _salesCustSearchControl;
+  }
+
   function populateSalesCustomers(selectedId = null) {
     const custSelect = document.getElementById('salesCustomer');
     if (!custSelect) return;
     
     custSelect.innerHTML = '<option value="">&mdash; Select Customer &mdash;</option>';
     
-    const customers = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-tr');
+    const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    
     customers.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
       const akaStr = c.aliases && c.aliases.length > 0 ? ` [A.K.A: ${c.aliases.join(', ')}]` : '';
       opt.textContent = c.name + akaStr;
-      if (selectedId && c.id == selectedId) {
+      if (selectedId && String(c.id) === String(selectedId)) {
         opt.selected = true;
       }
       custSelect.appendChild(opt);
     });
+
+    const control = getSalesCustSearchControl();
+    if (control) control.refresh();
   }
 
   function populateSalesExecutives(selectedId = null) {

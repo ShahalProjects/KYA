@@ -643,7 +643,7 @@
           journalRows.push({
             id: journalRows.length + 1,
             type: 'To',
-            particular: customerName,
+            particular: 'Trade Receivables',
             debit: '',
             credit: debtReduction.toFixed(2)
           });
@@ -761,7 +761,7 @@
         journalRows.push({
           id: journalRows.length + 1,
           type: 'By',
-          particular: customerName,
+          particular: 'Trade Receivables',
           debit: unpaidAmount.toFixed(2),
           credit: ''
         });
@@ -953,11 +953,11 @@
         const excessAmount = Math.max(0, orderAdvanceAmount - invoice.total);
         
         if (settledAmount > 0) {
-          // Credit: Customer Account (To)
+          // Credit: Trade Receivables (To)
           journalRows.push({
             id: journalRows.length + 1,
             type: 'To',
-            particular: customerName,
+            particular: 'Trade Receivables',
             debit: '',
             credit: settledAmount.toFixed(2)
           });
@@ -998,7 +998,7 @@
       preparedBy:     'Sales Module',
       departmentId:   '',
       isBudget:       false,
-      firstParticular: customerName,
+      firstParticular: (paidAmount > 0) ? 'Cash Account' : 'Trade Receivables',
       amount:         isOrd ? fmtNum(paidAmount) : (isReturnAgainstOrder ? fmtNum(origPaidAmt) : fmtNum(invoice.total)),
       allRows:        journalRows,
       narration:      isOrd

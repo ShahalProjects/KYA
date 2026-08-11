@@ -14,8 +14,27 @@
     salesVouchers: [], salesVouchersDrafts: [],
     salesInvoiceCtr: 1, salesReturnCtr: 1, salesOrderCtr: 1,
     purchaseVouchers: [], purchaseVouchersDrafts: [],
-    purchaseInvoiceCtr: 1
+    purchaseInvoiceCtr: 1,
+    customers: [],
+    suppliers: []
   };
+  window.KYA_STORE.customers = window.KYA_STORE.customers || [];
+  window.KYA_STORE.suppliers = window.KYA_STORE.suppliers || [];
+
+  function getKyaCustomers() {
+    if (!window.KYA_STORE) window.KYA_STORE = {};
+    if (!Array.isArray(window.KYA_STORE.customers)) window.KYA_STORE.customers = [];
+    return window.KYA_STORE.customers;
+  }
+
+  function getKyaSuppliers() {
+    if (!window.KYA_STORE) window.KYA_STORE = {};
+    if (!Array.isArray(window.KYA_STORE.suppliers)) window.KYA_STORE.suppliers = [];
+    return window.KYA_STORE.suppliers;
+  }
+
+  window.getKyaCustomers = getKyaCustomers;
+  window.getKyaSuppliers = getKyaSuppliers;
 
   /* ======================
      LANDING → APP

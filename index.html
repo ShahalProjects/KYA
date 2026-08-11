@@ -684,10 +684,11 @@
             </button>
             <button class="btn btn-secondary" id="btnCoaLedger" type="button" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
               </svg>
-              Ledger
+              Master
             </button>
           </div>
         </div>
@@ -718,13 +719,15 @@
           <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
             <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
               <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
-                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
-                  <path d="M4 5h12M4 10h8M4 15h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--white);">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <line x1="3" y1="9" x2="21" y2="9"/>
+                  <line x1="9" y1="21" x2="9" y2="9"/>
                 </svg>
               </div>
               <div>
-                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Ledgers</div>
-                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">View, create and alter ledger accounts</div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Master</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">View, create and alter master accounts and entries</div>
               </div>
             </div>
             <div class="panel-actions" id="ledgerHeaderActions" style="display: flex; gap: 8px; align-items: center;"></div>
@@ -741,6 +744,32 @@
                   </svg>
                 </div>
                 <span class="oh-tab-text">Ledgers</span>
+              </button>
+
+              <!-- Customers tab -->
+              <button class="oh-sub-tab" id="ledgerTabCustomers" role="tab" aria-selected="false" aria-controls="customer-list-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Customers</span>
+              </button>
+
+              <!-- Suppliers tab -->
+              <button class="oh-sub-tab" id="ledgerTabSuppliers" role="tab" aria-selected="false" aria-controls="supplier-list-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="3" width="15" height="13"></rect>
+                    <polygon points="16 8 20 8 23 11 23 16 8"></polygon>
+                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Suppliers</span>
               </button>
 
               <!-- Add Ledgers tab -->
@@ -768,7 +797,7 @@
 
             <!-- Content views area -->
             <div class="oh-content-area">
-              <!-- Ledgers list view -->
+              <!-- 1. Ledgers list view -->
               <div id="ledger-list-view" role="tabpanel">
                 <div style="margin-bottom: 16px; max-width: 400px; position: relative;">
                   <input type="text" id="ledgerSearchInput" placeholder="Search ledgers..." class="je-input" style="width: 100%; padding: 8px 12px 8px 36px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;" />
@@ -782,17 +811,45 @@
                 <div id="ledgerListWrap"></div>
               </div>
 
-              <!-- Add Ledgers view -->
+              <!-- 2. Customers list view -->
+              <div id="customer-list-view" role="tabpanel" style="display:none">
+                <div style="margin-bottom: 16px; max-width: 400px; position: relative;">
+                  <input type="text" id="customerSearchInput" placeholder="Search customers..." class="je-input" style="width: 100%; padding: 8px 12px 8px 36px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;" />
+                  <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; color: var(--slate-400); pointer-events: none;">
+                    <svg width="14" height="14" viewBox="0 0 17 17" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.8"/>
+                      <path d="M11.5 11.5l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                </div>
+                <div id="customerListWrap"></div>
+              </div>
+
+              <!-- 3. Suppliers list view -->
+              <div id="supplier-list-view" role="tabpanel" style="display:none">
+                <div style="margin-bottom: 16px; max-width: 400px; position: relative;">
+                  <input type="text" id="supplierSearchInput" placeholder="Search suppliers..." class="je-input" style="width: 100%; padding: 8px 12px 8px 36px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;" />
+                  <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; color: var(--slate-400); pointer-events: none;">
+                    <svg width="14" height="14" viewBox="0 0 17 17" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.8"/>
+                      <path d="M11.5 11.5l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                </div>
+                <div id="supplierListWrap"></div>
+              </div>
+
+              <!-- 4. Add Ledgers view -->
               <div id="ledger-add-view" role="tabpanel" style="display:none">
                 <div id="ledgerAddWrap"></div>
               </div>
 
-              <!-- Alter Ledgers view -->
+              <!-- 5. Alter Ledgers view -->
               <div id="ledger-alter-view" role="tabpanel" style="display:none">
                 <div id="ledgerAlterWrap"></div>
               </div>
 
-              <!-- Ledger Statement view -->
+              <!-- 6. Ledger Statement view -->
               <div id="ledger-statement-view" role="tabpanel" style="display:none">
                 <!-- Back button and Date filter bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
@@ -849,6 +906,114 @@
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Closing Balance</span>
                     <span id="statementClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">₹0.00</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 7. Customer Statement view -->
+              <div id="customer-statement-view" role="tabpanel" style="display:none">
+                <!-- Back button and Date filter bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                  <button class="btn btn-secondary" id="btnBackToCustomerList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="19" y1="12" x2="5" y2="12"></line>
+                      <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Customers
+                  </button>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">From:</label>
+                      <input type="date" id="statementCustDateFrom" class="je-input" style="height: 38px; padding: 0 10px;" />
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">To:</label>
+                      <input type="date" id="statementCustDateTo" class="je-input" style="height: 38px; padding: 0 10px;" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Table Card -->
+                <div class="table-card" style="padding: 0; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 20px;">
+                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center; background: var(--slate-50);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <h3 id="statementCustName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Customer</h3>
+                    </div>
+                    <span id="statementCustSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Trade Receivables</span>
+                  </div>
+                  
+                  <div id="statementCustTableWrap" style="overflow-x: auto;">
+                    <!-- Table goes here -->
+                  </div>
+                </div>
+
+                <!-- Balances Summary Area below the table -->
+                <div style="display: flex; justify-content: flex-end; gap: 24px; padding: 16px 20px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; margin-top: 16px; flex-wrap: wrap;">
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Opening Balance</span>
+                    <span id="statementCustOpeningBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Current Balance (Period Net)</span>
+                    <span id="statementCustCurrentBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Closing Balance</span>
+                    <span id="statementCustClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">₹0.00</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 8. Supplier Statement view -->
+              <div id="supplier-statement-view" role="tabpanel" style="display:none">
+                <!-- Back button and Date filter bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                  <button class="btn btn-secondary" id="btnBackToSupplierList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="19" y1="12" x2="5" y2="12"></line>
+                      <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Suppliers
+                  </button>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">From:</label>
+                      <input type="date" id="statementSuppDateFrom" class="je-input" style="height: 38px; padding: 0 10px;" />
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">To:</label>
+                      <input type="date" id="statementSuppDateTo" class="je-input" style="height: 38px; padding: 0 10px;" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Table Card -->
+                <div class="table-card" style="padding: 0; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 20px;">
+                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center; background: var(--slate-50);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <h3 id="statementSuppName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Supplier</h3>
+                    </div>
+                    <span id="statementSuppSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Trade Payables</span>
+                  </div>
+                  
+                  <div id="statementSuppTableWrap" style="overflow-x: auto;">
+                    <!-- Table goes here -->
+                  </div>
+                </div>
+
+                <!-- Balances Summary Area below the table -->
+                <div style="display: flex; justify-content: flex-end; gap: 24px; padding: 16px 20px; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 12px; margin-top: 16px; flex-wrap: wrap;">
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Opening Balance</span>
+                    <span id="statementSuppOpeningBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Current Balance (Period Net)</span>
+                    <span id="statementSuppCurrentBal" style="font-size: 16px; font-weight: 700; color: var(--slate-800);">₹0.00</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase;">Closing Balance</span>
+                    <span id="statementSuppClosingBal" style="font-size: 16px; font-weight: 700; color: var(--blue-700);">₹0.00</span>
                   </div>
                 </div>
               </div>
@@ -1561,11 +1726,21 @@
                 </div>
               </div>
             </div>
-            <div class="je-field">
+            <div class="je-field" id="salesCustomerWrap">
               <label for="salesCustomer">Customer *</label>
-              <select id="salesCustomer" class="je-input" aria-label="Customer Selection">
+              <select id="salesCustomer" class="je-input" aria-label="Customer Selection" style="display: none;">
                 <option value="">&mdash; Select Customer &mdash;</option>
               </select>
+              <div class="kya-searchable-select-wrap" id="salesCustomerSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="salesCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                  <span id="salesCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="salesCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="salesCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="salesCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
             </div>
             <div class="je-field">
               <label for="salesSupplyType">Supply Type *</label>
@@ -1872,11 +2047,21 @@
               <label for="purchaseInvoiceNo" id="lblPurchaseInvoiceNo">Purchase / Bill No.</label>
               <input type="text" id="purchaseInvoiceNo" class="je-input" placeholder="PUR-2026-001" aria-label="Purchase number" />
             </div>
-            <div class="je-field">
+            <div class="je-field" id="purchaseVendorWrap">
               <label for="purchaseVendor">Vendor / Supplier *</label>
-              <select id="purchaseVendor" class="je-input" aria-label="Vendor Selection">
+              <select id="purchaseVendor" class="je-input" aria-label="Vendor Selection" style="display: none;">
                 <option value="">&mdash; Select Vendor &mdash;</option>
               </select>
+              <div class="kya-searchable-select-wrap" id="purchaseVendorSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="purchaseVendorSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                  <span id="purchaseVendorSelectTriggerText">&mdash; Select Vendor &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="purchaseVendorSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="purchaseVendorSelectSearch" placeholder="Search vendor / supplier, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="purchaseVendorSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
             </div>
             <div class="je-field">
               <label for="purchaseSupplyType">Supply Type *</label>

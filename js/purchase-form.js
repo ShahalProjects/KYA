@@ -408,35 +408,35 @@
     recalculatePurchaseTotals();
   }
 
+  let _purchVendorSearchControl = null;
+  function getPurchVendorSearchControl() {
+    if (!_purchVendorSearchControl && typeof initPartySearchableSelect === 'function') {
+      _purchVendorSearchControl = initPartySearchableSelect('purchaseVendor', '— Select Vendor —', 'Vendor / Supplier');
+    }
+    return _purchVendorSearchControl;
+  }
+
   function populatePurchaseVendors(selectedId = null) {
     const vendorSelect = document.getElementById('purchaseVendor');
     if (!vendorSelect) return;
 
     vendorSelect.innerHTML = '<option value="">&mdash; Select Vendor &mdash;</option>';
 
-    const ledgers = typeof coaLedgers !== 'undefined' ? coaLedgers : [];
-    const vendors = ledgers.filter(l => {
-      if (l.type === 'group-ledger') return false;
-      if (l.sgId === 'sg-tp') return true;
-      if (typeof getLedgerMainGroup === 'function' && getLedgerMainGroup(l) === 'equity-liabilities') {
-        const sgName = (typeof resolveLedgerSubgroupName === 'function' ? resolveLedgerSubgroupName(l) : '').toLowerCase();
-        if (sgName.includes('payable') || sgName.includes('creditor') || sgName.includes('vendor') || sgName.includes('supplier')) return true;
-      }
-      return false;
-    });
+    const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
 
-    const list = vendors.length > 0 ? vendors : ledgers.filter(l => l.type === 'ledger' && l.sgId !== 'sg-cce');
-
-    list.forEach(v => {
+    suppliers.forEach(v => {
       const opt = document.createElement('option');
       opt.value = v.id;
       const akaStr = v.aliases && v.aliases.length > 0 ? ` [A.K.A: ${v.aliases.join(', ')}]` : '';
       opt.textContent = v.name + akaStr;
-      if (selectedId && v.id == selectedId) {
+      if (selectedId && String(v.id) === String(selectedId)) {
         opt.selected = true;
       }
       vendorSelect.appendChild(opt);
     });
+
+    const control = getPurchVendorSearchControl();
+    if (control) control.refresh();
   }
 
   function populatePurchaseExecutives(selectedId = null) {

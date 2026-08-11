@@ -55,10 +55,17 @@
     const isLocked = isSalesReturnInvoiceSelected();
     
     const custEl = document.getElementById('salesCustomer');
+    const custTrigger = document.getElementById('salesCustomerSelectTrigger');
     if (custEl) {
       custEl.disabled = isLocked;
       custEl.style.backgroundColor = isLocked ? 'var(--slate-50)' : '';
       custEl.style.cursor = isLocked ? 'not-allowed' : '';
+    }
+    if (custTrigger) {
+      custTrigger.style.pointerEvents = isLocked ? 'none' : '';
+      custTrigger.style.backgroundColor = isLocked ? 'var(--slate-50)' : '#fff';
+      custTrigger.style.cursor = isLocked ? 'not-allowed' : 'pointer';
+      custTrigger.style.opacity = isLocked ? '0.7' : '1';
     }
     
     const supplyTypeEl = document.getElementById('salesSupplyType');
@@ -127,7 +134,7 @@
     
     if (tdsTcsNoneBtn) { tdsTcsNoneBtn.disabled = false; tdsTcsNoneBtn.style.cursor = ''; tdsTcsNoneBtn.style.opacity = ''; }
     if (tdsTcsTdsBtn) { tdsTcsTdsBtn.disabled = false; tdsTcsTdsBtn.style.cursor = ''; tdsTcsTdsBtn.style.opacity = ''; }
-    if (tdsTcsTcsBtn) { tdsTcsTcsBtn.disabled = false; tdsTcsTcsBtn.style.cursor = ''; tdsTcsTcsBtn.style.opacity = ''; }
+    if (tdsTcsTcsBtn) { tdsTcsTdsBtn.disabled = false; tdsTcsTcsBtn.style.cursor = ''; tdsTcsTcsBtn.style.opacity = ''; }
 
     const payAmtEl = document.getElementById('salesPaymentAmount');
     if (payAmtEl) {

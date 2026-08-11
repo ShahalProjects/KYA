@@ -118,4 +118,7 @@
   let _ledgerAlterAliases = [];
   let _ledgerSearchQuery = '';
   let _ledgerStatementId = null;
-
+  let _customerSearchQuery = '';
+  let _supplierSearchQuery = '';
+  let _customerStatementId = null;
+  let _supplierStatementId = null;

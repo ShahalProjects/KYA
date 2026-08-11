@@ -115,6 +115,8 @@
       window.KYA_STORE.purchaseVouchers = window.KYA_STORE.purchaseVouchers || [];
       window.KYA_STORE.purchaseVouchersDrafts = window.KYA_STORE.purchaseVouchersDrafts || [];
       window.KYA_STORE.purchaseInvoiceCtr = window.KYA_STORE.purchaseInvoiceCtr || 1;
+      window.KYA_STORE.customers = window.KYA_STORE.customers || [];
+      window.KYA_STORE.suppliers = window.KYA_STORE.suppliers || [];
 
       if (!quiet) {
         showToast('Data restored successfully.', 'success');
