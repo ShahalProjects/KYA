@@ -378,6 +378,7 @@
     purchase_voucher: document.getElementById('panel-purchase-voucher'),
     company: document.getElementById('panel-company'),
     cashline: document.getElementById('panel-cashline'),
+    stock_hub: document.getElementById('panel-stock-hub'),
     master_desk: document.getElementById('panel-master-desk'),
   };
 
@@ -473,6 +474,13 @@
       navId: 'nav-cashline',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="11" r="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M2 9h16" stroke="currentColor" stroke-width="1.6"/></svg>`
     },
+    stock_hub: {
+      id: 'stock_hub',
+      label: 'Stock Hub',
+      panelId: 'panel-stock-hub',
+      navId: 'nav-stock-hub',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M10 2.5L3.5 6.25V13.75L10 17.5L16.5 13.75V6.25L10 2.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 2.5V17.5" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 6.25L10 10L16.5 6.25" stroke="currentColor" stroke-width="1.4"/></svg>`
+    },
   };
 
   let openTabs = [];
@@ -494,6 +502,7 @@
     purchase_voucher: { tabId: 'purchase_voucher' },
     company:   { tabId: 'company' },
     cashline:  { tabId: 'cashline' },
+    stock_hub: { tabId: 'stock_hub' },
   };
 
   const NAV_ID_TO_ROUTE = {
@@ -504,6 +513,7 @@
     'nav-trial': 'trial',
     'nav-pnl': 'pnl',
     'nav-balance': 'balance',
+    'nav-stock-hub': 'stock_hub',
     'nav-onehub': 'onehub',
     'nav-settings': 'settings',
     'nav-journal': 'journal',
@@ -568,16 +578,27 @@
     switchToActivePanel();
   }
 
-  function closeTab(tabId, event) {
-    if (event) event.stopPropagation();
+  function closeTab(tabId, event, fallbackTabId = null) {
+    if (event && event.stopPropagation) event.stopPropagation();
     const index = openTabs.indexOf(tabId);
-    if (index === -1) return;
+    if (index === -1) {
+      if (fallbackTabId) {
+        navigateTo(fallbackTabId);
+      }
+      return;
+    }
+    
+    if (tabId === 'master_desk' && typeof window.handleMasterDeskClosed === 'function') {
+      window.handleMasterDeskClosed();
+    }
     
     openTabs.splice(index, 1);
     
     let nextActiveTabId = activeTabId;
     if (activeTabId === tabId) {
-      if (openTabs.length > 0) {
+      if (fallbackTabId && (openTabs.includes(fallbackTabId) || TAB_DEFS[fallbackTabId])) {
+        nextActiveTabId = fallbackTabId;
+      } else if (openTabs.length > 0) {
         const nextActiveIndex = Math.min(index, openTabs.length - 1);
         nextActiveTabId = openTabs[nextActiveIndex];
       } else {
@@ -596,6 +617,10 @@
       switchToActivePanel();
     }
   }
+
+  window.openTab = openTab;
+  window.closeTab = closeTab;
+  window.navigateTo = navigateTo;
 
   function switchToActivePanel() {
     // Hide all panels
@@ -626,6 +651,9 @@
         if (typeof jeRows !== 'undefined' && jeRows.length === 0 && typeof initFormDefaults === 'function') {
           initFormDefaults();
         }
+        if (typeof window.checkAndRestorePendingJournalState === 'function') {
+          window.checkAndRestorePendingJournalState();
+        }
       }
       if (activeTabId === 'voucher_desk'  && typeof renderVoucherDeskPanel  === 'function') renderVoucherDeskPanel();
       if (activeTabId === 'chart'         && typeof switchCoaTab            === 'function') switchCoaTab(_coaActiveTab);
@@ -641,6 +669,9 @@
           if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
           if (typeof populateSalesExecutives === 'function') populateSalesExecutives();
         }
+        if (typeof window.checkAndRestorePendingJournalState === 'function') {
+          window.checkAndRestorePendingJournalState();
+        }
       }
       if (activeTabId === 'purchase_voucher') {
         if (typeof purchaseRows !== 'undefined' && purchaseRows.length === 0 && typeof initPurchaseForm === 'function') {
@@ -650,9 +681,13 @@
           if (typeof populatePurchaseExecutives === 'function') populatePurchaseExecutives();
           if (typeof populatePurchasePaymentAccounts === 'function') populatePurchasePaymentAccounts();
         }
+        if (typeof window.checkAndRestorePendingJournalState === 'function') {
+          window.checkAndRestorePendingJournalState();
+        }
       }
       if (activeTabId === 'company'       && typeof renderCompanyPanel      === 'function') renderCompanyPanel();
       if (activeTabId === 'cashline'      && typeof renderCashlinePanel     === 'function') renderCashlinePanel();
+      if (activeTabId === 'stock_hub'     && typeof renderStockHubPanel     === 'function') renderStockHubPanel();
 
       // Highlight sidebar nav item
       const navEl = document.getElementById(def.navId);

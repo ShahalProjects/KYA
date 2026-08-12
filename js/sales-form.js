@@ -445,6 +445,7 @@
     custSelect.innerHTML = '<option value="">&mdash; Select Customer &mdash;</option>';
     
     const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const addedNames = new Set();
     
     customers.forEach(c => {
       const opt = document.createElement('option');
@@ -455,11 +456,61 @@
         opt.selected = true;
       }
       custSelect.appendChild(opt);
+      addedNames.add((c.name || '').trim().toLowerCase());
     });
+
+    // Also include ledgers created under Trade Receivables group in Master Desk → Ledgers
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      coaLedgers.forEach(l => {
+        if (l.type === 'ledger' && l.sgId === 'sg-tr' && l.name && l.name.trim().toLowerCase() !== 'trade receivables') {
+          if (!addedNames.has(l.name.trim().toLowerCase())) {
+            const opt = document.createElement('option');
+            opt.value = l.id;
+            const akaStr = l.aliases && l.aliases.length > 0 ? ` [A.K.A: ${l.aliases.join(', ')}]` : '';
+            opt.textContent = l.name + akaStr;
+            if (selectedId && String(l.id) === String(selectedId)) {
+              opt.selected = true;
+            }
+            custSelect.appendChild(opt);
+            addedNames.add(l.name.trim().toLowerCase());
+          }
+        }
+      });
+    }
 
     const control = getSalesCustSearchControl();
     if (control) control.refresh();
   }
+
+  window.onPartyCreatedForSales = function(newParty, partySource) {
+    if (!newParty) return;
+    populateSalesCustomers(newParty.id);
+    setTimeout(() => {
+      const custSelect = document.getElementById('salesCustomer');
+      if (custSelect) {
+        custSelect.value = newParty.id;
+        custSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const ctrl = getSalesCustSearchControl();
+      if (ctrl) ctrl.refresh();
+      showToast(`${partySource === 'ledger' ? 'Ledger' : 'Customer'} "${newParty.name}" selected.`, 'success');
+    }, 60);
+  };
+
+  window.onPartyCreationCancelledForSales = function(initialName) {
+    setTimeout(() => {
+      const dropdown = document.getElementById('salesCustomerSelectDropdown');
+      const searchInput = document.getElementById('salesCustomerSelectSearch');
+      if (dropdown && searchInput) {
+        dropdown.style.display = 'flex';
+        if (initialName !== undefined && initialName !== null) {
+          searchInput.value = initialName;
+          searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        searchInput.focus();
+      }
+    }, 60);
+  };
 
   function populateSalesExecutives(selectedId = null) {
     const execSelect = document.getElementById('salesExecutive');

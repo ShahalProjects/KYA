@@ -423,6 +423,7 @@
     vendorSelect.innerHTML = '<option value="">&mdash; Select Vendor &mdash;</option>';
 
     const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+    const addedNames = new Set();
 
     suppliers.forEach(v => {
       const opt = document.createElement('option');
@@ -433,11 +434,61 @@
         opt.selected = true;
       }
       vendorSelect.appendChild(opt);
+      addedNames.add((v.name || '').trim().toLowerCase());
     });
+
+    // Also include ledgers created under Trade Payables group in Master Desk → Ledgers
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      coaLedgers.forEach(l => {
+        if (l.type === 'ledger' && l.sgId === 'sg-tp' && l.name && l.name.trim().toLowerCase() !== 'trade payables') {
+          if (!addedNames.has(l.name.trim().toLowerCase())) {
+            const opt = document.createElement('option');
+            opt.value = l.id;
+            const akaStr = l.aliases && l.aliases.length > 0 ? ` [A.K.A: ${l.aliases.join(', ')}]` : '';
+            opt.textContent = l.name + akaStr;
+            if (selectedId && String(l.id) === String(selectedId)) {
+              opt.selected = true;
+            }
+            vendorSelect.appendChild(opt);
+            addedNames.add(l.name.trim().toLowerCase());
+          }
+        }
+      });
+    }
 
     const control = getPurchVendorSearchControl();
     if (control) control.refresh();
   }
+
+  window.onPartyCreatedForPurchase = function(newParty, partySource) {
+    if (!newParty) return;
+    populatePurchaseVendors(newParty.id);
+    setTimeout(() => {
+      const vendorSelect = document.getElementById('purchaseVendor');
+      if (vendorSelect) {
+        vendorSelect.value = newParty.id;
+        vendorSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const ctrl = getPurchVendorSearchControl();
+      if (ctrl) ctrl.refresh();
+      showToast(`${partySource === 'ledger' ? 'Ledger' : 'Supplier'} "${newParty.name}" selected.`, 'success');
+    }, 60);
+  };
+
+  window.onPartyCreationCancelledForPurchase = function(initialName) {
+    setTimeout(() => {
+      const dropdown = document.getElementById('purchaseVendorSelectDropdown');
+      const searchInput = document.getElementById('purchaseVendorSelectSearch');
+      if (dropdown && searchInput) {
+        dropdown.style.display = 'flex';
+        if (initialName !== undefined && initialName !== null) {
+          searchInput.value = initialName;
+          searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        searchInput.focus();
+      }
+    }, 60);
+  };
 
   function populatePurchaseExecutives(selectedId = null) {
     const execSelect = document.getElementById('purchaseExecutive');

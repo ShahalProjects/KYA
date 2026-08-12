@@ -10,6 +10,27 @@
   let _masterLedgerAliases = [];
   let _masterCustomerAliases = [];
   let _masterSupplierAliases = [];
+  let _masterDeskReturnContext = null;
+
+  let _masterAlterSelectedGroupId = null;
+  let _masterAlterSelectedLedgerId = null;
+  let _masterAlterSelectedCustomerId = null;
+  let _masterAlterSelectedSupplierId = null;
+
+  let _masterAlterGroupAliases = [];
+  let _masterAlterLedgerAliases = [];
+  let _masterAlterCustomerAliases = [];
+  let _masterAlterSupplierAliases = [];
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
 
   function renderMasterDeskPanel() {
     const wrap = document.getElementById('panel-master-desk');
@@ -145,7 +166,7 @@
     }
   }
 
-  function findDuplicateCoaNameOrAlias(term) {
+  function findDuplicateCoaNameOrAlias(term, exclude) {
     if (!term) return null;
     const q = term.trim().toLowerCase();
     if (!q) return null;
@@ -153,6 +174,12 @@
     // 1. Check in coaLedgers (Active Ledgers and Group Ledgers)
     if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
       for (const ldg of coaLedgers) {
+        if (exclude && (
+          (exclude.id !== undefined && exclude.id !== null && String(ldg.id) === String(exclude.id)) ||
+          (exclude.originalName && ldg.name && ldg.name.trim().toLowerCase() === exclude.originalName.trim().toLowerCase())
+        )) {
+          continue;
+        }
         if (ldg.name && ldg.name.trim().toLowerCase() === q) {
           return { name: ldg.name, type: ldg.type === 'group-ledger' ? 'Group' : 'Ledger' };
         }
@@ -169,6 +196,12 @@
     // 2. Check in COA_SYS_SGS (Subgroups / Groups)
     if (typeof COA_SYS_SGS !== 'undefined' && Array.isArray(COA_SYS_SGS)) {
       for (const sg of COA_SYS_SGS) {
+        if (exclude && (
+          (exclude.id !== undefined && exclude.id !== null && String(sg.id) === String(exclude.id)) ||
+          (exclude.originalName && sg.name && sg.name.trim().toLowerCase() === exclude.originalName.trim().toLowerCase())
+        )) {
+          continue;
+        }
         if (sg.id && sg.id.startsWith('sg-grp-')) {
           const stillActive = typeof coaLedgers !== 'undefined' && coaLedgers.some(l => l.sgId === sg.id || l.name === sg.name);
           if (!stillActive) continue;
@@ -190,6 +223,12 @@
     // 3. Check in Customers Directory
     if (typeof getKyaCustomers === 'function') {
       for (const cust of getKyaCustomers()) {
+        if (exclude && (
+          (exclude.id !== undefined && exclude.id !== null && String(cust.id) === String(exclude.id)) ||
+          (exclude.originalName && cust.name && cust.name.trim().toLowerCase() === exclude.originalName.trim().toLowerCase())
+        )) {
+          continue;
+        }
         if (cust.name && cust.name.trim().toLowerCase() === q) {
           return { name: cust.name, type: 'Customer' };
         }
@@ -206,6 +245,12 @@
     // 4. Check in Suppliers Directory
     if (typeof getKyaSuppliers === 'function') {
       for (const supp of getKyaSuppliers()) {
+        if (exclude && (
+          (exclude.id !== undefined && exclude.id !== null && String(supp.id) === String(exclude.id)) ||
+          (exclude.originalName && supp.name && supp.name.trim().toLowerCase() === exclude.originalName.trim().toLowerCase())
+        )) {
+          continue;
+        }
         if (supp.name && supp.name.trim().toLowerCase() === q) {
           return { name: supp.name, type: 'Supplier' };
         }
@@ -1072,6 +1117,794 @@
     });
 
     validateMasterSupplierAliasesLive();
+  }
+
+  function validateMasterAlterGroupAliasesLive(excludeObj) {
+    const container = document.getElementById('masterAlterGroupAliasesContainer');
+    const nameInp = document.getElementById('masterAlterGroupName');
+    if (!container) return true;
+
+    const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
+    const rows = container.querySelectorAll('.master-alias-row-wrap');
+    let hasAnyError = false;
+
+    const aliasValues = [];
+    rows.forEach(row => {
+      const input = row.querySelector('.master-alias-input');
+      const val = input ? input.value.trim() : '';
+      aliasValues.push(val.toLowerCase());
+    });
+
+    rows.forEach((row, idx) => {
+      const input = row.querySelector('.master-alias-input');
+      const errDiv = row.querySelector('.master-alias-err');
+      if (!input || !errDiv) return;
+
+      const val = input.value.trim();
+      const valLower = val.toLowerCase();
+
+      if (!val) {
+        errDiv.style.display = 'none';
+        errDiv.textContent = '';
+        input.style.borderColor = 'var(--slate-200)';
+        input.style.boxShadow = 'none';
+        return;
+      }
+
+      if (currentName && valLower === currentName) {
+        const errorText = `"${val}" matches the Group Name in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const duplicateInForm = aliasValues.some((otherVal, otherIdx) => otherIdx !== idx && otherVal !== '' && otherVal === valLower);
+      if (duplicateInForm) {
+        const errorText = `"${val}" is already entered as another alias in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+      if (dup) {
+        const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+        const errorText = `"${val}" already exists in system (${typeLabel}).`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      errDiv.style.display = 'none';
+      errDiv.textContent = '';
+      input.style.borderColor = 'var(--slate-200)';
+      input.style.boxShadow = 'none';
+    });
+
+    return !hasAnyError;
+  }
+
+  function renderMasterAlterGroupAliases(excludeObj) {
+    const container = document.getElementById('masterAlterGroupAliasesContainer');
+    const addAliasBtn = document.getElementById('masterAlterGroupAddAliasBtn');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const hasEmpty = _masterAlterGroupAliases.some(a => a.trim() === '');
+    if (addAliasBtn) {
+      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
+    }
+
+    _masterAlterGroupAliases.forEach((alias, idx) => {
+      const block = document.createElement('div');
+      block.className = 'master-alias-row-wrap';
+      block.style.display = 'flex';
+      block.style.flexDirection = 'column';
+      block.style.gap = '2px';
+
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '8px';
+      row.style.alignItems = 'center';
+
+      const input = document.createElement('input');
+      input.className = 'master-alias-input';
+      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
+      input.value = alias;
+      input.style.cssText = `
+        flex: 1;
+        height: 38px;
+        padding: 8px 12px;
+        font-size: 13.5px;
+        font-family: inherit;
+        color: var(--slate-800);
+        background: #ffffff;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        box-sizing: border-box;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      `;
+
+      input.addEventListener('focus', () => {
+        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+          input.style.borderColor = '#3b82f6';
+          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        validateMasterAlterGroupAliasesLive(excludeObj);
+      });
+
+      input.addEventListener('input', (e) => {
+        _masterAlterGroupAliases[idx] = e.target.value;
+        const nowHasEmpty = _masterAlterGroupAliases.some(a => a.trim() === '');
+        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
+        validateMasterAlterGroupAliasesLive(excludeObj);
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-master-alias-del';
+      delBtn.title = 'Remove Alias';
+      delBtn.style.cssText = `
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--slate-400);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      `;
+      delBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      `;
+
+      delBtn.addEventListener('mouseenter', () => {
+        delBtn.style.background = '#fef2f2';
+        delBtn.style.color = '#dc2626';
+        delBtn.style.borderColor = '#fecaca';
+      });
+      delBtn.addEventListener('mouseleave', () => {
+        delBtn.style.background = '#ffffff';
+        delBtn.style.color = 'var(--slate-400)';
+        delBtn.style.borderColor = 'var(--slate-200)';
+      });
+
+      delBtn.addEventListener('click', () => {
+        _masterAlterGroupAliases.splice(idx, 1);
+        renderMasterAlterGroupAliases(excludeObj);
+      });
+
+      const errDiv = document.createElement('div');
+      errDiv.className = 'master-alias-err';
+      errDiv.style.cssText = `
+        display: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: #dc2626;
+        margin-top: 4px;
+        line-height: 1.4;
+      `;
+
+      row.appendChild(input);
+      row.appendChild(delBtn);
+      block.appendChild(row);
+      block.appendChild(errDiv);
+      container.appendChild(block);
+    });
+
+    validateMasterAlterGroupAliasesLive(excludeObj);
+  }
+
+  function validateMasterAlterLedgerAliasesLive(excludeObj) {
+    const container = document.getElementById('masterAlterLedgerAliasesContainer');
+    const nameInp = document.getElementById('masterAlterLedgerName');
+    if (!container) return true;
+
+    const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
+    const rows = container.querySelectorAll('.master-alias-row-wrap');
+    let hasAnyError = false;
+
+    const aliasValues = [];
+    rows.forEach(row => {
+      const input = row.querySelector('.master-alias-input');
+      const val = input ? input.value.trim() : '';
+      aliasValues.push(val.toLowerCase());
+    });
+
+    rows.forEach((row, idx) => {
+      const input = row.querySelector('.master-alias-input');
+      const errDiv = row.querySelector('.master-alias-err');
+      if (!input || !errDiv) return;
+
+      const val = input.value.trim();
+      const valLower = val.toLowerCase();
+
+      if (!val) {
+        errDiv.style.display = 'none';
+        errDiv.textContent = '';
+        input.style.borderColor = 'var(--slate-200)';
+        input.style.boxShadow = 'none';
+        return;
+      }
+
+      if (currentName && valLower === currentName) {
+        const errorText = `"${val}" matches the Ledger Name in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const duplicateInForm = aliasValues.some((otherVal, otherIdx) => otherIdx !== idx && otherVal !== '' && otherVal === valLower);
+      if (duplicateInForm) {
+        const errorText = `"${val}" is already entered as another alias in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+      if (dup) {
+        const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+        const errorText = `"${val}" already exists in system (${typeLabel}).`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      errDiv.style.display = 'none';
+      errDiv.textContent = '';
+      input.style.borderColor = 'var(--slate-200)';
+      input.style.boxShadow = 'none';
+    });
+
+    return !hasAnyError;
+  }
+
+  function renderMasterAlterLedgerAliases(excludeObj) {
+    const container = document.getElementById('masterAlterLedgerAliasesContainer');
+    const addAliasBtn = document.getElementById('masterAlterLedgerAddAliasBtn');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const hasEmpty = _masterAlterLedgerAliases.some(a => a.trim() === '');
+    if (addAliasBtn) {
+      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
+    }
+
+    _masterAlterLedgerAliases.forEach((alias, idx) => {
+      const block = document.createElement('div');
+      block.className = 'master-alias-row-wrap';
+      block.style.display = 'flex';
+      block.style.flexDirection = 'column';
+      block.style.gap = '2px';
+
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '8px';
+      row.style.alignItems = 'center';
+
+      const input = document.createElement('input');
+      input.className = 'master-alias-input';
+      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
+      input.value = alias;
+      input.style.cssText = `
+        flex: 1;
+        height: 38px;
+        padding: 8px 12px;
+        font-size: 13.5px;
+        font-family: inherit;
+        color: var(--slate-800);
+        background: #ffffff;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        box-sizing: border-box;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      `;
+
+      input.addEventListener('focus', () => {
+        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+          input.style.borderColor = '#3b82f6';
+          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        validateMasterAlterLedgerAliasesLive(excludeObj);
+      });
+
+      input.addEventListener('input', (e) => {
+        _masterAlterLedgerAliases[idx] = e.target.value;
+        const nowHasEmpty = _masterAlterLedgerAliases.some(a => a.trim() === '');
+        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
+        validateMasterAlterLedgerAliasesLive(excludeObj);
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-master-alias-del';
+      delBtn.title = 'Remove Alias';
+      delBtn.style.cssText = `
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--slate-400);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      `;
+      delBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      `;
+
+      delBtn.addEventListener('mouseenter', () => {
+        delBtn.style.background = '#fef2f2';
+        delBtn.style.color = '#dc2626';
+        delBtn.style.borderColor = '#fecaca';
+      });
+      delBtn.addEventListener('mouseleave', () => {
+        delBtn.style.background = '#ffffff';
+        delBtn.style.color = 'var(--slate-400)';
+        delBtn.style.borderColor = 'var(--slate-200)';
+      });
+
+      delBtn.addEventListener('click', () => {
+        _masterAlterLedgerAliases.splice(idx, 1);
+        renderMasterAlterLedgerAliases(excludeObj);
+      });
+
+      const errDiv = document.createElement('div');
+      errDiv.className = 'master-alias-err';
+      errDiv.style.cssText = `
+        display: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: #dc2626;
+        margin-top: 4px;
+        line-height: 1.4;
+      `;
+
+      row.appendChild(input);
+      row.appendChild(delBtn);
+      block.appendChild(row);
+      block.appendChild(errDiv);
+      container.appendChild(block);
+    });
+
+    validateMasterAlterLedgerAliasesLive(excludeObj);
+  }
+
+  function validateMasterAlterCustomerAliasesLive(excludeObj) {
+    const container = document.getElementById('masterAlterCustomerAliasesContainer');
+    const nameInp = document.getElementById('masterAlterCustomerName');
+    if (!container) return true;
+
+    const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
+    const rows = container.querySelectorAll('.master-alias-row-wrap');
+    let hasAnyError = false;
+
+    const aliasValues = [];
+    rows.forEach(row => {
+      const input = row.querySelector('.master-alias-input');
+      const val = input ? input.value.trim() : '';
+      aliasValues.push(val.toLowerCase());
+    });
+
+    rows.forEach((row, idx) => {
+      const input = row.querySelector('.master-alias-input');
+      const errDiv = row.querySelector('.master-alias-err');
+      if (!input || !errDiv) return;
+
+      const val = input.value.trim();
+      const valLower = val.toLowerCase();
+
+      if (!val) {
+        errDiv.style.display = 'none';
+        errDiv.textContent = '';
+        input.style.borderColor = 'var(--slate-200)';
+        input.style.boxShadow = 'none';
+        return;
+      }
+
+      if (currentName && valLower === currentName) {
+        const errorText = `"${val}" matches the Customer Name in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const duplicateInForm = aliasValues.some((otherVal, otherIdx) => otherIdx !== idx && otherVal !== '' && otherVal === valLower);
+      if (duplicateInForm) {
+        const errorText = `"${val}" is already entered as another alias in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+      if (dup) {
+        const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+        const errorText = `"${val}" already exists in system (${typeLabel}).`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      errDiv.style.display = 'none';
+      errDiv.textContent = '';
+      input.style.borderColor = 'var(--slate-200)';
+      input.style.boxShadow = 'none';
+    });
+
+    return !hasAnyError;
+  }
+
+  function renderMasterAlterCustomerAliases(excludeObj) {
+    const container = document.getElementById('masterAlterCustomerAliasesContainer');
+    const addAliasBtn = document.getElementById('masterAlterCustomerAddAliasBtn');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const hasEmpty = _masterAlterCustomerAliases.some(a => a.trim() === '');
+    if (addAliasBtn) {
+      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
+    }
+
+    _masterAlterCustomerAliases.forEach((alias, idx) => {
+      const block = document.createElement('div');
+      block.className = 'master-alias-row-wrap';
+      block.style.display = 'flex';
+      block.style.flexDirection = 'column';
+      block.style.gap = '2px';
+
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '8px';
+      row.style.alignItems = 'center';
+
+      const input = document.createElement('input');
+      input.className = 'master-alias-input';
+      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
+      input.value = alias;
+      input.style.cssText = `
+        flex: 1;
+        height: 38px;
+        padding: 8px 12px;
+        font-size: 13.5px;
+        font-family: inherit;
+        color: var(--slate-800);
+        background: #ffffff;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        box-sizing: border-box;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      `;
+
+      input.addEventListener('focus', () => {
+        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+          input.style.borderColor = '#3b82f6';
+          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        validateMasterAlterCustomerAliasesLive(excludeObj);
+      });
+
+      input.addEventListener('input', (e) => {
+        _masterAlterCustomerAliases[idx] = e.target.value;
+        const nowHasEmpty = _masterAlterCustomerAliases.some(a => a.trim() === '');
+        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
+        validateMasterAlterCustomerAliasesLive(excludeObj);
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-master-alias-del';
+      delBtn.title = 'Remove Alias';
+      delBtn.style.cssText = `
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--slate-400);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      `;
+      delBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      `;
+
+      delBtn.addEventListener('mouseenter', () => {
+        delBtn.style.background = '#fef2f2';
+        delBtn.style.color = '#dc2626';
+        delBtn.style.borderColor = '#fecaca';
+      });
+      delBtn.addEventListener('mouseleave', () => {
+        delBtn.style.background = '#ffffff';
+        delBtn.style.color = 'var(--slate-400)';
+        delBtn.style.borderColor = 'var(--slate-200)';
+      });
+
+      delBtn.addEventListener('click', () => {
+        _masterAlterCustomerAliases.splice(idx, 1);
+        renderMasterAlterCustomerAliases(excludeObj);
+      });
+
+      const errDiv = document.createElement('div');
+      errDiv.className = 'master-alias-err';
+      errDiv.style.cssText = `
+        display: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: #dc2626;
+        margin-top: 4px;
+        line-height: 1.4;
+      `;
+
+      row.appendChild(input);
+      row.appendChild(delBtn);
+      block.appendChild(row);
+      block.appendChild(errDiv);
+      container.appendChild(block);
+    });
+
+    validateMasterAlterCustomerAliasesLive(excludeObj);
+  }
+
+  function validateMasterAlterSupplierAliasesLive(excludeObj) {
+    const container = document.getElementById('masterAlterSupplierAliasesContainer');
+    const nameInp = document.getElementById('masterAlterSupplierName');
+    if (!container) return true;
+
+    const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
+    const rows = container.querySelectorAll('.master-alias-row-wrap');
+    let hasAnyError = false;
+
+    const aliasValues = [];
+    rows.forEach(row => {
+      const input = row.querySelector('.master-alias-input');
+      const val = input ? input.value.trim() : '';
+      aliasValues.push(val.toLowerCase());
+    });
+
+    rows.forEach((row, idx) => {
+      const input = row.querySelector('.master-alias-input');
+      const errDiv = row.querySelector('.master-alias-err');
+      if (!input || !errDiv) return;
+
+      const val = input.value.trim();
+      const valLower = val.toLowerCase();
+
+      if (!val) {
+        errDiv.style.display = 'none';
+        errDiv.textContent = '';
+        input.style.borderColor = 'var(--slate-200)';
+        input.style.boxShadow = 'none';
+        return;
+      }
+
+      if (currentName && valLower === currentName) {
+        const errorText = `"${val}" matches the Supplier Name in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const duplicateInForm = aliasValues.some((otherVal, otherIdx) => otherIdx !== idx && otherVal !== '' && otherVal === valLower);
+      if (duplicateInForm) {
+        const errorText = `"${val}" is already entered as another alias in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+      if (dup) {
+        const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+        const errorText = `"${val}" already exists in system (${typeLabel}).`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      errDiv.style.display = 'none';
+      errDiv.textContent = '';
+      input.style.borderColor = 'var(--slate-200)';
+      input.style.boxShadow = 'none';
+    });
+
+    return !hasAnyError;
+  }
+
+  function renderMasterAlterSupplierAliases(excludeObj) {
+    const container = document.getElementById('masterAlterSupplierAliasesContainer');
+    const addAliasBtn = document.getElementById('masterAlterSupplierAddAliasBtn');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const hasEmpty = _masterAlterSupplierAliases.some(a => a.trim() === '');
+    if (addAliasBtn) {
+      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
+    }
+
+    _masterAlterSupplierAliases.forEach((alias, idx) => {
+      const block = document.createElement('div');
+      block.className = 'master-alias-row-wrap';
+      block.style.display = 'flex';
+      block.style.flexDirection = 'column';
+      block.style.gap = '2px';
+
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.gap = '8px';
+      row.style.alignItems = 'center';
+
+      const input = document.createElement('input');
+      input.className = 'master-alias-input';
+      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
+      input.value = alias;
+      input.style.cssText = `
+        flex: 1;
+        height: 38px;
+        padding: 8px 12px;
+        font-size: 13.5px;
+        font-family: inherit;
+        color: var(--slate-800);
+        background: #ffffff;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        box-sizing: border-box;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      `;
+
+      input.addEventListener('focus', () => {
+        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+          input.style.borderColor = '#3b82f6';
+          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        validateMasterAlterSupplierAliasesLive(excludeObj);
+      });
+
+      input.addEventListener('input', (e) => {
+        _masterAlterSupplierAliases[idx] = e.target.value;
+        const nowHasEmpty = _masterAlterSupplierAliases.some(a => a.trim() === '');
+        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
+        validateMasterAlterSupplierAliasesLive(excludeObj);
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn-master-alias-del';
+      delBtn.title = 'Remove Alias';
+      delBtn.style.cssText = `
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1.5px solid var(--slate-200);
+        border-radius: 8px;
+        background: #ffffff;
+        color: var(--slate-400);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      `;
+      delBtn.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      `;
+
+      delBtn.addEventListener('mouseenter', () => {
+        delBtn.style.background = '#fef2f2';
+        delBtn.style.color = '#dc2626';
+        delBtn.style.borderColor = '#fecaca';
+      });
+      delBtn.addEventListener('mouseleave', () => {
+        delBtn.style.background = '#ffffff';
+        delBtn.style.color = 'var(--slate-400)';
+        delBtn.style.borderColor = 'var(--slate-200)';
+      });
+
+      delBtn.addEventListener('click', () => {
+        _masterAlterSupplierAliases.splice(idx, 1);
+        renderMasterAlterSupplierAliases(excludeObj);
+      });
+
+      const errDiv = document.createElement('div');
+      errDiv.className = 'master-alias-err';
+      errDiv.style.cssText = `
+        display: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: #dc2626;
+        margin-top: 4px;
+        line-height: 1.4;
+      `;
+
+      row.appendChild(input);
+      row.appendChild(delBtn);
+      block.appendChild(row);
+      block.appendChild(errDiv);
+      container.appendChild(block);
+    });
+
+    validateMasterAlterSupplierAliasesLive(excludeObj);
   }
 
   function initSearchableSelectHelper(container, prefix, placeholderText) {
@@ -1951,6 +2784,46 @@
           showToast(`Ledger "${name}" created successfully.`, 'success');
 
           _masterLedgerAliases = [];
+
+          if (_masterDeskReturnContext) {
+            const ctx = _masterDeskReturnContext;
+            _masterDeskReturnContext = null;
+            _masterLedgerAliases = [];
+
+            if (ctx.returnTab === 'sales_voucher') {
+              if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
+              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
+              if (typeof openTab === 'function') openTab('sales_voucher');
+              else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
+              if (typeof window.onPartyCreatedForSales === 'function') {
+                window.onPartyCreatedForSales(newLedger, 'ledger');
+              }
+              return;
+            }
+
+            if (ctx.returnTab === 'purchase_voucher') {
+              if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
+              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
+              if (typeof openTab === 'function') openTab('purchase_voucher');
+              else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
+              if (typeof window.onPartyCreatedForPurchase === 'function') {
+                window.onPartyCreatedForPurchase(newLedger, 'ledger');
+              }
+              return;
+            }
+
+            if (ctx.returnTab === 'journal') {
+              if (typeof closeTab === 'function') closeTab('master_desk', null, 'journal');
+              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'journal');
+              if (typeof openTab === 'function') openTab('journal');
+              else if (typeof window.openTab === 'function') window.openTab('journal');
+              if (typeof window.onLedgerCreatedForJournal === 'function') {
+                window.onLedgerCreatedForJournal(newLedger, ctx.rowId);
+              }
+              return;
+            }
+          }
+
           updateMasterDeskContent();
         });
       }
@@ -1958,6 +2831,7 @@
       if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
           _masterLedgerAliases = [];
+          if (cancelMasterDeskReturn()) return;
           updateMasterDeskContent();
         });
       }
@@ -2287,6 +3161,23 @@
           showToast(`Customer "${name}" created successfully (linked to Trade Receivables).`, 'success');
 
           _masterCustomerAliases = [];
+
+          if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'sales_voucher') {
+            const ctx = _masterDeskReturnContext;
+            _masterDeskReturnContext = null;
+            _masterCustomerAliases = [];
+
+            if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
+            else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
+            if (typeof openTab === 'function') openTab('sales_voucher');
+            else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
+
+            if (typeof window.onPartyCreatedForSales === 'function') {
+              window.onPartyCreatedForSales(newCustomer, 'customer');
+            }
+            return;
+          }
+
           updateMasterDeskContent();
         });
       }
@@ -2294,6 +3185,7 @@
       if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
           _masterCustomerAliases = [];
+          if (cancelMasterDeskReturn()) return;
           updateMasterDeskContent();
         });
       }
@@ -2623,6 +3515,23 @@
           showToast(`Supplier "${name}" created successfully (linked to Trade Payables).`, 'success');
 
           _masterSupplierAliases = [];
+
+          if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'purchase_voucher') {
+            const ctx = _masterDeskReturnContext;
+            _masterDeskReturnContext = null;
+            _masterSupplierAliases = [];
+
+            if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
+            else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
+            if (typeof openTab === 'function') openTab('purchase_voucher');
+            else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
+
+            if (typeof window.onPartyCreatedForPurchase === 'function') {
+              window.onPartyCreatedForPurchase(newSupplier, 'supplier');
+            }
+            return;
+          }
+
           updateMasterDeskContent();
         });
       }
@@ -2630,6 +3539,7 @@
       if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
           _masterSupplierAliases = [];
+          if (cancelMasterDeskReturn()) return;
           updateMasterDeskContent();
         });
       }
@@ -2637,191 +3547,1717 @@
       // ══════════════════════════════════════════════════════════════════
       //  ALTER MODE: Groups, Ledgers, Customers, and Suppliers
       // ══════════════════════════════════════════════════════════════════
-      if (currentMasterDeskTab === 'customers') {
-        const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+      if (currentMasterDeskTab === 'group') {
+        const allGroups = [];
+        if (typeof COA_SYS_SGS !== 'undefined') {
+          COA_SYS_SGS.forEach(sg => {
+            allGroups.push({
+              id: 'sg:' + sg.id,
+              rawId: sg.id,
+              name: sg.name,
+              main: sg.main,
+              parent: sg.parent,
+              aliases: sg.aliases || [],
+              isSysSg: true,
+              isCustomSg: String(sg.id).startsWith('sg-grp-')
+            });
+          });
+        }
+        if (typeof coaLedgers !== 'undefined') {
+          coaLedgers.filter(l => l.type === 'group-ledger').forEach(gl => {
+            allGroups.push({
+              id: 'gl:' + gl.id,
+              rawId: gl.id,
+              name: gl.name,
+              sgId: gl.sgId,
+              glId: gl.glId,
+              aliases: gl.aliases || [],
+              isSysSg: false,
+              isCustomSg: true
+            });
+          });
+        }
+
+        if (allGroups.length === 0) {
+          contentArea.innerHTML = `
+            <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 32px 24px; background: var(--white); text-align: center; margin: 0 0 20px 0;">
+              <div style="font-size: 14px; font-weight: 600; color: var(--slate-600); margin-bottom: 8px;">No groups found to alter.</div>
+              <div style="font-size: 12.5px; color: var(--slate-400); margin-bottom: 16px;">Create a new group first using the Create tab.</div>
+              <button class="btn btn-primary" id="btnAlterGoToCreateGroup" style="font-size: 13px; font-weight: 600; padding: 8px 16px;">Go to Create Group</button>
+            </div>
+          `;
+          const btnGo = contentArea.querySelector('#btnAlterGoToCreateGroup');
+          if (btnGo) btnGo.addEventListener('click', () => setMasterDeskSubtype('Create'));
+          return;
+        }
+
+        let currentGroup = allGroups.find(g => g.id === _masterAlterSelectedGroupId);
+        if (!currentGroup) {
+          currentGroup = allGroups[0];
+          _masterAlterSelectedGroupId = currentGroup.id;
+        }
+
+        _masterAlterGroupAliases = currentGroup.aliases ? [...currentGroup.aliases] : [];
+
+        const excludeObj = {
+          id: currentGroup.rawId,
+          originalName: currentGroup.name
+        };
+
+        let groupSelectorOptionsHtml = '';
+        allGroups.forEach(g => {
+          const isSel = (g.id === currentGroup.id);
+          const badge = g.isSysSg ? (g.isCustomSg ? 'Custom Group' : 'Group') : 'Group Ledger';
+          groupSelectorOptionsHtml += `<option value="${g.id}" data-badge="${badge}" ${isSel ? 'selected' : ''}>${escapeHtml(g.name)}</option>`;
+        });
+
+        // Determine current "Under"
+        let currentUnderVal = 'primary:assets';
+        if (currentGroup.isSysSg) {
+          if (currentGroup.parent) {
+            currentUnderVal = 'group:sg:' + currentGroup.parent;
+          } else {
+            currentUnderVal = 'primary:' + (currentGroup.main || 'assets');
+          }
+        } else {
+          if (currentGroup.glId) {
+            currentUnderVal = 'group:gl:' + currentGroup.glId;
+          } else {
+            currentUnderVal = 'group:sg:' + currentGroup.sgId;
+          }
+        }
+
+        // Build Under Options (excluding currentGroup itself and its descendant group ledgers to avoid cycles)
+        let groupUnderOptionsHtml = '';
+        if (typeof COA_SYS_SGS !== 'undefined') {
+          COA_SYS_SGS.forEach(sg => {
+            if (currentGroup.isSysSg && sg.id === currentGroup.rawId) return; // Cannot place under itself
+            const sgIndent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
+            const isOptSel = (currentUnderVal === 'group:sg:' + sg.id);
+            groupUnderOptionsHtml += `<option value="group:sg:${sg.id}" data-badge="Group" ${isOptSel ? 'selected' : ''}>${sgIndent}${escapeHtml(sg.name)}</option>`;
+
+            if (typeof coaLedgers !== 'undefined') {
+              const addGlOptions = (parentId, depth) => {
+                const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger' && (parentId ? l.glId === parentId : !l.glId));
+                gls.forEach(gl => {
+                  if (!currentGroup.isSysSg && gl.id === currentGroup.rawId) return; // Cannot place under itself
+                  const glIndent = sgIndent + '\u00a0\u00a0\u00a0\u00a0' + '\u00a0\u00a0'.repeat(depth);
+                  const isGlOptSel = (currentUnderVal === 'group:gl:' + gl.id);
+                  groupUnderOptionsHtml += `<option value="group:gl:${gl.id}" data-badge="Group" ${isGlOptSel ? 'selected' : ''}>${glIndent}📁 ${escapeHtml(gl.name)}</option>`;
+                  addGlOptions(gl.id, depth + 1);
+                });
+              };
+              addGlOptions(null, 0);
+            }
+          });
+        }
+
+        const isLockedGroup = currentGroup.isSysSg && !currentGroup.isCustomSg;
+
         contentArea.innerHTML = `
-          <div style="background: var(--white); border: 1px solid var(--slate-200); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-sm);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <div>
-                <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 2px 0;">Alter Customers (${customers.length})</h3>
-                <div style="font-size: 12px; color: var(--slate-500);">Connected under Trade Receivables (Current Assets)</div>
+          <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Alter Group
+            </h3>
+
+            <!-- Select Group to Alter field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterGroupSelector" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Select Group to Alter *</label>
+              <select class="coa-modal-sel" id="masterAlterGroupSelector" style="display: none;">
+                ${groupSelectorOptionsHtml}
+              </select>
+              <div class="kya-searchable-select-wrap" id="masterAlterGroupSelectorSearchableWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="masterAlterGroupSelectorTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                  <span id="masterAlterGroupSelectorTriggerText">${escapeHtml(currentGroup.name)}</span>
+                  <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="masterAlterGroupSelectorDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="masterAlterGroupSelectorSearch" placeholder="Search group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="masterAlterGroupSelectorOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
               </div>
-              <input type="text" id="alterCustomerSearch" placeholder="Search customers..." style="padding: 6px 12px; font-size: 12.5px; border-radius: 7px; border: 1.5px solid var(--slate-200); outline: none; width: 220px;">
             </div>
 
-            <div id="alterCustomerListWrap" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            <!-- Name field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterGroupName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+              <input class="coa-modal-inp" id="masterAlterGroupName" value="${escapeHtml(currentGroup.name)}" placeholder="e.g. Current Assets / Bank Accounts" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+              <div id="masterAlterGroupNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            </div>
+
+            <!-- Also Known As field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
+              <div id="masterAlterGroupAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+              <button type="button" id="masterAlterGroupAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add A.K.A
+              </button>
+            </div>
+
+            <!-- Under field (Single box with separated Primary Categories & Parent Groups) -->
+            <div class="coa-modal-fg" style="margin-bottom: 24px;">
+              <label class="coa-modal-label" for="masterAlterGroupUnderCombinedSel" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Under *</label>
+              <select class="coa-modal-sel" id="masterAlterGroupUnderCombinedSel" style="display: none;">
+                <optgroup label="Primary Categories">
+                  <option value="primary:assets" data-badge="Primary" ${currentUnderVal === 'primary:assets' ? 'selected' : ''}>Asset</option>
+                  <option value="primary:equity-liabilities" data-badge="Primary" ${currentUnderVal === 'primary:equity-liabilities' ? 'selected' : ''}>Liability</option>
+                  <option value="primary:expense" data-badge="Primary" ${currentUnderVal === 'primary:expense' ? 'selected' : ''}>Expense</option>
+                  <option value="primary:income" data-badge="Primary" ${currentUnderVal === 'primary:income' ? 'selected' : ''}>Income</option>
+                </optgroup>
+                <optgroup label="Parent Groups">
+                  ${groupUnderOptionsHtml}
+                </optgroup>
+              </select>
+              <div class="kya-searchable-select-wrap" id="masterAlterGroupUnderCombinedSelSearchableWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="masterAlterGroupUnderCombinedSelTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                  <span id="masterAlterGroupUnderCombinedSelTriggerText">Select category or parent group</span>
+                  <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="masterAlterGroupUnderCombinedSelDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="masterAlterGroupUnderCombinedSelSearch" placeholder="Search primary category or parent group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="masterAlterGroupUnderCombinedSelOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-primary" id="masterAlterGroupSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Save Changes</button>
+                <button class="btn btn-secondary" id="masterAlterGroupCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+              </div>
+              <button class="btn btn-secondary" id="masterAlterGroupDelBtn" style="height: 38px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: #dc2626; border-color: #fecaca; background: #fef2f2; display: ${isLockedGroup ? 'none' : 'inline-flex'}; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+                Delete Group
+              </button>
+            </div>
           </div>
         `;
 
-        const listWrap = contentArea.querySelector('#alterCustomerListWrap');
-        const searchInp = contentArea.querySelector('#alterCustomerSearch');
+        renderMasterAlterGroupAliases(excludeObj);
 
-        const renderCustomerList = (filter = '') => {
-          listWrap.innerHTML = '';
-          const q = filter.toLowerCase().trim();
-          const filtered = customers.filter(c => {
-            const aliasStr = Array.isArray(c.aliases) ? c.aliases.join(' ') : '';
-            return !q || `${c.name} ${aliasStr} ${c.gstin || ''} ${c.city || ''}`.toLowerCase().includes(q);
+        const groupSelector = contentArea.querySelector('#masterAlterGroupSelector');
+        initSearchableSelectHelper(contentArea, 'masterAlterGroupSelector', 'Select Group to Alter');
+
+        if (groupSelector) {
+          groupSelector.addEventListener('change', () => {
+            _masterAlterSelectedGroupId = groupSelector.value;
+            updateMasterDeskContent();
           });
+        }
 
-          if (filtered.length === 0) {
-            listWrap.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--slate-400); font-size: 13px;">No customers found.</div>`;
-            return;
+        const addAliasBtn = contentArea.querySelector('#masterAlterGroupAddAliasBtn');
+        if (addAliasBtn) {
+          addAliasBtn.addEventListener('click', () => {
+            _masterAlterGroupAliases.push('');
+            renderMasterAlterGroupAliases(excludeObj);
+            const inputs = contentArea.querySelectorAll('.master-alias-input');
+            if (inputs.length) inputs[inputs.length - 1].focus();
+          });
+        }
+
+        initSearchableSelectHelper(contentArea, 'masterAlterGroupUnderCombinedSel', 'Select category or parent group');
+
+        const saveBtn = contentArea.querySelector('#masterAlterGroupSaveBtn');
+        const cancelBtn = contentArea.querySelector('#masterAlterGroupCancelBtn');
+        const delBtn = contentArea.querySelector('#masterAlterGroupDelBtn');
+        const nameInp = contentArea.querySelector('#masterAlterGroupName');
+        const nameErr = contentArea.querySelector('#masterAlterGroupNameError');
+
+        const validateNameInputLive = () => {
+          const val = nameInp ? nameInp.value.trim() : '';
+          if (!val) {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
           }
 
-          filtered.forEach(c => {
-            const row = document.createElement('div');
-            row.style.cssText = `
-              display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
-              background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 8px;
-            `;
-            const bal = parseFloat(c.openingBalance) || 0;
-            const balStr = typeof fmtNum === 'function' ? fmtNum(bal) : bal.toFixed(2);
-            const aliasStr = Array.isArray(c.aliases) && c.aliases.length > 0 ? `<span style="color: var(--blue-600); font-size: 11.5px; margin-left: 6px;">[A.K.A: ${c.aliases.join(', ')}]</span>` : '';
+          const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+          if (dup) {
+            const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+            const errorText = `"${val}" already exists (${typeLabel}).`;
+            if (nameErr) {
+              nameErr.textContent = errorText;
+              nameErr.style.display = 'block';
+            }
+            if (nameInp) nameInp.style.borderColor = '#ef4444';
+            return errorText;
+          } else {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
+          }
+        };
 
-            row.innerHTML = `
-              <div>
-                <div style="font-weight: 700; font-size: 13.5px; color: var(--slate-800);">${c.name} ${aliasStr}</div>
-                <div style="font-size: 11.5px; color: var(--slate-500); margin-top: 3px;">
-                  ${c.contactName ? `<span>Attn: ${c.contactName}</span> &bull; ` : ''}
-                  ${c.city ? `<span>${c.city}, ${c.state || ''}</span> &bull; ` : ''}
-                  ${c.gstin ? `<span style="font-family: monospace; color: #047857; background: #ecfdf5; padding: 1px 4px; border-radius: 3px;">${c.gstin}</span>` : ''}
-                </div>
-              </div>
-              <div style="display: flex; align-items: center; gap: 14px;">
-                <div style="text-align: right; font-size: 12.5px;">
-                  <div style="color: var(--slate-400); font-size: 10.5px; font-weight: 600; text-transform: uppercase;">Balance</div>
-                  <div style="font-weight: 700; color: var(--slate-800);">₹ ${balStr}</div>
-                </div>
-                <button class="btn btn-secondary btn-del-cust" style="height: 30px; padding: 4px 10px; font-size: 12px; color: #dc2626; border-color: #fecaca; background: #fef2f2;">Delete</button>
-              </div>
-            `;
+        if (nameInp) {
+          nameInp.addEventListener('input', () => {
+            validateNameInputLive();
+            validateMasterAlterGroupAliasesLive(excludeObj);
+          });
+        }
 
-            row.querySelector('.btn-del-cust').addEventListener('click', () => {
-              if (confirm(`Are you sure you want to delete customer "${c.name}"?`)) {
-                const idx = customers.findIndex(item => item.id === c.id);
-                if (idx >= 0) {
-                  customers.splice(idx, 1);
-                  if (typeof coaLedgers !== 'undefined') {
-                    const tr = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tr' && l.name === 'Trade Receivables');
-                    if (tr) tr.openingBalance = customers.reduce((sum, item) => sum + (parseFloat(item.openingBalance) || 0), 0);
+        if (saveBtn) {
+          saveBtn.addEventListener('click', () => {
+            const name = nameInp ? nameInp.value.trim() : '';
+            if (!name) {
+              if (typeof showToast === 'function') showToast('Please enter a group name.', 'warning');
+              else alert('Please enter a group name.');
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const liveNameErr = validateNameInputLive();
+            if (liveNameErr) {
+              if (typeof showToast === 'function') showToast(liveNameErr, 'error');
+              else alert(liveNameErr);
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const aliasesValid = validateMasterAlterGroupAliasesLive(excludeObj);
+            if (!aliasesValid) {
+              const msg = 'Please fix duplicate or invalid Also Known As entries.';
+              if (typeof showToast === 'function') showToast(msg, 'error');
+              else alert(msg);
+              return;
+            }
+
+            const underSel = contentArea.querySelector('#masterAlterGroupUnderCombinedSel');
+            const underVal = underSel && underSel.value ? underSel.value : 'primary:assets';
+            const isPrimary = underVal.startsWith('primary:');
+            const aliases = _masterAlterGroupAliases.map(a => a.trim()).filter(a => a !== '');
+
+            const formNamesSet = new Set([name.toLowerCase()]);
+            for (let i = 0; i < aliases.length; i++) {
+              const al = aliases[i];
+              const alLower = al.toLowerCase();
+
+              if (formNamesSet.has(alLower)) {
+                const msg = `Duplicate entry "${al}" found in the form. Name and A.K.A must be unique.`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+              formNamesSet.add(alLower);
+
+              const dupAl = findDuplicateCoaNameOrAlias(al, excludeObj);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                const msg = `"${al}" already exists (${typeLabel}).`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+            }
+
+            if (currentGroup.isSysSg) {
+              if (typeof COA_SYS_SGS !== 'undefined') {
+                const sg = COA_SYS_SGS.find(s => s.id === currentGroup.rawId);
+                if (sg) {
+                  sg.name = name;
+                  sg.aliases = aliases;
+                  if (isPrimary) {
+                    sg.main = underVal.replace('primary:', '');
+                    sg.parent = null;
+                  } else {
+                    const selectedVal = underVal.replace('group:', '');
+                    if (selectedVal.startsWith('sg:')) {
+                      sg.parent = selectedVal.replace('sg:', '');
+                      const parentSg = COA_SYS_SGS.find(s => s.id === sg.parent);
+                      if (parentSg) sg.main = parentSg.main;
+                    }
                   }
-                  if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
-                  if (typeof refreshAllReports === 'function') refreshAllReports();
-                  if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-                  showToast(`Customer "${c.name}" deleted.`, 'info');
-                  renderCustomerList(searchInp ? searchInp.value : '');
+                  if (typeof saveCoaSubGroups === 'function') saveCoaSubGroups();
                 }
+              }
+            } else {
+              if (typeof coaLedgers !== 'undefined') {
+                const gl = coaLedgers.find(l => l.id === currentGroup.rawId && l.type === 'group-ledger');
+                if (gl) {
+                  gl.name = name;
+                  gl.aliases = aliases;
+                  if (isPrimary) {
+                    const mainNature = underVal.replace('primary:', '');
+                    const rootSg = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS.find(s => s.main === mainNature && !s.parent) : null;
+                    gl.sgId = rootSg ? rootSg.id : 'sg-cce';
+                    gl.glId = null;
+                  } else {
+                    const selectedVal = underVal.replace('group:', '');
+                    let parentSgId = selectedVal;
+                    let parentGlId = null;
+
+                    if (selectedVal.startsWith('gl:')) {
+                      const targetGlId = Number(selectedVal.replace('gl:', ''));
+                      const targetGl = coaLedgers.find(l => l.id === targetGlId);
+                      if (targetGl) {
+                        parentSgId = targetGl.sgId;
+                        parentGlId = targetGl.id;
+                      }
+                    } else if (selectedVal.startsWith('sg:')) {
+                      parentSgId = selectedVal.replace('sg:', '');
+                    }
+                    gl.sgId = parentSgId;
+                    gl.glId = parentGlId;
+                  }
+                }
+              }
+            }
+
+            if (typeof renderChartPanel === 'function') renderChartPanel();
+            if (typeof refreshAllReports === 'function') refreshAllReports();
+            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+            showToast(`Group "${name}" updated successfully.`, 'success');
+            _masterAlterSelectedGroupId = currentGroup.id;
+            updateMasterDeskContent();
+          });
+        }
+
+        if (delBtn) {
+          delBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to delete group "${currentGroup.name}"?`)) {
+              if (currentGroup.isSysSg) {
+                if (typeof COA_SYS_SGS !== 'undefined') {
+                  COA_SYS_SGS = COA_SYS_SGS.filter(s => s.id !== currentGroup.rawId && s.parent !== currentGroup.rawId);
+                  if (typeof saveCoaSubGroups === 'function') saveCoaSubGroups();
+                }
+                if (typeof coaLedgers !== 'undefined') {
+                  coaLedgers = coaLedgers.filter(l => l.sgId !== currentGroup.rawId);
+                }
+              } else {
+                if (typeof coaLedgers !== 'undefined') {
+                  coaLedgers = coaLedgers.filter(l => l.id !== currentGroup.rawId && l.glId !== currentGroup.rawId);
+                }
+              }
+
+              if (typeof renderChartPanel === 'function') renderChartPanel();
+              if (typeof refreshAllReports === 'function') refreshAllReports();
+              if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+              showToast(`Group "${currentGroup.name}" deleted.`, 'info');
+              _masterAlterSelectedGroupId = null;
+              updateMasterDeskContent();
+            }
+          });
+        }
+
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', () => {
+            updateMasterDeskContent();
+          });
+        }
+
+      } else if (currentMasterDeskTab === 'ledger') {
+        const allLedgers = typeof coaLedgers !== 'undefined' ? coaLedgers.filter(l => l.type === 'ledger') : [];
+
+        if (allLedgers.length === 0) {
+          contentArea.innerHTML = `
+            <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 32px 24px; background: var(--white); text-align: center; margin: 0 0 20px 0;">
+              <div style="font-size: 14px; font-weight: 600; color: var(--slate-600); margin-bottom: 8px;">No ledgers found to alter.</div>
+              <div style="font-size: 12.5px; color: var(--slate-400); margin-bottom: 16px;">Create a new ledger first using the Create tab.</div>
+              <button class="btn btn-primary" id="btnAlterGoToCreateLedger" style="font-size: 13px; font-weight: 600; padding: 8px 16px;">Go to Create Ledger</button>
+            </div>
+          `;
+          const btnGo = contentArea.querySelector('#btnAlterGoToCreateLedger');
+          if (btnGo) btnGo.addEventListener('click', () => setMasterDeskSubtype('Create'));
+          return;
+        }
+
+        let currentLedger = allLedgers.find(l => l.id === _masterAlterSelectedLedgerId);
+        if (!currentLedger) {
+          currentLedger = allLedgers[0];
+          _masterAlterSelectedLedgerId = currentLedger.id;
+        }
+
+        _masterAlterLedgerAliases = currentLedger.aliases ? [...currentLedger.aliases] : [];
+
+        const excludeObj = {
+          id: currentLedger.id,
+          originalName: currentLedger.name
+        };
+
+        let ledgerSelectorOptionsHtml = '';
+        allLedgers.forEach(l => {
+          const isSel = (l.id === currentLedger.id);
+          ledgerSelectorOptionsHtml += `<option value="${l.id}" ${isSel ? 'selected' : ''}>${escapeHtml(l.name)}</option>`;
+        });
+
+        // Group selector options for this ledger
+        let ledgerGroupOptionsHtml = '';
+        let selectedGroupText = 'Select Group';
+        const currentLedgerGroupVal = currentLedger.glId ? ('gl:' + currentLedger.glId) : ('sg:' + currentLedger.sgId);
+
+        const mainCategories = [
+          { key: 'assets', label: 'Assets' },
+          { key: 'equity-liabilities', label: 'Liabilities & Equity' },
+          { key: 'expense', label: 'Expenses' },
+          { key: 'income', label: 'Income' }
+        ];
+
+        if (typeof COA_SYS_SGS !== 'undefined') {
+          mainCategories.forEach(cat => {
+            const sgsInCat = COA_SYS_SGS.filter(s => s.main === cat.key);
+            if (sgsInCat.length === 0) return;
+
+            let catOptionsHtml = '';
+            sgsInCat.forEach(sg => {
+              const sgIndent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
+              const isSgSel = (currentLedgerGroupVal === 'sg:' + sg.id);
+              catOptionsHtml += `<option value="sg:${sg.id}" data-badge="Group" ${isSgSel ? 'selected' : ''}>${sgIndent}${escapeHtml(sg.name)}</option>`;
+              if (isSgSel) selectedGroupText = sg.name;
+
+              if (typeof coaLedgers !== 'undefined') {
+                const addGlOptions = (parentId, depth) => {
+                  const gls = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger' && (parentId ? l.glId === parentId : !l.glId));
+                  gls.forEach(gl => {
+                    const glIndent = sgIndent + '\u00a0\u00a0\u00a0\u00a0' + '\u00a0\u00a0'.repeat(depth);
+                    const isGlSel = (currentLedgerGroupVal === 'gl:' + gl.id);
+                    catOptionsHtml += `<option value="gl:${gl.id}" data-badge="Group Ledger" ${isGlSel ? 'selected' : ''}>${glIndent}📁 ${escapeHtml(gl.name)}</option>`;
+                    if (isGlSel) selectedGroupText = gl.name;
+                    addGlOptions(gl.id, depth + 1);
+                  });
+                };
+                addGlOptions(null, 0);
               }
             });
 
-            listWrap.appendChild(row);
+            if (catOptionsHtml) {
+              ledgerGroupOptionsHtml += `<optgroup label="${cat.label}">${catOptionsHtml}</optgroup>`;
+            }
           });
+        }
+
+        const balVal = (currentLedger.openingBalance !== undefined && currentLedger.openingBalance !== null && currentLedger.openingBalance !== 0) ? currentLedger.openingBalance : '';
+
+        contentArea.innerHTML = `
+          <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="var(--blue-600)" stroke-width="1.8" stroke-linecap="round">
+                <path d="M4 5h12M4 10h8M4 15h10"/>
+              </svg>
+              Alter Ledger
+            </h3>
+
+            <!-- Select Ledger to Alter field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterLedgerSelector" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Select Ledger to Alter *</label>
+              <select class="coa-modal-sel" id="masterAlterLedgerSelector" style="display: none;">
+                ${ledgerSelectorOptionsHtml}
+              </select>
+              <div class="kya-searchable-select-wrap" id="masterAlterLedgerSelectorSearchableWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="masterAlterLedgerSelectorTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                  <span id="masterAlterLedgerSelectorTriggerText">${escapeHtml(currentLedger.name)}</span>
+                  <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="masterAlterLedgerSelectorDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="masterAlterLedgerSelectorSearch" placeholder="Search ledger..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="masterAlterLedgerSelectorOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Name field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterLedgerName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+              <input class="coa-modal-inp" id="masterAlterLedgerName" value="${escapeHtml(currentLedger.name)}" placeholder="e.g. ICICI Bank / Rent Expense / Office Supplies" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+              <div id="masterAlterLedgerNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            </div>
+
+            <!-- Also Known As field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
+              <div id="masterAlterLedgerAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+              <button type="button" id="masterAlterLedgerAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add A.K.A
+              </button>
+            </div>
+
+            <!-- Group field (Groups and Group Ledgers) -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterLedgerGroupCombinedSel" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Group *</label>
+              <select class="coa-modal-sel" id="masterAlterLedgerGroupCombinedSel" style="display: none;">
+                ${ledgerGroupOptionsHtml}
+              </select>
+              <div class="kya-searchable-select-wrap" id="masterAlterLedgerGroupCombinedSelSearchableWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="masterAlterLedgerGroupCombinedSelTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                  <span id="masterAlterLedgerGroupCombinedSelTriggerText">${escapeHtml(selectedGroupText)}</span>
+                  <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="masterAlterLedgerGroupCombinedSelDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="masterAlterLedgerGroupCombinedSelSearch" placeholder="Search group or group ledger..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="masterAlterLedgerGroupCombinedSelOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Additional Information (Dynamic for Trade Receivable / Payable) -->
+            <div id="masterAlterLedgerAdditionalInfoWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px; transition: all 0.2s ease;">
+              
+              <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  <span>Additional Information</span>
+                </div>
+                <span style="font-size: 11px; font-weight: 600; background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; border: 1px solid #dbeafe;">Party Profile</span>
+              </div>
+
+              <!-- 1. Address & Location Details -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  Name & Address
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div>
+                    <input type="text" id="masterAlterLedgerContactName" value="${escapeHtml(currentLedger.contactName || '')}" placeholder="Contact Person / Trade Name (Optional)" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div>
+                    <textarea id="masterAlterLedgerAddress" placeholder="Street Address / Building / Area" rows="2" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; resize: vertical; font-family: inherit; outline: none; background: #fff;">${escapeHtml(currentLedger.address || '')}</textarea>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterLedgerCity" value="${escapeHtml(currentLedger.city || '')}" placeholder="City / Town" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterLedgerPincode" value="${escapeHtml(currentLedger.pincode || '')}" placeholder="PIN / Postal Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterLedgerState" value="${escapeHtml(currentLedger.state || '')}" placeholder="State (e.g. Maharashtra)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterLedgerCountry" value="${escapeHtml(currentLedger.country || 'India')}" placeholder="Country" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 2. Bank Information -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                  Bank Information
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterLedgerBankName" value="${escapeHtml(currentLedger.bankName || '')}" placeholder="Bank Name (e.g. HDFC Bank)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterLedgerAccountNo" value="${escapeHtml(currentLedger.accountNo || '')}" placeholder="Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterLedgerIfsc" value="${escapeHtml(currentLedger.ifsc || '')}" placeholder="IFSC Code (e.g. HDFC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                    <input type="text" id="masterAlterLedgerBranch" value="${escapeHtml(currentLedger.branch || '')}" placeholder="Branch Name (Optional)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 3. Tax Details (GSTIN & PAN) -->
+              <div>
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  GSTIN & PAN
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <input type="text" id="masterAlterLedgerGstin" value="${escapeHtml(currentLedger.gstin || '')}" placeholder="GSTIN (e.g. 27AAAAA0000A1Z5)" maxlength="15" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                  <input type="text" id="masterAlterLedgerPan" value="${escapeHtml(currentLedger.pan || '')}" placeholder="PAN (e.g. AAAAA0000A)" maxlength="10" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Opening Balance field (Optional) -->
+            <div class="coa-modal-fg" style="margin-bottom: 24px;">
+              <label class="coa-modal-label" for="masterAlterLedgerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance (Optional)</label>
+              <input class="coa-modal-inp" id="masterAlterLedgerBalance" type="number" min="0" step="0.01" value="${balVal}" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-primary" id="masterAlterLedgerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Save Changes</button>
+                <button class="btn btn-secondary" id="masterAlterLedgerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+              </div>
+              <button class="btn btn-secondary" id="masterAlterLedgerDelBtn" style="height: 38px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: #dc2626; border-color: #fecaca; background: #fef2f2; display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+                Delete Ledger
+              </button>
+            </div>
+          </div>
+        `;
+
+        renderMasterAlterLedgerAliases(excludeObj);
+
+        const ledgerSelector = contentArea.querySelector('#masterAlterLedgerSelector');
+        initSearchableSelectHelper(contentArea, 'masterAlterLedgerSelector', 'Select Ledger to Alter');
+
+        if (ledgerSelector) {
+          ledgerSelector.addEventListener('change', () => {
+            _masterAlterSelectedLedgerId = Number(ledgerSelector.value);
+            updateMasterDeskContent();
+          });
+        }
+
+        const addAliasBtn = contentArea.querySelector('#masterAlterLedgerAddAliasBtn');
+        if (addAliasBtn) {
+          addAliasBtn.addEventListener('click', () => {
+            _masterAlterLedgerAliases.push('');
+            renderMasterAlterLedgerAliases(excludeObj);
+            const inputs = contentArea.querySelectorAll('.master-alias-input');
+            if (inputs.length) inputs[inputs.length - 1].focus();
+          });
+        }
+
+        initSearchableSelectHelper(contentArea, 'masterAlterLedgerGroupCombinedSel', 'Select Group');
+
+        const groupSel = contentArea.querySelector('#masterAlterLedgerGroupCombinedSel');
+        const addInfoWrap = contentArea.querySelector('#masterAlterLedgerAdditionalInfoWrap');
+        const updateAdditionalInfoVisibility = () => {
+          if (!groupSel || !addInfoWrap) return;
+          const isParty = isTradePartyGroup(groupSel.value);
+          addInfoWrap.style.display = isParty ? 'block' : 'none';
         };
 
-        renderCustomerList('');
-        if (searchInp) searchInp.addEventListener('input', e => renderCustomerList(e.target.value));
+        if (groupSel) {
+          groupSel.addEventListener('change', updateAdditionalInfoVisibility);
+          updateAdditionalInfoVisibility();
+        }
+
+        const gstinInp = contentArea.querySelector('#masterAlterLedgerGstin');
+        const panInp = contentArea.querySelector('#masterAlterLedgerPan');
+        const ifscInp = contentArea.querySelector('#masterAlterLedgerIfsc');
+
+        if (gstinInp) {
+          gstinInp.addEventListener('input', (e) => {
+            const val = e.target.value.toUpperCase();
+            e.target.value = val;
+            if (val.length >= 12 && panInp && !panInp.value) {
+              panInp.value = val.substring(2, 12);
+            }
+          });
+        }
+        if (panInp) {
+          panInp.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+          });
+        }
+        if (ifscInp) {
+          ifscInp.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+          });
+        }
+
+        const saveBtn = contentArea.querySelector('#masterAlterLedgerSaveBtn');
+        const cancelBtn = contentArea.querySelector('#masterAlterLedgerCancelBtn');
+        const delBtn = contentArea.querySelector('#masterAlterLedgerDelBtn');
+        const nameInp = contentArea.querySelector('#masterAlterLedgerName');
+        const nameErr = contentArea.querySelector('#masterAlterLedgerNameError');
+
+        const validateNameInputLive = () => {
+          const val = nameInp ? nameInp.value.trim() : '';
+          if (!val) {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
+          }
+
+          const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+          if (dup) {
+            const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+            const errorText = `"${val}" already exists (${typeLabel}).`;
+            if (nameErr) {
+              nameErr.textContent = errorText;
+              nameErr.style.display = 'block';
+            }
+            if (nameInp) nameInp.style.borderColor = '#ef4444';
+            return errorText;
+          } else {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
+          }
+        };
+
+        if (nameInp) {
+          nameInp.addEventListener('input', () => {
+            validateNameInputLive();
+            validateMasterAlterLedgerAliasesLive(excludeObj);
+          });
+        }
+
+        if (saveBtn) {
+          saveBtn.addEventListener('click', () => {
+            const name = nameInp ? nameInp.value.trim() : '';
+            if (!name) {
+              if (typeof showToast === 'function') showToast('Please enter a ledger name.', 'warning');
+              else alert('Please enter a ledger name.');
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const liveNameErr = validateNameInputLive();
+            if (liveNameErr) {
+              if (typeof showToast === 'function') showToast(liveNameErr, 'error');
+              else alert(liveNameErr);
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const aliasesValid = validateMasterAlterLedgerAliasesLive(excludeObj);
+            if (!aliasesValid) {
+              const msg = 'Please fix duplicate or invalid Also Known As entries.';
+              if (typeof showToast === 'function') showToast(msg, 'error');
+              else alert(msg);
+              return;
+            }
+
+            const aliases = _masterAlterLedgerAliases.map(a => a.trim()).filter(a => a !== '');
+            const formNamesSet = new Set([name.toLowerCase()]);
+            for (let i = 0; i < aliases.length; i++) {
+              const al = aliases[i];
+              const alLower = al.toLowerCase();
+
+              if (formNamesSet.has(alLower)) {
+                const msg = `Duplicate entry "${al}" found in the form. Name and A.K.A must be unique.`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+              formNamesSet.add(alLower);
+
+              const dupAl = findDuplicateCoaNameOrAlias(al, excludeObj);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                const msg = `"${al}" already exists (${typeLabel}).`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+            }
+
+            const groupVal = groupSel ? groupSel.value : 'sg:sg-cce';
+            const [parentType, parentRawId] = groupVal.split(':');
+            let parentSgId = parentRawId;
+            let parentGlId = null;
+
+            if (parentType === 'gl') {
+              parentGlId = Number(parentRawId);
+              const targetGl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id === parentGlId) : null;
+              if (targetGl) parentSgId = targetGl.sgId;
+            }
+
+            const balInp = contentArea.querySelector('#masterAlterLedgerBalance');
+            const openingBal = balInp && balInp.value ? parseFloat(balInp.value) : 0;
+
+            const isParty = isTradePartyGroup(groupVal);
+            const contactName = isParty && contentArea.querySelector('#masterAlterLedgerContactName') ? contentArea.querySelector('#masterAlterLedgerContactName').value.trim() : '';
+            const address = isParty && contentArea.querySelector('#masterAlterLedgerAddress') ? contentArea.querySelector('#masterAlterLedgerAddress').value.trim() : '';
+            const city = isParty && contentArea.querySelector('#masterAlterLedgerCity') ? contentArea.querySelector('#masterAlterLedgerCity').value.trim() : '';
+            const pincode = isParty && contentArea.querySelector('#masterAlterLedgerPincode') ? contentArea.querySelector('#masterAlterLedgerPincode').value.trim() : '';
+            const state = isParty && contentArea.querySelector('#masterAlterLedgerState') ? contentArea.querySelector('#masterAlterLedgerState').value.trim() : '';
+            const country = isParty && contentArea.querySelector('#masterAlterLedgerCountry') ? contentArea.querySelector('#masterAlterLedgerCountry').value.trim() : 'India';
+            const bankName = isParty && contentArea.querySelector('#masterAlterLedgerBankName') ? contentArea.querySelector('#masterAlterLedgerBankName').value.trim() : '';
+            const accountNo = isParty && contentArea.querySelector('#masterAlterLedgerAccountNo') ? contentArea.querySelector('#masterAlterLedgerAccountNo').value.trim() : '';
+            const ifsc = isParty && contentArea.querySelector('#masterAlterLedgerIfsc') ? contentArea.querySelector('#masterAlterLedgerIfsc').value.trim() : '';
+            const branch = isParty && contentArea.querySelector('#masterAlterLedgerBranch') ? contentArea.querySelector('#masterAlterLedgerBranch').value.trim() : '';
+            const gstin = isParty && contentArea.querySelector('#masterAlterLedgerGstin') ? contentArea.querySelector('#masterAlterLedgerGstin').value.trim() : '';
+            const pan = isParty && contentArea.querySelector('#masterAlterLedgerPan') ? contentArea.querySelector('#masterAlterLedgerPan').value.trim() : '';
+
+            currentLedger.name = name;
+            currentLedger.aliases = aliases;
+            currentLedger.sgId = parentSgId;
+            currentLedger.glId = parentGlId;
+            currentLedger.openingBalance = openingBal;
+            if (isParty) {
+              currentLedger.contactName = contactName;
+              currentLedger.address = address;
+              currentLedger.city = city;
+              currentLedger.pincode = pincode;
+              currentLedger.state = state;
+              currentLedger.country = country;
+              currentLedger.bankName = bankName;
+              currentLedger.accountNo = accountNo;
+              currentLedger.ifsc = ifsc;
+              currentLedger.branch = branch;
+              currentLedger.gstin = gstin;
+              currentLedger.pan = pan;
+            }
+
+            if (typeof renderChartPanel === 'function') renderChartPanel();
+            if (typeof refreshAllReports === 'function') refreshAllReports();
+            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+            if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
+            if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
+
+            showToast(`Ledger "${name}" updated successfully.`, 'success');
+            _masterAlterSelectedLedgerId = currentLedger.id;
+            updateMasterDeskContent();
+          });
+        }
+
+        if (delBtn) {
+          delBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to delete ledger "${currentLedger.name}"?`)) {
+              if (typeof coaLedgers !== 'undefined') {
+                const idx = coaLedgers.findIndex(l => l.id === currentLedger.id);
+                if (idx >= 0) coaLedgers.splice(idx, 1);
+              }
+
+              if (typeof renderChartPanel === 'function') renderChartPanel();
+              if (typeof refreshAllReports === 'function') refreshAllReports();
+              if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+              if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
+              if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
+
+              showToast(`Ledger "${currentLedger.name}" deleted.`, 'info');
+              _masterAlterSelectedLedgerId = null;
+              updateMasterDeskContent();
+            }
+          });
+        }
+
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', () => {
+            updateMasterDeskContent();
+          });
+        }
+
+      } else if (currentMasterDeskTab === 'customers') {
+        const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+
+        if (customers.length === 0) {
+          contentArea.innerHTML = `
+            <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 32px 24px; background: var(--white); text-align: center; margin: 0 0 20px 0;">
+              <div style="font-size: 14px; font-weight: 600; color: var(--slate-600); margin-bottom: 8px;">No customers found to alter.</div>
+              <div style="font-size: 12.5px; color: var(--slate-400); margin-bottom: 16px;">Create a new customer first using the Create tab.</div>
+              <button class="btn btn-primary" id="btnAlterGoToCreateCustomer" style="font-size: 13px; font-weight: 600; padding: 8px 16px;">Go to Create Customer</button>
+            </div>
+          `;
+          const btnGo = contentArea.querySelector('#btnAlterGoToCreateCustomer');
+          if (btnGo) btnGo.addEventListener('click', () => setMasterDeskSubtype('Create'));
+          return;
+        }
+
+        let currentCustomer = customers.find(c => c.id === _masterAlterSelectedCustomerId);
+        if (!currentCustomer) {
+          currentCustomer = customers[0];
+          _masterAlterSelectedCustomerId = currentCustomer.id;
+        }
+
+        _masterAlterCustomerAliases = currentCustomer.aliases ? [...currentCustomer.aliases] : [];
+
+        const excludeObj = {
+          id: currentCustomer.id,
+          originalName: currentCustomer.name
+        };
+
+        let customerSelectorOptionsHtml = '';
+        customers.forEach(c => {
+          const isSel = (c.id === currentCustomer.id);
+          customerSelectorOptionsHtml += `<option value="${c.id}" ${isSel ? 'selected' : ''}>${escapeHtml(c.name)}</option>`;
+        });
+
+        const balVal = (currentCustomer.openingBalance !== undefined && currentCustomer.openingBalance !== null && currentCustomer.openingBalance !== 0) ? currentCustomer.openingBalance : '';
+
+        contentArea.innerHTML = `
+          <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              Alter Customer
+            </h3>
+
+            <!-- Select Customer to Alter field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterCustomerSelector" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Select Customer to Alter *</label>
+              <select class="coa-modal-sel" id="masterAlterCustomerSelector" style="display: none;">
+                ${customerSelectorOptionsHtml}
+              </select>
+              <div class="kya-searchable-select-wrap" id="masterAlterCustomerSelectorSearchableWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="masterAlterCustomerSelectorTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                  <span id="masterAlterCustomerSelectorTriggerText">${escapeHtml(currentCustomer.name)}</span>
+                  <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="masterAlterCustomerSelectorDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="masterAlterCustomerSelectorSearch" placeholder="Search customer..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="masterAlterCustomerSelectorOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Name field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterCustomerName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+              <input class="coa-modal-inp" id="masterAlterCustomerName" value="${escapeHtml(currentCustomer.name)}" placeholder="e.g. Acme Corp / Rahul Sharma / TechNova Ltd" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+              <div id="masterAlterCustomerNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            </div>
+
+            <!-- Also Known As field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
+              <div id="masterAlterCustomerAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+              <button type="button" id="masterAlterCustomerAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add A.K.A
+              </button>
+            </div>
+
+            <!-- Additional Information (Party Profile) -->
+            <div id="masterAlterCustomerAdditionalInfoWrap" style="background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+              <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  <span>Additional Information</span>
+                </div>
+                <span style="font-size: 11px; font-weight: 600; background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; border: 1px solid #dbeafe;">Trade Receivables</span>
+              </div>
+
+              <!-- 1. Address & Location Details -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  Name & Address
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div>
+                    <input type="text" id="masterAlterCustomerContactName" value="${escapeHtml(currentCustomer.contactName || '')}" placeholder="Contact Person / Trade Name (Optional)" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div>
+                    <textarea id="masterAlterCustomerAddress" placeholder="Street Address / Building / Area" rows="2" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; resize: vertical; font-family: inherit; outline: none; background: #fff;">${escapeHtml(currentCustomer.address || '')}</textarea>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterCustomerCity" value="${escapeHtml(currentCustomer.city || '')}" placeholder="City / Town" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterCustomerPincode" value="${escapeHtml(currentCustomer.pincode || '')}" placeholder="PIN / Postal Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterCustomerState" value="${escapeHtml(currentCustomer.state || '')}" placeholder="State (e.g. Maharashtra)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterCustomerCountry" value="${escapeHtml(currentCustomer.country || 'India')}" placeholder="Country" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 2. Bank Information -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                  Bank Information
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterCustomerBankName" value="${escapeHtml(currentCustomer.bankName || '')}" placeholder="Bank Name (e.g. HDFC Bank)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterCustomerAccountNo" value="${escapeHtml(currentCustomer.accountNo || '')}" placeholder="Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterCustomerIfsc" value="${escapeHtml(currentCustomer.ifsc || '')}" placeholder="IFSC Code (e.g. HDFC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                    <input type="text" id="masterAlterCustomerBranch" value="${escapeHtml(currentCustomer.branch || '')}" placeholder="Branch Name (Optional)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 3. Tax Details (GSTIN & PAN) -->
+              <div>
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  GSTIN & PAN
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <input type="text" id="masterAlterCustomerGstin" value="${escapeHtml(currentCustomer.gstin || '')}" placeholder="GSTIN (e.g. 27AAAAA0000A1Z5)" maxlength="15" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                  <input type="text" id="masterAlterCustomerPan" value="${escapeHtml(currentCustomer.pan || '')}" placeholder="PAN (e.g. AAAAA0000A)" maxlength="10" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Opening Balance field (Optional) -->
+            <div class="coa-modal-fg" style="margin-bottom: 24px;">
+              <label class="coa-modal-label" for="masterAlterCustomerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance (Optional)</label>
+              <input class="coa-modal-inp" id="masterAlterCustomerBalance" type="number" min="0" step="0.01" value="${balVal}" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-primary" id="masterAlterCustomerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Save Changes</button>
+                <button class="btn btn-secondary" id="masterAlterCustomerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+              </div>
+              <button class="btn btn-secondary" id="masterAlterCustomerDelBtn" style="height: 38px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: #dc2626; border-color: #fecaca; background: #fef2f2; display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+                Delete Customer
+              </button>
+            </div>
+          </div>
+        `;
+
+        renderMasterAlterCustomerAliases(excludeObj);
+
+        const customerSelector = contentArea.querySelector('#masterAlterCustomerSelector');
+        initSearchableSelectHelper(contentArea, 'masterAlterCustomerSelector', 'Select Customer to Alter');
+
+        if (customerSelector) {
+          customerSelector.addEventListener('change', () => {
+            _masterAlterSelectedCustomerId = customerSelector.value;
+            updateMasterDeskContent();
+          });
+        }
+
+        const addAliasBtn = contentArea.querySelector('#masterAlterCustomerAddAliasBtn');
+        if (addAliasBtn) {
+          addAliasBtn.addEventListener('click', () => {
+            _masterAlterCustomerAliases.push('');
+            renderMasterAlterCustomerAliases(excludeObj);
+            const inputs = contentArea.querySelectorAll('.master-alias-input');
+            if (inputs.length) inputs[inputs.length - 1].focus();
+          });
+        }
+
+        const gstinInp = contentArea.querySelector('#masterAlterCustomerGstin');
+        const panInp = contentArea.querySelector('#masterAlterCustomerPan');
+        const ifscInp = contentArea.querySelector('#masterAlterCustomerIfsc');
+
+        if (gstinInp) {
+          gstinInp.addEventListener('input', (e) => {
+            const val = e.target.value.toUpperCase();
+            e.target.value = val;
+            if (val.length >= 12 && panInp && !panInp.value) {
+              panInp.value = val.substring(2, 12);
+            }
+          });
+        }
+        if (panInp) {
+          panInp.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+          });
+        }
+        if (ifscInp) {
+          ifscInp.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+          });
+        }
+
+        const saveBtn = contentArea.querySelector('#masterAlterCustomerSaveBtn');
+        const cancelBtn = contentArea.querySelector('#masterAlterCustomerCancelBtn');
+        const delBtn = contentArea.querySelector('#masterAlterCustomerDelBtn');
+        const nameInp = contentArea.querySelector('#masterAlterCustomerName');
+        const nameErr = contentArea.querySelector('#masterAlterCustomerNameError');
+
+        const validateNameInputLive = () => {
+          const val = nameInp ? nameInp.value.trim() : '';
+          if (!val) {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
+          }
+
+          const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+          if (dup) {
+            const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+            const errorText = `"${val}" already exists (${typeLabel}).`;
+            if (nameErr) {
+              nameErr.textContent = errorText;
+              nameErr.style.display = 'block';
+            }
+            if (nameInp) nameInp.style.borderColor = '#ef4444';
+            return errorText;
+          } else {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
+          }
+        };
+
+        if (nameInp) {
+          nameInp.addEventListener('input', () => {
+            validateNameInputLive();
+            validateMasterAlterCustomerAliasesLive(excludeObj);
+          });
+        }
+
+        if (saveBtn) {
+          saveBtn.addEventListener('click', () => {
+            const name = nameInp ? nameInp.value.trim() : '';
+            if (!name) {
+              if (typeof showToast === 'function') showToast('Please enter a customer name.', 'warning');
+              else alert('Please enter a customer name.');
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const liveNameErr = validateNameInputLive();
+            if (liveNameErr) {
+              if (typeof showToast === 'function') showToast(liveNameErr, 'error');
+              else alert(liveNameErr);
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const aliasesValid = validateMasterAlterCustomerAliasesLive(excludeObj);
+            if (!aliasesValid) {
+              const msg = 'Please fix duplicate or invalid Also Known As entries.';
+              if (typeof showToast === 'function') showToast(msg, 'error');
+              else alert(msg);
+              return;
+            }
+
+            const aliases = _masterAlterCustomerAliases.map(a => a.trim()).filter(a => a !== '');
+            const formNamesSet = new Set([name.toLowerCase()]);
+            for (let i = 0; i < aliases.length; i++) {
+              const al = aliases[i];
+              const alLower = al.toLowerCase();
+
+              if (formNamesSet.has(alLower)) {
+                const msg = `Duplicate entry "${al}" found in the form. Name and A.K.A must be unique.`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+              formNamesSet.add(alLower);
+
+              const dupAl = findDuplicateCoaNameOrAlias(al, excludeObj);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                const msg = `"${al}" already exists (${typeLabel}).`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+            }
+
+            const contactName = contentArea.querySelector('#masterAlterCustomerContactName') ? contentArea.querySelector('#masterAlterCustomerContactName').value.trim() : '';
+            const address = contentArea.querySelector('#masterAlterCustomerAddress') ? contentArea.querySelector('#masterAlterCustomerAddress').value.trim() : '';
+            const city = contentArea.querySelector('#masterAlterCustomerCity') ? contentArea.querySelector('#masterAlterCustomerCity').value.trim() : '';
+            const pincode = contentArea.querySelector('#masterAlterCustomerPincode') ? contentArea.querySelector('#masterAlterCustomerPincode').value.trim() : '';
+            const state = contentArea.querySelector('#masterAlterCustomerState') ? contentArea.querySelector('#masterAlterCustomerState').value.trim() : '';
+            const country = contentArea.querySelector('#masterAlterCustomerCountry') ? contentArea.querySelector('#masterAlterCustomerCountry').value.trim() : 'India';
+            const bankName = contentArea.querySelector('#masterAlterCustomerBankName') ? contentArea.querySelector('#masterAlterCustomerBankName').value.trim() : '';
+            const accountNo = contentArea.querySelector('#masterAlterCustomerAccountNo') ? contentArea.querySelector('#masterAlterCustomerAccountNo').value.trim() : '';
+            const ifsc = contentArea.querySelector('#masterAlterCustomerIfsc') ? contentArea.querySelector('#masterAlterCustomerIfsc').value.trim() : '';
+            const branch = contentArea.querySelector('#masterAlterCustomerBranch') ? contentArea.querySelector('#masterAlterCustomerBranch').value.trim() : '';
+            const gstin = contentArea.querySelector('#masterAlterCustomerGstin') ? contentArea.querySelector('#masterAlterCustomerGstin').value.trim() : '';
+            const pan = contentArea.querySelector('#masterAlterCustomerPan') ? contentArea.querySelector('#masterAlterCustomerPan').value.trim() : '';
+            const balInp = contentArea.querySelector('#masterAlterCustomerBalance');
+            const openingBal = balInp && balInp.value ? parseFloat(balInp.value) : 0;
+
+            currentCustomer.name = name;
+            currentCustomer.aliases = aliases;
+            currentCustomer.contactName = contactName;
+            currentCustomer.address = address;
+            currentCustomer.city = city;
+            currentCustomer.pincode = pincode;
+            currentCustomer.state = state;
+            currentCustomer.country = country;
+            currentCustomer.bankName = bankName;
+            currentCustomer.accountNo = accountNo;
+            currentCustomer.ifsc = ifsc;
+            currentCustomer.branch = branch;
+            currentCustomer.gstin = gstin;
+            currentCustomer.pan = pan;
+            currentCustomer.openingBalance = openingBal;
+
+            // Recalculate Trade Receivables opening balance in CoA
+            if (typeof coaLedgers !== 'undefined') {
+              const tr = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tr' && l.name === 'Trade Receivables');
+              if (tr) tr.openingBalance = customers.reduce((sum, item) => sum + (parseFloat(item.openingBalance) || 0), 0);
+            }
+
+            if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
+            if (typeof refreshAllReports === 'function') refreshAllReports();
+            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+            showToast(`Customer "${name}" updated successfully.`, 'success');
+            _masterAlterSelectedCustomerId = currentCustomer.id;
+            updateMasterDeskContent();
+          });
+        }
+
+        if (delBtn) {
+          delBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to delete customer "${currentCustomer.name}"?`)) {
+              const idx = customers.findIndex(item => item.id === currentCustomer.id);
+              if (idx >= 0) {
+                customers.splice(idx, 1);
+                if (typeof coaLedgers !== 'undefined') {
+                  const tr = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tr' && l.name === 'Trade Receivables');
+                  if (tr) tr.openingBalance = customers.reduce((sum, item) => sum + (parseFloat(item.openingBalance) || 0), 0);
+                }
+                if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
+                if (typeof refreshAllReports === 'function') refreshAllReports();
+                if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+                showToast(`Customer "${currentCustomer.name}" deleted.`, 'info');
+                _masterAlterSelectedCustomerId = null;
+                updateMasterDeskContent();
+              }
+            }
+          });
+        }
+
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', () => {
+            updateMasterDeskContent();
+          });
+        }
 
       } else if (currentMasterDeskTab === 'suppliers') {
         const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
-        contentArea.innerHTML = `
-          <div style="background: var(--white); border: 1px solid var(--slate-200); border-radius: 12px; padding: 20px; box-shadow: var(--shadow-sm);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <div>
-                <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 2px 0;">Alter Suppliers (${suppliers.length})</h3>
-                <div style="font-size: 12px; color: var(--slate-500);">Connected under Trade Payables (Current Liabilities)</div>
-              </div>
-              <input type="text" id="alterSupplierSearch" placeholder="Search suppliers..." style="padding: 6px 12px; font-size: 12.5px; border-radius: 7px; border: 1.5px solid var(--slate-200); outline: none; width: 220px;">
+
+        if (suppliers.length === 0) {
+          contentArea.innerHTML = `
+            <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 32px 24px; background: var(--white); text-align: center; margin: 0 0 20px 0;">
+              <div style="font-size: 14px; font-weight: 600; color: var(--slate-600); margin-bottom: 8px;">No suppliers found to alter.</div>
+              <div style="font-size: 12.5px; color: var(--slate-400); margin-bottom: 16px;">Create a new supplier first using the Create tab.</div>
+              <button class="btn btn-primary" id="btnAlterGoToCreateSupplier" style="font-size: 13px; font-weight: 600; padding: 8px 16px;">Go to Create Supplier</button>
             </div>
+          `;
+          const btnGo = contentArea.querySelector('#btnAlterGoToCreateSupplier');
+          if (btnGo) btnGo.addEventListener('click', () => setMasterDeskSubtype('Create'));
+          return;
+        }
 
-            <div id="alterSupplierListWrap" style="display: flex; flex-direction: column; gap: 8px;"></div>
-          </div>
-        `;
+        let currentSupplier = suppliers.find(s => s.id === _masterAlterSelectedSupplierId);
+        if (!currentSupplier) {
+          currentSupplier = suppliers[0];
+          _masterAlterSelectedSupplierId = currentSupplier.id;
+        }
 
-        const listWrap = contentArea.querySelector('#alterSupplierListWrap');
-        const searchInp = contentArea.querySelector('#alterSupplierSearch');
+        _masterAlterSupplierAliases = currentSupplier.aliases ? [...currentSupplier.aliases] : [];
 
-        const renderSupplierList = (filter = '') => {
-          listWrap.innerHTML = '';
-          const q = filter.toLowerCase().trim();
-          const filtered = suppliers.filter(s => {
-            const aliasStr = Array.isArray(s.aliases) ? s.aliases.join(' ') : '';
-            return !q || `${s.name} ${aliasStr} ${s.gstin || ''} ${s.city || ''}`.toLowerCase().includes(q);
-          });
-
-          if (filtered.length === 0) {
-            listWrap.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--slate-400); font-size: 13px;">No suppliers found.</div>`;
-            return;
-          }
-
-          filtered.forEach(s => {
-            const row = document.createElement('div');
-            row.style.cssText = `
-              display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
-              background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 8px;
-            `;
-            const bal = parseFloat(s.openingBalance) || 0;
-            const balStr = typeof fmtNum === 'function' ? fmtNum(bal) : bal.toFixed(2);
-            const aliasStr = Array.isArray(s.aliases) && s.aliases.length > 0 ? `<span style="color: var(--blue-600); font-size: 11.5px; margin-left: 6px;">[A.K.A: ${s.aliases.join(', ')}]</span>` : '';
-
-            row.innerHTML = `
-              <div>
-                <div style="font-weight: 700; font-size: 13.5px; color: var(--slate-800);">${s.name} ${aliasStr}</div>
-                <div style="font-size: 11.5px; color: var(--slate-500); margin-top: 3px;">
-                  ${s.contactName ? `<span>Attn: ${s.contactName}</span> &bull; ` : ''}
-                  ${s.city ? `<span>${s.city}, ${s.state || ''}</span> &bull; ` : ''}
-                  ${s.gstin ? `<span style="font-family: monospace; color: #047857; background: #ecfdf5; padding: 1px 4px; border-radius: 3px;">${s.gstin}</span>` : ''}
-                </div>
-              </div>
-              <div style="display: flex; align-items: center; gap: 14px;">
-                <div style="text-align: right; font-size: 12.5px;">
-                  <div style="color: var(--slate-400); font-size: 10.5px; font-weight: 600; text-transform: uppercase;">Balance</div>
-                  <div style="font-weight: 700; color: var(--slate-800);">₹ ${balStr}</div>
-                </div>
-                <button class="btn btn-secondary btn-del-supp" style="height: 30px; padding: 4px 10px; font-size: 12px; color: #dc2626; border-color: #fecaca; background: #fef2f2;">Delete</button>
-              </div>
-            `;
-
-            row.querySelector('.btn-del-supp').addEventListener('click', () => {
-              if (confirm(`Are you sure you want to delete supplier "${s.name}"?`)) {
-                const idx = suppliers.findIndex(item => item.id === s.id);
-                if (idx >= 0) {
-                  suppliers.splice(idx, 1);
-                  if (typeof coaLedgers !== 'undefined') {
-                    const tp = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tp' && l.name === 'Trade Payables');
-                    if (tp) tp.openingBalance = suppliers.reduce((sum, item) => sum + (parseFloat(item.openingBalance) || 0), 0);
-                  }
-                  if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
-                  if (typeof refreshAllReports === 'function') refreshAllReports();
-                  if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-                  showToast(`Supplier "${s.name}" deleted.`, 'info');
-                  renderSupplierList(searchInp ? searchInp.value : '');
-                }
-              }
-            });
-
-            listWrap.appendChild(row);
-          });
+        const excludeObj = {
+          id: currentSupplier.id,
+          originalName: currentSupplier.name
         };
 
-        renderSupplierList('');
-        if (searchInp) searchInp.addEventListener('input', e => renderSupplierList(e.target.value));
+        let supplierSelectorOptionsHtml = '';
+        suppliers.forEach(s => {
+          const isSel = (s.id === currentSupplier.id);
+          supplierSelectorOptionsHtml += `<option value="${s.id}" ${isSel ? 'selected' : ''}>${escapeHtml(s.name)}</option>`;
+        });
 
-      } else {
-        let tabName = currentMasterDeskTab === 'ledger' ? 'Ledger' : 'Group';
+        const balVal = (currentSupplier.openingBalance !== undefined && currentSupplier.openingBalance !== null && currentSupplier.openingBalance !== 0) ? currentSupplier.openingBalance : '';
+
         contentArea.innerHTML = `
-          <div style="text-align: center; padding: 64px 20px; color: var(--slate-400);">
-            <div style="width: 56px; height: 56px; border-radius: 16px; background: var(--slate-100); border: 1.5px solid var(--slate-200); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: var(--slate-600);">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <line x1="3" y1="9" x2="21" y2="9"/>
-                <line x1="9" y1="21" x2="9" y2="9"/>
+          <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="3" width="15" height="13"></rect>
+                <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                <circle cx="18.5" cy="18.5" r="2.5"></circle>
               </svg>
+              Alter Supplier / Vendor
+            </h3>
+
+            <!-- Select Supplier to Alter field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterSupplierSelector" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Select Supplier to Alter *</label>
+              <select class="coa-modal-sel" id="masterAlterSupplierSelector" style="display: none;">
+                ${supplierSelectorOptionsHtml}
+              </select>
+              <div class="kya-searchable-select-wrap" id="masterAlterSupplierSelectorSearchableWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="masterAlterSupplierSelectorTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+                  <span id="masterAlterSupplierSelectorTriggerText">${escapeHtml(currentSupplier.name)}</span>
+                  <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="masterAlterSupplierSelectorDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="masterAlterSupplierSelectorSearch" placeholder="Search supplier..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="masterAlterSupplierSelectorOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
             </div>
-            <div id="masterDeskModeTitle" style="font-size: 16px; font-weight: 700; color: var(--slate-700); margin-bottom: 6px;">Master Desk Workspace — ${tabName} (${currentMasterDeskSubtype})</div>
-            <div id="masterDeskModeDesc" style="font-size: 13px; color: var(--slate-400); max-width: 380px; margin: 0 auto; line-height: 1.5;">Central master workspace is ready for ${currentMasterDeskSubtype.toLowerCase()}ing ${tabName.toLowerCase()} entries.</div>
+
+            <!-- Name field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" for="masterAlterSupplierName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+              <input class="coa-modal-inp" id="masterAlterSupplierName" value="${escapeHtml(currentSupplier.name)}" placeholder="e.g. Apex Industries / Global Supplies Ltd" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+              <div id="masterAlterSupplierNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            </div>
+
+            <!-- Also Known As field -->
+            <div class="coa-modal-fg" style="margin-bottom: 16px;">
+              <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
+              <div id="masterAlterSupplierAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
+              <button type="button" id="masterAlterSupplierAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add A.K.A
+              </button>
+            </div>
+
+            <!-- Additional Information (Party Profile) -->
+            <div id="masterAlterSupplierAdditionalInfoWrap" style="background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+              <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  <span>Additional Information</span>
+                </div>
+                <span style="font-size: 11px; font-weight: 600; background: #f0fdf4; color: #15803d; padding: 2px 8px; border-radius: 12px; border: 1px solid #bbf7d0;">Trade Payables</span>
+              </div>
+
+              <!-- 1. Address & Location Details -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  Name & Address
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div>
+                    <input type="text" id="masterAlterSupplierContactName" value="${escapeHtml(currentSupplier.contactName || '')}" placeholder="Contact Person / Trade Name (Optional)" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div>
+                    <textarea id="masterAlterSupplierAddress" placeholder="Street Address / Building / Area" rows="2" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; resize: vertical; font-family: inherit; outline: none; background: #fff;">${escapeHtml(currentSupplier.address || '')}</textarea>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterSupplierCity" value="${escapeHtml(currentSupplier.city || '')}" placeholder="City / Town" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterSupplierPincode" value="${escapeHtml(currentSupplier.pincode || '')}" placeholder="PIN / Postal Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterSupplierState" value="${escapeHtml(currentSupplier.state || '')}" placeholder="State (e.g. Maharashtra)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterSupplierCountry" value="${escapeHtml(currentSupplier.country || 'India')}" placeholder="Country" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 2. Bank Information -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                  Bank Information
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterSupplierBankName" value="${escapeHtml(currentSupplier.bankName || '')}" placeholder="Bank Name (e.g. ICICI Bank)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <input type="text" id="masterAlterSupplierAccountNo" value="${escapeHtml(currentSupplier.accountNo || '')}" placeholder="Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterAlterSupplierIfsc" value="${escapeHtml(currentSupplier.ifsc || '')}" placeholder="IFSC Code (e.g. ICIC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                    <input type="text" id="masterAlterSupplierBranch" value="${escapeHtml(currentSupplier.branch || '')}" placeholder="Branch Name (Optional)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 3. Tax Details (GSTIN & PAN) -->
+              <div>
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  GSTIN & PAN
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <input type="text" id="masterAlterSupplierGstin" value="${escapeHtml(currentSupplier.gstin || '')}" placeholder="GSTIN (e.g. 27AAAAA0000A1Z5)" maxlength="15" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                  <input type="text" id="masterAlterSupplierPan" value="${escapeHtml(currentSupplier.pan || '')}" placeholder="PAN (e.g. AAAAA0000A)" maxlength="10" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Opening Balance field (Optional) -->
+            <div class="coa-modal-fg" style="margin-bottom: 24px;">
+              <label class="coa-modal-label" for="masterAlterSupplierBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance (Optional)</label>
+              <input class="coa-modal-inp" id="masterAlterSupplierBalance" type="number" min="0" step="0.01" value="${balVal}" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-primary" id="masterAlterSupplierSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Save Changes</button>
+                <button class="btn btn-secondary" id="masterAlterSupplierCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+              </div>
+              <button class="btn btn-secondary" id="masterAlterSupplierDelBtn" style="height: 38px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: #dc2626; border-color: #fecaca; background: #fef2f2; display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+                Delete Supplier
+              </button>
+            </div>
           </div>
         `;
+
+        renderMasterAlterSupplierAliases(excludeObj);
+
+        const supplierSelector = contentArea.querySelector('#masterAlterSupplierSelector');
+        initSearchableSelectHelper(contentArea, 'masterAlterSupplierSelector', 'Select Supplier to Alter');
+
+        if (supplierSelector) {
+          supplierSelector.addEventListener('change', () => {
+            _masterAlterSelectedSupplierId = supplierSelector.value;
+            updateMasterDeskContent();
+          });
+        }
+
+        const addAliasBtn = contentArea.querySelector('#masterAlterSupplierAddAliasBtn');
+        if (addAliasBtn) {
+          addAliasBtn.addEventListener('click', () => {
+            _masterAlterSupplierAliases.push('');
+            renderMasterAlterSupplierAliases(excludeObj);
+            const inputs = contentArea.querySelectorAll('.master-alias-input');
+            if (inputs.length) inputs[inputs.length - 1].focus();
+          });
+        }
+
+        const gstinInp = contentArea.querySelector('#masterAlterSupplierGstin');
+        const panInp = contentArea.querySelector('#masterAlterSupplierPan');
+        const ifscInp = contentArea.querySelector('#masterAlterSupplierIfsc');
+
+        if (gstinInp) {
+          gstinInp.addEventListener('input', (e) => {
+            const val = e.target.value.toUpperCase();
+            e.target.value = val;
+            if (val.length >= 12 && panInp && !panInp.value) {
+              panInp.value = val.substring(2, 12);
+            }
+          });
+        }
+        if (panInp) {
+          panInp.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+          });
+        }
+        if (ifscInp) {
+          ifscInp.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+          });
+        }
+
+        const saveBtn = contentArea.querySelector('#masterAlterSupplierSaveBtn');
+        const cancelBtn = contentArea.querySelector('#masterAlterSupplierCancelBtn');
+        const delBtn = contentArea.querySelector('#masterAlterSupplierDelBtn');
+        const nameInp = contentArea.querySelector('#masterAlterSupplierName');
+        const nameErr = contentArea.querySelector('#masterAlterSupplierNameError');
+
+        const validateNameInputLive = () => {
+          const val = nameInp ? nameInp.value.trim() : '';
+          if (!val) {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
+          }
+
+          const dup = findDuplicateCoaNameOrAlias(val, excludeObj);
+          if (dup) {
+            const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
+            const errorText = `"${val}" already exists (${typeLabel}).`;
+            if (nameErr) {
+              nameErr.textContent = errorText;
+              nameErr.style.display = 'block';
+            }
+            if (nameInp) nameInp.style.borderColor = '#ef4444';
+            return errorText;
+          } else {
+            if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+            if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+            return null;
+          }
+        };
+
+        if (nameInp) {
+          nameInp.addEventListener('input', () => {
+            validateNameInputLive();
+            validateMasterAlterSupplierAliasesLive(excludeObj);
+          });
+        }
+
+        if (saveBtn) {
+          saveBtn.addEventListener('click', () => {
+            const name = nameInp ? nameInp.value.trim() : '';
+            if (!name) {
+              if (typeof showToast === 'function') showToast('Please enter a supplier name.', 'warning');
+              else alert('Please enter a supplier name.');
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const liveNameErr = validateNameInputLive();
+            if (liveNameErr) {
+              if (typeof showToast === 'function') showToast(liveNameErr, 'error');
+              else alert(liveNameErr);
+              if (nameInp) nameInp.focus();
+              return;
+            }
+
+            const aliasesValid = validateMasterAlterSupplierAliasesLive(excludeObj);
+            if (!aliasesValid) {
+              const msg = 'Please fix duplicate or invalid Also Known As entries.';
+              if (typeof showToast === 'function') showToast(msg, 'error');
+              else alert(msg);
+              return;
+            }
+
+            const aliases = _masterAlterSupplierAliases.map(a => a.trim()).filter(a => a !== '');
+            const formNamesSet = new Set([name.toLowerCase()]);
+            for (let i = 0; i < aliases.length; i++) {
+              const al = aliases[i];
+              const alLower = al.toLowerCase();
+
+              if (formNamesSet.has(alLower)) {
+                const msg = `Duplicate entry "${al}" found in the form. Name and A.K.A must be unique.`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+              formNamesSet.add(alLower);
+
+              const dupAl = findDuplicateCoaNameOrAlias(al, excludeObj);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                const msg = `"${al}" already exists (${typeLabel}).`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                return;
+              }
+            }
+
+            const contactName = contentArea.querySelector('#masterAlterSupplierContactName') ? contentArea.querySelector('#masterAlterSupplierContactName').value.trim() : '';
+            const address = contentArea.querySelector('#masterAlterSupplierAddress') ? contentArea.querySelector('#masterAlterSupplierAddress').value.trim() : '';
+            const city = contentArea.querySelector('#masterAlterSupplierCity') ? contentArea.querySelector('#masterAlterSupplierCity').value.trim() : '';
+            const pincode = contentArea.querySelector('#masterAlterSupplierPincode') ? contentArea.querySelector('#masterAlterSupplierPincode').value.trim() : '';
+            const state = contentArea.querySelector('#masterAlterSupplierState') ? contentArea.querySelector('#masterAlterSupplierState').value.trim() : '';
+            const country = contentArea.querySelector('#masterAlterSupplierCountry') ? contentArea.querySelector('#masterAlterSupplierCountry').value.trim() : 'India';
+            const bankName = contentArea.querySelector('#masterAlterSupplierBankName') ? contentArea.querySelector('#masterAlterSupplierBankName').value.trim() : '';
+            const accountNo = contentArea.querySelector('#masterAlterSupplierAccountNo') ? contentArea.querySelector('#masterAlterSupplierAccountNo').value.trim() : '';
+            const ifsc = contentArea.querySelector('#masterAlterSupplierIfsc') ? contentArea.querySelector('#masterAlterSupplierIfsc').value.trim() : '';
+            const branch = contentArea.querySelector('#masterAlterSupplierBranch') ? contentArea.querySelector('#masterAlterSupplierBranch').value.trim() : '';
+            const gstin = contentArea.querySelector('#masterAlterSupplierGstin') ? contentArea.querySelector('#masterAlterSupplierGstin').value.trim() : '';
+            const pan = contentArea.querySelector('#masterAlterSupplierPan') ? contentArea.querySelector('#masterAlterSupplierPan').value.trim() : '';
+            const balInp = contentArea.querySelector('#masterAlterSupplierBalance');
+            const openingBal = balInp && balInp.value ? parseFloat(balInp.value) : 0;
+
+            currentSupplier.name = name;
+            currentSupplier.aliases = aliases;
+            currentSupplier.contactName = contactName;
+            currentSupplier.address = address;
+            currentSupplier.city = city;
+            currentSupplier.pincode = pincode;
+            currentSupplier.state = state;
+            currentSupplier.country = country;
+            currentSupplier.bankName = bankName;
+            currentSupplier.accountNo = accountNo;
+            currentSupplier.ifsc = ifsc;
+            currentSupplier.branch = branch;
+            currentSupplier.gstin = gstin;
+            currentSupplier.pan = pan;
+            currentSupplier.openingBalance = openingBal;
+
+            // Recalculate Trade Payables opening balance in CoA
+            if (typeof coaLedgers !== 'undefined') {
+              const tp = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tp' && l.name === 'Trade Payables');
+              if (tp) tp.openingBalance = suppliers.reduce((sum, item) => sum + (parseFloat(item.openingBalance) || 0), 0);
+            }
+
+            if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
+            if (typeof refreshAllReports === 'function') refreshAllReports();
+            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+            showToast(`Supplier "${name}" updated successfully.`, 'success');
+            _masterAlterSelectedSupplierId = currentSupplier.id;
+            updateMasterDeskContent();
+          });
+        }
+
+        if (delBtn) {
+          delBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to delete supplier "${currentSupplier.name}"?`)) {
+              const idx = suppliers.findIndex(item => item.id === currentSupplier.id);
+              if (idx >= 0) {
+                suppliers.splice(idx, 1);
+                if (typeof coaLedgers !== 'undefined') {
+                  const tp = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tp' && l.name === 'Trade Payables');
+                  if (tp) tp.openingBalance = suppliers.reduce((sum, item) => sum + (parseFloat(item.openingBalance) || 0), 0);
+                }
+                if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
+                if (typeof refreshAllReports === 'function') refreshAllReports();
+                if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+                showToast(`Supplier "${currentSupplier.name}" deleted.`, 'info');
+                _masterAlterSelectedSupplierId = null;
+                updateMasterDeskContent();
+              }
+            }
+          });
+        }
+
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', () => {
+            updateMasterDeskContent();
+          });
+        }
       }
     }
   }
@@ -2975,7 +5411,148 @@
     updateMasterDeskContent();
   }
 
+  function openMasterDeskCreateLedger(options = {}) {
+    _masterDeskReturnContext = options;
+
+    if (typeof openTab === 'function') {
+      openTab('master_desk');
+    } else if (typeof window.openTab === 'function') {
+      window.openTab('master_desk');
+    } else if (typeof navigateTo === 'function') {
+      navigateTo('master_desk');
+    } else {
+      window.location.hash = '#master_desk';
+    }
+
+    const wrap = document.getElementById('panel-master-desk');
+    if (wrap && (!_masterDeskInitialized || !wrap.children.length)) {
+      initMasterDesk(wrap);
+      _masterDeskInitialized = true;
+    }
+
+    setMasterDeskSubtype('Create');
+    setMasterDeskTab('ledger');
+
+    setTimeout(() => {
+      const nameInp = document.getElementById('masterLedgerName');
+      if (nameInp) {
+        if (options.initialName) {
+          nameInp.value = options.initialName;
+          nameInp.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        nameInp.focus();
+        if (options.initialName) {
+          nameInp.select();
+        }
+      }
+      if (options.groupVal) {
+        const groupSel = document.getElementById('masterLedgerGroupCombinedSel');
+        const triggerText = document.getElementById('masterLedgerGroupCombinedSelTriggerText');
+        if (groupSel) {
+          groupSel.value = options.groupVal;
+          const opt = groupSel.options[groupSel.selectedIndex];
+          if (triggerText && opt) {
+            triggerText.textContent = opt.textContent.trim().replace(/^📁\s*/, '');
+          }
+          groupSel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    }, 60);
+  }
+
+  function openMasterDeskCreateParty(options = {}) {
+    _masterDeskReturnContext = options;
+
+    if (typeof openTab === 'function') {
+      openTab('master_desk');
+    } else if (typeof window.openTab === 'function') {
+      window.openTab('master_desk');
+    } else if (typeof navigateTo === 'function') {
+      navigateTo('master_desk');
+    } else {
+      window.location.hash = '#master_desk';
+    }
+
+    const wrap = document.getElementById('panel-master-desk');
+    if (wrap && (!_masterDeskInitialized || !wrap.children.length)) {
+      initMasterDesk(wrap);
+      _masterDeskInitialized = true;
+    }
+
+    setMasterDeskSubtype('Create');
+    setMasterDeskTab(options.type === 'customer' ? 'customers' : 'suppliers');
+
+    setTimeout(() => {
+      const nameInpId = options.type === 'customer' ? 'masterCustomerName' : 'masterSupplierName';
+      const nameInp = document.getElementById(nameInpId);
+      if (nameInp) {
+        if (options.initialName) {
+          nameInp.value = options.initialName;
+          nameInp.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        nameInp.focus();
+        if (options.initialName) {
+          nameInp.select();
+        }
+      }
+    }, 60);
+  }
+
+  function cancelMasterDeskReturn() {
+    if (_masterDeskReturnContext) {
+      const ctx = _masterDeskReturnContext;
+      _masterDeskReturnContext = null;
+      _masterLedgerAliases = [];
+      _masterCustomerAliases = [];
+      _masterSupplierAliases = [];
+
+      const targetTab = ctx.returnTab || 'journal';
+
+      if (typeof closeTab === 'function') {
+        closeTab('master_desk', null, targetTab);
+      } else if (typeof window.closeTab === 'function') {
+        window.closeTab('master_desk', null, targetTab);
+      }
+
+      if (typeof openTab === 'function') {
+        openTab(targetTab);
+      } else if (typeof window.openTab === 'function') {
+        window.openTab(targetTab);
+      } else if (typeof navigateTo === 'function') {
+        navigateTo(targetTab);
+      }
+
+      if (targetTab === 'sales_voucher') {
+        if (typeof window.onPartyCreationCancelledForSales === 'function') {
+          window.onPartyCreationCancelledForSales(ctx.initialName);
+        }
+      } else if (targetTab === 'purchase_voucher') {
+        if (typeof window.onPartyCreationCancelledForPurchase === 'function') {
+          window.onPartyCreationCancelledForPurchase(ctx.initialName);
+        }
+      } else if (targetTab === 'journal') {
+        if (typeof window.onLedgerCreationCancelledForJournal === 'function') {
+          window.onLedgerCreationCancelledForJournal(ctx.rowId, ctx.initialName);
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function handleMasterDeskClosed() {
+    cancelMasterDeskReturn();
+  }
+
+  function checkAndRestorePendingJournalState() {
+    cancelMasterDeskReturn();
+  }
+
   // Expose global functions
   window.renderMasterDeskPanel = renderMasterDeskPanel;
   window.initMasterDesk = initMasterDesk;
+  window.openMasterDeskCreateLedger = openMasterDeskCreateLedger;
+  window.openMasterDeskCreateParty = openMasterDeskCreateParty;
+  window.handleMasterDeskClosed = handleMasterDeskClosed;
+  window.checkAndRestorePendingJournalState = checkAndRestorePendingJournalState;
 })();

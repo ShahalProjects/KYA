@@ -534,7 +534,7 @@
     let _highlightIdx = -1;
     let _open         = false;
 
-    function _items() { return el.querySelectorAll('.je-drop-item'); }
+    function _items() { return el.querySelectorAll('.je-drop-item, .je-drop-create-item'); }
 
     function _setHL(idx) {
       const items = _items();
@@ -547,13 +547,20 @@
     }
 
     function _position(inp) {
-      const r          = inp.getBoundingClientRect();
+      if (!inp || !inp.isConnected) return;
+      const r = inp.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) {
+        requestAnimationFrame(() => {
+          if (_open && _activeInp === inp) _position(inp);
+        });
+        return;
+      }
       const spaceBelow = window.innerHeight - r.bottom - 8;
       const spaceAbove = r.top - 8;
       const maxH       = Math.min(280, Math.max(spaceBelow, spaceAbove) - 8);
       el.style.maxHeight = maxH + 'px';
       el.style.width     = Math.max(r.width, 260) + 'px';
-      el.style.left      = r.left + 'px';
+      el.style.left      = Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 260) - 8)) + 'px';
       if (spaceBelow >= 140 || spaceBelow >= spaceAbove) {
         el.style.top    = (r.bottom + 6) + 'px';
         el.style.bottom = 'auto';
@@ -585,15 +592,38 @@
       el.innerHTML = '';
 
       if (!matches.length) {
-        el.innerHTML = `
-          <div class="je-drop-empty">
-            <svg class="je-drop-empty-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
-              <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'je-drop-empty';
+        emptyDiv.innerHTML = `
+          <svg class="je-drop-empty-icon" width="28" height="28" viewBox="0 0 32 32" fill="none">
+            <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span class="je-drop-empty-txt">No ledger found</span>
+          <button type="button" class="je-drop-create-item" id="jeDropCreateLedgerBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
-            <span class="je-drop-empty-txt">No ledger found</span>
-            <span class="je-drop-empty-sub">Try a different name or add it in Chart of Accounts</span>
-          </div>`;
+            <span>Create Ledger</span>
+          </button>
+        `;
+        const createBtn = emptyDiv.querySelector('#jeDropCreateLedgerBtn');
+        if (createBtn) {
+          createBtn.addEventListener('mousedown', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            const targetInp = _activeInp;
+            const rowEl = targetInp ? targetInp.closest('[data-row-id]') : null;
+            const rowId = rowEl ? Number(rowEl.dataset.rowId) : null;
+            const searchVal = query ? query.trim() : (targetInp ? targetInp.value.trim() : '');
+            window._jeOpeningMasterDesk = true;
+            close();
+            triggerCreateLedgerFromJournal(searchVal, rowId);
+          });
+        }
+        el.appendChild(emptyDiv);
+        _setHL(0);
       } else {
         const GROUP_LABELS = {
           assets: 'Assets', 'equity-liabilities': 'Equity & Liabilities',
@@ -632,6 +662,9 @@
       }
 
       _position(inp);
+      requestAnimationFrame(() => {
+        if (_open && _activeInp === inp) _position(inp);
+      });
       el.classList.add('open');
       _open = true;
     }
@@ -668,6 +701,72 @@
     return { open, close, isOpen, moveHighlight, selectHighlighted };
   })();
 
+  function triggerCreateLedgerFromJournal(initialName, rowId) {
+    window._jeOpeningMasterDesk = true;
+    if (typeof window.openMasterDeskCreateLedger === 'function') {
+      window.openMasterDeskCreateLedger({
+        initialName: initialName || '',
+        rowId: rowId,
+        returnTab: 'journal'
+      });
+    } else {
+      if (typeof openTab === 'function') openTab('master_desk');
+      else if (typeof window.openTab === 'function') window.openTab('master_desk');
+      else if (typeof navigateTo === 'function') navigateTo('master_desk');
+    }
+  }
+
+  window.onLedgerCreatedForJournal = function(newLedger, rowId) {
+    window._jeOpeningMasterDesk = false;
+    if (!newLedger || !newLedger.name) return;
+
+    let targetRow = (typeof rowId === 'number') ? jeRows.find(r => r.id === rowId) : null;
+    if (!targetRow && jeRows.length > 0) {
+      targetRow = jeRows[jeRows.length - 1];
+    }
+
+    if (targetRow) {
+      targetRow.particular = newLedger.name;
+      setTimeout(() => {
+        const tr = document.querySelector(`[data-row-id="${targetRow.id}"]`);
+        if (tr) {
+          const inp = tr.querySelector('.je-particulars-input');
+          if (inp) inp.value = newLedger.name;
+        }
+        focusDebitOfRow(targetRow.id);
+      }, 60);
+    }
+  };
+
+  window.onLedgerCreationCancelledForJournal = function(rowId, initialName) {
+    window._jeOpeningMasterDesk = false;
+    let targetRow = (typeof rowId === 'number') ? jeRows.find(r => r.id === rowId) : null;
+    if (!targetRow && jeRows.length > 0) {
+      targetRow = jeRows[0];
+    }
+    if (targetRow) {
+      if (initialName !== undefined && initialName !== null) {
+        targetRow.particular = initialName;
+      }
+      setTimeout(() => {
+        const tr = document.querySelector(`[data-row-id="${targetRow.id}"]`);
+        if (tr) {
+          const inp = tr.querySelector('.je-particulars-input');
+          if (inp) {
+            if (initialName !== undefined && initialName !== null) {
+              inp.value = initialName;
+            }
+            inp.focus();
+            _jePortal.open(inp, inp.value, function(acct) {
+              inp.value = acct.name;
+              targetRow.particular = acct.name;
+              focusDebitOfRow(targetRow.id);
+            });
+          }
+        }
+      }, 60);
+    }
+  };
 
   // ── Particulars custom dropdown cell ─────────────────────────────
   function buildParticularsCell(row, isFirstRow) {
@@ -749,6 +848,7 @@
       // Give portal mousedown time to fire before validating
       setTimeout(() => {
         if (_jePortal.isOpen()) return;
+        if (window._jeOpeningMasterDesk) return;
         const val = inp.value.trim().toLowerCase();
         if (val === '') {
           row.particular = '';
