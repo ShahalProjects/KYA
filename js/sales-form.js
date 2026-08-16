@@ -1,3 +1,11 @@
+  // ── Global Sales State Variables ──
+  window.salesRows = window.salesRows || [];
+  window.currentSalesType = window.currentSalesType || 'Product';
+  window.currentSalesVoucherSubtype = window.currentSalesVoucherSubtype || 'Invoice';
+  window.currentSalesInvoiceMode = window.currentSalesInvoiceMode || 'Auto';
+  window._editingSalesInvoice = window._editingSalesInvoice || null;
+  window._salesUploadedDoc = window._salesUploadedDoc || null;
+
   // ══════════════════════════════════════════════════════════════════
   //  SALES REVENUE-ACCOUNT SEARCH DROPDOWN (recovered — was missing from split)
   // ══════════════════════════════════════════════════════════════════
@@ -552,12 +560,21 @@
     
     paySelect.innerHTML = '<option value="">&mdash; Select &mdash;</option>';
     
-    const accounts = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
+    let accounts = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
+      ? coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce')
+      : [];
+
+    if (accounts.length === 0 && typeof getOrCreateSystemLedger === 'function') {
+      getOrCreateSystemLedger('Cash Account', 'sg-cce');
+      getOrCreateSystemLedger('Bank Account', 'sg-cce');
+      accounts = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
+    }
+
     accounts.forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.id;
       opt.textContent = a.name;
-      if (selectedId && a.id == selectedId) {
+      if (selectedId && String(a.id) === String(selectedId)) {
         opt.selected = true;
       }
       paySelect.appendChild(opt);
@@ -925,6 +942,66 @@
       if (btnAuto) btnAuto.classList.add('active');
       recalculateSalesTotals();
     }
+  }
+
+  function syncSalesRowsFromDOM() {
+    const body = document.getElementById('salesItemBody');
+    if (!body) return;
+    const trs = body.querySelectorAll('tr.sales-row');
+    if (trs.length === 0) return;
+    
+    trs.forEach((tr, index) => {
+      if (!salesRows[index]) {
+        salesRows[index] = { item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 };
+      }
+      const row = salesRows[index];
+      const itemEl = tr.querySelector('.sales-row-item');
+      if (itemEl && itemEl.value !== undefined) row.item = itemEl.value;
+
+      const hsnEl = tr.querySelector('.sales-row-hsn');
+      if (hsnEl && hsnEl.value !== undefined) row.hsn = hsnEl.value;
+
+      const unitEl = tr.querySelector('.sales-row-unit');
+      if (unitEl && unitEl.value !== undefined) row.unit = unitEl.value;
+
+      const qtyEl = tr.querySelector('.sales-row-qty');
+      if (qtyEl && qtyEl.value !== '') row.qty = parseFloat(qtyEl.value) || 0;
+
+      const rateEl = tr.querySelector('.sales-row-rate');
+      if (rateEl && rateEl.value !== '') row.rate = parseSalesAmt(rateEl.value) || 0;
+
+      const baseEl = tr.querySelector('.sales-row-base');
+      if (baseEl && baseEl.value !== '') row.baseAmount = parseSalesAmt(baseEl.value) || 0;
+
+      const discEl = tr.querySelector('.sales-row-discount');
+      if (discEl && discEl.value !== '') row.discount = parseSalesAmt(discEl.value) || 0;
+
+      const discTypeEl = tr.querySelector('.sales-row-discount-type');
+      if (discTypeEl && discTypeEl.value !== undefined) row.discountType = discTypeEl.value || 'val';
+
+      const taxEl = tr.querySelector('.sales-row-tax');
+      if (taxEl && taxEl.value !== undefined) row.tax = parseFloat(taxEl.value) || 0;
+
+      const amtEl = tr.querySelector('.sales-row-amount-input');
+      if (amtEl && amtEl.value !== '') {
+        row.amount = parseSalesAmt(amtEl.value) || 0;
+      } else {
+        if (currentSalesType === 'Product') {
+          const base = (row.qty || 1) * (row.rate || 0);
+          const discAmt = row.discountType === 'pct' ? (base * ((row.discount || 0) / 100)) : (row.discount || 0);
+          const afterDisc = Math.max(0, base - discAmt);
+          row.amount = Math.round((afterDisc * (1 + (row.tax || 0) / 100)) * 100) / 100;
+        } else {
+          const base = (row.baseAmount || 0);
+          const discAmt = row.discountType === 'pct' ? (base * ((row.discount || 0) / 100)) : (row.discount || 0);
+          const afterDisc = Math.max(0, base - discAmt);
+          row.amount = Math.round((afterDisc * (1 + (row.tax || 0) / 100)) * 100) / 100;
+        }
+      }
+
+      const revSelect = tr.querySelector('.sales-row-rev');
+      if (revSelect && revSelect.value) row.revenueLedgerId = revSelect.value;
+    });
   }
 
   function calculateSubtotal() {
@@ -1578,3 +1655,17 @@
     updateSalesDocUI(null);
     setupSalesDocEventListeners();
   }
+
+  // ── Global Window Exports ──
+  window.initSalesForm = initSalesForm;
+  window.populateSalesCustomers = populateSalesCustomers;
+  window.populateSalesExecutives = populateSalesExecutives;
+  window.populateSalesPaymentAccounts = populateSalesPaymentAccounts;
+  window.renderSalesRows = renderSalesRows;
+  window.addSalesRow = addSalesRow;
+  window.switchSalesType = switchSalesType;
+  window.syncSalesRowsFromDOM = syncSalesRowsFromDOM;
+  window.calculateSubtotal = calculateSubtotal;
+  window.recalculateSalesTotals = recalculateSalesTotals;
+  window.getSalesPaymentStatus = getSalesPaymentStatus;
+  window.setInvoiceNoMode = setInvoiceNoMode;

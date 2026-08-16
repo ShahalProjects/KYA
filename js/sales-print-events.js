@@ -1,4 +1,4 @@
-  // ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
   //  SALES PRINT & EVENTS — Print invoice, due-date helper, event wiring
   //  (Split from sales.js for maintainability)
   // ══════════════════════════════════════════════════════════════════
@@ -132,26 +132,57 @@
       <div class="inv-modal-card" style="padding: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1.5px solid var(--slate-100); background: var(--slate-50); border-radius: 20px 20px 0 0;">
           <div style="font-weight: 700; color: var(--slate-800);">${inv.isReturn ? 'Sales Reversal Preview' : (inv.isOrder ? 'Sales Pre Invoice Preview' : 'Invoice Preview')}</div>
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <button onclick="loadSalesInvoice((window.KYA_STORE.salesVouchers || []).find(v => v.id === ${inv.id}), false); document.getElementById('salesInvoicePrintOverlay')?.remove();" title="Edit Invoice" style="background: var(--blue-50); border: 1.5px solid var(--blue-100); border-radius: 6px; padding: 8px; cursor: pointer; color: var(--blue-600); display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-100)'" onmouseout="this.style.background='var(--blue-50)'">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <!-- Export Dropdown -->
+            <div class="rpt-more-wrap" style="position: relative;">
+              <button class="btn btn-secondary" id="btnExportInvoiceAction" type="button" style="padding: 7px 12px; display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; height: 34px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Export</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <div id="invExportDropdown" class="rpt-more-dropdown" style="top: calc(100% + 6px); right: 0; min-width: 130px;">
+                <button class="rpt-menu-item" id="invExportPdfBtn" type="button">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                  </svg>
+                  PDF
+                </button>
+                <button class="rpt-menu-item" id="invExportExcelBtn" type="button">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="8" y1="13" x2="16" y2="17"></line>
+                    <line x1="16" y1="13" x2="8" y2="17"></line>
+                  </svg>
+                  Excel
+                </button>
+              </div>
+            </div>
+
+            <!-- Edit Button -->
+            <button onclick="loadSalesInvoice((window.KYA_STORE.salesVouchers || []).find(v => v.id === ${inv.id}), false); document.getElementById('salesInvoicePrintOverlay')?.remove();" title="Edit Invoice" style="background: var(--blue-50); border: 1.5px solid var(--blue-100); border-radius: 6px; padding: 7px; cursor: pointer; color: var(--blue-600); display: flex; align-items: center; justify-content: center; height: 34px; width: 34px; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-100)'" onmouseout="this.style.background='var(--blue-50)'">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
             </button>
-            <button onclick="deleteSalesInvoice(${inv.id}); document.getElementById('salesInvoicePrintOverlay')?.remove();" title="Delete Invoice" style="background: var(--red-50); border: 1.5px solid var(--red-100); border-radius: 6px; padding: 8px; cursor: pointer; color: var(--red-600); display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='var(--red-100)'" onmouseout="this.style.background='var(--red-50)'">
+            <!-- Delete Button -->
+            <button onclick="deleteSalesInvoice(${inv.id}); document.getElementById('salesInvoicePrintOverlay')?.remove();" title="Delete Invoice" style="background: var(--red-50); border: 1.5px solid var(--red-100); border-radius: 6px; padding: 7px; cursor: pointer; color: var(--red-600); display: flex; align-items: center; justify-content: center; height: 34px; width: 34px; transition: all 0.2s;" onmouseover="this.style.background='var(--red-100)'" onmouseout="this.style.background='var(--red-50)'">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
             </button>
-            <button class="btn btn-secondary" id="btnPrintInvoiceAction" style="padding: 8px 16px;">
-              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px; margin-right: 6px; display: inline-block; vertical-align: middle;">
-                <path d="M4 5v-3h8v3M2 5h12v7h-3v3H5v-3H2V5zm3 4h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              </svg>
-              Print
-            </button>
-            <button class="btn btn-danger" id="btnCloseInvoiceAction" style="padding: 8px 16px;">Close</button>
+            <button class="btn btn-danger" id="btnCloseInvoiceAction" style="padding: 7px 14px; height: 34px; font-size: 13px;">Close</button>
           </div>
         </div>
         
@@ -306,8 +337,12 @@
                 ` : `
                   ${orderAdvanceAmount > 0 ? `
                     <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
-                      <span>Order Advance Applied</span>
+                      <span>Advance Paid</span>
                       <span style="color: var(--emerald-700); font-weight: 700;">₹ ${fmtNum(orderAdvanceAmount)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 6px; font-weight: 700;">
+                      <span>Balance Due</span>
+                      <span style="color: var(--blue-700);">₹ ${fmtNum(Math.max(0, inv.total - orderAdvanceAmount))}</span>
                     </div>
                   ` : ''}
                   ${inv.paymentStatus && inv.paymentStatus !== 'Not Paid' && inv.paymentStatus !== 'No Refund' ? `
@@ -335,12 +370,46 @@
     document.body.appendChild(overlay);
     overlay.focus();
     
+    // Wire Export Dropdown
+    const expBtn = overlay.querySelector('#btnExportInvoiceAction');
+    const expDropdown = overlay.querySelector('#invExportDropdown');
+    const expPdfBtn = overlay.querySelector('#invExportPdfBtn');
+    const expExcelBtn = overlay.querySelector('#invExportExcelBtn');
+
+    if (expBtn && expDropdown) {
+      expBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        expDropdown.classList.toggle('active');
+      });
+    }
+
+    if (expPdfBtn) {
+      expPdfBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (expDropdown) expDropdown.classList.remove('active');
+        if (typeof window.exportInvoiceToPDF === 'function') {
+          await window.exportInvoiceToPDF(inv);
+        }
+      });
+    }
+
+    if (expExcelBtn) {
+      expExcelBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (expDropdown) expDropdown.classList.remove('active');
+        if (typeof window.exportInvoiceToExcel === 'function') {
+          await window.exportInvoiceToExcel(inv);
+        }
+      });
+    }
+
     overlay.querySelector('#btnCloseInvoiceAction').addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#btnPrintInvoiceAction').addEventListener('click', () => {
-      window.print();
+    overlay.addEventListener('click', e => { 
+      if (expDropdown && !expDropdown.contains(e.target) && expBtn && !expBtn.contains(e.target)) {
+        expDropdown.classList.remove('active');
+      }
+      if (e.target === overlay) overlay.remove(); 
     });
-    
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
   }
 
@@ -473,27 +542,35 @@
       });
     }
     
-    document.getElementById('salesTypeProduct').addEventListener('click', () => {
-      const bg = document.getElementById('salesTypeBg');
-      if (bg) {
-        bg.classList.add('prod-active');
-        bg.classList.remove('serv-active');
-      }
-      document.getElementById('salesTypeProduct').classList.add('active');
-      document.getElementById('salesTypeService').classList.remove('active');
-      switchSalesType('Product');
-    });
+    const prodTypeBtn = document.getElementById('salesTypeProduct');
+    if (prodTypeBtn) {
+      prodTypeBtn.addEventListener('click', () => {
+        const bg = document.getElementById('salesTypeBg');
+        if (bg) {
+          bg.classList.add('prod-active');
+          bg.classList.remove('serv-active');
+        }
+        prodTypeBtn.classList.add('active');
+        const servTypeBtn = document.getElementById('salesTypeService');
+        if (servTypeBtn) servTypeBtn.classList.remove('active');
+        switchSalesType('Product');
+      });
+    }
     
-    document.getElementById('salesTypeService').addEventListener('click', () => {
-      const bg = document.getElementById('salesTypeBg');
-      if (bg) {
-        bg.classList.add('serv-active');
-        bg.classList.remove('prod-active');
-      }
-      document.getElementById('salesTypeService').classList.add('active');
-      document.getElementById('salesTypeProduct').classList.remove('active');
-      switchSalesType('Service');
-    });
+    const servTypeBtn = document.getElementById('salesTypeService');
+    if (servTypeBtn) {
+      servTypeBtn.addEventListener('click', () => {
+        const bg = document.getElementById('salesTypeBg');
+        if (bg) {
+          bg.classList.add('serv-active');
+          bg.classList.remove('prod-active');
+        }
+        servTypeBtn.classList.add('active');
+        const prodTypeBtn = document.getElementById('salesTypeProduct');
+        if (prodTypeBtn) prodTypeBtn.classList.remove('active');
+        switchSalesType('Service');
+      });
+    }
     
     const noneBtn = document.getElementById('salesTdsTcsNone');
     const tdsBtn = document.getElementById('salesTdsTcsTds');
@@ -907,3 +984,9 @@
     });
   }
 
+  // ── Global Window Exports ──
+  window.setupSalesVoucherEventListeners = setupSalesVoucherEventListeners;
+  window.setupVoucherDeskEventListeners = setupVoucherDeskEventListeners;
+  if (typeof viewPrintInvoice === 'function') window.viewPrintInvoice = viewPrintInvoice;
+  if (typeof editSalesDraft === 'function') window.editSalesDraft = editSalesDraft;
+  if (typeof printSalesVoucher === 'function') window.printSalesVoucher = printSalesVoucher;

@@ -144,12 +144,26 @@
         list.splice(index, 1);
         window.KYA_STORE.salesVouchers = list;
         
+        if (typeof postedEntries !== 'undefined') {
+          if (invoice.journalEntryId) {
+            postedEntries = postedEntries.filter(e => e.id !== invoice.journalEntryId && e.id !== invoice.id);
+          } else {
+            postedEntries = postedEntries.filter(e => e.id !== invoice.id);
+          }
+          if (invoice.refundJournalEntryIds && Array.isArray(invoice.refundJournalEntryIds)) {
+            postedEntries = postedEntries.filter(e => !invoice.refundJournalEntryIds.includes(e.id));
+          }
+        }
+
         let successMsg = `Invoice "${invoice.invoiceNo}" deleted.`;
         if (isRet) successMsg = `Sales Reversal "${invoice.invoiceNo}" deleted.`;
         else if (isOrd) successMsg = `Sales Pre Invoice "${invoice.invoiceNo}" deleted.`;
         
         showToast(successMsg, 'success');
-        renderSalesPostedPanel();
+        if (typeof refreshAllReports === 'function') refreshAllReports();
+        if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+        if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
+        if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
         triggerAutoBackup();
       }
     });

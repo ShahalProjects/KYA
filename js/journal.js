@@ -1891,13 +1891,50 @@
             <div class="fj-head-title">Journal Voucher — ${entry.voucherNo || '—'}</div>
             <div class="fj-head-sub">${statusText}</div>
           </div>
-          <div style="display: flex; align-items: center; gap: 12px; margin-left: auto; margin-right: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-left: auto; margin-right: 16px;">
+            <!-- Export dropdown wrap -->
+            <div class="rpt-more-wrap" style="position: relative;">
+              <button id="fjExportBtn" title="Export Voucher" style="background: rgba(255,255,255,0.15); border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; color: #fff; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Export</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: -2px;">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <div id="fjExportDropdown" class="rpt-more-dropdown" style="top: calc(100% + 6px); right: 0; min-width: 130px;">
+                <button class="rpt-menu-item" id="fjExportPdfBtn" type="button">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                  </svg>
+                  PDF
+                </button>
+                <button class="rpt-menu-item" id="fjExportExcelBtn" type="button">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="8" y1="13" x2="16" y2="17"></line>
+                    <line x1="16" y1="13" x2="8" y2="17"></line>
+                  </svg>
+                  Excel
+                </button>
+              </div>
+            </div>
+
+            <!-- Edit Entry Button -->
             <button onclick="editVoucherFromDetails(${entry.id}, ${!!isDraft}); document.getElementById('fjOverlay')?.remove();" title="Edit Entry" style="background: rgba(255,255,255,0.15); border: none; border-radius: 6px; padding: 6px; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
             </button>
+            <!-- Delete Entry Button -->
             <button onclick="deleteVoucherFromDetails(${entry.id}, ${!!isDraft}); document.getElementById('fjOverlay')?.remove();" title="Delete Entry" style="background: rgba(255,255,255,0.15); border: none; border-radius: 6px; padding: 6px; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1969,8 +2006,48 @@
     document.body.appendChild(overlay);
     overlay.focus();
 
+    // Wire Export Dropdown
+    const expBtn = overlay.querySelector('#fjExportBtn');
+    const expDropdown = overlay.querySelector('#fjExportDropdown');
+    const expPdfBtn = overlay.querySelector('#fjExportPdfBtn');
+    const expExcelBtn = overlay.querySelector('#fjExportExcelBtn');
+
+    if (expBtn && expDropdown) {
+      expBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        expDropdown.classList.toggle('active');
+      });
+    }
+
+    if (expPdfBtn) {
+      expPdfBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (expDropdown) expDropdown.classList.remove('active');
+        const entryPayload = { ...entry, isDraft: !!isDraft };
+        if (typeof window.exportVoucherToPDF === 'function') {
+          await window.exportVoucherToPDF(entryPayload);
+        }
+      });
+    }
+
+    if (expExcelBtn) {
+      expExcelBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (expDropdown) expDropdown.classList.remove('active');
+        const entryPayload = { ...entry, isDraft: !!isDraft };
+        if (typeof window.exportVoucherToExcel === 'function') {
+          await window.exportVoucherToExcel(entryPayload);
+        }
+      });
+    }
+
     overlay.querySelector('#fjClose').addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    overlay.addEventListener('click', e => { 
+      if (expDropdown && !expDropdown.contains(e.target) && expBtn && !expBtn.contains(e.target)) {
+        expDropdown.classList.remove('active');
+      }
+      if (e.target === overlay) overlay.remove(); 
+    });
     overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
   }
 
@@ -2063,6 +2140,54 @@
           }
         });
       }
+    } else if (type === 'Invoice' || type === 'Order' || type === 'Reversal') {
+      const isSalesDraft = (window.KYA_STORE?.salesVouchersDrafts || []).some(d => d.id === id);
+      if (isSalesDraft) {
+        showKyaConfirm({
+          title: 'Delete this draft?',
+          message: 'Permanently delete this sales voucher draft?<br>This action cannot be undone.',
+          confirmLabel: '✕ Delete',
+          iconBg: '#fee2e2', iconColor: '#dc2626',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          okBg: '#dc2626',
+          onConfirm: () => {
+            if (window.KYA_STORE?.salesVouchersDrafts) {
+              window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts.filter(d => d.id !== id);
+            }
+            if (typeof renderSalesDraftedPanel === 'function') renderSalesDraftedPanel();
+            triggerAutoBackup();
+            renderVoucherDeskPanel();
+          }
+        });
+      } else {
+        showKyaConfirm({
+          title: 'Delete this voucher?',
+          message: 'Permanently delete this sales voucher?<br>This action cannot be undone.',
+          confirmLabel: '✕ Delete',
+          iconBg: '#fee2e2', iconColor: '#dc2626',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          okBg: '#dc2626',
+          onConfirm: () => {
+            const list = window.KYA_STORE?.salesVouchers || [];
+            const idx = list.findIndex(v => v.id === id || v.journalEntryId === id);
+            if (idx > -1) {
+              const inv = list[idx];
+              list.splice(idx, 1);
+              window.KYA_STORE.salesVouchers = list;
+              if (inv.journalEntryId) {
+                postedEntries = postedEntries.filter(e => e.id !== inv.journalEntryId && e.id !== id);
+              }
+            } else {
+              postedEntries = postedEntries.filter(e => e.id !== id);
+            }
+            refreshAllReports();
+            if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
+            if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
+            triggerAutoBackup();
+            renderVoucherDeskPanel();
+          }
+        });
+      }
     }
   }
 
@@ -2078,28 +2203,27 @@
       caretEnd = activeEl.selectionEnd;
     }
 
-    const totalJE = postedEntries.length;
-    const totalDrafts = draftedEntries.length;
-    const totalVouchers = totalJE + totalDrafts;
-
-    const elTotal = document.getElementById('vdStatTotal');
-    const elJE = document.getElementById('vdStatJE');
-    const elInv = document.getElementById('vdStatInv');
-    const elDrafts = document.getElementById('vdStatDrafts');
-
-    if (elTotal) elTotal.textContent = totalVouchers;
-    if (elJE) elJE.textContent = totalJE;
-    if (elInv) elInv.textContent = 0;
-    if (elDrafts) elDrafts.textContent = totalDrafts;
-
     let list = [];
 
+    // 1. Process Journal & Sales entries posted in postedEntries
     postedEntries.forEach(e => {
+      let type = 'Journal';
+      const vNo = e.voucherNo || '';
+      if (vNo.startsWith('SR-') || vNo.startsWith('REV-')) {
+        type = 'Reversal';
+      } else if (vNo.startsWith('SO-')) {
+        type = 'Order';
+      } else if (vNo.startsWith('SV-') || vNo.startsWith('INV-') || e.preparedBy === 'Sales Module') {
+        type = 'Invoice';
+      } else if (vNo.startsWith('PV-') || e.preparedBy === 'Purchase Module') {
+        type = 'Purchase';
+      }
+
       list.push({
         id: e.id,
         date: e.date,
         voucherNo: e.voucherNo,
-        type: 'Journal',
+        type: type,
         particulars: e.narration || e.firstParticular || '—',
         amount: e.amount,
         isDraft: false,
@@ -2107,6 +2231,7 @@
       });
     });
 
+    // 2. Process Journal drafts
     draftedEntries.forEach(e => {
       list.push({
         id: e.id,
@@ -2119,6 +2244,77 @@
         raw: e
       });
     });
+
+    // 3. Process Sales drafts from KYA_STORE
+    const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
+    salesDrafts.forEach(d => {
+      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+      const cust = custs.find(c => String(c.id) === String(d.customerId));
+      const custName = cust ? cust.name : (d.customerName || '');
+      const vType = d.isReturn ? 'Reversal' : (d.isOrder ? 'Order' : 'Invoice');
+      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      list.push({
+        id: d.id,
+        date: d.date,
+        voucherNo: d.invoiceNo || 'Draft',
+        type: vType,
+        particulars: d.notes || (`Draft ${vType}${custName ? ' for ' + custName : ''}`),
+        amount: vAmt,
+        isDraft: true,
+        raw: d
+      });
+    });
+
+    // 4. Process any Sales Vouchers not captured in postedEntries (e.g. non-financial orders)
+    const salesPosted = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [];
+    salesPosted.forEach(v => {
+      const alreadyInList = list.some(item => !item.isDraft && (
+        item.id === v.journalEntryId || 
+        item.id === v.id || 
+        item.voucherNo === v.invoiceNo || 
+        item.voucherNo === `SV-${v.invoiceNo}` || 
+        item.voucherNo === `SR-${v.invoiceNo}` || 
+        item.voucherNo === `SO-${v.invoiceNo}`
+      ));
+
+      if (!alreadyInList) {
+        const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+        const cust = custs.find(c => String(c.id) === String(v.customerId));
+        const custName = cust ? cust.name : (v.customerName || '');
+        const vType = v.isReturn ? 'Reversal' : (v.isOrder ? 'Order' : 'Invoice');
+        const prefix = v.isReturn ? 'SR-' : (v.isOrder ? 'SO-' : 'SV-');
+        const vNo = (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-')) ? v.invoiceNo : `${prefix}${v.invoiceNo}`;
+        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        list.push({
+          id: v.id,
+          date: v.date,
+          voucherNo: vNo,
+          type: vType,
+          particulars: v.notes || (`${vType}${custName ? ' for ' + custName : ''}`),
+          amount: vAmt,
+          isDraft: false,
+          raw: v
+        });
+      }
+    });
+
+    // 5. Update Stat counters
+    const totalJournal = list.filter(e => e.type === 'Journal' && !e.isDraft).length;
+    const totalSales = list.filter(e => (e.type === 'Invoice' || e.type === 'Order' || e.type === 'Reversal') && !e.isDraft).length;
+    const totalDrafts = list.filter(e => e.isDraft).length;
+    const totalVouchers = list.length;
+
+    const elTotal = document.getElementById('vdStatTotal');
+    const elJE = document.getElementById('vdStatJE');
+    const elInv = document.getElementById('vdStatInv');
+    const elDrafts = document.getElementById('vdStatDrafts');
+
+    if (elTotal) elTotal.textContent = totalVouchers;
+    if (elJE) elJE.textContent = totalJournal;
+    if (elInv) elInv.textContent = totalSales;
+    if (elDrafts) elDrafts.textContent = totalDrafts;
 
     list.sort((a, b) => {
       const dComp = (b.date || '').localeCompare(a.date || '');
@@ -2291,9 +2487,20 @@
           if (entry) showFullJournalModal(entry, isDraft);
         } else if (type === 'Invoice' || type === 'Reversal' || type === 'Order') {
           if (isDraft) {
-            editSalesDraft(id);
+            if (typeof editSalesDraft === 'function') editSalesDraft(id);
           } else {
-            viewPrintInvoice(id);
+            let sInv = (window.KYA_STORE?.salesVouchers || []).find(v => v.id === id || v.journalEntryId === id);
+            if (!sInv) {
+              const vNo = (row.querySelector('td:nth-child(3)')?.textContent || '').trim();
+              const cleanNo = vNo.replace(/^(SV-|SR-|SO-|INV-)/, '');
+              sInv = (window.KYA_STORE?.salesVouchers || []).find(v => v.invoiceNo === cleanNo || v.invoiceNo === vNo);
+            }
+            if (sInv && typeof viewPrintInvoice === 'function') {
+              viewPrintInvoice(sInv.id);
+            } else {
+              const entry = postedEntries.find(e => e.id === id);
+              if (entry) showFullJournalModal(entry, false);
+            }
           }
         }
       });
@@ -2306,12 +2513,242 @@
         try { searchInput.setSelectionRange(caretStart, caretEnd); } catch (e) {}
       }
     }
+
+    wireVoucherDeskMoreDropdown();
   }
 
+  function getVoucherDeskExportData() {
+    let list = [];
 
+    // 1. Process Journal & Sales entries posted in postedEntries
+    postedEntries.forEach(e => {
+      let type = 'Journal Entry';
+      const vNo = e.voucherNo || '';
+      if (vNo.startsWith('SR-') || vNo.startsWith('REV-')) {
+        type = 'Sales Reversal';
+      } else if (vNo.startsWith('SO-')) {
+        type = 'Sales Order';
+      } else if (vNo.startsWith('SV-') || vNo.startsWith('INV-') || e.preparedBy === 'Sales Module') {
+        type = 'Sales Invoice';
+      } else if (vNo.startsWith('PV-') || e.preparedBy === 'Purchase Module') {
+        type = 'Purchase';
+      }
 
+      list.push({
+        id: e.id,
+        date: e.date,
+        voucherNo: e.voucherNo,
+        type: type,
+        rawType: (type === 'Journal Entry' ? 'Journal' : (type === 'Sales Reversal' ? 'Reversal' : (type === 'Sales Order' ? 'Order' : (type === 'Purchase' ? 'Purchase' : 'Invoice')))),
+        particulars: e.narration || e.firstParticular || '—',
+        amount: e.amount,
+        status: 'Posted',
+        isDraft: false
+      });
+    });
 
-  // ══════════════════════════════════════════════════════════════════
+    // 2. Process Journal drafts
+    draftedEntries.forEach(e => {
+      list.push({
+        id: e.id,
+        date: e.date,
+        voucherNo: e.voucherNo,
+        type: 'Journal Entry',
+        rawType: 'Journal',
+        particulars: e.narration || e.firstParticular || '—',
+        amount: e.amount,
+        status: 'Draft',
+        isDraft: true
+      });
+    });
+
+    // 3. Process Sales drafts
+    const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
+    salesDrafts.forEach(d => {
+      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+      const cust = custs.find(c => String(c.id) === String(d.customerId));
+      const custName = cust ? cust.name : (d.customerName || '');
+      const vType = d.isReturn ? 'Sales Reversal' : (d.isOrder ? 'Sales Order' : 'Sales Invoice');
+      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      list.push({
+        id: d.id,
+        date: d.date,
+        voucherNo: d.invoiceNo || 'Draft',
+        type: vType,
+        rawType: d.isReturn ? 'Reversal' : (d.isOrder ? 'Order' : 'Invoice'),
+        particulars: d.notes || (`Draft ${vType}${custName ? ' for ' + custName : ''}`),
+        amount: vAmt,
+        status: 'Draft',
+        isDraft: true
+      });
+    });
+
+    // 4. Process any Sales Vouchers not in postedEntries
+    const salesPosted = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [];
+    salesPosted.forEach(v => {
+      const alreadyInList = list.some(item => !item.isDraft && (
+        item.id === v.journalEntryId || 
+        item.id === v.id || 
+        item.voucherNo === v.invoiceNo || 
+        item.voucherNo === `SV-${v.invoiceNo}` || 
+        item.voucherNo === `SR-${v.invoiceNo}` || 
+        item.voucherNo === `SO-${v.invoiceNo}`
+      ));
+
+      if (!alreadyInList) {
+        const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+        const cust = custs.find(c => String(c.id) === String(v.customerId));
+        const custName = cust ? cust.name : (v.customerName || '');
+        const vType = v.isReturn ? 'Sales Reversal' : (v.isOrder ? 'Sales Order' : 'Sales Invoice');
+        const prefix = v.isReturn ? 'SR-' : (v.isOrder ? 'SO-' : 'SV-');
+        const vNo = (v.invoiceNo && (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-'))) ? v.invoiceNo : `${prefix}${v.invoiceNo || ''}`;
+        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        let status = 'Posted';
+        if (v.isOrder) {
+          const isCompleted = (window.KYA_STORE.salesVouchers || []).some(so => !so.isOrder && !so.isReturn && so.orderNo === vNo);
+          status = isCompleted ? 'Completed' : 'Placed';
+        }
+
+        list.push({
+          id: v.id,
+          date: v.date,
+          voucherNo: vNo,
+          type: vType,
+          rawType: v.isReturn ? 'Reversal' : (v.isOrder ? 'Order' : 'Invoice'),
+          particulars: v.notes || (`${vType}${custName ? ' for ' + custName : ''}`),
+          amount: vAmt,
+          status: status,
+          isDraft: false
+        });
+      }
+    });
+
+    list.sort((a, b) => {
+      const dComp = (b.date || '').localeCompare(a.date || '');
+      if (dComp !== 0) return dComp;
+      return b.id - a.id;
+    });
+
+    // Apply current active filters if any
+    let filtered = list.filter(e => {
+      if (_vdTypeFilter && _vdTypeFilter !== 'All' && e.rawType !== _vdTypeFilter) return false;
+      if (_vdStatusFilter && _vdStatusFilter !== 'All') {
+        const isDraft = _vdStatusFilter === 'Draft';
+        if (e.isDraft !== isDraft) return false;
+      }
+      if (_vdSearch) {
+        const q = _vdSearch.toLowerCase();
+        const noMatch = (e.voucherNo || '').toLowerCase().includes(q);
+        const partMatch = (e.particulars || '').toLowerCase().includes(q);
+        const dateMatch = (e.date || '').toLowerCase().includes(q);
+        const amtMatch = (e.amount || '').toLowerCase().includes(q);
+        if (!noMatch && !partMatch && !dateMatch && !amtMatch) return false;
+      }
+      return true;
+    });
+
+    const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
+    return {
+      companyName: activeCo.name || 'KYA Accounting',
+      filterStatus: _vdStatusFilter || 'All',
+      filterType: _vdTypeFilter || 'All',
+      items: filtered
+    };
+  }
+
+  function wireVoucherDeskMoreDropdown() {
+    const moreBtn = document.getElementById('vdMoreBtn');
+    const moreDropdown = document.getElementById('vdMoreDropdown');
+    const submenuBtn = document.getElementById('vdExportMenuBtn');
+    const submenu = document.getElementById('vdExportSubmenu');
+    const pdfBtn = document.getElementById('vdExportPdf');
+    const excelBtn = document.getElementById('vdExportExcel');
+
+    if (!moreBtn || moreBtn._isWired) return;
+    moreBtn._isWired = true;
+
+    function closeAllVdMenus() {
+      if (moreDropdown) moreDropdown.classList.remove('active');
+      if (submenu) submenu.classList.remove('active');
+    }
+
+    if (moreDropdown) {
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = moreDropdown.classList.contains('active');
+        closeAllVdMenus();
+        if (!isOpen) {
+          moreDropdown.classList.add('active');
+        }
+      });
+    }
+
+    if (submenuBtn && submenu) {
+      let closeTimer = null;
+      submenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        submenu.classList.toggle('active');
+      });
+      const submenuWrap = document.getElementById('vdExportSubmenuWrap');
+      if (submenuWrap) {
+        submenuWrap.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active');
+        });
+        submenuWrap.addEventListener('mouseleave', () => {
+          closeTimer = setTimeout(() => {
+            submenu.classList.remove('active');
+          }, 300);
+        });
+        submenu.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active');
+        });
+      }
+    }
+
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllVdMenus();
+        if (typeof window.exportVoucherDeskToPDF === 'function') {
+          await window.exportVoucherDeskToPDF(getVoucherDeskExportData());
+        }
+      });
+    }
+
+    if (excelBtn) {
+      excelBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllVdMenus();
+        if (typeof window.exportVoucherDeskToExcel === 'function') {
+          await window.exportVoucherDeskToExcel(getVoucherDeskExportData());
+        }
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (moreDropdown && !moreDropdown.contains(e.target) && moreBtn && !moreBtn.contains(e.target)) {
+        closeAllVdMenus();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeAllVdMenus();
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireVoucherDeskMoreDropdown);
+  } else {
+    wireVoucherDeskMoreDropdown();
+  }
+
+  window.getVoucherDeskExportData = getVoucherDeskExportData;
   //  CHART OF ACCOUNTS
   // ══════════════════════════════════════════════════════════════════
 

@@ -10,8 +10,6 @@
       ledgerTabList:      'list',
       ledgerTabCustomers: 'customers',
       ledgerTabSuppliers: 'suppliers',
-      ledgerTabAdd:       'add',
-      ledgerTabAlter:     'alter',
     };
     Object.entries(tabMap).forEach(([btnId, tab]) => {
       const btn = document.getElementById(btnId);
@@ -19,10 +17,6 @@
         btn._wired = true;
         btn.addEventListener('click', (e) => {
           if (e) e.preventDefault();
-          if (tab === 'alter' && !_ledgerEditId) {
-            const firstLedger = coaLedgers[0];
-            _ledgerEditId = firstLedger ? firstLedger.id : null;
-          }
           switchLedgerTab(tab);
         });
       }
@@ -54,24 +48,156 @@
         switchLedgerTab('suppliers');
       });
     }
+
+    wireMasterCoaMoreDropdown();
+  }
+
+  let _masterCoaMoreWired = false;
+  function wireMasterCoaMoreDropdown() {
+    if (_masterCoaMoreWired) return;
+    _masterCoaMoreWired = true;
+
+    const moreBtn = document.getElementById('masterCoaMoreBtn');
+    const moreDropdown = document.getElementById('masterCoaMoreDropdown');
+    const submenuBtn = document.getElementById('masterCoaExportMenuBtn');
+    const submenu = document.getElementById('masterCoaExportSubmenu');
+    const pdfBtn = document.getElementById('masterCoaExportPdf');
+    const excelBtn = document.getElementById('masterCoaExportExcel');
+
+    if (moreBtn && moreDropdown) {
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = moreDropdown.classList.contains('active');
+        closeAllMasterCoaMenus();
+        if (!isOpen) {
+          moreDropdown.classList.add('active');
+        }
+      });
+    }
+
+    if (submenuBtn && submenu) {
+      let closeTimer = null;
+      submenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        submenu.classList.toggle('active');
+      });
+      const submenuWrap = document.getElementById('masterCoaExportSubmenuWrap');
+      if (submenuWrap) {
+        submenuWrap.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active');
+        });
+        submenuWrap.addEventListener('mouseleave', () => {
+          closeTimer = setTimeout(() => {
+            submenu.classList.remove('active');
+          }, 300);
+        });
+        submenu.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active');
+        });
+      }
+    }
+
+    function closeAllMasterCoaMenus() {
+      if (moreDropdown) moreDropdown.classList.remove('active');
+      if (submenu) submenu.classList.remove('active');
+    }
+
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllMasterCoaMenus();
+        const tab = _ledgerActiveTab || 'list';
+        if (tab === 'statement') {
+          const data = typeof getLedgerStatementExportData === 'function' ? getLedgerStatementExportData() : null;
+          if (data && typeof window.exportStatementToPDF === 'function') {
+            await window.exportStatementToPDF(data);
+          }
+        } else if (tab === 'customer-statement') {
+          const data = typeof getCustomerStatementExportData === 'function' ? getCustomerStatementExportData() : null;
+          if (data && typeof window.exportStatementToPDF === 'function') {
+            await window.exportStatementToPDF(data);
+          }
+        } else if (tab === 'supplier-statement') {
+          const data = typeof getSupplierStatementExportData === 'function' ? getSupplierStatementExportData() : null;
+          if (data && typeof window.exportStatementToPDF === 'function') {
+            await window.exportStatementToPDF(data);
+          }
+        } else if (tab === 'customers') {
+          if (typeof window.exportCustomersToPDF === 'function') {
+            await window.exportCustomersToPDF(window.getCustomersExportData());
+          }
+        } else if (tab === 'suppliers') {
+          if (typeof window.exportSuppliersToPDF === 'function') {
+            await window.exportSuppliersToPDF(window.getSuppliersExportData());
+          }
+        } else {
+          if (typeof window.exportLedgersToPDF === 'function') {
+            await window.exportLedgersToPDF(window.getLedgersExportData());
+          }
+        }
+      });
+    }
+
+    if (excelBtn) {
+      excelBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllMasterCoaMenus();
+        const tab = _ledgerActiveTab || 'list';
+        if (tab === 'statement') {
+          const data = typeof getLedgerStatementExportData === 'function' ? getLedgerStatementExportData() : null;
+          if (data && typeof window.exportStatementToExcel === 'function') {
+            await window.exportStatementToExcel(data);
+          }
+        } else if (tab === 'customer-statement') {
+          const data = typeof getCustomerStatementExportData === 'function' ? getCustomerStatementExportData() : null;
+          if (data && typeof window.exportStatementToExcel === 'function') {
+            await window.exportStatementToExcel(data);
+          }
+        } else if (tab === 'supplier-statement') {
+          const data = typeof getSupplierStatementExportData === 'function' ? getSupplierStatementExportData() : null;
+          if (data && typeof window.exportStatementToExcel === 'function') {
+            await window.exportStatementToExcel(data);
+          }
+        } else if (tab === 'customers') {
+          if (typeof window.exportCustomersToExcel === 'function') {
+            await window.exportCustomersToExcel(window.getCustomersExportData());
+          }
+        } else if (tab === 'suppliers') {
+          if (typeof window.exportSuppliersToExcel === 'function') {
+            await window.exportSuppliersToExcel(window.getSuppliersExportData());
+          }
+        } else {
+          if (typeof window.exportLedgersToExcel === 'function') {
+            await window.exportLedgersToExcel(window.getLedgersExportData());
+          }
+        }
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (moreDropdown && !moreDropdown.contains(e.target) && (!moreBtn || !moreBtn.contains(e.target))) {
+        closeAllMasterCoaMenus();
+      }
+    });
   }
 
   function switchLedgerTab(tab) {
+    if (tab === 'add' || tab === 'alter') {
+      tab = 'list';
+    }
     _ledgerActiveTab = tab;
 
     const allTabs = [
       ['ledgerTabList',      'list'],
       ['ledgerTabCustomers', 'customers'],
       ['ledgerTabSuppliers', 'suppliers'],
-      ['ledgerTabAdd',       'add'],
-      ['ledgerTabAlter',     'alter'],
     ];
     const allViews = [
       ['ledger-list-view',        'list'],
       ['customer-list-view',      'customers'],
       ['supplier-list-view',      'suppliers'],
-      ['ledger-add-view',         'add'],
-      ['ledger-alter-view',       'alter'],
       ['ledger-statement-view',   'statement'],
       ['customer-statement-view', 'customer-statement'],
       ['supplier-statement-view', 'supplier-statement'],
@@ -107,10 +233,6 @@
       renderCustomerListView();
     } else if (tab === 'suppliers') {
       renderSupplierListView();
-    } else if (tab === 'add') {
-      renderLedgerAddView();
-    } else if (tab === 'alter') {
-      renderLedgerAlterView();
     } else if (tab === 'statement') {
       renderLedgerStatementView();
     } else if (tab === 'customer-statement') {
@@ -637,18 +759,6 @@
     document.getElementById('statementLedgerName').textContent = ledger.name;
     document.getElementById('statementSubGroupName').textContent = resolveLedgerSubgroupName(ledger);
 
-    // Wire Alter Details button
-    const btnEdit = document.getElementById('btnEditLedgerFromStatement');
-    if (btnEdit) {
-      const newBtn = btnEdit.cloneNode(true);
-      btnEdit.parentNode.replaceChild(newBtn, btnEdit);
-      newBtn.addEventListener('click', (e) => {
-        if (e) e.preventDefault();
-        _ledgerEditId = ledger.id;
-        switchLedgerTab('alter');
-      });
-    }
-
     // Get date values
     const fromInp = document.getElementById('statementDateFrom');
     const toInp = document.getElementById('statementDateTo');
@@ -964,6 +1074,154 @@
     document.getElementById('statementSuppOpeningBal').textContent = `₹${fmtNum(Math.abs(data.openingBalance).toFixed(2))} Cr`;
     document.getElementById('statementSuppCurrentBal').textContent = `₹${fmtNum(Math.abs(data.periodNet).toFixed(2))} ${data.periodNet >= 0 ? 'Cr' : 'Dr'}`;
     document.getElementById('statementSuppClosingBal').textContent = `₹${fmtNum(Math.abs(data.closingBalance).toFixed(2))} Cr`;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  STATEMENT EXPORT HELPERS & WIRING
+  // ══════════════════════════════════════════════════════════════════
+
+  function getLedgerStatementExportData() {
+    const ledger = coaLedgers.find(l => l.id === _ledgerStatementId);
+    if (!ledger) return null;
+
+    const fromInp = document.getElementById('statementDateFrom');
+    const toInp = document.getElementById('statementDateTo');
+    const dateFrom = fromInp ? fromInp.value : '';
+    const dateTo = toInp ? toInp.value : '';
+
+    const balances = calculateLedgerBalances(ledger, dateFrom, dateTo);
+
+    const ledgerTrans = [];
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    postedEntries.forEach(entry => {
+      if (dateFrom && entry.date < dateFrom) return;
+      if (dateTo && entry.date > dateTo) return;
+
+      (entry.allRows || []).forEach(row => {
+        if (row.particular.trim().toLowerCase() === ledger.name.trim().toLowerCase()) {
+          const dr = parseFloat(row.debit) || 0;
+          const cr = parseFloat(row.credit) || 0;
+          if (dr > 0 || cr > 0) {
+            totalDebit += dr;
+            totalCredit += cr;
+            ledgerTrans.push({
+              id: entry.id,
+              date: entry.date,
+              voucherNo: entry.voucherNo || '-',
+              particulars: getOppositeParticulars(entry, ledger.name, dr > 0),
+              debit: dr,
+              credit: cr
+            });
+          }
+        }
+      });
+    });
+
+    ledgerTrans.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
+    const companyName = activeCo.name || 'KYA Accounting';
+
+    return {
+      companyName,
+      type: 'ledger',
+      title: 'LEDGER STATEMENT',
+      accountName: ledger.name,
+      code: ledger.code || '',
+      subgroupName: resolveLedgerSubgroupName(ledger),
+      dateFrom,
+      dateTo,
+      openingBalance: balances.openingBalance,
+      periodNet: balances.periodNet,
+      closingBalance: balances.closingBalance,
+      totalDebit,
+      totalCredit,
+      transactions: ledgerTrans
+    };
+  }
+
+  function getCustomerStatementExportData() {
+    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const customer = custs.find(c => String(c.id) === String(_customerStatementId) || String(c.name).toLowerCase() === String(_customerStatementId).toLowerCase());
+    if (!customer) return null;
+
+    const fromInp = document.getElementById('statementCustDateFrom');
+    const toInp = document.getElementById('statementCustDateTo');
+    const dateFrom = fromInp ? fromInp.value : '';
+    const dateTo = toInp ? toInp.value : '';
+
+    const data = getCustomerStatementData(customer.id, dateFrom, dateTo);
+    if (!data) return null;
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    (data.transactions || []).forEach(tr => {
+      totalDebit += (parseFloat(tr.debit) || 0);
+      totalCredit += (parseFloat(tr.credit) || 0);
+    });
+
+    const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
+    const companyName = activeCo.name || 'KYA Accounting';
+
+    return {
+      companyName,
+      type: 'customer',
+      title: 'CUSTOMER STATEMENT',
+      accountName: customer.name,
+      code: customer.code || '',
+      subgroupName: 'Trade Receivables (Sundry Debtors)',
+      dateFrom,
+      dateTo,
+      openingBalance: data.openingBalance,
+      periodNet: data.periodNet,
+      closingBalance: data.closingBalance,
+      totalDebit,
+      totalCredit,
+      transactions: data.transactions || []
+    };
+  }
+
+  function getSupplierStatementExportData() {
+    const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+    const supplier = supps.find(s => String(s.id) === String(_supplierStatementId) || String(s.name).toLowerCase() === String(_supplierStatementId).toLowerCase());
+    if (!supplier) return null;
+
+    const fromInp = document.getElementById('statementSuppDateFrom');
+    const toInp = document.getElementById('statementSuppDateTo');
+    const dateFrom = fromInp ? fromInp.value : '';
+    const dateTo = toInp ? toInp.value : '';
+
+    const data = getSupplierStatementData(supplier.id, dateFrom, dateTo);
+    if (!data) return null;
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    (data.transactions || []).forEach(tr => {
+      totalDebit += (parseFloat(tr.debit) || 0);
+      totalCredit += (parseFloat(tr.credit) || 0);
+    });
+
+    const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
+    const companyName = activeCo.name || 'KYA Accounting';
+
+    return {
+      companyName,
+      type: 'supplier',
+      title: 'SUPPLIER STATEMENT',
+      accountName: supplier.name,
+      code: supplier.code || '',
+      subgroupName: 'Trade Payables (Sundry Creditors)',
+      dateFrom,
+      dateTo,
+      openingBalance: data.openingBalance,
+      periodNet: data.periodNet,
+      closingBalance: data.closingBalance,
+      totalDebit,
+      totalCredit,
+      transactions: data.transactions || []
+    };
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1689,3 +1947,7 @@
       }
     }
   };
+
+  window.getLedgerStatementExportData = getLedgerStatementExportData;
+  window.getCustomerStatementExportData = getCustomerStatementExportData;
+  window.getSupplierStatementExportData = getSupplierStatementExportData;

@@ -195,6 +195,136 @@
     return 0;
   }
 
+  // ── Helper: Format date for report column headers ───────────────────
+  function formatRptDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+      }
+    } catch(e) {}
+    return dateStr;
+  }
+
+  function formatRptDateRange(fromStr, toStr, defaultLabel = '') {
+    if (!fromStr && !toStr) return defaultLabel || 'All Periods';
+    if (fromStr && toStr) {
+      return `${formatRptDate(fromStr)} – ${formatRptDate(toStr)}`;
+    }
+    if (toStr) {
+      return `Up to ${formatRptDate(toStr)}`;
+    }
+    return `From ${formatRptDate(fromStr)}`;
+  }
+
+  // ── Helper: Check if a single ledger has transactions/activity ──────
+  function ledgerHasTransactions(ledger, dateFrom, dateTo, isBalanceSheet = false) {
+    if (!ledger || ledger.type !== 'ledger') return false;
+
+    // For Balance Sheet, opening balance is considered an active transaction/starting balance
+    if (isBalanceSheet && parseAmt(ledger.openingBalance) !== 0) {
+      return true;
+    }
+
+    const ledgerNameLower = (ledger.name || '').trim().toLowerCase();
+    if (!ledgerNameLower) return false;
+
+    const entries = (typeof postedEntries !== 'undefined' && Array.isArray(postedEntries)) ? postedEntries : [];
+    return entries.some(entry => {
+      if (isBalanceSheet) {
+        if (dateTo && entry.date > dateTo) return false;
+      } else {
+        if (dateFrom && entry.date < dateFrom) return false;
+        if (dateTo && entry.date > dateTo) return false;
+      }
+
+      return (entry.allRows || []).some(row => {
+        const part = (row.particular || '').trim().toLowerCase();
+        if (part !== ledgerNameLower) return false;
+        const dr = parseAmt(row.debit);
+        const cr = parseAmt(row.credit);
+        return dr !== 0 || cr !== 0;
+      });
+    });
+  }
+
+  // ── Helper: Check if any P&L transactions exist in period ───────────
+  function hasAnyPnlTransactions(dateFrom, dateTo) {
+    if (typeof postedEntries === 'undefined' || !Array.isArray(postedEntries)) return false;
+    const pnlLedgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).filter(l => {
+      if (l.type !== 'ledger') return false;
+      const mg = getLedgerMainGroup(l);
+      return mg === 'income' || mg === 'expense';
+    });
+    const pnlNames = new Set(pnlLedgers.map(l => (l.name || '').trim().toLowerCase()));
+
+    return postedEntries.some(entry => {
+      if (dateFrom && entry.date < dateFrom) return false;
+      if (dateTo && entry.date > dateTo) return false;
+      return (entry.allRows || []).some(r => {
+        const part = (r.particular || '').trim().toLowerCase();
+        return pnlNames.has(part) && (parseAmt(r.debit) !== 0 || parseAmt(r.credit) !== 0);
+      });
+    });
+  }
+
+  // ── Helper: Check if a group ledger has any insider ledgers with transactions ──
+  function groupLedgerHasTransactions(glId, dateFrom, dateTo, isBalanceSheet = false) {
+    if (!glId || typeof coaLedgers === 'undefined') return false;
+    const childLedgers = coaLedgers.filter(l => l.glId === glId);
+    return childLedgers.some(l => {
+      if (l.type === 'ledger') {
+        return ledgerHasTransactions(l, dateFrom, dateTo, isBalanceSheet);
+      } else if (l.type === 'group-ledger') {
+        return groupLedgerHasTransactions(l.id, dateFrom, dateTo, isBalanceSheet);
+      }
+      return false;
+    });
+  }
+
+  // ── Helper: Check if a subgroup has any inside ledgers or child subgroups with transactions ──
+  function subgroupHasTransactions(sgId, dateFrom, dateTo, isBalanceSheet = false, profitAmt = 0, priorProfit = 0, openingDiff = 0) {
+    if (!sgId) return false;
+
+    // Special case for Reserves & Surplus (sg-rs) in Balance Sheet
+    if (isBalanceSheet && sgId === 'sg-rs') {
+      if (profitAmt !== 0 || priorProfit !== 0 || openingDiff !== 0) {
+        return true;
+      }
+      if (hasAnyPnlTransactions(dateFrom, dateTo)) {
+        return true;
+      }
+    }
+
+    // Direct ledgers under this subgroup
+    if (typeof coaLedgers !== 'undefined') {
+      const directLedgers = coaLedgers.filter(l => l.sgId === sgId && l.type === 'ledger' && !l.glId);
+      if (directLedgers.some(l => ledgerHasTransactions(l, dateFrom, dateTo, isBalanceSheet))) {
+        return true;
+      }
+
+      // Group ledgers under this subgroup
+      const groupLedgers = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger' && !l.glId);
+      if (groupLedgers.some(gl => groupLedgerHasTransactions(gl.id, dateFrom, dateTo, isBalanceSheet))) {
+        return true;
+      }
+    }
+
+    // Child subgroups under this subgroup
+    if (typeof COA_SYS_SGS !== 'undefined') {
+      const childSgs = COA_SYS_SGS.filter(s => s.parent === sgId);
+      if (childSgs.some(csg => subgroupHasTransactions(csg.id, dateFrom, dateTo, isBalanceSheet, profitAmt, priorProfit, openingDiff))) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function renderBalanceSheetPanel() {
     injectBalanceSheetStyles();
     const wrap = document.getElementById('balanceSheetWrap');
@@ -208,6 +338,12 @@
     const dateFrom = fromInp ? fromInp.value : '';
     const dateTo   = toInp ? toInp.value : '';
 
+    const isCompare = document.getElementById('bsCompareCheck')?.checked || false;
+    const compFromInp = document.getElementById('bsCompareDateFrom');
+    const compToInp   = document.getElementById('bsCompareDateTo');
+    const compareDateFrom = (isCompare && compFromInp) ? compFromInp.value : '';
+    const compareDateTo   = (isCompare && compToInp) ? compToInp.value : '';
+
     if (_bsExpanded.size === 0) {
       _bsExpanded.add('mg-assets');
       _bsExpanded.add('mg-equity-liabilities');
@@ -216,21 +352,39 @@
       });
     }
 
-    // 1. Posted Journal Entries -> Trial Balance (for filtered period)
-    const pnlBalances = computeTrialBalanceBalances(dateFrom, dateTo);
+    // 1. Primary Period Trial Balance
+    const pnlBalances1 = computeTrialBalanceBalances(dateFrom, dateTo);
+    const profitAmt1   = calculatePnlProfitFromTrialBalances(pnlBalances1);
+    const ledgerBalances1 = computeTrialBalanceBalances('', dateTo);
+    const cumulativeProfit1 = calculatePnlProfitFromTrialBalances(ledgerBalances1);
+    const priorProfit1 = cumulativeProfit1 - profitAmt1;
+    const openingDiff1 = calculateOpeningDifferenceFromTrial(ledgerBalances1);
 
-    // 2. Profit & Loss Account generated from filtered Trial Balance
-    const profitAmt = calculatePnlProfitFromTrialBalances(pnlBalances);
+    // 2. Comparison Period Trial Balance (if enabled)
+    let pnlBalances2 = {};
+    let profitAmt2 = 0;
+    let ledgerBalances2 = {};
+    let priorProfit2 = 0;
+    let openingDiff2 = 0;
 
-    // 3. Balance Sheet uses the closing balances from the Trial Balance as of To Date
-    const ledgerBalances = computeTrialBalanceBalances('', dateTo);
+    if (isCompare) {
+      pnlBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
+      profitAmt2 = calculatePnlProfitFromTrialBalances(pnlBalances2);
+      ledgerBalances2 = computeTrialBalanceBalances('', compareDateTo);
+      const cumulativeProfit2 = calculatePnlProfitFromTrialBalances(ledgerBalances2);
+      priorProfit2 = cumulativeProfit2 - profitAmt2;
+      openingDiff2 = calculateOpeningDifferenceFromTrial(ledgerBalances2);
+    }
 
-    // Cumulative profit & prior profit
-    const cumulativeProfit = calculatePnlProfitFromTrialBalances(ledgerBalances);
-    const priorProfit = cumulativeProfit - profitAmt;
+    const col1Title = dateTo ? `As of ${formatRptDate(dateTo)}` : 'Current (₹)';
+    const col2Title = compareDateTo ? `As of ${formatRptDate(compareDateTo)}` : 'Compare (₹)';
 
-    // Opening Difference computed from Trial Balance balances
-    const openingDiff = calculateOpeningDifferenceFromTrial(ledgerBalances);
+    function getBsAmtHtml(bal1, bal2) {
+      if (isCompare) {
+        return `<div class="bs-amt-pair"><span class="amt-col-primary">₹ ${fmtNum(bal1)}</span><span class="amt-col-compare">₹ ${fmtNum(bal2)}</span></div>`;
+      }
+      return `<div class="bs-amt-col">₹ ${fmtNum(bal1)}</div>`;
+    }
 
     const btnVert = document.getElementById('bsLayoutVertical');
     const btnHoriz = document.getElementById('bsLayoutHorizontal');
@@ -272,7 +426,8 @@
     mainGroupsToRender.forEach(mg => {
       if (!mg) return;
 
-      const mgBal = getNodeBalance(mg.id, 'mg', ledgerBalances, profitAmt, openingDiff, priorProfit);
+      const mgBal1 = getNodeBalance(mg.id, 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+      const mgBal2 = isCompare ? getNodeBalance(mg.id, 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
       const isMgOpen = _bsExpanded.has('mg-' + mg.id);
 
       treeHtml += `
@@ -284,16 +439,62 @@
               </svg>
               <span class="bs-name-text">${mg.name}</span>
             </div>
-            <div class="bs-amt-col">₹ ${fmtNum(mgBal)}</div>
+            ${getBsAmtHtml(mgBal1, mgBal2)}
           </div>
+          ${isCompare ? `
+            <div class="bs-col-hdrs">
+              <span>Particulars</span>
+              <div class="bs-amt-pair">
+                <span class="amt-col-primary">${col1Title}</span>
+                <span class="amt-col-compare">${col2Title}</span>
+              </div>
+            </div>
+          ` : ''}
           <div id="bsBody-mg-${mg.id}" style="${isMgOpen ? '' : 'display:none'} ${(_bsLayoutMode === 'Horizontal' && isMgOpen) ? '; display: flex; flex-direction: column; flex-grow: 1;' : ''}">
       `;
 
       const l1Sgs = COA_SYS_SGS.filter(s => s.main === mg.id && s.parent === null);
       l1Sgs.forEach(l1Sg => {
-        const l1Bal = getNodeBalance(l1Sg.id, 'sg', ledgerBalances, profitAmt, openingDiff, priorProfit);
+        const hasTx1 = subgroupHasTransactions(l1Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
+        const hasTx2 = isCompare && subgroupHasTransactions(l1Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
+        if (!hasTx1 && !hasTx2) return;
+
+        const l1Bal1 = getNodeBalance(l1Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+        const l1Bal2 = isCompare ? getNodeBalance(l1Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
         const isL1Open = _bsExpanded.has('sg-' + l1Sg.id);
         const hasChildrenSg = COA_SYS_SGS.some(s => s.parent === l1Sg.id);
+
+        let bodyHtml = '';
+
+        if (hasChildrenSg) {
+          const l2Sgs = COA_SYS_SGS.filter(s => s.parent === l1Sg.id);
+          l2Sgs.forEach(l2Sg => {
+            const hasL2Tx1 = subgroupHasTransactions(l2Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
+            const hasL2Tx2 = isCompare && subgroupHasTransactions(l2Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
+            if (!hasL2Tx1 && !hasL2Tx2) return;
+
+            const l2Bal1 = getNodeBalance(l2Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+            const l2Bal2 = isCompare ? getNodeBalance(l2Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+            const isL2Open = _bsExpanded.has('sg-' + l2Sg.id);
+
+            bodyHtml += `
+              <div class="bs-row bs-row-l2 bs-indent-l2" data-bs-toggle="sg-${l2Sg.id}">
+                <div class="bs-name-col">
+                  <svg class="bs-caret${isL2Open ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
+                    <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span class="bs-name-text">${l2Sg.name}</span>
+                </div>
+                ${getBsAmtHtml(l2Bal1, l2Bal2)}
+              </div>
+              <div id="bsBody-sg-${l2Sg.id}" style="${isL2Open ? '' : 'display:none'}">
+                ${renderSubgroupLeafs(l2Sg.id, ledgerBalances1, profitAmt1, openingDiff1, 'bs-indent-l3', 'bs-indent-l4', priorProfit1, dateFrom, dateTo, isCompare, ledgerBalances2, profitAmt2, openingDiff2, priorProfit2, compareDateFrom, compareDateTo)}
+              </div>
+            `;
+          });
+        } else {
+          bodyHtml += renderSubgroupLeafs(l1Sg.id, ledgerBalances1, profitAmt1, openingDiff1, 'bs-indent-l2', 'bs-indent-l3', priorProfit1, dateFrom, dateTo, isCompare, ledgerBalances2, profitAmt2, openingDiff2, priorProfit2, compareDateFrom, compareDateTo);
+        }
 
         treeHtml += `
           <div class="bs-row bs-row-l1 bs-indent-l1" data-bs-toggle="sg-${l1Sg.id}">
@@ -303,45 +504,18 @@
               </svg>
               <span class="bs-name-text">${l1Sg.name}</span>
             </div>
-            <div class="bs-amt-col">₹ ${fmtNum(l1Bal)}</div>
+            ${getBsAmtHtml(l1Bal1, l1Bal2)}
           </div>
           <div id="bsBody-sg-${l1Sg.id}" style="${isL1Open ? '' : 'display:none'}">
+            ${bodyHtml}
+          </div>
         `;
-
-        if (hasChildrenSg) {
-          const l2Sgs = COA_SYS_SGS.filter(s => s.parent === l1Sg.id);
-          l2Sgs.forEach(l2Sg => {
-            const l2Bal = getNodeBalance(l2Sg.id, 'sg', ledgerBalances, profitAmt, openingDiff, priorProfit);
-            const isL2Open = _bsExpanded.has('sg-' + l2Sg.id);
-
-            treeHtml += `
-              <div class="bs-row bs-row-l2 bs-indent-l2" data-bs-toggle="sg-${l2Sg.id}">
-                <div class="bs-name-col">
-                  <svg class="bs-caret${isL2Open ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
-                    <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span class="bs-name-text">${l2Sg.name}</span>
-                </div>
-                <div class="bs-amt-col">₹ ${fmtNum(l2Bal)}</div>
-              </div>
-              <div id="bsBody-sg-${l2Sg.id}" style="${isL2Open ? '' : 'display:none'}">
-            `;
-
-            treeHtml += renderSubgroupLeafs(l2Sg.id, ledgerBalances, profitAmt, openingDiff, 'bs-indent-l3', 'bs-indent-l4', priorProfit);
-
-            treeHtml += `</div>`;
-          });
-        } else {
-          treeHtml += renderSubgroupLeafs(l1Sg.id, ledgerBalances, profitAmt, openingDiff, 'bs-indent-l2', 'bs-indent-l3', priorProfit);
-        }
-
-        treeHtml += `</div>`;
       });
 
       treeHtml += `
             <div class="bs-row bs-grandtotal bs-indent-l0" style="${_bsLayoutMode === 'Horizontal' ? 'margin-top: auto;' : ''}">
               <span style="text-transform: uppercase;">Total ${mg.name}</span>
-              <div class="bs-amt-col">₹ ${fmtNum(mgBal)}</div>
+              ${getBsAmtHtml(mgBal1, mgBal2)}
             </div>
           </div>
         </div>
@@ -351,11 +525,11 @@
     treeHtml += '</div>';
     wrap.innerHTML = treeHtml;
 
-    // Validation Status Badge
+    // Validation Status Badge for Primary Period
     const badgeWrap = document.getElementById('bsStatusBadgeWrap');
     if (badgeWrap) {
-      const totAssets = getNodeBalance('assets', 'mg', ledgerBalances, profitAmt, openingDiff, priorProfit);
-      const totLiab   = getNodeBalance('equity-liabilities', 'mg', ledgerBalances, profitAmt, openingDiff, priorProfit);
+      const totAssets = getNodeBalance('assets', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+      const totLiab   = getNodeBalance('equity-liabilities', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
       const isBalanced = Math.abs(totAssets - totLiab) < 0.01;
 
       if (isBalanced) {
@@ -391,41 +565,52 @@
     });
   }
 
-  function renderSubgroupLeafs(sgId, ledgerBalances, profitAmt, openingDiff, indentClassL3, indentClassL4, priorProfit = 0) {
+  function renderSubgroupLeafs(sgId, ledgerBalances1, profitAmt1, openingDiff1, indentClassL3, indentClassL4, priorProfit1 = 0, dateFrom = '', dateTo = '', isCompare = false, ledgerBalances2 = {}, profitAmt2 = 0, openingDiff2 = 0, priorProfit2 = 0, compareDateFrom = '', compareDateTo = '') {
     let html = '';
     const hideZero = document.getElementById('bsHideZero')?.checked || false;
 
+    function getBsAmtHtml(bal1, bal2) {
+      if (isCompare) {
+        return `<div class="bs-amt-pair"><span class="amt-col-primary">₹ ${fmtNum(bal1)}</span><span class="amt-col-compare">₹ ${fmtNum(bal2)}</span></div>`;
+      }
+      return `<div class="bs-amt-col">₹ ${fmtNum(bal1)}</div>`;
+    }
+
     if (sgId === 'sg-rs') {
-      if (!hideZero || profitAmt !== 0) {
+      const hasPnl1 = (profitAmt1 !== 0 || hasAnyPnlTransactions(dateFrom, dateTo));
+      const hasPnl2 = isCompare && (profitAmt2 !== 0 || hasAnyPnlTransactions(compareDateFrom, compareDateTo));
+      if ((hasPnl1 || hasPnl2) && (!hideZero || profitAmt1 !== 0 || (isCompare && profitAmt2 !== 0))) {
         html += `
           <div class="bs-row bs-row-l4 ${indentClassL3}">
             <div class="bs-name-col">
               <span class="bs-caret-empty"></span>
               <span class="bs-name-text">Profit & Loss A/c (Current Year)</span>
             </div>
-            <div class="bs-amt-col">₹ ${fmtNum(profitAmt)}</div>
+            ${getBsAmtHtml(profitAmt1, profitAmt2)}
           </div>
         `;
       }
-      if (!hideZero || priorProfit !== 0) {
+      const hasPrior1 = priorProfit1 !== 0 || hasAnyPnlTransactions('', dateFrom);
+      const hasPrior2 = isCompare && (priorProfit2 !== 0 || hasAnyPnlTransactions('', compareDateFrom));
+      if ((!hideZero && (hasPrior1 || hasPrior2)) || (hideZero && (priorProfit1 !== 0 || (isCompare && priorProfit2 !== 0)))) {
         html += `
           <div class="bs-row bs-row-l4 ${indentClassL3}">
             <div class="bs-name-col">
               <span class="bs-caret-empty"></span>
               <span class="bs-name-text">Retained Earnings (Prior to filter)</span>
             </div>
-            <div class="bs-amt-col">₹ ${fmtNum(priorProfit)}</div>
+            ${getBsAmtHtml(priorProfit1, priorProfit2)}
           </div>
         `;
       }
-      if (!hideZero || openingDiff !== 0) {
+      if (openingDiff1 !== 0 || (isCompare && openingDiff2 !== 0)) {
         html += `
           <div class="bs-row bs-row-l4 ${indentClassL3}">
             <div class="bs-name-col">
               <span class="bs-caret-empty"></span>
               <span class="bs-name-text">Difference in Opening Balances</span>
             </div>
-            <div class="bs-amt-col">₹ ${fmtNum(openingDiff)}</div>
+            ${getBsAmtHtml(openingDiff1, openingDiff2)}
           </div>
         `;
       }
@@ -436,8 +621,13 @@
       const sg = COA_SYS_SGS.find(s => s.id === gl.sgId);
       if (!sg || (sg.main !== 'assets' && sg.main !== 'equity-liabilities')) return;
 
-      const glBal = getNodeBalance(gl.id, 'group-ledger', ledgerBalances, profitAmt, openingDiff, priorProfit);
-      if (hideZero && glBal === 0) return;
+      const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, true);
+      const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, true);
+      if (!hasGlTx1 && !hasGlTx2) return;
+
+      const glBal1 = getNodeBalance(gl.id, 'group-ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+      const glBal2 = isCompare ? getNodeBalance(gl.id, 'group-ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+      if (hideZero && glBal1 === 0 && (!isCompare || glBal2 === 0)) return;
 
       const isGlOpen = _bsExpanded.has('gl-' + gl.id);
 
@@ -447,8 +637,13 @@
         const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
         if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
 
-        const bal = getNodeBalance(l.id, 'ledger', ledgerBalances, profitAmt, openingDiff, priorProfit);
-        if (hideZero && bal === 0) return;
+        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
+        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
+        if (!hasLTx1 && !hasLTx2) return;
+
+        const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+        const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+        if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
 
         childHtml += `
           <div class="bs-row bs-row-l4 ${indentClassL4}">
@@ -457,12 +652,12 @@
               <span class="bs-name-text">${l.name}</span>
               ${l.code ? `<span class="bs-code">${l.code}</span>` : ''}
             </div>
-            <div class="bs-amt-col">₹ ${fmtNum(bal)}</div>
+            ${getBsAmtHtml(bal1, bal2)}
           </div>
         `;
       });
 
-      if (hideZero && glBal === 0 && childHtml === '') return;
+      if (hideZero && glBal1 === 0 && (!isCompare || glBal2 === 0) && childHtml === '') return;
 
       html += `
         <div class="bs-row bs-row-l3 ${indentClassL3}" data-bs-toggle="gl-${gl.id}">
@@ -473,7 +668,7 @@
             <span class="bs-name-text">📁 ${gl.name}</span>
             ${gl.code ? `<span class="bs-code">${gl.code}</span>` : ''}
           </div>
-          <div class="bs-amt-col">₹ ${fmtNum(glBal)}</div>
+          ${getBsAmtHtml(glBal1, glBal2)}
         </div>
         <div id="bsBody-gl-${gl.id}" style="${isGlOpen ? '' : 'display:none'}">
           ${childHtml}
@@ -486,8 +681,13 @@
       const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
       if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
 
-      const bal = getNodeBalance(l.id, 'ledger', ledgerBalances, profitAmt, openingDiff, priorProfit);
-      if (hideZero && bal === 0) return;
+      const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
+      const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
+      if (!hasLTx1 && !hasLTx2) return;
+
+      const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+      const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+      if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
 
       html += `
         <div class="bs-row bs-row-l4 ${indentClassL3}">
@@ -496,7 +696,7 @@
             <span class="bs-name-text">${l.name}</span>
             ${l.code ? `<span class="bs-code">${l.code}</span>` : ''}
           </div>
-          <div class="bs-amt-col">₹ ${fmtNum(bal)}</div>
+          ${getBsAmtHtml(bal1, bal2)}
         </div>
       `;
     });
@@ -504,18 +704,281 @@
     return html;
   }
 
-  // Wire toolbar buttons for Balance Sheet
+  // Helper to compile structured Balance Sheet Report Data for Export
+  function getBalanceSheetReportData() {
+    const fromInp = document.getElementById('bsDateFrom');
+    const toInp   = document.getElementById('bsDateTo');
+    const dateFrom = fromInp ? fromInp.value : (_globalDateFrom || '');
+    const dateTo   = toInp ? toInp.value : (_globalDateTo || '');
+
+    const isCompare = document.getElementById('bsCompareCheck')?.checked || false;
+    const compFromInp = document.getElementById('bsCompareDateFrom');
+    const compToInp   = document.getElementById('bsCompareDateTo');
+    const compareDateFrom = (isCompare && compFromInp) ? compFromInp.value : '';
+    const compareDateTo   = (isCompare && compToInp) ? compToInp.value : '';
+
+    const hideZero = document.getElementById('bsHideZero')?.checked || false;
+
+    // 1. Primary Period Trial Balance
+    const pnlBalances1 = computeTrialBalanceBalances(dateFrom, dateTo);
+    const profitAmt1   = calculatePnlProfitFromTrialBalances(pnlBalances1);
+    const ledgerBalances1 = computeTrialBalanceBalances('', dateTo);
+    const cumulativeProfit1 = calculatePnlProfitFromTrialBalances(ledgerBalances1);
+    const priorProfit1 = cumulativeProfit1 - profitAmt1;
+    const openingDiff1 = calculateOpeningDifferenceFromTrial(ledgerBalances1);
+
+    // 2. Comparison Period Trial Balance
+    let pnlBalances2 = {};
+    let profitAmt2 = 0;
+    let ledgerBalances2 = {};
+    let priorProfit2 = 0;
+    let openingDiff2 = 0;
+
+    if (isCompare) {
+      pnlBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
+      profitAmt2 = calculatePnlProfitFromTrialBalances(pnlBalances2);
+      ledgerBalances2 = computeTrialBalanceBalances('', compareDateTo);
+      const cumulativeProfit2 = calculatePnlProfitFromTrialBalances(ledgerBalances2);
+      priorProfit2 = cumulativeProfit2 - profitAmt2;
+      openingDiff2 = calculateOpeningDifferenceFromTrial(ledgerBalances2);
+    }
+
+    const co = (typeof getCompanyDetails === 'function') ? getCompanyDetails() : {};
+    const companyName = co.name || 'KYA Accounting';
+
+    function getSubgroupItems(sgId) {
+      const items = [];
+
+      if (sgId === 'sg-rs') {
+        const hasPnl1 = (profitAmt1 !== 0 || hasAnyPnlTransactions(dateFrom, dateTo));
+        const hasPnl2 = isCompare && (profitAmt2 !== 0 || hasAnyPnlTransactions(compareDateFrom, compareDateTo));
+        if ((hasPnl1 || hasPnl2) && (!hideZero || profitAmt1 !== 0 || (isCompare && profitAmt2 !== 0))) {
+          items.push({ name: 'Profit & Loss A/c (Current Year)', code: '', isGroup: false, amount1: profitAmt1, amount2: profitAmt2 });
+        }
+
+        const hasPrior1 = priorProfit1 !== 0 || hasAnyPnlTransactions('', dateFrom);
+        const hasPrior2 = isCompare && (priorProfit2 !== 0 || hasAnyPnlTransactions('', compareDateFrom));
+        if ((!hideZero && (hasPrior1 || hasPrior2)) || (hideZero && (priorProfit1 !== 0 || (isCompare && priorProfit2 !== 0)))) {
+          items.push({ name: 'Retained Earnings (Prior to filter)', code: '', isGroup: false, amount1: priorProfit1, amount2: priorProfit2 });
+        }
+
+        if (openingDiff1 !== 0 || (isCompare && openingDiff2 !== 0)) {
+          items.push({ name: 'Difference in Opening Balances', code: '', isGroup: false, amount1: openingDiff1, amount2: openingDiff2 });
+        }
+      }
+
+      const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
+      groupLdgs.forEach(gl => {
+        const sg = COA_SYS_SGS.find(s => s.id === gl.sgId);
+        if (!sg || (sg.main !== 'assets' && sg.main !== 'equity-liabilities')) return;
+
+        const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, true);
+        const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, true);
+        if (!hasGlTx1 && !hasGlTx2) return;
+
+        const glBal1 = getNodeBalance(gl.id, 'group-ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+        const glBal2 = isCompare ? getNodeBalance(gl.id, 'group-ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+        if (hideZero && glBal1 === 0 && (!isCompare || glBal2 === 0)) return;
+
+        const children = [];
+        const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
+        childLdgs.forEach(l => {
+          const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
+          if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
+
+          const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
+          const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
+          if (!hasLTx1 && !hasLTx2) return;
+
+          const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+          const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+          if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
+
+          children.push({ name: l.name, code: l.code || '', amount1: bal1, amount2: bal2 });
+        });
+
+        items.push({ name: gl.name, code: gl.code || '', isGroup: true, amount1: glBal1, amount2: glBal2, children });
+      });
+
+      const directLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'ledger' && !l.glId);
+      directLdgs.forEach(l => {
+        const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
+        if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
+
+        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
+        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
+        if (!hasLTx1 && !hasLTx2) return;
+
+        const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+        const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+        if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
+
+        items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
+      });
+
+      return items;
+    }
+
+    const mainGroups = [];
+    const orderedMainGroups = [
+      COA_MAIN_GROUPS.find(mg => mg.id === 'equity-liabilities'),
+      COA_MAIN_GROUPS.find(mg => mg.id === 'assets')
+    ];
+
+    orderedMainGroups.forEach(mg => {
+      if (!mg) return;
+
+      const mgBal1 = getNodeBalance(mg.id, 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+      const mgBal2 = isCompare ? getNodeBalance(mg.id, 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+
+      const subgroups = [];
+      const l1Sgs = COA_SYS_SGS.filter(s => s.main === mg.id && s.parent === null);
+      l1Sgs.forEach(l1Sg => {
+        const hasTx1 = subgroupHasTransactions(l1Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
+        const hasTx2 = isCompare && subgroupHasTransactions(l1Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
+        if (!hasTx1 && !hasTx2) return;
+
+        const l1Bal1 = getNodeBalance(l1Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+        const l1Bal2 = isCompare ? getNodeBalance(l1Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+        const hasChildrenSg = COA_SYS_SGS.some(s => s.parent === l1Sg.id);
+
+        if (hasChildrenSg) {
+          const l2Subgroups = [];
+          const l2Sgs = COA_SYS_SGS.filter(s => s.parent === l1Sg.id);
+          l2Sgs.forEach(l2Sg => {
+            const hasL2Tx1 = subgroupHasTransactions(l2Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
+            const hasL2Tx2 = isCompare && subgroupHasTransactions(l2Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
+            if (!hasL2Tx1 && !hasL2Tx2) return;
+
+            const l2Bal1 = getNodeBalance(l2Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+            const l2Bal2 = isCompare ? getNodeBalance(l2Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+
+            l2Subgroups.push({
+              id: l2Sg.id,
+              name: l2Sg.name,
+              amount1: l2Bal1,
+              amount2: l2Bal2,
+              items: getSubgroupItems(l2Sg.id)
+            });
+          });
+
+          subgroups.push({
+            id: l1Sg.id,
+            name: l1Sg.name,
+            amount1: l1Bal1,
+            amount2: l1Bal2,
+            hasChildren: true,
+            l2Subgroups
+          });
+        } else {
+          subgroups.push({
+            id: l1Sg.id,
+            name: l1Sg.name,
+            amount1: l1Bal1,
+            amount2: l1Bal2,
+            hasChildren: false,
+            items: getSubgroupItems(l1Sg.id)
+          });
+        }
+      });
+
+      mainGroups.push({
+        id: mg.id,
+        name: mg.name,
+        total1: mgBal1,
+        total2: mgBal2,
+        subgroups
+      });
+    });
+
+    const totAssets1 = getNodeBalance('assets', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+    const totLiab1   = getNodeBalance('equity-liabilities', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+
+    const totAssets2 = isCompare ? getNodeBalance('assets', 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+    const totLiab2   = isCompare ? getNodeBalance('equity-liabilities', 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+
+    return {
+      companyName,
+      dateFrom,
+      dateTo,
+      isCompare,
+      compareDateFrom,
+      compareDateTo,
+      mainGroups,
+      totAssets1,
+      totLiab1,
+      totAssets2,
+      totLiab2
+    };
+  }
+
+  // Wire toolbar / 3-dot menu buttons for Balance Sheet
+  const bsSubmenu = document.getElementById('bsExportSubmenu');
+  const bsSubmenuWrap = document.getElementById('bsExportSubmenuWrap');
+  let bsCloseTimer = null;
+
+  document.getElementById('bsExportMenuBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (bsSubmenu) bsSubmenu.classList.toggle('open');
+  });
+
+  if (bsSubmenuWrap && bsSubmenu) {
+    bsSubmenuWrap.addEventListener('mouseenter', () => {
+      if (bsCloseTimer) clearTimeout(bsCloseTimer);
+      bsSubmenu.classList.add('open');
+    });
+    bsSubmenuWrap.addEventListener('mouseleave', () => {
+      bsCloseTimer = setTimeout(() => {
+        bsSubmenu.classList.remove('open');
+      }, 300);
+    });
+    bsSubmenu.addEventListener('mouseenter', () => {
+      if (bsCloseTimer) clearTimeout(bsCloseTimer);
+      bsSubmenu.classList.add('open');
+    });
+  }
+
+  document.getElementById('bsExportPdf')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('bsMoreDropdown')?.classList.remove('open');
+    document.getElementById('bsExportSubmenu')?.classList.remove('open');
+    const bsData = getBalanceSheetReportData();
+    if (typeof window !== 'undefined' && typeof window.exportBalanceSheetToPDF === 'function') {
+      window.exportBalanceSheetToPDF(bsData);
+    } else if (typeof exportBalanceSheetToPDF === 'function') {
+      exportBalanceSheetToPDF(bsData);
+    } else {
+      console.error('exportBalanceSheetToPDF function is not available.');
+    }
+  });
+
+  document.getElementById('bsExportExcel')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('bsMoreDropdown')?.classList.remove('open');
+    document.getElementById('bsExportSubmenu')?.classList.remove('open');
+    const bsData = getBalanceSheetReportData();
+    if (typeof window !== 'undefined' && typeof window.exportBalanceSheetToExcel === 'function') {
+      window.exportBalanceSheetToExcel(bsData);
+    } else if (typeof exportBalanceSheetToExcel === 'function') {
+      exportBalanceSheetToExcel(bsData);
+    } else {
+      console.error('exportBalanceSheetToExcel function is not available.');
+    }
+  });
+
   document.getElementById('bsExpandAll')?.addEventListener('click', () => {
     _bsExpanded = new Set([
       'mg-assets', 'mg-equity-liabilities',
       ...COA_SYS_SGS.map(sg => 'sg-' + sg.id),
       ...coaLedgers.filter(l => l.type === 'group-ledger').map(gl => 'gl-' + gl.id)
     ]);
+    document.getElementById('bsMoreDropdown')?.classList.remove('open');
     renderBalanceSheetPanel();
   });
 
   document.getElementById('bsCollapseAll')?.addEventListener('click', () => {
     _bsExpanded = new Set();
+    document.getElementById('bsMoreDropdown')?.classList.remove('open');
     renderBalanceSheetPanel();
   });
 
@@ -649,6 +1112,12 @@
     const dateFrom = fromInp ? fromInp.value : '';
     const dateTo   = toInp ? toInp.value : '';
 
+    const isCompare = document.getElementById('pnlCompareCheck')?.checked || false;
+    const compFromInp = document.getElementById('pnlCompareDateFrom');
+    const compToInp   = document.getElementById('pnlCompareDateTo');
+    const compareDateFrom = (isCompare && compFromInp) ? compFromInp.value : '';
+    const compareDateTo   = (isCompare && compToInp) ? compToInp.value : '';
+
     if (_pnlExpanded.size === 0) {
       COA_SYS_SGS.forEach(sg => {
         if (sg.main === 'income' || sg.main === 'expense') {
@@ -657,21 +1126,52 @@
       });
     }
 
-    const ledgerBalances = computeTrialBalanceBalances(dateFrom, dateTo);
-
-    const rfoBal = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances);
-    const oiBal  = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances);
-    const totalRevenue = rfoBal + oiBal;
+    // Primary Period Calculations
+    const ledgerBalances1 = computeTrialBalanceBalances(dateFrom, dateTo);
+    const rfoBal1 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances1);
+    const oiBal1  = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances1);
+    const totalRevenue1 = rfoBal1 + oiBal1;
 
     const expSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'expense' && sg.id !== 'sg-tax');
-    let totalExpenses = 0;
+    let totalExpenses1 = 0;
     expSubgroups.forEach(sg => {
-      totalExpenses += getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+      totalExpenses1 += getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
     });
 
-    const pbt = totalRevenue - totalExpenses;
-    const taxBal = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances);
-    const pat = pbt - taxBal;
+    const pbt1 = totalRevenue1 - totalExpenses1;
+    const taxBal1 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances1);
+    const pat1 = pbt1 - taxBal1;
+
+    // Comparison Period Calculations
+    let ledgerBalances2 = {};
+    let totalRevenue2 = 0;
+    let totalExpenses2 = 0;
+    let pbt2 = 0;
+    let taxBal2 = 0;
+    let pat2 = 0;
+
+    if (isCompare) {
+      ledgerBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
+      const rfoBal2 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances2);
+      const oiBal2  = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances2);
+      totalRevenue2 = rfoBal2 + oiBal2;
+      expSubgroups.forEach(sg => {
+        totalExpenses2 += getPnlNodeBalance(sg.id, 'sg', ledgerBalances2);
+      });
+      pbt2 = totalRevenue2 - totalExpenses2;
+      taxBal2 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances2);
+      pat2 = pbt2 - taxBal2;
+    }
+
+    const col1Title = formatRptDateRange(dateFrom, dateTo, 'Primary Period');
+    const col2Title = formatRptDateRange(compareDateFrom, compareDateTo, 'Comparison Period');
+
+    function getPnlAmtHtml(bal1, bal2) {
+      if (isCompare) {
+        return `<div class="pnl-amt-pair"><span class="amt-col-primary">₹ ${fmtNum(bal1)}</span><span class="amt-col-compare">₹ ${fmtNum(bal2)}</span></div>`;
+      }
+      return `<div class="pnl-amt-col">₹ ${fmtNum(bal1)}</div>`;
+    }
 
     const btnVert = document.getElementById('pnlLayoutVertical');
     const btnHoriz = document.getElementById('pnlLayoutHorizontal');
@@ -708,13 +1208,18 @@
         <div class="pnl-card" style="display: flex; flex-direction: column; height: 100%; margin-bottom: 0;">
           <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
             <span>II. Expenses &amp; Profit</span>
-            <span>Amount (₹)</span>
+            ${isCompare ? `<div class="pnl-amt-pair"><span class="amt-col-primary">${col1Title}</span><span class="amt-col-compare">${col2Title}</span></div>` : `<span>Amount (₹)</span>`}
           </div>
           <div style="display: flex; flex-direction: column; flex-grow: 1;">
       `;
 
       expSubgroups.forEach(sg => {
-        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
+        const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
+        if (!hasTx1 && !hasTx2) return;
+
+        const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+        const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
         const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
         leftHtml += `
           <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
@@ -724,16 +1229,18 @@
               </svg>
               <span class="pnl-name-text">${sg.name}</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+            ${getPnlAmtHtml(sgBal1, sgBal2)}
           </div>
           <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
-            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances1, 'pnl-indent-l2', 'pnl-indent-l3', dateFrom, dateTo, isCompare, ledgerBalances2, compareDateFrom, compareDateTo)}
           </div>
         `;
       });
 
       const taxSg = COA_SYS_SGS.find(sg => sg.id === 'sg-tax');
-      if (taxSg) {
+      const hasTaxActivity1 = taxSg && (taxBal1 !== 0 || subgroupHasTransactions('sg-tax', dateFrom, dateTo, false));
+      const hasTaxActivity2 = isCompare && taxSg && (taxBal2 !== 0 || subgroupHasTransactions('sg-tax', compareDateFrom, compareDateTo, false));
+      if (taxSg && (hasTaxActivity1 || hasTaxActivity2)) {
         const isTaxOpen = _pnlExpanded.has('sg-sg-tax');
         leftHtml += `
           <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-sg-tax">
@@ -743,31 +1250,32 @@
               </svg>
               <span class="pnl-name-text">Tax Expense</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(taxBal)}</div>
+            ${getPnlAmtHtml(taxBal1, taxBal2)}
           </div>
           <div id="pnlBody-sg-sg-tax" style="${isTaxOpen ? '' : 'display:none'}">
-            ${renderPnlSubgroupLeafs('sg-tax', ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+            ${renderPnlSubgroupLeafs('sg-tax', ledgerBalances1, 'pnl-indent-l2', 'pnl-indent-l3', dateFrom, dateTo, isCompare, ledgerBalances2, compareDateFrom, compareDateTo)}
           </div>
         `;
       }
 
-      if (pat > 0) {
+      if (pat1 > 0 || (isCompare && pat2 > 0)) {
         leftHtml += `
           <div class="pnl-row pnl-row-l1 pnl-indent-l1" style="background: #f0fdf4; color: #16a34a; font-weight: 700; cursor: default;">
             <div class="pnl-name-col">
               <span class="pnl-caret-empty"></span>
               <span class="pnl-name-text">Profit After Tax (PAT)</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(pat)}</div>
+            ${getPnlAmtHtml(pat1 > 0 ? pat1 : 0, pat2 > 0 ? pat2 : 0)}
           </div>
         `;
       }
 
-      const leftTotal = totalExpenses + taxBal + (pat > 0 ? pat : 0);
+      const leftTotal1 = totalExpenses1 + taxBal1 + (pat1 > 0 ? pat1 : 0);
+      const leftTotal2 = totalExpenses2 + taxBal2 + (pat2 > 0 ? pat2 : 0);
       leftHtml += `
             <div class="pnl-row pnl-total-row pnl-indent-hdr" style="margin-top: auto;">
               <span>Total Expenses &amp; Profit</span>
-              <div class="pnl-amt-col">₹ ${fmtNum(leftTotal)}</div>
+              ${getPnlAmtHtml(leftTotal1, leftTotal2)}
             </div>
           </div>
         </div>
@@ -778,15 +1286,21 @@
         <div class="pnl-card" style="display: flex; flex-direction: column; height: 100%; margin-bottom: 0;">
           <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
             <span>I. Revenue &amp; Income</span>
-            <span>Amount (₹)</span>
+            ${isCompare ? `<div class="pnl-amt-pair"><span class="amt-col-primary">${col1Title}</span><span class="amt-col-compare">${col2Title}</span></div>` : `<span>Amount (₹)</span>`}
           </div>
           <div style="display: flex; flex-direction: column; flex-grow: 1;">
       `;
 
       const incSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'income');
       incSubgroups.forEach(sg => {
-        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
+        const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
+        if (!hasTx1 && !hasTx2) return;
+
+        const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+        const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
         const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
+
         rightHtml += `
           <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-${sg.id}">
             <div class="pnl-name-col">
@@ -795,31 +1309,32 @@
               </svg>
               <span class="pnl-name-text">${sg.name}</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+            ${getPnlAmtHtml(sgBal1, sgBal2)}
           </div>
           <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
-            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances1, 'pnl-indent-l2', 'pnl-indent-l3', dateFrom, dateTo, isCompare, ledgerBalances2, compareDateFrom, compareDateTo)}
           </div>
         `;
       });
 
-      if (pat < 0) {
+      if (pat1 < 0 || (isCompare && pat2 < 0)) {
         rightHtml += `
           <div class="pnl-row pnl-row-l1 pnl-indent-l1" style="background: #fef2f2; color: #dc2626; font-weight: 700; cursor: default;">
             <div class="pnl-name-col">
               <span class="pnl-caret-empty"></span>
               <span class="pnl-name-text">Loss After Tax</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(Math.abs(pat))}</div>
+            ${getPnlAmtHtml(pat1 < 0 ? Math.abs(pat1) : 0, pat2 < 0 ? Math.abs(pat2) : 0)}
           </div>
         `;
       }
 
-      const rightTotal = totalRevenue + (pat < 0 ? Math.abs(pat) : 0);
+      const rightTotal1 = totalRevenue1 + (pat1 < 0 ? Math.abs(pat1) : 0);
+      const rightTotal2 = totalRevenue2 + (pat2 < 0 ? Math.abs(pat2) : 0);
       rightHtml += `
             <div class="pnl-row pnl-total-row pnl-indent-hdr" style="margin-top: auto;">
               <span>Total Revenue &amp; Loss</span>
-              <div class="pnl-amt-col">₹ ${fmtNum(rightTotal)}</div>
+              ${getPnlAmtHtml(rightTotal1, rightTotal2)}
             </div>
           </div>
         </div>
@@ -834,12 +1349,17 @@
         <div class="pnl-card">
           <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
             <span>I. Revenue</span>
-            <span>Amount (₹)</span>
+            ${isCompare ? `<div class="pnl-amt-pair"><span class="amt-col-primary">${col1Title}</span><span class="amt-col-compare">${col2Title}</span></div>` : `<span>Amount (₹)</span>`}
           </div>
       `;
       const incSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'income');
       incSubgroups.forEach(sg => {
-        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
+        const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
+        if (!hasTx1 && !hasTx2) return;
+
+        const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+        const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
         const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
 
         treeHtml += `
@@ -850,10 +1370,10 @@
               </svg>
               <span class="pnl-name-text">${sg.name}</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+            ${getPnlAmtHtml(sgBal1, sgBal2)}
           </div>
           <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
-            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances1, 'pnl-indent-l2', 'pnl-indent-l3', dateFrom, dateTo, isCompare, ledgerBalances2, compareDateFrom, compareDateTo)}
           </div>
         `;
       });
@@ -861,7 +1381,7 @@
       treeHtml += `
           <div class="pnl-row pnl-total-row pnl-indent-hdr">
             <span>Total Revenue (I)</span>
-            <div class="pnl-amt-col">₹ ${fmtNum(totalRevenue)}</div>
+            ${getPnlAmtHtml(totalRevenue1, totalRevenue2)}
           </div>
         </div>
       `;
@@ -870,11 +1390,16 @@
         <div class="pnl-card">
           <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
             <span>II. Expenses</span>
-            <span>Amount (₹)</span>
+            ${isCompare ? `<div class="pnl-amt-pair"><span class="amt-col-primary">${col1Title}</span><span class="amt-col-compare">${col2Title}</span></div>` : `<span>Amount (₹)</span>`}
           </div>
       `;
       expSubgroups.forEach(sg => {
-        const sgBal = getPnlNodeBalance(sg.id, 'sg', ledgerBalances);
+        const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
+        const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
+        if (!hasTx1 && !hasTx2) return;
+
+        const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+        const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
         const isSgOpen = _pnlExpanded.has('sg-' + sg.id);
 
         treeHtml += `
@@ -885,10 +1410,10 @@
               </svg>
               <span class="pnl-name-text">${sg.name}</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(sgBal)}</div>
+            ${getPnlAmtHtml(sgBal1, sgBal2)}
           </div>
           <div id="pnlBody-sg-${sg.id}" style="${isSgOpen ? '' : 'display:none'}">
-            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+            ${renderPnlSubgroupLeafs(sg.id, ledgerBalances1, 'pnl-indent-l2', 'pnl-indent-l3', dateFrom, dateTo, isCompare, ledgerBalances2, compareDateFrom, compareDateTo)}
           </div>
         `;
       });
@@ -896,7 +1421,7 @@
       treeHtml += `
           <div class="pnl-row pnl-total-row pnl-indent-hdr">
             <span>Total Expenses (II)</span>
-            <div class="pnl-amt-col">₹ ${fmtNum(totalExpenses)}</div>
+            ${getPnlAmtHtml(totalExpenses1, totalExpenses2)}
           </div>
         </div>
       `;
@@ -905,7 +1430,7 @@
         <div class="pnl-card">
           <div class="pnl-row pnl-row-hdr pnl-indent-hdr">
             <span>III. Profitability</span>
-            <span>Amount (₹)</span>
+            ${isCompare ? `<div class="pnl-amt-pair"><span class="amt-col-primary">${col1Title}</span><span class="amt-col-compare">${col2Title}</span></div>` : `<span>Amount (₹)</span>`}
           </div>
           
           <div class="pnl-row pnl-total-row pnl-indent-l1">
@@ -913,12 +1438,14 @@
               <span class="pnl-caret-empty"></span>
               <span class="pnl-name-text" style="font-weight:700;">Profit Before Tax (PBT) (I - II)</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(pbt)}</div>
+            ${getPnlAmtHtml(pbt1, pbt2)}
           </div>
       `;
 
       const taxSg = COA_SYS_SGS.find(sg => sg.id === 'sg-tax');
-      if (taxSg) {
+      const hasTaxActivity1 = taxSg && (taxBal1 !== 0 || subgroupHasTransactions('sg-tax', dateFrom, dateTo, false));
+      const hasTaxActivity2 = isCompare && taxSg && (taxBal2 !== 0 || subgroupHasTransactions('sg-tax', compareDateFrom, compareDateTo, false));
+      if (taxSg && (hasTaxActivity1 || hasTaxActivity2)) {
         const isTaxOpen = _pnlExpanded.has('sg-sg-tax');
         treeHtml += `
           <div class="pnl-row pnl-row-l1 pnl-indent-l1" data-pnl-toggle="sg-sg-tax">
@@ -928,10 +1455,10 @@
               </svg>
               <span class="pnl-name-text">Less: Tax Expense</span>
             </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(taxBal)}</div>
+            ${getPnlAmtHtml(taxBal1, taxBal2)}
           </div>
           <div id="pnlBody-sg-sg-tax" style="${isTaxOpen ? '' : 'display:none'}">
-            ${renderPnlSubgroupLeafs('sg-tax', ledgerBalances, 'pnl-indent-l2', 'pnl-indent-l3')}
+            ${renderPnlSubgroupLeafs('sg-tax', ledgerBalances1, 'pnl-indent-l2', 'pnl-indent-l3', dateFrom, dateTo, isCompare, ledgerBalances2, compareDateFrom, compareDateTo)}
           </div>
         `;
       }
@@ -939,7 +1466,7 @@
       treeHtml += `
           <div class="pnl-row pnl-grandtotal pnl-indent-hdr">
             <span>Profit After Tax (PAT)</span>
-            <div class="pnl-amt-col">₹ ${fmtNum(pat)}</div>
+            ${getPnlAmtHtml(pat1, pat2)}
           </div>
         </div>
       `;
@@ -959,15 +1486,49 @@
     });
   }
 
-  function renderPnlSubgroupLeafs(sgId, ledgerBalances, indentClassL2, indentClassL3) {
+  function renderPnlSubgroupLeafs(sgId, ledgerBalances1, indentClassL2, indentClassL3, dateFrom = '', dateTo = '', isCompare = false, ledgerBalances2 = {}, compareDateFrom = '', compareDateTo = '') {
     let html = '';
+
+    function getPnlAmtHtml(bal1, bal2) {
+      if (isCompare) {
+        return `<div class="pnl-amt-pair"><span class="amt-col-primary">₹ ${fmtNum(bal1)}</span><span class="amt-col-compare">₹ ${fmtNum(bal2)}</span></div>`;
+      }
+      return `<div class="pnl-amt-col">₹ ${fmtNum(bal1)}</div>`;
+    }
 
     const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
     groupLdgs.forEach(gl => {
-      const glBal = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances);
-      if (glBal === 0) return;
+      const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, false);
+      const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, false);
+      if (!hasGlTx1 && !hasGlTx2) return;
 
+      const glBal1 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances1);
+      const glBal2 = isCompare ? getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances2) : 0;
       const isGlOpen = _pnlExpanded.has('gl-' + gl.id);
+
+      let childHtml = '';
+      const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
+      childLdgs.forEach(l => {
+        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
+        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
+        if (!hasLTx1 && !hasLTx2) return;
+
+        const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+        const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
+
+        childHtml += `
+          <div class="pnl-row pnl-row-l3 ${indentClassL3}">
+            <div class="pnl-name-col">
+              <span class="pnl-caret-empty"></span>
+              <span class="pnl-name-text">${l.name}</span>
+              ${l.code ? `<span class="pnl-code">${l.code}</span>` : ''}
+            </div>
+            ${getPnlAmtHtml(bal1, bal2)}
+          </div>
+        `;
+      });
+
+      if (!childHtml) return;
 
       html += `
         <div class="pnl-row pnl-row-l2 ${indentClassL2}" data-pnl-toggle="gl-${gl.id}">
@@ -978,35 +1539,22 @@
             <span class="pnl-name-text">📁 ${gl.name}</span>
             ${gl.code ? `<span class="pnl-code">${gl.code}</span>` : ''}
           </div>
-          <div class="pnl-amt-col">₹ ${fmtNum(glBal)}</div>
+          ${getPnlAmtHtml(glBal1, glBal2)}
         </div>
         <div id="pnlBody-gl-${gl.id}" style="${isGlOpen ? '' : 'display:none'}">
+          ${childHtml}
+        </div>
       `;
-
-      const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
-      childLdgs.forEach(l => {
-        const bal = getPnlNodeBalance(l.id, 'ledger', ledgerBalances);
-        if (bal === 0) return;
-
-        html += `
-          <div class="pnl-row pnl-row-l3 ${indentClassL3}">
-            <div class="pnl-name-col">
-              <span class="pnl-caret-empty"></span>
-              <span class="pnl-name-text">${l.name}</span>
-              ${l.code ? `<span class="pnl-code">${l.code}</span>` : ''}
-            </div>
-            <div class="pnl-amt-col">₹ ${fmtNum(bal)}</div>
-          </div>
-        `;
-      });
-
-      html += `</div>`;
     });
 
     const directLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'ledger' && !l.glId);
     directLdgs.forEach(l => {
-      const bal = getPnlNodeBalance(l.id, 'ledger', ledgerBalances);
-      if (bal === 0) return;
+      const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
+      const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
+      if (!hasLTx1 && !hasLTx2) return;
+
+      const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+      const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
 
       html += `
         <div class="pnl-row pnl-row-l3 ${indentClassL2}">
@@ -1015,7 +1563,7 @@
             <span class="pnl-name-text">${l.name}</span>
             ${l.code ? `<span class="pnl-code">${l.code}</span>` : ''}
           </div>
-          <div class="pnl-amt-col">₹ ${fmtNum(bal)}</div>
+          ${getPnlAmtHtml(bal1, bal2)}
         </div>
       `;
     });
@@ -1023,18 +1571,233 @@
     return html;
   }
 
-  // Wire toolbar buttons for Profit & Loss
+  // Helper to compile structured P&L Report Data for Export
+  function getPnLReportData() {
+    const fromInp = document.getElementById('pnlDateFrom');
+    const toInp   = document.getElementById('pnlDateTo');
+    const dateFrom = fromInp ? fromInp.value : (_globalDateFrom || '');
+    const dateTo   = toInp ? toInp.value : (_globalDateTo || '');
+
+    const isCompare = document.getElementById('pnlCompareCheck')?.checked || false;
+    const compFromInp = document.getElementById('pnlCompareDateFrom');
+    const compToInp   = document.getElementById('pnlCompareDateTo');
+    const compareDateFrom = (isCompare && compFromInp) ? compFromInp.value : '';
+    const compareDateTo   = (isCompare && compToInp) ? compToInp.value : '';
+
+    const ledgerBalances1 = computeTrialBalanceBalances(dateFrom, dateTo);
+    const ledgerBalances2 = isCompare ? computeTrialBalanceBalances(compareDateFrom, compareDateTo) : {};
+
+    const co = (typeof getCompanyDetails === 'function') ? getCompanyDetails() : {};
+    const companyName = co.name || 'KYA Accounting';
+
+    // 1. Income Data
+    const incSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'income');
+    const incomeData = [];
+    let totalRevenue1 = 0;
+    let totalRevenue2 = 0;
+
+    incSubgroups.forEach(sg => {
+      const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
+      const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
+      if (!hasTx1 && !hasTx2) return;
+
+      const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+      const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
+      totalRevenue1 += sgBal1;
+      totalRevenue2 += sgBal2;
+
+      const items = [];
+      const groupLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger');
+      groupLdgs.forEach(gl => {
+        const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, false);
+        const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, false);
+        if (!hasGlTx1 && !hasGlTx2) return;
+
+        const glBal1 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances1);
+        const glBal2 = isCompare ? getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances2) : 0;
+
+        const children = [];
+        const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
+        childLdgs.forEach(l => {
+          const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
+          const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
+          if (!hasLTx1 && !hasLTx2) return;
+
+          const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+          const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
+          children.push({ name: l.name, code: l.code || '', amount1: bal1, amount2: bal2 });
+        });
+
+        items.push({ name: gl.name, code: gl.code || '', isGroup: true, amount1: glBal1, amount2: glBal2, children });
+      });
+
+      const directLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'ledger' && !l.glId);
+      directLdgs.forEach(l => {
+        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
+        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
+        if (!hasLTx1 && !hasLTx2) return;
+
+        const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+        const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
+        items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
+      });
+
+      incomeData.push({ id: sg.id, name: sg.name, amount1: sgBal1, amount2: sgBal2, items });
+    });
+
+    // 2. Expense Data
+    const expSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'expense' && sg.id !== 'sg-tax');
+    const expenseData = [];
+    let totalExpenses1 = 0;
+    let totalExpenses2 = 0;
+
+    expSubgroups.forEach(sg => {
+      const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
+      const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
+      if (!hasTx1 && !hasTx2) return;
+
+      const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+      const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
+      totalExpenses1 += sgBal1;
+      totalExpenses2 += sgBal2;
+
+      const items = [];
+      const groupLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger');
+      groupLdgs.forEach(gl => {
+        const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, false);
+        const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, false);
+        if (!hasGlTx1 && !hasGlTx2) return;
+
+        const glBal1 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances1);
+        const glBal2 = isCompare ? getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances2) : 0;
+
+        const children = [];
+        const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
+        childLdgs.forEach(l => {
+          const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
+          const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
+          if (!hasLTx1 && !hasLTx2) return;
+
+          const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+          const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
+          children.push({ name: l.name, code: l.code || '', amount1: bal1, amount2: bal2 });
+        });
+
+        items.push({ name: gl.name, code: gl.code || '', isGroup: true, amount1: glBal1, amount2: glBal2, children });
+      });
+
+      const directLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'ledger' && !l.glId);
+      directLdgs.forEach(l => {
+        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
+        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
+        if (!hasLTx1 && !hasLTx2) return;
+
+        const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+        const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
+        items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
+      });
+
+      expenseData.push({ id: sg.id, name: sg.name, amount1: sgBal1, amount2: sgBal2, items });
+    });
+
+    const pbt1 = totalRevenue1 - totalExpenses1;
+    const pbt2 = totalRevenue2 - totalExpenses2;
+
+    const taxBal1 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances1);
+    const taxBal2 = isCompare ? getPnlNodeBalance('sg-tax', 'sg', ledgerBalances2) : 0;
+
+    const pat1 = pbt1 - taxBal1;
+    const pat2 = pbt2 - taxBal2;
+
+    return {
+      companyName,
+      dateFrom,
+      dateTo,
+      isCompare,
+      compareDateFrom,
+      compareDateTo,
+      incomeData,
+      totalRevenue1,
+      totalRevenue2,
+      expenseData,
+      totalExpenses1,
+      totalExpenses2,
+      pbt1,
+      pbt2,
+      taxBal1,
+      taxBal2,
+      pat1,
+      pat2
+    };
+  }
+
+  // Wire toolbar / 3-dot menu buttons for Profit & Loss
+  const pnlSubmenu = document.getElementById('pnlExportSubmenu');
+  const pnlSubmenuWrap = document.getElementById('pnlExportSubmenuWrap');
+  let pnlCloseTimer = null;
+
+  document.getElementById('pnlExportMenuBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (pnlSubmenu) pnlSubmenu.classList.toggle('open');
+  });
+
+  if (pnlSubmenuWrap && pnlSubmenu) {
+    pnlSubmenuWrap.addEventListener('mouseenter', () => {
+      if (pnlCloseTimer) clearTimeout(pnlCloseTimer);
+      pnlSubmenu.classList.add('open');
+    });
+    pnlSubmenuWrap.addEventListener('mouseleave', () => {
+      pnlCloseTimer = setTimeout(() => {
+        pnlSubmenu.classList.remove('open');
+      }, 300);
+    });
+    pnlSubmenu.addEventListener('mouseenter', () => {
+      if (pnlCloseTimer) clearTimeout(pnlCloseTimer);
+      pnlSubmenu.classList.add('open');
+    });
+  }
+
+  document.getElementById('pnlExportPdf')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('pnlMoreDropdown')?.classList.remove('open');
+    document.getElementById('pnlExportSubmenu')?.classList.remove('open');
+    const pnlData = getPnLReportData();
+    if (typeof window !== 'undefined' && typeof window.exportPnLToPDF === 'function') {
+      window.exportPnLToPDF(pnlData);
+    } else if (typeof exportPnLToPDF === 'function') {
+      exportPnLToPDF(pnlData);
+    } else {
+      console.error('exportPnLToPDF function is not available.');
+    }
+  });
+
+  document.getElementById('pnlExportExcel')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('pnlMoreDropdown')?.classList.remove('open');
+    document.getElementById('pnlExportSubmenu')?.classList.remove('open');
+    const pnlData = getPnLReportData();
+    if (typeof window !== 'undefined' && typeof window.exportPnLToExcel === 'function') {
+      window.exportPnLToExcel(pnlData);
+    } else if (typeof exportPnLToExcel === 'function') {
+      exportPnLToExcel(pnlData);
+    } else {
+      console.error('exportPnLToExcel function is not available.');
+    }
+  });
+
   document.getElementById('pnlExpandAll')?.addEventListener('click', () => {
     _pnlExpanded = new Set([
       ...COA_SYS_SGS.filter(sg => sg.main === 'income' || sg.main === 'expense').map(sg => 'sg-' + sg.id),
       ...coaLedgers.filter(l => l.type === 'group-ledger').map(gl => 'gl-' + gl.id)
     ]);
     _pnlExpanded.add('sg-sg-tax');
+    document.getElementById('pnlMoreDropdown')?.classList.remove('open');
     renderPnlPanel();
   });
 
   document.getElementById('pnlCollapseAll')?.addEventListener('click', () => {
     _pnlExpanded = new Set();
+    document.getElementById('pnlMoreDropdown')?.classList.remove('open');
     renderPnlPanel();
   });
 
@@ -1333,6 +2096,182 @@
     onDateFilterChange();
   });
 
+  // Helper to compile structured Trial Balance Report Data for Export
+  function getTrialBalanceReportData() {
+    const fromInp = document.getElementById('trialDateFrom');
+    const toInp   = document.getElementById('trialDateTo');
+    const dateFrom = fromInp ? fromInp.value : '';
+    const dateTo   = toInp ? toInp.value : '';
+
+    const balances = computeTrialBalanceBalances(dateFrom, dateTo);
+
+    const co = (typeof getCompanyDetails === 'function') ? getCompanyDetails() : {};
+    const companyName = co.name || 'KYA Accounting';
+
+    const showAllChk = document.getElementById('trialShowAllCheck');
+    const showAll = showAllChk ? showAllChk.checked : false;
+
+    const ledgers = coaLedgers.filter(l => l.type === 'ledger');
+    const items = [];
+    let slNo = 1;
+    let totalDr = 0;
+    let totalCr = 0;
+
+    ledgers.forEach(l => {
+      const main = getLedgerMainGroup(l);
+      const netVal = balances[l.id] || 0;
+      let drVal = 0;
+      let crVal = 0;
+
+      if (main === 'assets' || main === 'expense') {
+        if (netVal >= 0) {
+          drVal = netVal;
+        } else {
+          crVal = -netVal;
+        }
+      } else {
+        if (netVal >= 0) {
+          crVal = netVal;
+        } else {
+          drVal = -netVal;
+        }
+      }
+
+      if (!showAll && drVal === 0 && crVal === 0) {
+        return;
+      }
+
+      totalDr += drVal;
+      totalCr += crVal;
+
+      let glText = '';
+      if (l.glId) {
+        const parentGL = coaLedgers.find(parent => parent.type === 'group-ledger' && parent.id === l.glId);
+        if (parentGL) {
+          glText = parentGL.name;
+        }
+      }
+
+      let sgText = '';
+      let mainGroupKey = '';
+      if (l.sgId) {
+        const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
+        if (sg) {
+          sgText = sg.name;
+          mainGroupKey = sg.main;
+        }
+      }
+
+      let mgText = '';
+      if (mainGroupKey) {
+        const mg = COA_MAIN_GROUPS.find(m => m.id === mainGroupKey);
+        if (mg) {
+          mgText = mg.name;
+        }
+      }
+
+      let plbsText = '';
+      if (mainGroupKey === 'income' || mainGroupKey === 'expense') {
+        plbsText = 'PL';
+      } else if (mainGroupKey === 'assets' || mainGroupKey === 'equity-liabilities') {
+        plbsText = 'BS';
+      }
+
+      items.push({
+        slNo: slNo++,
+        name: l.name,
+        code: l.code || '',
+        gl: glText,
+        sg: sgText,
+        mg: mgText,
+        plbs: plbsText,
+        drVal,
+        crVal
+      });
+    });
+
+    return {
+      companyName,
+      dateFrom,
+      dateTo,
+      optionalCols: { ..._tbOptionalCols },
+      items,
+      totalDr,
+      totalCr,
+      isBalanced: Math.abs(totalDr - totalCr) < 0.01
+    };
+  }
+
+  // Trial Balance 3-dot More Options Dropdown
+  const trialMoreBtn = document.getElementById('trialMoreBtn');
+  const trialMoreDropdown = document.getElementById('trialMoreDropdown');
+  const trialExportSubmenu = document.getElementById('trialExportSubmenu');
+  if (trialMoreBtn && trialMoreDropdown) {
+    trialMoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      trialMoreDropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!trialMoreDropdown.contains(e.target) && e.target !== trialMoreBtn) {
+        trialMoreDropdown.classList.remove('open');
+        if (trialExportSubmenu) trialExportSubmenu.classList.remove('open');
+      }
+    });
+  }
+
+  const trialSubmenuWrap = document.getElementById('trialExportSubmenuWrap');
+  let trialCloseTimer = null;
+
+  document.getElementById('trialExportMenuBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (trialExportSubmenu) trialExportSubmenu.classList.toggle('open');
+  });
+
+  if (trialSubmenuWrap && trialExportSubmenu) {
+    trialSubmenuWrap.addEventListener('mouseenter', () => {
+      if (trialCloseTimer) clearTimeout(trialCloseTimer);
+      trialExportSubmenu.classList.add('open');
+    });
+    trialSubmenuWrap.addEventListener('mouseleave', () => {
+      trialCloseTimer = setTimeout(() => {
+        trialExportSubmenu.classList.remove('open');
+      }, 300);
+    });
+    trialExportSubmenu.addEventListener('mouseenter', () => {
+      if (trialCloseTimer) clearTimeout(trialCloseTimer);
+      trialExportSubmenu.classList.add('open');
+    });
+  }
+
+  document.getElementById('trialExportPdf')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    trialMoreDropdown?.classList.remove('open');
+    trialExportSubmenu?.classList.remove('open');
+    const tbData = getTrialBalanceReportData();
+    if (typeof window !== 'undefined' && typeof window.exportTrialBalanceToPDF === 'function') {
+      window.exportTrialBalanceToPDF(tbData);
+    } else if (typeof exportTrialBalanceToPDF === 'function') {
+      exportTrialBalanceToPDF(tbData);
+    } else {
+      console.error('exportTrialBalanceToPDF function is not available.');
+    }
+  });
+
+  document.getElementById('trialExportExcel')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    trialMoreDropdown?.classList.remove('open');
+    trialExportSubmenu?.classList.remove('open');
+    const tbData = getTrialBalanceReportData();
+    if (typeof window !== 'undefined' && typeof window.exportTrialBalanceToExcel === 'function') {
+      window.exportTrialBalanceToExcel(tbData);
+    } else if (typeof exportTrialBalanceToExcel === 'function') {
+      exportTrialBalanceToExcel(tbData);
+    } else {
+      console.error('exportTrialBalanceToExcel function is not available.');
+    }
+  });
+
   // Trial Balance Show All Event Listener
   document.getElementById('trialShowAllCheck')?.addEventListener('change', () => {
     renderTrialBalancePanel();
@@ -1370,6 +2309,114 @@
     });
   }
 
+
+  // Balance Sheet 3-dot More Options Dropdown
+  const bsMoreBtn = document.getElementById('bsMoreBtn');
+  const bsMoreDropdown = document.getElementById('bsMoreDropdown');
+  const bsExportSubmenu = document.getElementById('bsExportSubmenu');
+  if (bsMoreBtn && bsMoreDropdown) {
+    bsMoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      bsMoreDropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!bsMoreDropdown.contains(e.target) && e.target !== bsMoreBtn) {
+        bsMoreDropdown.classList.remove('open');
+        if (bsExportSubmenu) bsExportSubmenu.classList.remove('open');
+      }
+    });
+  }
+
+  // Balance Sheet Comparison Mode Toggle & Date Listeners
+  document.getElementById('bsCompareCheck')?.addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    const wrap = document.getElementById('bsCompareDateWrap');
+    if (wrap) wrap.style.display = isChecked ? 'flex' : 'none';
+    if (isChecked) {
+      const fromInp = document.getElementById('bsDateFrom');
+      const toInp   = document.getElementById('bsDateTo');
+      const compFromInp = document.getElementById('bsCompareDateFrom');
+      const compToInp   = document.getElementById('bsCompareDateTo');
+      if (compFromInp && !compFromInp.value) {
+        if (fromInp && fromInp.value) {
+          const p = fromInp.value.split('-');
+          compFromInp.value = `${parseInt(p[0]) - 1}-${p[1]}-${p[2]}`;
+        } else {
+          compFromInp.value = '2023-04-01';
+        }
+      }
+      if (compToInp && !compToInp.value) {
+        if (toInp && toInp.value) {
+          const p = toInp.value.split('-');
+          compToInp.value = `${parseInt(p[0]) - 1}-${p[1]}-${p[2]}`;
+        } else {
+          compToInp.value = '2024-03-31';
+        }
+      }
+    }
+    renderBalanceSheetPanel();
+  });
+
+  ['bsCompareDateFrom', 'bsCompareDateTo'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      renderBalanceSheetPanel();
+    });
+  });
+
+  // Profit & Loss 3-dot More Options Dropdown
+  const pnlMoreBtn = document.getElementById('pnlMoreBtn');
+  const pnlMoreDropdown = document.getElementById('pnlMoreDropdown');
+  const pnlExportSubmenu = document.getElementById('pnlExportSubmenu');
+  if (pnlMoreBtn && pnlMoreDropdown) {
+    pnlMoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pnlMoreDropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!pnlMoreDropdown.contains(e.target) && e.target !== pnlMoreBtn) {
+        pnlMoreDropdown.classList.remove('open');
+        if (pnlExportSubmenu) pnlExportSubmenu.classList.remove('open');
+      }
+    });
+  }
+
+  // Profit & Loss Comparison Mode Toggle & Date Listeners
+  document.getElementById('pnlCompareCheck')?.addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    const wrap = document.getElementById('pnlCompareDateWrap');
+    if (wrap) wrap.style.display = isChecked ? 'flex' : 'none';
+    if (isChecked) {
+      const fromInp = document.getElementById('pnlDateFrom');
+      const toInp   = document.getElementById('pnlDateTo');
+      const compFromInp = document.getElementById('pnlCompareDateFrom');
+      const compToInp   = document.getElementById('pnlCompareDateTo');
+      if (compFromInp && !compFromInp.value) {
+        if (fromInp && fromInp.value) {
+          const p = fromInp.value.split('-');
+          compFromInp.value = `${parseInt(p[0]) - 1}-${p[1]}-${p[2]}`;
+        } else {
+          compFromInp.value = '2023-04-01';
+        }
+      }
+      if (compToInp && !compToInp.value) {
+        if (toInp && toInp.value) {
+          const p = toInp.value.split('-');
+          compToInp.value = `${parseInt(p[0]) - 1}-${p[1]}-${p[2]}`;
+        } else {
+          compToInp.value = '2024-03-31';
+        }
+      }
+    }
+    renderPnlPanel();
+  });
+
+  ['pnlCompareDateFrom', 'pnlCompareDateTo'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      renderPnlPanel();
+    });
+  });
 
   // ── Narration keyboard shortcuts ──────────────────────────────────
   document.getElementById('jeNarration').addEventListener('keydown', function(e) {

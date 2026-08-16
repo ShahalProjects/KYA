@@ -57,12 +57,7 @@
       // Current Investments (sg-ci)
       { name: 'Short-Term Investments', sgId: 'sg-ci' },
 
-      // Inventories (sg-inv)
-      { name: 'Raw Materials', sgId: 'sg-inv' },
-      { name: 'Work-in-Progress', sgId: 'sg-inv' },
-      { name: 'Finished Goods', sgId: 'sg-inv' },
-      { name: 'Stock-in-Trade', sgId: 'sg-inv' },
-      { name: 'Stores & Spares', sgId: 'sg-inv' },
+      // Inventories (sg-inv) - clean / empty by default
 
       // Trade Receivables (sg-tr)
       { name: 'Trade Receivables', sgId: 'sg-tr' },
@@ -1870,6 +1865,7 @@
       }
 
       close();
+      if (typeof window.syncStockGroupsToCoa === 'function') window.syncStockGroupsToCoa();
       renderChartPanel();
       refreshAllReports();
       triggerAutoBackup();
@@ -1907,6 +1903,9 @@
 
   // ── Main render ───────────────────────────────────────────────────
   function renderChartPanel() {
+    if (typeof window.syncStockGroupsToCoa === 'function') {
+      window.syncStockGroupsToCoa();
+    }
     injectChartStyles();
     const wrap = document.getElementById('chartWrap');
     if (!wrap) return;
@@ -2137,6 +2136,7 @@
             }
           }
           coaLedgers = coaLedgers.filter(l => l.id !== id);
+          if (typeof window.syncStockGroupsToCoa === 'function') window.syncStockGroupsToCoa();
           showToast(`${isGl ? 'Group Ledger' : 'Ledger'} "${ldg.name}" deleted.`, 'info');
           renderChartPanel();
           refreshAllReports();
@@ -2170,6 +2170,333 @@
       const el = wrap.querySelector('#coaSearch');
       if (el) { el.focus(); try{ el.setSelectionRange(cS, cE); }catch(_){} }
     }
+
+    // Wire COA 3-dot menu and export options
+    wireCoaMoreDropdown();
+  }
+
+  // ── Helper: Get active company name ───────────────────────────────
+  function getActiveCoaCompanyName() {
+    const el = document.getElementById('sidebarCompanyName');
+    if (el && el.textContent && el.textContent.trim()) return el.textContent.trim();
+    try {
+      const saved = localStorage.getItem('kya_company_details');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.companyName) return parsed.companyName;
+      }
+    } catch (e) {}
+    return 'KYA Accounting';
+  }
+
+  // ── Export Data Builder: Chart of Accounts ────────────────────────
+  function getChartOfAccountsExportData() {
+    const compName = getActiveCoaCompanyName();
+    const mainGroupsData = [];
+
+    (COA_MAIN_GROUPS || []).forEach(mg => {
+      const mgItems = [];
+      const l1Sgs = (COA_SYS_SGS || []).filter(s => s.main === mg.id && !s.parent);
+      
+      l1Sgs.forEach(l1 => {
+        mgItems.push({
+          name: l1.name,
+          code: '',
+          type: 'Sub Group',
+          parentName: mg.name,
+          level: 1,
+          isGroup: true,
+          openingBalance: ''
+        });
+
+        const l2Sgs = (COA_SYS_SGS || []).filter(s => s.parent === l1.id);
+        if (l2Sgs.length > 0) {
+          l2Sgs.forEach(l2 => {
+            mgItems.push({
+              name: l2.name,
+              code: '',
+              type: 'Sub Group (L2)',
+              parentName: l1.name,
+              level: 2,
+              isGroup: true,
+              openingBalance: ''
+            });
+
+            const ledgers = (coaLedgers || []).filter(l => l.sgId === l2.id);
+            ledgers.forEach(l => {
+              if (l.type === 'group-ledger') {
+                mgItems.push({
+                  name: l.name,
+                  code: l.code || '',
+                  type: 'Group Ledger',
+                  parentName: l2.name,
+                  level: 3,
+                  isGroup: true,
+                  openingBalance: l.openingBalance || ''
+                });
+                const ch = (coaLedgers || []).filter(c => c.glId === l.id);
+                ch.forEach(c => {
+                  mgItems.push({
+                    name: c.name,
+                    code: c.code || '',
+                    type: 'Ledger',
+                    parentName: l.name,
+                    level: 4,
+                    isGroup: false,
+                    openingBalance: c.openingBalance || ''
+                  });
+                });
+              } else if (!l.glId) {
+                mgItems.push({
+                  name: l.name,
+                  code: l.code || '',
+                  type: 'Ledger',
+                  parentName: l2.name,
+                  level: 3,
+                  isGroup: false,
+                  openingBalance: l.openingBalance || ''
+                });
+              }
+            });
+          });
+        } else {
+          const ledgers = (coaLedgers || []).filter(l => l.sgId === l1.id);
+          ledgers.forEach(l => {
+            if (l.type === 'group-ledger') {
+              mgItems.push({
+                name: l.name,
+                code: l.code || '',
+                type: 'Group Ledger',
+                parentName: l1.name,
+                level: 2,
+                isGroup: true,
+                openingBalance: l.openingBalance || ''
+              });
+              const ch = (coaLedgers || []).filter(c => c.glId === l.id);
+              ch.forEach(c => {
+                mgItems.push({
+                  name: c.name,
+                  code: c.code || '',
+                  type: 'Ledger',
+                  parentName: l.name,
+                  level: 3,
+                  isGroup: false,
+                  openingBalance: c.openingBalance || ''
+                });
+              });
+            } else if (!l.glId) {
+              mgItems.push({
+                name: l.name,
+                code: l.code || '',
+                type: 'Ledger',
+                parentName: l1.name,
+                level: 2,
+                isGroup: false,
+                openingBalance: l.openingBalance || ''
+              });
+            }
+          });
+        }
+      });
+
+      mainGroupsData.push({
+        name: mg.name,
+        items: mgItems
+      });
+    });
+
+    return {
+      companyName: compName,
+      mainGroups: mainGroupsData
+    };
+  }
+
+  // ── Export Data Builder: Ledgers List ──────────────────────────────
+  function getLedgersExportData() {
+    const compName = getActiveCoaCompanyName();
+    const onlyLedgers = (coaLedgers || []).filter(l => l.type !== 'group-ledger');
+    const sorted = [...onlyLedgers].sort((a, b) => a.name.localeCompare(b.name));
+
+    const items = sorted.map((l, idx) => {
+      const sg = (COA_SYS_SGS || []).find(s => s.id === l.sgId);
+      let mgName = '—';
+      let sgName = sg ? sg.name : (l.sgId || '—');
+      if (sg && sg.main) {
+        const mg = (COA_MAIN_GROUPS || []).find(m => m.id === sg.main);
+        if (mg) mgName = mg.name;
+      }
+      return {
+        slNo: idx + 1,
+        name: l.name,
+        code: l.code || '',
+        sgName: sgName,
+        mgName: mgName,
+        openingBalance: Number(l.openingBalance) || 0
+      };
+    });
+
+    return {
+      companyName: compName,
+      items: items
+    };
+  }
+
+  // ── Export Data Builder: Customers List ────────────────────────────
+  function getCustomersExportData() {
+    const compName = getActiveCoaCompanyName();
+    const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const sorted = [...customers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    const items = sorted.map((c, idx) => {
+      return {
+        slNo: idx + 1,
+        name: c.name || '',
+        code: c.code || '',
+        aliases: c.aliases || [],
+        phone: c.phone || c.mobile || '',
+        email: c.email || '',
+        gstin: c.gstin || '',
+        state: c.state || '',
+        openingBalance: Number(c.openingBalance) || 0
+      };
+    });
+
+    return {
+      companyName: compName,
+      items: items
+    };
+  }
+
+  // ── Export Data Builder: Suppliers List ────────────────────────────
+  function getSuppliersExportData() {
+    const compName = getActiveCoaCompanyName();
+    const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+    const sorted = [...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    const items = sorted.map((s, idx) => {
+      return {
+        slNo: idx + 1,
+        name: s.name || '',
+        code: s.code || '',
+        aliases: s.aliases || [],
+        phone: s.phone || s.mobile || '',
+        email: s.email || '',
+        gstin: s.gstin || '',
+        state: s.state || '',
+        openingBalance: Number(s.openingBalance) || 0
+      };
+    });
+
+    return {
+      companyName: compName,
+      items: items
+    };
+  }
+
+  // Expose helpers globally
+  window.getChartOfAccountsExportData = getChartOfAccountsExportData;
+  window.getLedgersExportData = getLedgersExportData;
+  window.getCustomersExportData = getCustomersExportData;
+  window.getSuppliersExportData = getSuppliersExportData;
+
+  // ── Wire COA Dropdown ──────────────────────────────────────────────
+  let _coaMoreWired = false;
+  function wireCoaMoreDropdown() {
+    if (_coaMoreWired) return;
+    _coaMoreWired = true;
+
+    const moreBtn = document.getElementById('coaMoreBtn');
+    const moreDropdown = document.getElementById('coaMoreDropdown');
+    const submenuBtn = document.getElementById('coaExportMenuBtn');
+    const submenu = document.getElementById('coaExportSubmenu');
+    const pdfBtn = document.getElementById('coaExportPdf');
+    const excelBtn = document.getElementById('coaExportExcel');
+    const expandAllBtn = document.getElementById('coaMoreExpandAll');
+    const collapseAllBtn = document.getElementById('coaMoreCollapseAll');
+
+    if (moreBtn && moreDropdown) {
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = moreDropdown.classList.contains('active');
+        closeAllCoaMenus();
+        if (!isOpen) {
+          moreDropdown.classList.add('active');
+        }
+      });
+    }
+
+    if (submenuBtn && submenu) {
+      let closeTimer = null;
+      submenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        submenu.classList.toggle('active');
+      });
+      const submenuWrap = document.getElementById('coaExportSubmenuWrap');
+      if (submenuWrap) {
+        submenuWrap.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active');
+        });
+        submenuWrap.addEventListener('mouseleave', () => {
+          closeTimer = setTimeout(() => {
+            submenu.classList.remove('active');
+          }, 300);
+        });
+        submenu.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active');
+        });
+      }
+    }
+
+    function closeAllCoaMenus() {
+      if (moreDropdown) moreDropdown.classList.remove('active');
+      if (submenu) submenu.classList.remove('active');
+    }
+
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllCoaMenus();
+        if (typeof window.exportChartOfAccountsToPDF === 'function') {
+          await window.exportChartOfAccountsToPDF(getChartOfAccountsExportData());
+        }
+      });
+    }
+
+    if (excelBtn) {
+      excelBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllCoaMenus();
+        if (typeof window.exportChartOfAccountsToExcel === 'function') {
+          await window.exportChartOfAccountsToExcel(getChartOfAccountsExportData());
+        }
+      });
+    }
+
+    if (expandAllBtn) {
+      expandAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllCoaMenus();
+        const btn = document.getElementById('coaExpandAll');
+        if (btn) btn.click();
+      });
+    }
+
+    if (collapseAllBtn) {
+      collapseAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllCoaMenus();
+        const btn = document.getElementById('coaCollapseAll');
+        if (btn) btn.click();
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (moreDropdown && !moreDropdown.contains(e.target) && (!moreBtn || !moreBtn.contains(e.target))) {
+        closeAllCoaMenus();
+      }
+    });
   }
 
 
