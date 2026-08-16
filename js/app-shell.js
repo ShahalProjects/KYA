@@ -370,6 +370,167 @@
 
 
   /* ======================
+     SIDEBAR EXPAND / COLLAPSE
+  ====================== */
+  const KYA_SIDEBAR_COLLAPSED_KEY = 'kya_sidebar_collapsed';
+
+  function initSidebarToggle() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarToggleBtn');
+    const brandGroup = document.getElementById('sidebarBrandGroup');
+    if (!sidebar) return;
+
+    // Create global floating tooltip element if not present
+    let tooltipEl = document.getElementById('kyaSidebarTooltip');
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div');
+      tooltipEl.id = 'kyaSidebarTooltip';
+      tooltipEl.className = 'kya-sidebar-tooltip';
+      document.body.appendChild(tooltipEl);
+    }
+
+    function setSidebarCollapsed(collapsed, save = true) {
+      if (collapsed) {
+        sidebar.classList.add('collapsed');
+        document.getElementById('app')?.classList.add('sidebar-collapsed');
+        if (toggleBtn) {
+          toggleBtn.setAttribute('title', 'Expand sidebar (Ctrl+B)');
+          toggleBtn.setAttribute('aria-label', 'Expand navigation sidebar');
+          toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+      } else {
+        sidebar.classList.remove('collapsed');
+        document.getElementById('app')?.classList.remove('sidebar-collapsed');
+        if (toggleBtn) {
+          toggleBtn.setAttribute('title', 'Collapse sidebar (Ctrl+B)');
+          toggleBtn.setAttribute('aria-label', 'Collapse navigation sidebar');
+          toggleBtn.setAttribute('aria-expanded', 'true');
+        }
+      }
+
+      if (save) {
+        try {
+          localStorage.setItem(KYA_SIDEBAR_COLLAPSED_KEY, collapsed ? 'true' : 'false');
+        } catch (e) { /* ignore */ }
+      }
+
+      // Hide active tooltip on state change
+      if (tooltipEl) tooltipEl.classList.remove('visible');
+
+      // Dispatch window resize after transition so active components/tables adjust smoothly
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 260);
+    }
+
+    function toggleSidebar() {
+      const isCurrentlyCollapsed = sidebar.classList.contains('collapsed');
+      setSidebarCollapsed(!isCurrentlyCollapsed, true);
+    }
+
+    // Toggle button click handler
+    toggleBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSidebar();
+    });
+
+    // Clicking brand group / logo when collapsed expands the sidebar
+    brandGroup?.addEventListener('click', (e) => {
+      if (sidebar.classList.contains('collapsed')) {
+        e.stopPropagation();
+        setSidebarCollapsed(false, true);
+      }
+    });
+
+    // Keyboard shortcut: Ctrl + B (or Cmd + B)
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        // Only trigger shortcut when user is not actively typing in an input or textarea
+        if (!e.target.matches('input, textarea, select, [contenteditable="true"]')) {
+          e.preventDefault();
+          toggleSidebar();
+        }
+      }
+    });
+
+    // Setup floating tooltips on hover when collapsed
+    function showTooltip(targetEl, text) {
+      if (!sidebar.classList.contains('collapsed') || !text || !tooltipEl) return;
+      const rect = targetEl.getBoundingClientRect();
+      tooltipEl.textContent = text;
+      const topPos = rect.top + (rect.height / 2);
+      const leftPos = rect.right + 10;
+      tooltipEl.style.top = `${topPos}px`;
+      tooltipEl.style.transform = `translateY(-50%)`;
+      tooltipEl.style.left = `${leftPos}px`;
+      tooltipEl.classList.add('visible');
+    }
+
+    function hideTooltip() {
+      if (tooltipEl) tooltipEl.classList.remove('visible');
+    }
+
+    // Attach tooltip listeners to all nav items
+    document.querySelectorAll('#sidebar .nav-item').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const label = item.getAttribute('aria-label') || item.querySelector('.nav-label')?.textContent?.trim();
+        showTooltip(item, label);
+      });
+      item.addEventListener('mouseleave', hideTooltip);
+      item.addEventListener('click', hideTooltip);
+    });
+
+    // Company Card tooltip in collapsed state
+    const companyCard = document.getElementById('sidebarCompanyCard');
+    if (companyCard) {
+      companyCard.addEventListener('mouseenter', () => {
+        const coName = document.getElementById('sidebarCompanyName')?.textContent?.trim() || 'Company Details';
+        showTooltip(companyCard, `${coName} (Company Details)`);
+      });
+      companyCard.addEventListener('mouseleave', hideTooltip);
+      companyCard.addEventListener('click', hideTooltip);
+    }
+
+    // Toggle button tooltip in collapsed state
+    if (toggleBtn) {
+      toggleBtn.addEventListener('mouseenter', () => {
+        if (sidebar.classList.contains('collapsed')) {
+          showTooltip(toggleBtn, 'Expand Sidebar (Ctrl+B)');
+        }
+      });
+      toggleBtn.addEventListener('mouseleave', hideTooltip);
+    }
+
+    // Logo tooltip in collapsed state
+    const logoBox = sidebar.querySelector('.sidebar-logo-box');
+    if (logoBox) {
+      logoBox.addEventListener('mouseenter', () => {
+        if (sidebar.classList.contains('collapsed')) {
+          showTooltip(logoBox, 'KYA - Keep Your Accounts (Click to expand)');
+        }
+      });
+      logoBox.addEventListener('mouseleave', hideTooltip);
+      logoBox.addEventListener('click', hideTooltip);
+    }
+
+    // Restore saved state
+    try {
+      const savedState = localStorage.getItem(KYA_SIDEBAR_COLLAPSED_KEY);
+      if (savedState === 'true') {
+        setSidebarCollapsed(true, false);
+      } else {
+        setSidebarCollapsed(false, false);
+      }
+    } catch (e) {
+      setSidebarCollapsed(false, false);
+    }
+  }
+
+  // Initialize sidebar collapse handling
+  initSidebarToggle();
+
+
+  /* ======================
      NAVIGATION
   ====================== */
   const navItems        = document.querySelectorAll('.nav-item');
