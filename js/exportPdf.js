@@ -1709,7 +1709,10 @@
       doc.line(14, 26.5, pageWidth - 14, 26.5);
 
       // Metadata Info Box
-      const customer = (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == inv.customerId) : null) || { name: 'Unknown Customer' };
+      const customer = (typeof findPartyById === 'function' ? findPartyById(inv.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == inv.customerId) : null) || { name: 'Unknown Customer' };
+      const partyName = (inv.partyOverride && inv.partyOverride.name) || customer.name || 'Unknown Customer';
+      const partyAddr = (inv.partyOverride && inv.partyOverride.address) || customer.address || '';
+      const partyGstin = (inv.partyOverride && inv.partyOverride.gstin) || customer.gstin || '';
       
       doc.setFillColor(248, 250, 252);
       doc.roundedRect(14, 29, pageWidth - 28, 26, 2, 2, 'F');
@@ -1723,11 +1726,17 @@
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
-      doc.text(customer.name || 'Unknown Customer', 18, 41);
+      doc.text(partyName || 'Unknown Customer', 18, 41);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('Trade Receivables Account', 18, 47);
+      if (partyGstin) {
+        doc.text(`GSTIN: ${partyGstin}`, 18, 47);
+      } else if (partyAddr) {
+        doc.text(partyAddr.length > 35 ? partyAddr.substring(0, 32) + '...' : partyAddr, 18, 47);
+      } else {
+        doc.text('Trade Receivables Account', 18, 47);
+      }
 
       // Right: Dates and Supply
       doc.setFontSize(8);

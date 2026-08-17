@@ -1,4 +1,5 @@
   function loadSalesInvoice(inv, isDraft = false) {
+    window._salesPartyOverride = inv.partyOverride ? JSON.parse(JSON.stringify(inv.partyOverride)) : null;
     currentSalesVoucherSubtype = inv.isReturn ? 'Return' : (inv.isOrder ? 'Order' : 'Invoice');
     updateVoucherSubtypeUI();
     const dateEl = document.getElementById('salesDate');
@@ -253,6 +254,7 @@
       excessAmount: excessAmount > 0 ? excessAmount : undefined,
       refundedAmount: excessAmount > 0 ? refundedAmount : undefined,
       rows: JSON.parse(JSON.stringify(salesRows)),
+      partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
       updatedAt: Date.now()
     };
@@ -560,6 +562,7 @@
       refundedAmount: excessAmount > 0 ? refundedAmount : undefined,
       refundJournalEntryIds: excessAmount > 0 ? refundJournalEntryIds : undefined,
       rows: JSON.parse(JSON.stringify(salesRows)),
+      partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
       journalEntryId: existingJournalEntryId || '', 
       postedAt: isEditPosted ? (existingPostedInv?.postedAt || Date.now()) : Date.now()

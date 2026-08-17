@@ -1146,8 +1146,55 @@
     };
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  PARTY HOVER & TEMPORARY IN-PLACE VOUCHER DETAILS CARD
+  // ══════════════════════════════════════════════════════════════════
+
   let _kyaPartyHoverCardEl = null;
+  let _kyaHoverHideTimeout = null;
+  let _kyaPartyCardIsEditable = false;
+  let _kyaPartyGlobalListenersAttached = false;
+
+  window._salesPartyOverride = window._salesPartyOverride || null;
+  window._purchasePartyOverride = window._purchasePartyOverride || null;
+
+  function ensurePartyGlobalListeners() {
+    if (_kyaPartyGlobalListenersAttached) return;
+    _kyaPartyGlobalListenersAttached = true;
+
+    // Stable dismiss only when explicitly clicking outside
+    document.addEventListener('mousedown', (e) => {
+      if (_kyaPartyHoverCardEl && _kyaPartyHoverCardEl.style.display !== 'none') {
+        if (_kyaPartyHoverCardEl.contains(e.target) || e.target.closest('.kya-searchable-select-trigger') || e.target.closest('.kya-searchable-select-dropdown')) {
+          return;
+        }
+        hidePartyHoverCard();
+      }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && _kyaPartyHoverCardEl && _kyaPartyHoverCardEl.style.display !== 'none') {
+        hidePartyHoverCard();
+      }
+    });
+
+    // Scroll listener: do not close if editable card or scrolling inside card
+    window.addEventListener('scroll', (e) => {
+      if (_kyaPartyHoverCardEl && _kyaPartyHoverCardEl.style.display !== 'none') {
+        if (e.target && (_kyaPartyHoverCardEl === e.target || _kyaPartyHoverCardEl.contains(e.target))) {
+          return;
+        }
+        if (_kyaPartyCardIsEditable) {
+          return;
+        }
+        hidePartyHoverCard();
+      }
+    }, true);
+  }
+
   function getOrCreatePartyHoverCard() {
+    ensurePartyGlobalListeners();
     if (!_kyaPartyHoverCardEl) {
       _kyaPartyHoverCardEl = document.getElementById('kyaPartyHoverCard');
       if (!_kyaPartyHoverCardEl) {
@@ -1156,38 +1203,216 @@
         _kyaPartyHoverCardEl.style.cssText = `
           display: none;
           position: fixed;
-          width: 325px;
+          width: 385px;
           max-width: calc(100vw - 24px);
           max-height: calc(100vh - 24px);
           background: #ffffff;
           border: 1.5px solid var(--slate-200);
-          border-radius: 12px;
-          box-shadow: 0 20px 40px -6px rgba(0, 0, 0, 0.22), 0 8px 18px rgba(0, 0, 0, 0.08);
-          padding: 14px 16px;
-          z-index: 100005;
-          pointer-events: none;
+          border-radius: 14px;
+          box-shadow: 0 24px 50px -10px rgba(0, 0, 0, 0.25), 0 10px 24px rgba(0, 0, 0, 0.1);
+          padding: 16px 18px;
+          z-index: 100050;
+          pointer-events: auto;
           box-sizing: border-box;
           font-family: inherit;
           overflow-y: auto;
           scrollbar-width: thin;
+          color: var(--slate-800);
         `;
         document.body.appendChild(_kyaPartyHoverCardEl);
+
+        // Hover grace period listeners
+        _kyaPartyHoverCardEl.addEventListener('mouseenter', () => {
+          cancelHidePartyHoverCard();
+        });
+        _kyaPartyHoverCardEl.addEventListener('mouseleave', () => {
+          // Never auto-close editable card on mouseleave!
+          if (_kyaPartyCardIsEditable) return;
+          scheduleHidePartyHoverCard(350);
+        });
+        _kyaPartyHoverCardEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
       }
     }
     return _kyaPartyHoverCardEl;
   }
 
-  function positionAndShowPartyHoverCard(targetElement, party, partyType) {
+  function cancelHidePartyHoverCard() {
+    if (_kyaHoverHideTimeout) {
+      clearTimeout(_kyaHoverHideTimeout);
+      _kyaHoverHideTimeout = null;
+    }
+  }
+
+  function scheduleHidePartyHoverCard(delay = 300) {
+    if (_kyaPartyCardIsEditable) {
+      // Keep editable card stable!
+      return;
+    }
+    cancelHidePartyHoverCard();
+    _kyaHoverHideTimeout = setTimeout(() => {
+      hidePartyHoverCard();
+    }, delay);
+  }
+
+  function hidePartyHoverCard() {
+    cancelHidePartyHoverCard();
+    _kyaPartyCardIsEditable = false;
+    if (_kyaPartyHoverCardEl) {
+      _kyaPartyHoverCardEl.style.display = 'none';
+    }
+  }
+  window.hidePartyHoverCard = hidePartyHoverCard;
+
+  function findPartyById(partyId, partyType) {
+    if (!partyId) return null;
+    const pStr = String(partyId);
+    if (partyType && partyType.toLowerCase().includes('customer')) {
+      const cust = typeof getKyaCustomers === 'function' ? getKyaCustomers().find(c => String(c.id) === pStr) : null;
+      if (cust) return cust;
+    } else if (partyType && (partyType.toLowerCase().includes('supplier') || partyType.toLowerCase().includes('vendor'))) {
+      const supp = typeof getKyaSuppliers === 'function' ? getKyaSuppliers().find(s => String(s.id) === pStr) : null;
+      if (supp) return supp;
+    }
+    if (typeof getKyaCustomers === 'function') {
+      const cust = getKyaCustomers().find(c => String(c.id) === pStr);
+      if (cust) return cust;
+    }
+    if (typeof getKyaSuppliers === 'function') {
+      const supp = getKyaSuppliers().find(s => String(s.id) === pStr);
+      if (supp) return supp;
+    }
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      return coaLedgers.find(l => String(l.id) === pStr);
+    }
+    return null;
+  }
+  window.findPartyById = findPartyById;
+
+  function getPartyActiveDetails(partyId, partyType, context) {
+    const master = findPartyById(partyId, partyType) || { id: partyId, name: '' };
+    const pStr = String(partyId);
+
+    if (context === 'sales') {
+      if (window._salesPartyOverride && String(window._salesPartyOverride.partyId) === pStr) {
+        return {
+          master,
+          active: { ...master, ...window._salesPartyOverride },
+          isOverridden: Boolean(window._salesPartyOverride.isOverridden)
+        };
+      } else {
+        const fresh = {
+          partyId: pStr,
+          name: master.name || '',
+          contactName: master.contactName || '',
+          address: master.address || '',
+          city: master.city || '',
+          pincode: master.pincode || '',
+          state: master.state || '',
+          country: master.country || 'India',
+          phone: master.phone || master.mobile || '',
+          email: master.email || '',
+          gstin: master.gstin || '',
+          pan: master.pan || '',
+          bankName: master.bankName || '',
+          accountNo: master.accountNo || '',
+          ifsc: master.ifsc || '',
+          branch: master.branch || '',
+          isOverridden: false
+        };
+        window._salesPartyOverride = fresh;
+        return { master, active: fresh, isOverridden: false };
+      }
+    } else if (context === 'purchase') {
+      if (window._purchasePartyOverride && String(window._purchasePartyOverride.partyId) === pStr) {
+        return {
+          master,
+          active: { ...master, ...window._purchasePartyOverride },
+          isOverridden: Boolean(window._purchasePartyOverride.isOverridden)
+        };
+      } else {
+        const fresh = {
+          partyId: pStr,
+          name: master.name || '',
+          contactName: master.contactName || '',
+          address: master.address || '',
+          city: master.city || '',
+          pincode: master.pincode || '',
+          state: master.state || '',
+          country: master.country || 'India',
+          phone: master.phone || master.mobile || '',
+          email: master.email || '',
+          gstin: master.gstin || '',
+          pan: master.pan || '',
+          bankName: master.bankName || '',
+          accountNo: master.accountNo || '',
+          ifsc: master.ifsc || '',
+          branch: master.branch || '',
+          isOverridden: false
+        };
+        window._purchasePartyOverride = fresh;
+        return { master, active: fresh, isOverridden: false };
+      }
+    }
+
+    return { master, active: master, isOverridden: false };
+  }
+  window.getPartyActiveDetails = getPartyActiveDetails;
+
+  function resetPartyActiveOverride(context, partyId, partyType) {
+    const master = findPartyById(partyId, partyType) || { id: partyId, name: '' };
+    const pStr = String(partyId);
+    const fresh = {
+      partyId: pStr,
+      name: master.name || '',
+      contactName: master.contactName || '',
+      address: master.address || '',
+      city: master.city || '',
+      pincode: master.pincode || '',
+      state: master.state || '',
+      country: master.country || 'India',
+      phone: master.phone || master.mobile || '',
+      email: master.email || '',
+      gstin: master.gstin || '',
+      pan: master.pan || '',
+      bankName: master.bankName || '',
+      accountNo: master.accountNo || '',
+      ifsc: master.ifsc || '',
+      branch: master.branch || '',
+      isOverridden: false
+    };
+    if (context === 'sales') {
+      window._salesPartyOverride = fresh;
+    } else if (context === 'purchase') {
+      window._purchasePartyOverride = fresh;
+    }
+    return fresh;
+  }
+  window.resetPartyActiveOverride = resetPartyActiveOverride;
+
+  function positionAndShowPartyHoverCard(targetElement, party, partyType, isEditable = false, context = '') {
     if (!targetElement || !party) return;
+    cancelHidePartyHoverCard();
+    _kyaPartyCardIsEditable = Boolean(isEditable);
+
     const card = getOrCreatePartyHoverCard();
-    card.innerHTML = getPartyHoverPreviewHtml(party, partyType);
+    
+    if (isEditable && (context === 'sales' || context === 'purchase')) {
+      const details = getPartyActiveDetails(party.id, partyType, context);
+      card.innerHTML = getPartyEditableCardHtml(details.active, details.master, partyType, details.isOverridden, context);
+      attachPartyEditableCardEvents(card, party.id, partyType, context, targetElement);
+    } else {
+      card.innerHTML = getPartyHoverPreviewHtml(party, partyType);
+    }
+
     card.style.display = 'block';
     card.style.visibility = 'hidden';
 
     // Measure card dimensions accurately
     const cardRect = card.getBoundingClientRect();
-    const cardWidth = cardRect.width || 325;
-    const cardHeight = cardRect.height || 260;
+    const cardWidth = cardRect.width || (isEditable ? 385 : 325);
+    const cardHeight = cardRect.height || (isEditable ? 520 : 260);
 
     const targetRect = targetElement.getBoundingClientRect();
     const vw = window.innerWidth;
@@ -1222,6 +1447,302 @@
     card.style.left = `${Math.round(left)}px`;
     card.style.top = `${Math.round(top)}px`;
     card.style.visibility = 'visible';
+  }
+
+  function getPartyEditableCardHtml(activeData, masterData, typeLabel = 'Customer', isOverridden = false, context = 'sales') {
+    const isCustomer = typeLabel.toLowerCase().includes('customer');
+    const badgeColor = isCustomer ? '#1d4ed8' : '#15803d';
+    const badgeBg = isCustomer ? '#eff6ff' : '#f0fdf4';
+    const badgeBorder = isCustomer ? '#dbeafe' : '#bbf7d0';
+
+    const bal = Number(masterData.openingBalance || 0);
+    const balFormatted = typeof fmtNum === 'function' ? fmtNum(Math.abs(bal)) : Math.abs(bal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+    const safeVal = (v) => (v !== undefined && v !== null ? String(v).replace(/"/g, '&quot;') : '');
+
+    return `
+      <!-- Header -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--slate-100); padding-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 2.5px 8px; border-radius: 6px; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder};">
+            ${isCustomer ? 'Customer Details' : 'Vendor / Supplier Details'}
+          </span>
+          <span id="kyaHovStatusBadge" style="font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; ${isOverridden ? 'background: #fef3c7; color: #b45309; border: 1px solid #fde68a;' : 'background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;'}">
+            ${isOverridden ? '● Voucher Override' : '● Master Default'}
+          </span>
+        </div>
+        <button type="button" id="kyaHovCloseBtn" title="Close" style="background: transparent; border: none; cursor: pointer; color: var(--slate-400); font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.15s;" onmouseover="this.style.color='var(--slate-800)'" onmouseout="this.style.color='var(--slate-400)'">&times;</button>
+      </div>
+
+      <!-- Temporary Notice Strip with Hover Tooltip -->
+      <div style="margin-bottom: 12px; position: relative;">
+        <div class="kya-temp-voucher-edit-wrap" 
+             tabindex="0"
+             title="Changes made here apply only to this voucher and will not alter the master database record." 
+             style="display: inline-flex; align-items: center; gap: 6px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 4.5px 10px; font-size: 11px; color: #1e40af; cursor: help; user-select: none; position: relative; transition: all 0.15s ease;"
+             onmouseenter="const t=this.querySelector('.kya-temp-voucher-tooltip'); if(t) t.style.display='block';"
+             onmouseleave="const t=this.querySelector('.kya-temp-voucher-tooltip'); if(t) t.style.display='none';">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="color: #2563eb; flex-shrink: 0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <span style="font-weight: 600; text-decoration: underline dotted #3b82f6; text-underline-offset: 2.5px;">Temporary In-Voucher Edit:</span>
+          <span style="font-size: 10px; color: #3b82f6; opacity: 0.85;">(hover for info)</span>
+
+          <!-- Tooltip on cursor hover -->
+          <div class="kya-temp-voucher-tooltip" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 270px; max-width: 320px; background: #1e293b; color: #f8fafc; font-size: 11px; font-weight: 400; line-height: 1.45; padding: 8px 11px; border-radius: 7px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15); border: 1px solid #334155; z-index: 100010; pointer-events: none; white-space: normal;">
+            Changes made here apply <em>only to this voucher</em> and will not alter the master database record.
+            <div style="position: absolute; top: -5px; left: 24px; width: 8px; height: 8px; background: #1e293b; border-left: 1px solid #334155; border-top: 1px solid #334155; transform: rotate(45deg);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editable Fields -->
+      <div style="display: flex; flex-direction: column; gap: 9px; font-size: 12px;">
+        <!-- Name -->
+        <div>
+          <label style="font-size: 11px; font-weight: 700; color: var(--slate-700); margin-bottom: 3px; display: block;">
+            Billing / Display Name
+          </label>
+          <input type="text" id="kyaHovName" value="${safeVal(activeData.name)}" class="je-input" placeholder="Party Name" style="width: 100%; height: 30px; font-size: 12.5px; padding: 4px 8px; border-radius: 6px; box-sizing: border-box;" />
+        </div>
+
+        <!-- Contact Person -->
+        <div>
+          <label style="font-size: 11px; font-weight: 700; color: var(--slate-700); margin-bottom: 3px; display: block;">
+            Attention / Contact Person
+          </label>
+          <input type="text" id="kyaHovContactName" value="${safeVal(activeData.contactName)}" class="je-input" placeholder="Contact Person (Optional)" style="width: 100%; height: 30px; font-size: 12px; padding: 4px 8px; border-radius: 6px; box-sizing: border-box;" />
+        </div>
+
+        <!-- Address -->
+        <div>
+          <label style="font-size: 11px; font-weight: 700; color: var(--slate-700); margin-bottom: 3px; display: block;">
+            Street Address / Building
+          </label>
+          <textarea id="kyaHovAddress" class="je-input" rows="2" placeholder="Street Address / Building / Area" style="width: 100%; font-size: 12px; padding: 5px 8px; border-radius: 6px; box-sizing: border-box; resize: vertical; font-family: inherit;">${activeData.address || ''}</textarea>
+        </div>
+
+        <!-- City & Pincode -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">City / Town</label>
+            <input type="text" id="kyaHovCity" value="${safeVal(activeData.city)}" class="je-input" placeholder="City" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+          </div>
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">PIN Code</label>
+            <input type="text" id="kyaHovPincode" value="${safeVal(activeData.pincode)}" class="je-input" placeholder="PIN Code" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+          </div>
+        </div>
+
+        <!-- State & Country -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">State</label>
+            <input type="text" id="kyaHovState" value="${safeVal(activeData.state)}" class="je-input" placeholder="State" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+          </div>
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">Country</label>
+            <input type="text" id="kyaHovCountry" value="${safeVal(activeData.country || 'India')}" class="je-input" placeholder="Country" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+          </div>
+        </div>
+
+        <!-- Phone & Email -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">Phone / Mobile</label>
+            <input type="text" id="kyaHovPhone" value="${safeVal(activeData.phone)}" class="je-input" placeholder="Phone" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+          </div>
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">Email Address</label>
+            <input type="text" id="kyaHovEmail" value="${safeVal(activeData.email)}" class="je-input" placeholder="Email" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+          </div>
+        </div>
+
+        <!-- GSTIN & PAN -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">GSTIN</label>
+            <input type="text" id="kyaHovGstin" value="${safeVal(activeData.gstin)}" maxlength="15" class="je-input" placeholder="GSTIN" style="width: 100%; height: 28px; font-size: 11.5px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box; text-transform: uppercase; font-family: monospace;" />
+          </div>
+          <div>
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">PAN</label>
+            <input type="text" id="kyaHovPan" value="${safeVal(activeData.pan)}" maxlength="10" class="je-input" placeholder="PAN" style="width: 100%; height: 28px; font-size: 11.5px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box; text-transform: uppercase; font-family: monospace;" />
+          </div>
+        </div>
+
+        <!-- Bank Details Option -->
+        <div style="margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--slate-200);">
+          <div style="font-size: 11px; font-weight: 700; color: var(--slate-700); text-transform: uppercase; display: flex; align-items: center; gap: 5px; margin-bottom: 6px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--slate-500);"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+            Bank Details
+          </div>
+
+          <!-- Bank Name & Account No -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <div>
+              <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">Bank Name</label>
+              <input type="text" id="kyaHovBankName" value="${safeVal(activeData.bankName)}" class="je-input" placeholder="e.g. HDFC Bank" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+            </div>
+            <div>
+              <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">Account Number</label>
+              <input type="text" id="kyaHovAccountNo" value="${safeVal(activeData.accountNo)}" class="je-input" placeholder="A/C Number" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box; font-family: monospace;" />
+            </div>
+          </div>
+
+          <!-- IFSC & Branch -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+              <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">IFSC Code</label>
+              <input type="text" id="kyaHovIfsc" value="${safeVal(activeData.ifsc)}" maxlength="11" class="je-input" placeholder="IFSC Code" style="width: 100%; height: 28px; font-size: 11.5px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box; text-transform: uppercase; font-family: monospace;" />
+            </div>
+            <div>
+              <label style="font-size: 10.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px; display: block;">Branch</label>
+              <input type="text" id="kyaHovBranch" value="${safeVal(activeData.branch)}" class="je-input" placeholder="Branch Name" style="width: 100%; height: 28px; font-size: 12px; padding: 3px 7px; border-radius: 6px; box-sizing: border-box;" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Master Reference Strip -->
+      <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid var(--slate-200); border-radius: 6px; padding: 5px 8px; margin-top: 10px; font-size: 11px;">
+        <span style="color: var(--slate-500);">Master Balance: <strong style="color: var(--slate-800);">₹ ${balFormatted}</strong></span>
+        <span id="kyaHovSavedHint" style="color: #15803d; font-weight: 600; font-size: 10.5px; display: flex; align-items: center; gap: 3px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Active for voucher
+        </span>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; pt-1; border-top: 1px solid var(--slate-100);">
+        <button type="button" id="kyaHovResetBtn" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 10px; height: 28px; display: flex; align-items: center; gap: 4px; color: var(--slate-600);">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+          Reset to Master
+        </button>
+        <button type="button" id="kyaHovDoneBtn" class="btn btn-primary btn-sm" style="font-size: 11px; padding: 4px 14px; height: 28px; font-weight: 600;">
+          Done
+        </button>
+      </div>
+    `;
+  }
+
+  function attachPartyEditableCardEvents(card, partyId, partyType, context, targetElement) {
+    const fields = ['Name', 'ContactName', 'Address', 'City', 'Pincode', 'State', 'Country', 'Phone', 'Email', 'Gstin', 'Pan', 'BankName', 'AccountNo', 'Ifsc', 'Branch'];
+    const pStr = String(partyId);
+
+    const updateOverride = () => {
+      let override = (context === 'sales') ? window._salesPartyOverride : window._purchasePartyOverride;
+      if (!override || String(override.partyId) !== pStr) {
+        override = { partyId: pStr, isOverridden: true };
+      }
+
+      fields.forEach(f => {
+        const inp = card.querySelector('#kyaHov' + f);
+        if (inp) {
+          const key = f.charAt(0).toLowerCase() + f.slice(1);
+          override[key] = inp.value.trim();
+        }
+      });
+      override.isOverridden = true;
+
+      if (context === 'sales') {
+        window._salesPartyOverride = override;
+        const triggerText = document.getElementById('salesCustomerSelectTriggerText');
+        if (triggerText && override.name) {
+          triggerText.textContent = override.name;
+        }
+      } else if (context === 'purchase') {
+        window._purchasePartyOverride = override;
+        const triggerText = document.getElementById('purchaseVendorSelectTriggerText');
+        if (triggerText && override.name) {
+          triggerText.textContent = override.name;
+        }
+      }
+
+      const statusBadge = card.querySelector('#kyaHovStatusBadge');
+      if (statusBadge) {
+        statusBadge.textContent = '● Voucher Override';
+        statusBadge.style.background = '#fef3c7';
+        statusBadge.style.color = '#b45309';
+        statusBadge.style.border = '1px solid #fde68a';
+      }
+
+      const savedHint = card.querySelector('#kyaHovSavedHint');
+      if (savedHint) {
+        savedHint.style.opacity = '1';
+      }
+    };
+
+    fields.forEach(f => {
+      const inp = card.querySelector('#kyaHov' + f);
+      if (inp) {
+        inp.addEventListener('input', () => {
+          if (f === 'Gstin' || f === 'Pan' || f === 'Ifsc') {
+            inp.value = inp.value.toUpperCase();
+          }
+          if (f === 'Gstin') {
+            const panInp = card.querySelector('#kyaHovPan');
+            if (panInp && !panInp.value && inp.value.length >= 12) {
+              panInp.value = inp.value.substring(2, 12);
+            }
+          }
+          updateOverride();
+        });
+        inp.addEventListener('change', updateOverride);
+      }
+    });
+
+    const resetBtn = card.querySelector('#kyaHovResetBtn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const fresh = resetPartyActiveOverride(context, partyId, partyType);
+        
+        fields.forEach(f => {
+          const inp = card.querySelector('#kyaHov' + f);
+          if (inp) {
+            const key = f.charAt(0).toLowerCase() + f.slice(1);
+            inp.value = fresh[key] || '';
+          }
+        });
+
+        const statusBadge = card.querySelector('#kyaHovStatusBadge');
+        if (statusBadge) {
+          statusBadge.textContent = '● Master Default';
+          statusBadge.style.background = '#f1f5f9';
+          statusBadge.style.color = '#64748b';
+          statusBadge.style.border = '1px solid #e2e8f0';
+        }
+
+        if (context === 'sales') {
+          const triggerText = document.getElementById('salesCustomerSelectTriggerText');
+          if (triggerText && fresh.name) triggerText.textContent = fresh.name;
+        } else if (context === 'purchase') {
+          const triggerText = document.getElementById('purchaseVendorSelectTriggerText');
+          if (triggerText && fresh.name) triggerText.textContent = fresh.name;
+        }
+
+        if (typeof showToast === 'function') {
+          showToast('Reset to original master details.', 'info');
+        }
+      });
+    }
+
+    const closeBtn = card.querySelector('#kyaHovCloseBtn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hidePartyHoverCard();
+      });
+    }
+
+    const doneBtn = card.querySelector('#kyaHovDoneBtn');
+    if (doneBtn) {
+      doneBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hidePartyHoverCard();
+      });
+    }
   }
 
   function getPartyHoverPreviewHtml(party, typeLabel = 'Customer') {
@@ -1312,31 +1833,6 @@
     `;
   }
 
-  function findPartyById(partyId, partyType) {
-    if (!partyId) return null;
-    const pStr = String(partyId);
-    if (partyType && partyType.toLowerCase().includes('customer')) {
-      const cust = typeof getKyaCustomers === 'function' ? getKyaCustomers().find(c => String(c.id) === pStr) : null;
-      if (cust) return cust;
-    } else if (partyType && (partyType.toLowerCase().includes('supplier') || partyType.toLowerCase().includes('vendor'))) {
-      const supp = typeof getKyaSuppliers === 'function' ? getKyaSuppliers().find(s => String(s.id) === pStr) : null;
-      if (supp) return supp;
-    }
-    if (typeof getKyaCustomers === 'function') {
-      const cust = getKyaCustomers().find(c => String(c.id) === pStr);
-      if (cust) return cust;
-    }
-    if (typeof getKyaSuppliers === 'function') {
-      const supp = getKyaSuppliers().find(s => String(s.id) === pStr);
-      if (supp) return supp;
-    }
-    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
-      return coaLedgers.find(l => String(l.id) === pStr);
-    }
-    return null;
-  }
-  window.findPartyById = findPartyById;
-
   function initPartySearchableSelect(selectId, placeholderText = 'Select Party', partyType = 'Customer') {
     const realSelect = document.getElementById(selectId);
     const wrap = document.getElementById(selectId + 'SelectWrap');
@@ -1350,15 +1846,15 @@
       return null;
     }
 
-    const hideHoverCard = () => {
-      const card = getOrCreatePartyHoverCard();
-      card.style.display = 'none';
-    };
+    const context = (selectId === 'salesCustomer' || partyType.toLowerCase().includes('customer')) ? 'sales' : (selectId === 'purchaseVendor' || partyType.toLowerCase().includes('vendor') || partyType.toLowerCase().includes('supplier') ? 'purchase' : 'generic');
 
     const updateTriggerText = () => {
       const selectedOpt = realSelect.options[realSelect.selectedIndex];
       if (selectedOpt && selectedOpt.value) {
-        triggerText.textContent = selectedOpt.textContent.trim();
+        const partyId = selectedOpt.value;
+        const details = getPartyActiveDetails(partyId, partyType, context);
+        const displayName = (details && details.active && details.active.name) ? details.active.name : selectedOpt.textContent.trim();
+        triggerText.textContent = displayName;
         triggerText.style.color = 'var(--slate-800)';
       } else {
         triggerText.textContent = placeholderText;
@@ -1366,19 +1862,21 @@
       }
     };
 
-    // Hover on trigger box itself when party is selected
+    // Hover on trigger box when party is selected: show editable details stably
     trigger.addEventListener('mouseenter', () => {
       if (dropdown.style.display === 'flex') return;
       const partyId = realSelect.value;
       if (!partyId) return;
       const party = findPartyById(partyId, partyType);
       if (party) {
-        positionAndShowPartyHoverCard(trigger, party, partyType);
+        cancelHidePartyHoverCard();
+        positionAndShowPartyHoverCard(trigger, party, partyType, true, context);
       }
     });
 
     trigger.addEventListener('mouseleave', () => {
-      hideHoverCard();
+      if (_kyaPartyCardIsEditable) return;
+      scheduleHidePartyHoverCard(350);
     });
 
     const populateList = (filter = '') => {
@@ -1428,12 +1926,13 @@
         item.addEventListener('mouseenter', () => {
           if (!isSelected) item.style.background = 'var(--slate-50)';
           if (!party) return;
-          positionAndShowPartyHoverCard(item, party, partyType);
+          cancelHidePartyHoverCard();
+          positionAndShowPartyHoverCard(item, party, partyType, false, '');
         });
 
         item.addEventListener('mouseleave', () => {
           if (!isSelected) item.style.background = 'transparent';
-          hideHoverCard();
+          scheduleHidePartyHoverCard(250);
         });
 
         item.addEventListener('click', () => {
@@ -1441,7 +1940,7 @@
           realSelect.dispatchEvent(new Event('change'));
           updateTriggerText();
           dropdown.style.display = 'none';
-          hideHoverCard();
+          hidePartyHoverCard();
         });
 
         optionsList.appendChild(item);
@@ -1486,7 +1985,7 @@
             e.preventDefault();
             e.stopPropagation();
             dropdown.style.display = 'none';
-            hideHoverCard();
+            hidePartyHoverCard();
             const q = searchInput.value.trim();
             if (typeof window.openMasterDeskCreateLedger === 'function') {
               window.openMasterDeskCreateLedger({
@@ -1504,7 +2003,7 @@
             e.preventDefault();
             e.stopPropagation();
             dropdown.style.display = 'none';
-            hideHoverCard();
+            hidePartyHoverCard();
             const q = searchInput.value.trim();
             if (typeof window.openMasterDeskCreateParty === 'function') {
               window.openMasterDeskCreateParty({
@@ -1524,7 +2023,7 @@
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
       const isOpen = dropdown.style.display === 'flex';
-      hideHoverCard();
+      hidePartyHoverCard();
       if (isOpen) {
         dropdown.style.display = 'none';
       } else {
@@ -1544,17 +2043,14 @@
     });
 
     dropdown.addEventListener('scroll', () => {
-      hideHoverCard();
+      hidePartyHoverCard();
     });
 
-    const handleOutsideClick = (e) => {
+    document.addEventListener('click', (e) => {
       if (!trigger.contains(e.target) && !dropdown.contains(e.target)) {
         dropdown.style.display = 'none';
-        hideHoverCard();
       }
-    };
-    document.addEventListener('click', handleOutsideClick);
-    window.addEventListener('scroll', hideHoverCard, true);
+    });
 
     realSelect.addEventListener('change', () => {
       updateTriggerText();
@@ -1570,7 +2066,7 @@
       },
       close: () => {
         dropdown.style.display = 'none';
-        hideHoverCard();
+        hidePartyHoverCard();
       }
     };
   }

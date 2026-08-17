@@ -1139,7 +1139,7 @@
                 Statement Import
               </div>
               <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 800; color: var(--slate-900);">Configure Column Mapping</h3>
-              <p style="margin: 0; font-size: 12.5px; color: var(--slate-400);">Choose heading row and map statement columns. Date, Debit, and Credit columns are mandatory.</p>
+              <p style="margin: 0; font-size: 12.5px; color: var(--slate-400);">Choose heading row and map statement columns. Date, Withdrawal, and Deposit columns are mandatory.</p>
             </div>
             <button id="clWzCloseBtn2" style="background: transparent; border: none; font-size: 18px; font-weight: 700; color: #94a3b8; cursor: pointer; padding: 4px; line-height: 1;" type="button">✕</button>
           </div>
@@ -1174,12 +1174,12 @@
                 <select id="clWzMapDescription" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
               </div>
               <div class="cl-form-group">
-                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Debit / Deposit Column *</label>
-                <select id="clWzMapDebit" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
+                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Withdrawal Column *</label>
+                <select id="clWzMapWithdrawal" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
               </div>
               <div class="cl-form-group">
-                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Credit / Withdrawal Column *</label>
-                <select id="clWzMapCredit" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
+                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Deposit Column *</label>
+                <select id="clWzMapDeposit" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
               </div>
               <div class="cl-form-group" style="grid-column: 1 / -1;">
                 <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Balance Column</label>
@@ -1214,14 +1214,17 @@
           return `<option value="${cIdx}">${ohEsc(label)}</option>`;
         }).join('');
 
-        const fields = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
+        const fields = ['Date', 'Description', 'Withdrawal', 'Deposit', 'Balance'];
         fields.forEach(f => {
           const select = overlay.querySelector('#clWzMap' + f);
           if (!select) return;
           select.innerHTML = '<option value="">-- Choose Column --</option>' + optionsHtml;
 
           // Attempt saved mapping match
-          const savedColName = savedConfig[f.toLowerCase() + 'Col'];
+          let savedColName = savedConfig[f.toLowerCase() + 'Col'];
+          if (!savedColName && f === 'Withdrawal') savedColName = savedConfig.debitCol;
+          if (!savedColName && f === 'Deposit') savedColName = savedConfig.creditCol;
+
           if (savedColName && headers.includes(savedColName)) {
             select.value = headers.indexOf(savedColName);
           } else {
@@ -1234,11 +1237,11 @@
             } else if (fL === 'description') {
               const idx = lowerH.findIndex(h => h.includes('desc') || h.includes('particular') || h.includes('narr') || h.includes('remark') || h.includes('info'));
               if (idx > -1) select.value = idx;
-            } else if (fL === 'debit') {
-              const idx = lowerH.findIndex(h => h.includes('debit') || h.includes('deposit') || h.includes('receipt') || h.includes('in') || h.includes('dr'));
+            } else if (fL === 'withdrawal') {
+              const idx = lowerH.findIndex(h => h.includes('withdrawal') || h.includes('withdraw') || h.includes('dr') || h.includes('debit') || h.includes('payment') || h.includes('paid') || h.includes('out'));
               if (idx > -1) select.value = idx;
-            } else if (fL === 'credit') {
-              const idx = lowerH.findIndex(h => h.includes('credit') || h.includes('withdrawal') || h.includes('payment') || h.includes('out') || h.includes('cr'));
+            } else if (fL === 'deposit') {
+              const idx = lowerH.findIndex(h => h.includes('deposit') || h.includes('cr') || h.includes('credit') || h.includes('receipt') || h.includes('received') || h.includes('in'));
               if (idx > -1) select.value = idx;
             } else if (fL === 'balance') {
               const idx = lowerH.findIndex(h => h.includes('bal'));
@@ -1257,20 +1260,20 @@
         const hIdx = Math.max(0, rowNum - 1);
         const dateVal = overlay.querySelector('#clWzMapDate').value;
         const descVal = overlay.querySelector('#clWzMapDescription').value;
-        const debitVal = overlay.querySelector('#clWzMapDebit').value;
-        const creditVal = overlay.querySelector('#clWzMapCredit').value;
+        const withdrawalVal = overlay.querySelector('#clWzMapWithdrawal').value;
+        const depositVal = overlay.querySelector('#clWzMapDeposit').value;
         const balVal = overlay.querySelector('#clWzMapBalance').value;
 
-        if (dateVal === '' || debitVal === '' || creditVal === '') {
-          showToast('Date, Debit, and Credit column mappings are mandatory.', 'warning');
+        if (dateVal === '' || withdrawalVal === '' || depositVal === '') {
+          showToast('Date, Withdrawal, and Deposit column mappings are mandatory.', 'warning');
           return;
         }
 
         const headers = parsedRows[hIdx] || [];
         const dateColName = headers[Number(dateVal)] || '';
         const descColName = descVal !== '' ? headers[Number(descVal)] : '';
-        const debitColName = headers[Number(debitVal)] || '';
-        const creditColName = headers[Number(creditVal)] || '';
+        const withdrawalColName = headers[Number(withdrawalVal)] || '';
+        const depositColName = headers[Number(depositVal)] || '';
         const balanceColName = balVal !== '' ? headers[Number(balVal)] : '';
 
         // Save mapping config
@@ -1279,16 +1282,18 @@
           headerRowIndex: hIdx,
           dateCol: dateColName,
           descCol: descColName,
-          debitCol: debitColName,
-          creditCol: creditColName,
+          withdrawalCol: withdrawalColName,
+          depositCol: depositColName,
+          debitCol: withdrawalColName,
+          creditCol: depositColName,
           balanceCol: balanceColName
         };
 
         const statementRows = [];
         const dCol = Number(dateVal);
         const descCol = descVal !== '' ? Number(descVal) : -1;
-        const drCol = Number(debitVal);
-        const crCol = Number(creditVal);
+        const wCol = Number(withdrawalVal);
+        const depCol = Number(depositVal);
         const bCol = balVal !== '' ? Number(balVal) : -1;
 
         for (let i = hIdx + 1; i < parsedRows.length; i++) {
@@ -1302,8 +1307,8 @@
           if (!date) continue; // Skip invalid rows
 
           const description = descCol !== -1 ? String(row[descCol] || '').trim() : '';
-          const debit = parseFloat(row[drCol]) || 0;
-          const credit = parseFloat(row[crCol]) || 0;
+          const debit = parseFloat(row[wCol]) || 0;
+          const credit = parseFloat(row[depCol]) || 0;
           const balance = bCol !== -1 ? parseFloat(row[bCol]) || 0 : 0;
 
           // Skip if all values are zero
@@ -2151,11 +2156,33 @@
                             data-index="${line.origIdx}"
                             data-account-id="${currentAcc.id}"
                             data-selected-id="${savedLedgerId}"
-                            style="width: 100%; height: 36px; padding: 0 12px; font-size: 13px; font-weight: 600; text-align: left; background: #fff; border: 1px solid var(--slate-300); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; color: ${savedLedger ? 'var(--slate-800)' : 'var(--slate-400)'}; transition: all 0.15s ease;">
-                      <span class="cl-recon-ledger-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        ${savedLedger ? ohEsc(savedLedger.name) : 'Select Ledger...'}
-                      </span>
-                      <span style="font-size: 9px; margin-left: 6px; color: var(--slate-400);">▼</span>
+                            data-description="${ohEsc(line.description || '—')}"
+                            data-amount="${amtDisplay}"
+                            data-date="${formatToDDMMYYYY(line.date)}"
+                            data-type="${dbVal > 0 ? 'Withdrawal' : 'Deposit'}"
+                            data-type-color="${amtColor}"
+                            style="width: 100%; height: 36px; padding: 0 10px; font-size: 13px; text-align: left; background: ${savedLedger ? '#eff6ff' : '#fff'}; border: ${savedLedger ? '1.5px solid #2563eb' : '1px solid var(--slate-300)'}; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; color: ${savedLedger ? '#1e3a8a' : 'var(--slate-400)'}; transition: all 0.15s ease;">
+                      ${savedLedger ? `
+                        <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                          <span style="color: #2563eb; font-weight: 800; font-size: 12px; background: rgba(37,99,235,0.15); border-radius: 4px; padding: 1px 4px;">✓</span>
+                          <span class="cl-recon-ledger-label" style="font-weight: 700; color: #1e3a8a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${ohEsc(savedLedger.name)}
+                          </span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                          <span class="cl-recon-clear-btn" data-index="${line.origIdx}" data-account-id="${currentAcc.id}" title="Remove selection (Backspace)" style="background: rgba(220,38,38,0.1); color: #dc2626; border-radius: 4px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;">
+                            <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px; display: block;" stroke="currentColor">
+                              <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                            </svg>
+                          </span>
+                          <span style="font-size: 8px; color: #3b82f6;">▼</span>
+                        </div>
+                      ` : `
+                        <span class="cl-recon-ledger-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--slate-400); font-weight: 500;">
+                          Select Ledger...
+                        </span>
+                        <span style="font-size: 9px; margin-left: 6px; color: var(--slate-400);">▼</span>
+                      `}
                     </button>
                   </td>
                 </tr>
@@ -2868,15 +2895,43 @@
       });
 
       document.querySelectorAll('.cl-recon-ledger-btn').forEach(btn => {
+        function goToPrevRow() {
+          const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
+          const currentBtnIdx = allBtns.indexOf(btn);
+          if (currentBtnIdx > 0) {
+            const prevBtn = allBtns[currentBtnIdx - 1];
+            setTimeout(() => {
+              prevBtn.focus();
+              prevBtn.click();
+            }, 50);
+          }
+        }
+
         btn.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
             e.preventDefault();
             btn.click();
-          } else if (e.key === 'Backspace') {
+          } else if (e.key === 'Backspace' || e.key === 'Delete') {
             e.preventDefault();
-            selectOptionAndAdvance('', 'prev');
+            if (btn.dataset.selectedId) {
+              selectOptionAndAdvance('', 'none');
+            } else {
+              goToPrevRow();
+            }
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            goToPrevRow();
           }
         });
+
+        // Wire up initial clear button if present
+        const initClearBtn = btn.querySelector('.cl-recon-clear-btn');
+        if (initClearBtn) {
+          initClearBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            selectOptionAndAdvance('', 'none');
+          });
+        }
 
         function selectOptionAndAdvance(selectedId, direction = 'next') {
           const origIdx = btn.dataset.index;
@@ -2890,33 +2945,75 @@
           }
 
           const chosenLedger = allLedgers.find(l => String(l.id) === String(selectedId));
-          const labelSpan = btn.querySelector('.cl-recon-ledger-label');
-          if (labelSpan) {
-            labelSpan.textContent = chosenLedger ? chosenLedger.name : 'Select Ledger...';
-          }
-          btn.style.color = chosenLedger ? 'var(--slate-800)' : 'var(--slate-400)';
           btn.dataset.selectedId = selectedId || '';
+
+          if (chosenLedger) {
+            btn.style.background = '#eff6ff';
+            btn.style.border = '1.5px solid #2563eb';
+            btn.style.color = '#1e3a8a';
+            btn.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                <span style="color: #2563eb; font-weight: 800; font-size: 12px; background: rgba(37,99,235,0.15); border-radius: 4px; padding: 1px 4px;">✓</span>
+                <span class="cl-recon-ledger-label" style="font-weight: 700; color: #1e3a8a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  ${ohEsc(chosenLedger.name)}
+                </span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span class="cl-recon-clear-btn" data-index="${origIdx}" data-account-id="${bankId}" title="Remove selection (Backspace)" style="background: rgba(220,38,38,0.1); color: #dc2626; border-radius: 4px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;">
+                  <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px; display: block;" stroke="currentColor">
+                    <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span style="font-size: 8px; color: #3b82f6;">▼</span>
+              </div>
+            `;
+          } else {
+            btn.style.background = '#ffffff';
+            btn.style.border = '1px solid var(--slate-300)';
+            btn.style.color = 'var(--slate-400)';
+            btn.innerHTML = `
+              <span class="cl-recon-ledger-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--slate-400); font-weight: 500;">
+                Select Ledger...
+              </span>
+              <span style="font-size: 9px; margin-left: 6px; color: var(--slate-400);">▼</span>
+            `;
+          }
+
+          const dynamicClearBtn = btn.querySelector('.cl-recon-clear-btn');
+          if (dynamicClearBtn) {
+            dynamicClearBtn.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              selectOptionAndAdvance('', 'none');
+            });
+          }
 
           const existingPopover = document.getElementById('clReconLedgerPopover');
           if (existingPopover) existingPopover.remove();
 
           if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
 
-          const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
-          const currentBtnIdx = allBtns.indexOf(btn);
-
-          if (direction === 'next' && currentBtnIdx > -1 && currentBtnIdx + 1 < allBtns.length) {
-            const nextBtn = allBtns[currentBtnIdx + 1];
-            setTimeout(() => {
-              nextBtn.focus();
-              nextBtn.click();
-            }, 50);
-          } else if (direction === 'prev' && currentBtnIdx > 0) {
-            const prevBtn = allBtns[currentBtnIdx - 1];
-            setTimeout(() => {
-              prevBtn.focus();
-              prevBtn.click();
-            }, 50);
+          if (direction === 'next') {
+            const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
+            const currentBtnIdx = allBtns.indexOf(btn);
+            if (currentBtnIdx > -1 && currentBtnIdx + 1 < allBtns.length) {
+              const nextBtn = allBtns[currentBtnIdx + 1];
+              setTimeout(() => {
+                nextBtn.focus();
+                nextBtn.click();
+              }, 50);
+            }
+          } else if (direction === 'prev') {
+            const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
+            const currentBtnIdx = allBtns.indexOf(btn);
+            if (currentBtnIdx > 0) {
+              const prevBtn = allBtns[currentBtnIdx - 1];
+              setTimeout(() => {
+                prevBtn.focus();
+                prevBtn.click();
+              }, 50);
+            }
+          } else {
+            btn.focus();
           }
         }
 
@@ -2933,15 +3030,40 @@
           const origIdx = btn.dataset.index;
           const bankId = btn.dataset.accountId;
           const currentSelectedId = btn.dataset.selectedId || '';
+          const currentSelectedLedger = allLedgers.find(l => String(l.id) === String(currentSelectedId));
+
+          const tr = btn.closest('tr');
+          const origRowBg = tr ? tr.style.background : '';
+          if (tr) {
+            tr.style.background = '#fef9c3';
+            tr.style.transition = 'background 0.2s ease';
+          }
 
           const popover = document.createElement('div');
           popover.id = 'clReconLedgerPopover';
           popover.dataset.btnIndex = origIdx;
           popover.tabIndex = -1;
+
+          const btnRect = btn.getBoundingClientRect();
+          const popoverWidth = Math.max(300, Math.min(360, btnRect.width || 280));
+          
+          const spaceBelow = window.innerHeight - btnRect.bottom;
+          const spaceAbove = btnRect.top;
+          const placeAbove = spaceBelow < 240 && spaceAbove > spaceBelow;
+
+          let maxListHeight;
+          if (placeAbove) {
+            const availableHeight = Math.max(160, spaceAbove - 20);
+            maxListHeight = Math.max(90, Math.min(220, availableHeight - 165));
+          } else {
+            const availableHeight = Math.max(160, spaceBelow - 20);
+            maxListHeight = Math.max(90, Math.min(220, availableHeight - 165));
+          }
+
           popover.style.cssText = `
             position: fixed;
             z-index: 10000;
-            width: 320px;
+            width: ${popoverWidth}px;
             background: #ffffff;
             border: 1.5px solid #cbd5e1;
             border-radius: 12px;
@@ -2952,53 +3074,98 @@
             outline: none;
           `;
 
+          // Align right edge of popover with right edge of button to prevent hiding Description/Amount columns
+          let leftPos = btnRect.right - popoverWidth;
+          if (leftPos < 10) leftPos = Math.max(10, btnRect.left);
+          if (leftPos + popoverWidth > window.innerWidth - 10) {
+            leftPos = Math.max(10, window.innerWidth - popoverWidth - 10);
+          }
+          popover.style.left = `${leftPos}px`;
+
+          // Vertical positioning: strictly above or below without overlapping the row/button
+          if (placeAbove) {
+            popover.style.bottom = `${window.innerHeight - btnRect.top + 4}px`;
+            popover.style.top = 'auto';
+          } else {
+            popover.style.top = `${btnRect.bottom + 4}px`;
+            popover.style.bottom = 'auto';
+          }
+
           popover.innerHTML = `
             <div style="position: sticky; top: 0; background: #ffffff; z-index: 10; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid #f1f5f9;">
-              <div id="clTypeaheadBadge" style="display: none; align-items: center; justify-content: space-between; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 4px 8px; margin-bottom: 6px; font-size: 11.5px; font-weight: 600; color: #1d4ed8;">
-                <span style="display: flex; align-items: center; gap: 4px;">🔍 Match: "<span id="clTypeaheadText" style="font-weight: 700;"></span>"</span>
-                <span style="font-size: 10px; color: #64748b; font-weight: 400;">(typing...)</span>
+              <!-- Transaction Summary Header -->
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="min-width: 0; flex: 1; padding-right: 8px;">
+                  <div style="font-size: 11.5px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${ohEsc(btn.dataset.description || '')}">
+                    ${ohEsc(btn.dataset.description || '—')}
+                  </div>
+                  <div style="font-size: 10px; color: #64748b; margin-top: 1px; display: flex; gap: 6px;">
+                    <span>${btn.dataset.date || ''}</span>
+                    <span>•</span>
+                    <span style="font-weight: 600; color: ${btn.dataset.typeColor || 'var(--slate-800)'};">${btn.dataset.type || ''}</span>
+                  </div>
+                </div>
+                <div style="font-size: 12.5px; font-weight: 800; color: ${btn.dataset.typeColor || 'var(--slate-800)'}; white-space: nowrap;">
+                  ${btn.dataset.amount || ''}
+                </div>
               </div>
+
+              <!-- Currently Selected Ledger Banner -->
+              ${currentSelectedLedger ? `
+                <div id="clReconCurrentSelectionBanner" style="background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+                  <div style="min-width: 0; flex: 1; padding-right: 8px;">
+                    <div style="font-size: 9.5px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px;">Currently Selected:</div>
+                    <div style="font-size: 12.5px; font-weight: 800; color: #1e3a8a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      ✓ ${ohEsc(currentSelectedLedger.name)}
+                    </div>
+                  </div>
+                  <button type="button" id="clBtnClearCurrentSelection" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+                    <svg viewBox="0 0 15 15" fill="none" style="width: 12px; height: 12px; display: block;" stroke="currentColor">
+                      <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                    </svg>
+                    <span>Remove</span>
+                  </button>
+                </div>
+              ` : ''}
+
+              <!-- Dedicated Search Input Box -->
+              <div style="position: relative; margin-bottom: 6px;">
+                <input type="text" id="clReconSearchInput" placeholder="Search ledger name..." style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px 0 28px; border: 1.5px solid #cbd5e1; border-radius: 6px; outline: none; box-sizing: border-box; font-family: Inter, sans-serif; background: #fff;" autocomplete="off" />
+                <span style="position: absolute; left: 8px; top: 7px; font-size: 12px; color: #94a3b8; pointer-events: none;">🔍</span>
+              </div>
+
+              <!-- Category filter tabs -->
               <div id="clReconCategoryTabs" style="display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none;">
-                <button type="button" class="cl-cat-tab active" data-cat="all" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: 1px solid #2563eb; background: #eff6ff; color: #2563eb; cursor: pointer; white-space: nowrap;">All</button>
-                <button type="button" class="cl-cat-tab" data-cat="expenses" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Expenses</button>
-                <button type="button" class="cl-cat-tab" data-cat="income" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Income</button>
-                <button type="button" class="cl-cat-tab" data-cat="assets" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Assets/Liab</button>
+                <button type="button" class="cl-cat-tab active" data-cat="all" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #2563eb; background: #eff6ff; color: #2563eb; cursor: pointer; white-space: nowrap;">All</button>
+                <button type="button" class="cl-cat-tab" data-cat="expenses" style="padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Expenses</button>
+                <button type="button" class="cl-cat-tab" data-cat="income" style="padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Income</button>
+                <button type="button" class="cl-cat-tab" data-cat="assets" style="padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Assets/Liab</button>
               </div>
             </div>
-            <div id="clReconLedgerList" style="max-height: 230px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 2px;">
+            <div id="clReconLedgerList" style="max-height: ${maxListHeight}px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 2px;">
             </div>
-            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: #64748b; font-weight: 500;">
-              <span>Type letters to search</span>
-              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 4px; font-size:9.5px;">↵ Enter</kbd> Select</span>
-              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 4px; font-size:9.5px;">Esc</kbd> Exit</span>
+            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b; font-weight: 500;">
+              <span>Type to search</span>
+              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 3px; font-size:9px;">↑↓</kbd> Navigate</span>
+              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 3px; font-size:9px;">↵</kbd> Select</span>
+              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 3px; font-size:9px;">Bksp</kbd> Remove</span>
             </div>
           `;
 
-          const btnRect = btn.getBoundingClientRect();
-          const popoverHeight = 280;
-          const spaceBelow = window.innerHeight - btnRect.bottom;
-          const spaceAbove = btnRect.top;
-
-          popover.style.position = 'fixed';
-
-          if (spaceBelow < popoverHeight && spaceAbove > spaceBelow) {
-            const topPos = Math.max(10, btnRect.top - popoverHeight - 4);
-            popover.style.top = `${topPos}px`;
-          } else {
-            const topPos = Math.min(btnRect.bottom + 4, window.innerHeight - popoverHeight - 10);
-            popover.style.top = `${Math.max(10, topPos)}px`;
-          }
-
-          const leftPos = Math.max(10, Math.min(btnRect.left, window.innerWidth - 335));
-          popover.style.left = `${leftPos}px`;
-
           document.body.appendChild(popover);
 
+          const searchInput = popover.querySelector('#clReconSearchInput');
           const listContainer = popover.querySelector('#clReconLedgerList');
+          const clearBannerBtn = popover.querySelector('#clBtnClearCurrentSelection');
+          if (clearBannerBtn) {
+            clearBannerBtn.addEventListener('click', () => {
+              closePopover();
+              selectOptionAndAdvance('', 'none');
+            });
+          }
+
           let activeIndex = 0;
           let currentCatFilter = 'all';
-          let typeaheadQuery = '';
-          let typeaheadTimer = null;
 
           function updateHighlight() {
             const opts = Array.from(listContainer.querySelectorAll('.cl-recon-opt'));
@@ -3009,12 +3176,12 @@
             opts.forEach((opt, idx) => {
               const isSel = String(opt.dataset.id) === String(currentSelectedId);
               if (idx === activeIndex) {
-                opt.style.background = isSel ? '#dbeafe' : '#f1f5f9';
-                opt.style.border = '1px solid #2563eb';
+                opt.style.background = isSel ? '#bfdbfe' : '#f1f5f9';
+                opt.style.border = isSel ? '2px solid #2563eb' : '1px solid #2563eb';
                 opt.scrollIntoView({ block: 'nearest' });
               } else {
-                opt.style.border = isSel ? '1px solid #bfdbfe' : '1px solid transparent';
-                opt.style.background = isSel ? '#eff6ff' : 'transparent';
+                opt.style.border = isSel ? '2px solid #2563eb' : '1px solid transparent';
+                opt.style.background = isSel ? '#dbeafe' : 'transparent';
               }
             });
           }
@@ -3060,9 +3227,14 @@
             }
 
             let html = `
-              <div class="cl-recon-opt" data-id="" style="padding: 7px 10px; font-size: 12px; font-weight: 600; color: #64748b; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px dashed #cbd5e1; margin-bottom: 2px;">
-                <span style="font-size: 13px; color: #94a3b8;">↺</span>
-                <span>-- Clear / Unmap --</span>
+              <div class="cl-recon-opt" data-id="" style="padding: 8px 10px; font-size: 12px; font-weight: 700; color: #dc2626; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #fff5f5; border: 1px dashed #fca5a5; margin-bottom: 4px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px; display: block;" stroke="currentColor">
+                    <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                  <span>Clear / Remove Selected Ledger</span>
+                </div>
+                <kbd style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 3px; padding: 1px 5px; font-size: 9px; color: #991b1b;">Backspace</kbd>
               </div>
             `;
 
@@ -3072,21 +3244,21 @@
                 const groupName = getLedgerGroup(l.id);
 
                 html += `
-                  <div class="cl-recon-opt" data-id="${l.id}" style="padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.1s ease; border: 1px solid ${isSel ? '#bfdbfe' : 'transparent'}; background: ${isSel ? '#eff6ff' : 'transparent'};">
+                  <div class="cl-recon-opt" data-id="${l.id}" style="padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.1s ease; border: 1.5px solid ${isSel ? '#2563eb' : 'transparent'}; background: ${isSel ? '#dbeafe' : 'transparent'};">
                     <div style="display: flex; flex-direction: column; gap: 1.5px; min-width: 0; padding-right: 8px;">
-                      <div style="font-size: 12.5px; font-weight: 600; color: ${isSel ? '#1d4ed8' : '#1e293b'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        ${ohEsc(l.name)}
+                      <div style="font-size: 12.5px; font-weight: ${isSel ? '800' : '600'}; color: ${isSel ? '#1e40af' : '#1e293b'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${isSel ? '<span style="color: #2563eb; margin-right: 4px;">✓</span>' : ''}${ohEsc(l.name)}
                       </div>
                       ${groupName ? `
-                        <div style="font-size: 10.5px; font-weight: 500; color: ${isSel ? '#3b82f6' : '#64748b'}; display: flex; align-items: center; gap: 4px;">
-                          <span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: ${isSel ? '#3b82f6' : '#94a3b8'}; flex-shrink: 0;"></span>
+                        <div style="font-size: 10.5px; font-weight: 500; color: ${isSel ? '#2563eb' : '#64748b'}; display: flex; align-items: center; gap: 4px;">
+                          <span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: ${isSel ? '#2563eb' : '#94a3b8'}; flex-shrink: 0;"></span>
                           <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${ohEsc(groupName)}</span>
                         </div>
                       ` : ''}
                     </div>
                     ${isSel ? `
-                      <div style="background: #2563eb; color: #fff; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0;">
-                        ✓
+                      <div style="background: #2563eb; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 10.5px; font-weight: 800; flex-shrink: 0;">
+                        ✓ Selected
                       </div>
                     ` : ''}
                   </div>
@@ -3104,6 +3276,7 @@
                 updateHighlight();
               });
               opt.addEventListener('click', () => {
+                closePopover();
                 selectOptionAndAdvance(opt.dataset.id, 'next');
               });
             });
@@ -3112,19 +3285,33 @@
             updateHighlight();
           }
 
-          function updateTypeaheadFilter() {
-            const badge = popover.querySelector('#clTypeaheadBadge');
-            const txtSpan = popover.querySelector('#clTypeaheadText');
-            if (badge && txtSpan) {
-              if (typeaheadQuery) {
-                txtSpan.textContent = typeaheadQuery;
-                badge.style.display = 'flex';
+          searchInput.addEventListener('input', () => {
+            renderOptions(searchInput.value, currentCatFilter);
+          });
+
+          searchInput.addEventListener('focus', () => {
+            searchInput.style.borderColor = '#2563eb';
+            searchInput.style.boxShadow = '0 0 0 2px rgba(37,99,235,0.15)';
+          });
+          searchInput.addEventListener('blur', () => {
+            searchInput.style.borderColor = '#cbd5e1';
+            searchInput.style.boxShadow = 'none';
+          });
+
+          searchInput.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Backspace' && searchInput.value === '') {
+              ev.preventDefault();
+              if (btn.dataset.selectedId) {
+                closePopover();
+                selectOptionAndAdvance('', 'none');
               } else {
-                badge.style.display = 'none';
+                closePopover();
+                goToPrevRow();
               }
+            } else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Enter' || ev.key === 'Escape') {
+              handleKeydown(ev);
             }
-            renderOptions(typeaheadQuery);
-          }
+          });
 
           popover.querySelectorAll('.cl-cat-tab').forEach(tabBtn => {
             tabBtn.addEventListener('click', () => {
@@ -3139,14 +3326,14 @@
               tabBtn.style.color = '#2563eb';
               tabBtn.style.fontWeight = '700';
 
-              renderOptions(typeaheadQuery, tabBtn.dataset.cat);
+              renderOptions(searchInput.value, tabBtn.dataset.cat);
+              searchInput.focus();
             });
           });
 
           renderOptions();
-          popover.focus();
 
-          popover.addEventListener('keydown', (ev) => {
+          const handleKeydown = (ev) => {
             const opts = Array.from(listContainer.querySelectorAll('.cl-recon-opt'));
             if (ev.key === 'ArrowDown') {
               ev.preventDefault();
@@ -3163,41 +3350,41 @@
             } else if (ev.key === 'Enter') {
               ev.preventDefault();
               if (opts.length > 0 && activeIndex >= 0 && activeIndex < opts.length) {
+                closePopover();
                 selectOptionAndAdvance(opts[activeIndex].dataset.id, 'next');
               }
             } else if (ev.key === 'Escape') {
               ev.preventDefault();
-              popover.remove();
+              closePopover();
               btn.focus();
-            } else if (ev.key === 'Backspace') {
+            } else if (ev.key === 'Backspace' && document.activeElement !== searchInput) {
               ev.preventDefault();
-              if (typeaheadQuery.length > 0) {
-                typeaheadQuery = typeaheadQuery.slice(0, -1);
-                updateTypeaheadFilter();
+              if (btn.dataset.selectedId) {
+                closePopover();
+                selectOptionAndAdvance('', 'none');
               } else {
-                selectOptionAndAdvance('', 'prev');
+                closePopover();
+                goToPrevRow();
               }
-            } else if (ev.key.length === 1 && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
-              ev.preventDefault();
-              typeaheadQuery += ev.key.toLowerCase();
-              updateTypeaheadFilter();
-
-              clearTimeout(typeaheadTimer);
-              typeaheadTimer = setTimeout(() => {
-                typeaheadQuery = '';
-                updateTypeaheadFilter();
-              }, 2000);
             }
-          });
+          };
+
+          popover.addEventListener('keydown', handleKeydown);
+
+          const closePopover = () => {
+            if (tr) tr.style.background = origRowBg;
+            popover.remove();
+            document.removeEventListener('click', closeHandler);
+          };
 
           const closeHandler = (evt) => {
             if (!popover.contains(evt.target) && !btn.contains(evt.target)) {
-              popover.remove();
-              document.removeEventListener('click', closeHandler);
+              closePopover();
             }
           };
           setTimeout(() => {
             document.addEventListener('click', closeHandler);
+            searchInput.focus();
           }, 10);
         });
       });

@@ -5520,3 +5520,28 @@
   color: #b91c1c;
 }
 
+/* Temporary In-Voucher Edit Notice & Tooltip */
+.kya-temp-voucher-edit-wrap:hover,
+.kya-temp-voucher-edit-wrap:focus-within {
+  background: #e0f2fe !important;
+  border-color: #7dd3fc !important;
+}
+
+.kya-temp-voucher-edit-wrap:hover .kya-temp-voucher-tooltip,
+.kya-temp-voucher-edit-wrap:focus-within .kya-temp-voucher-tooltip {
+  display: block !important;
+  animation: kyaTooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes kyaTooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+

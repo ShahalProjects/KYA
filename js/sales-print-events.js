@@ -20,7 +20,15 @@
       }
     }
     
-    const customer = coaLedgers.find(l => l.id == inv.customerId) || { name: 'Unknown Customer' };
+    const customer = (typeof findPartyById === 'function' ? findPartyById(inv.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == inv.customerId) : null) || { name: 'Unknown Customer' };
+    const partyName = (inv.partyOverride && inv.partyOverride.name) || customer.name || 'Unknown Customer';
+    const partyContact = (inv.partyOverride && inv.partyOverride.contactName) || customer.contactName || '';
+    const partyAddr = (inv.partyOverride && inv.partyOverride.address) || customer.address || '';
+    const cityPin = [(inv.partyOverride && inv.partyOverride.city) || customer.city, (inv.partyOverride && inv.partyOverride.pincode) || customer.pincode].filter(Boolean).join(' - ');
+    const stateCountry = [(inv.partyOverride && inv.partyOverride.state) || customer.state, (inv.partyOverride && inv.partyOverride.country) || customer.country || 'India'].filter(Boolean).join(', ');
+    const partyGstin = (inv.partyOverride && inv.partyOverride.gstin) || customer.gstin || '';
+    const partyPan = (inv.partyOverride && inv.partyOverride.pan) || customer.pan || '';
+    const partyPhone = (inv.partyOverride && inv.partyOverride.phone) || customer.phone || customer.mobile || '';
     
     let execName = '';
     if (inv.salesExecutiveId) {
@@ -216,9 +224,14 @@
           
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; border-bottom: 2px solid var(--slate-100); padding-bottom: 30px; margin-bottom: 30px;">
             <div>
-              <h3 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 700;">Billed To:</h3>
-              <div style="font-size: 16px; font-weight: 800; color: var(--slate-900);">${ohEsc(customer.name)}</div>
-              <div style="font-size: 13px; color: var(--slate-500); margin-top: 4px; font-weight: 500;">Trade Receivables Account</div>
+              <h3 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.1em; margin-bottom: 8px; font-weight: 700;">Billed To:</h3>
+              <div style="font-size: 16px; font-weight: 800; color: var(--slate-900);">${ohEsc(partyName)}</div>
+              ${partyContact ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px; font-weight: 600;">Attn: ${ohEsc(partyContact)}</div>` : ''}
+              ${partyAddr ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 4px; line-height: 1.35;">${ohEsc(partyAddr)}</div>` : ''}
+              ${(cityPin || stateCountry) ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px;">${[cityPin, stateCountry].filter(Boolean).map(s => ohEsc(s)).join(', ')}</div>` : ''}
+              ${partyGstin ? `<div style="font-size: 12px; color: var(--slate-700); margin-top: 4px;"><span style="color: var(--slate-400); font-size: 11px; font-weight: 600;">GSTIN:</span> <strong style="font-family: monospace; color: #047857;">${ohEsc(partyGstin)}</strong></div>` : ''}
+              ${partyPan ? `<div style="font-size: 12px; color: var(--slate-700); margin-top: 2px;"><span style="color: var(--slate-400); font-size: 11px; font-weight: 600;">PAN:</span> <strong style="font-family: monospace;">${ohEsc(partyPan)}</strong></div>` : ''}
+              ${partyPhone ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px;">Phone: ${ohEsc(partyPhone)}</div>` : ''}
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13.5px;">
               <div>

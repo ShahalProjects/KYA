@@ -333,7 +333,7 @@
                 Statement Import
               </div>
               <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 800; color: var(--slate-900);">Configure Column Mapping</h3>
-              <p style="margin: 0; font-size: 12.5px; color: var(--slate-400);">Choose heading row and map statement columns. Date, Debit, and Credit columns are mandatory.</p>
+              <p style="margin: 0; font-size: 12.5px; color: var(--slate-400);">Choose heading row and map statement columns. Date, Withdrawal, and Deposit columns are mandatory.</p>
             </div>
             <button id="clWzCloseBtn2" style="background: transparent; border: none; font-size: 18px; font-weight: 700; color: #94a3b8; cursor: pointer; padding: 4px; line-height: 1;" type="button">✕</button>
           </div>
@@ -368,12 +368,12 @@
                 <select id="clWzMapDescription" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
               </div>
               <div class="cl-form-group">
-                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Debit / Deposit Column *</label>
-                <select id="clWzMapDebit" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
+                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Withdrawal Column *</label>
+                <select id="clWzMapWithdrawal" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
               </div>
               <div class="cl-form-group">
-                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Credit / Withdrawal Column *</label>
-                <select id="clWzMapCredit" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
+                <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Deposit Column *</label>
+                <select id="clWzMapDeposit" class="je-input" style="height: 38px; background:#fff; cursor:pointer; border-radius:8px; width:100%;"></select>
               </div>
               <div class="cl-form-group" style="grid-column: 1 / -1;">
                 <label style="font-weight: 700; font-size: 12px; color: #475569; margin-bottom: 4px; display: block;">Balance Column</label>
@@ -408,14 +408,17 @@
           return `<option value="${cIdx}">${ohEsc(label)}</option>`;
         }).join('');
 
-        const fields = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
+        const fields = ['Date', 'Description', 'Withdrawal', 'Deposit', 'Balance'];
         fields.forEach(f => {
           const select = overlay.querySelector('#clWzMap' + f);
           if (!select) return;
           select.innerHTML = '<option value="">-- Choose Column --</option>' + optionsHtml;
 
           // Attempt saved mapping match
-          const savedColName = savedConfig[f.toLowerCase() + 'Col'];
+          let savedColName = savedConfig[f.toLowerCase() + 'Col'];
+          if (!savedColName && f === 'Withdrawal') savedColName = savedConfig.debitCol;
+          if (!savedColName && f === 'Deposit') savedColName = savedConfig.creditCol;
+
           if (savedColName && headers.includes(savedColName)) {
             select.value = headers.indexOf(savedColName);
           } else {
@@ -428,11 +431,11 @@
             } else if (fL === 'description') {
               const idx = lowerH.findIndex(h => h.includes('desc') || h.includes('particular') || h.includes('narr') || h.includes('remark') || h.includes('info'));
               if (idx > -1) select.value = idx;
-            } else if (fL === 'debit') {
-              const idx = lowerH.findIndex(h => h.includes('debit') || h.includes('deposit') || h.includes('receipt') || h.includes('in') || h.includes('dr'));
+            } else if (fL === 'withdrawal') {
+              const idx = lowerH.findIndex(h => h.includes('withdrawal') || h.includes('withdraw') || h.includes('dr') || h.includes('debit') || h.includes('payment') || h.includes('paid') || h.includes('out'));
               if (idx > -1) select.value = idx;
-            } else if (fL === 'credit') {
-              const idx = lowerH.findIndex(h => h.includes('credit') || h.includes('withdrawal') || h.includes('payment') || h.includes('out') || h.includes('cr'));
+            } else if (fL === 'deposit') {
+              const idx = lowerH.findIndex(h => h.includes('deposit') || h.includes('cr') || h.includes('credit') || h.includes('receipt') || h.includes('received') || h.includes('in'));
               if (idx > -1) select.value = idx;
             } else if (fL === 'balance') {
               const idx = lowerH.findIndex(h => h.includes('bal'));
@@ -451,20 +454,20 @@
         const hIdx = Math.max(0, rowNum - 1);
         const dateVal = overlay.querySelector('#clWzMapDate').value;
         const descVal = overlay.querySelector('#clWzMapDescription').value;
-        const debitVal = overlay.querySelector('#clWzMapDebit').value;
-        const creditVal = overlay.querySelector('#clWzMapCredit').value;
+        const withdrawalVal = overlay.querySelector('#clWzMapWithdrawal').value;
+        const depositVal = overlay.querySelector('#clWzMapDeposit').value;
         const balVal = overlay.querySelector('#clWzMapBalance').value;
 
-        if (dateVal === '' || debitVal === '' || creditVal === '') {
-          showToast('Date, Debit, and Credit column mappings are mandatory.', 'warning');
+        if (dateVal === '' || withdrawalVal === '' || depositVal === '') {
+          showToast('Date, Withdrawal, and Deposit column mappings are mandatory.', 'warning');
           return;
         }
 
         const headers = parsedRows[hIdx] || [];
         const dateColName = headers[Number(dateVal)] || '';
         const descColName = descVal !== '' ? headers[Number(descVal)] : '';
-        const debitColName = headers[Number(debitVal)] || '';
-        const creditColName = headers[Number(creditVal)] || '';
+        const withdrawalColName = headers[Number(withdrawalVal)] || '';
+        const depositColName = headers[Number(depositVal)] || '';
         const balanceColName = balVal !== '' ? headers[Number(balVal)] : '';
 
         // Save mapping config
@@ -473,16 +476,18 @@
           headerRowIndex: hIdx,
           dateCol: dateColName,
           descCol: descColName,
-          debitCol: debitColName,
-          creditCol: creditColName,
+          withdrawalCol: withdrawalColName,
+          depositCol: depositColName,
+          debitCol: withdrawalColName,
+          creditCol: depositColName,
           balanceCol: balanceColName
         };
 
         const statementRows = [];
         const dCol = Number(dateVal);
         const descCol = descVal !== '' ? Number(descVal) : -1;
-        const drCol = Number(debitVal);
-        const crCol = Number(creditVal);
+        const wCol = Number(withdrawalVal);
+        const depCol = Number(depositVal);
         const bCol = balVal !== '' ? Number(balVal) : -1;
 
         for (let i = hIdx + 1; i < parsedRows.length; i++) {
@@ -496,8 +501,8 @@
           if (!date) continue; // Skip invalid rows
 
           const description = descCol !== -1 ? String(row[descCol] || '').trim() : '';
-          const debit = parseFloat(row[drCol]) || 0;
-          const credit = parseFloat(row[crCol]) || 0;
+          const debit = parseFloat(row[wCol]) || 0;
+          const credit = parseFloat(row[depCol]) || 0;
           const balance = bCol !== -1 ? parseFloat(row[bCol]) || 0 : 0;
 
           // Skip if all values are zero

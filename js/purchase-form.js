@@ -404,9 +404,63 @@
     purchaseRows = [
       { item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0, itemType: 'Product' }
     ];
+    if (!_editingPurchaseVoucher) {
+      window._purchasePartyOverride = null;
+    }
     renderPurchaseRows();
     recalculatePurchaseTotals();
   }
+
+  function loadPurchaseVoucher(v, isDraft = false) {
+    if (!v) return;
+    _editingPurchaseVoucher = v;
+    window._purchasePartyOverride = v.partyOverride ? JSON.parse(JSON.stringify(v.partyOverride)) : null;
+
+    const dateEl = document.getElementById('purchaseDate');
+    if (dateEl) dateEl.value = v.date || '';
+
+    const invNoEl = document.getElementById('purchaseInvoiceNo');
+    if (invNoEl) invNoEl.value = v.invoiceNo || '';
+
+    const chipEl = document.getElementById('purchaseVoucherChipDisplay');
+    if (chipEl) chipEl.textContent = v.invoiceNo || 'PUR-XXXX';
+
+    populatePurchaseVendors(v.vendorId);
+    populatePurchaseExecutives(v.executiveId);
+    populatePurchasePaymentAccounts(v.paymentAccountId);
+
+    const supplyEl = document.getElementById('purchaseSupplyType');
+    if (supplyEl) supplyEl.value = v.supplyType || 'Intra-State (CGST + SGST)';
+
+    const notesEl = document.getElementById('purchaseNotes');
+    if (notesEl) notesEl.value = v.notes || '';
+
+    const dueEl = document.getElementById('purchaseDueDate');
+    if (dueEl) dueEl.value = v.dueDate || '';
+
+    const adjEl = document.getElementById('purchaseAdjustments');
+    if (adjEl) adjEl.value = (v.adjustments !== undefined && v.adjustments !== 0) ? v.adjustments : '';
+
+    if (v.paymentStatus === 'Full Payment') setPurchasePaymentStatus('Full');
+    else if (v.paymentStatus === 'Partial Payment') {
+      setPurchasePaymentStatus('Partial');
+      const amtEl = document.getElementById('purchasePaymentAmount');
+      if (amtEl) amtEl.value = v.paymentAmount || '';
+    } else {
+      setPurchasePaymentStatus('NotPaid');
+    }
+
+    if (v.tdsTcsMode === 'TDS') setPurchaseTdsTcs('TDS');
+    else if (v.tdsTcsMode === 'TCS') setPurchaseTdsTcs('TCS');
+    else setPurchaseTdsTcs('None');
+
+    if (v.rows && Array.isArray(v.rows)) {
+      purchaseRows = JSON.parse(JSON.stringify(v.rows));
+      renderPurchaseRows();
+      recalculatePurchaseTotals();
+    }
+  }
+  window.loadPurchaseVoucher = loadPurchaseVoucher;
 
   let _purchVendorSearchControl = null;
   function getPurchVendorSearchControl() {
@@ -1109,6 +1163,7 @@
       invoiceNo,
       date,
       vendorId,
+      partyOverride: window._purchasePartyOverride ? JSON.parse(JSON.stringify(window._purchasePartyOverride)) : null,
       supplyType,
       executiveId,
       rows: validRows,
@@ -1146,6 +1201,7 @@
     }
 
     _editingPurchaseVoucher = null;
+    window._purchasePartyOverride = null;
     initPurchaseForm();
 
     if (typeof triggerAutoBackup === 'function') {
