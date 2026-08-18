@@ -5544,4 +5544,16 @@
   }
 }
 
+/* Reconciliation Active Selected Row */
+tr.cl-recon-row.cl-recon-active-row,
+tr.cl-recon-active-row {
+  background: #dbeafe !important;
+  box-shadow: inset 4px 0 0 #2563eb !important;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+tr.cl-recon-row:hover:not(.cl-recon-active-row) {
+  background: #f8fafc;
+}
+
+
 

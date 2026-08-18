@@ -57,8 +57,9 @@
 
   // ── Date Normalization ─────────────────────────────────────────────
   function parseStatementDate(dateStr) {
-    if (!dateStr) return '';
-    const clean = dateStr.trim();
+    if (!dateStr && dateStr !== 0) return '';
+    const clean = String(dateStr).trim();
+    if (!clean) return '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
     
     // DD-MM-YYYY or DD/MM/YYYY
@@ -79,6 +80,16 @@
       return `${y}-${month}-${d}`;
     }
 
+    // Excel numeric serial date
+    if (!isNaN(clean) && Number(clean) > 20000 && Number(clean) < 80000) {
+      try {
+        const utc_days = Math.floor(Number(clean) - 25569);
+        const utc_value = utc_days * 86400;
+        const date_info = new Date(utc_value * 1000);
+        return date_info.toISOString().split('T')[0];
+      } catch(e) {}
+    }
+
     try {
       const parsed = new Date(clean);
       if (!isNaN(parsed.getTime())) {
@@ -86,7 +97,7 @@
       }
     } catch(e) {}
     
-    return clean;
+    return '';
   }
 
   // ── Upload Statement Wizard Flow ──────────────────────────────────
@@ -458,8 +469,8 @@
         const depositVal = overlay.querySelector('#clWzMapDeposit').value;
         const balVal = overlay.querySelector('#clWzMapBalance').value;
 
-        if (dateVal === '' || withdrawalVal === '' || depositVal === '') {
-          showToast('Date, Withdrawal, and Deposit column mappings are mandatory.', 'warning');
+        if (dateVal === '' || descVal === '' || withdrawalVal === '' || depositVal === '') {
+          showToast('Date, Description, Withdrawal, and Deposit column mappings are mandatory.', 'warning');
           return;
         }
 
@@ -494,13 +505,15 @@
           const row = parsedRows[i];
           if (!row || row.length === 0) continue;
 
-          const rawDate = row[dCol];
+          const rawDate = dCol !== -1 ? row[dCol] : '';
           if (!rawDate) continue;
 
           const date = parseStatementDate(String(rawDate));
-          if (!date) continue; // Skip invalid rows
+          if (!date) continue; // Skip invalid rows or rows without a valid date
 
           const description = descCol !== -1 ? String(row[descCol] || '').trim() : '';
+          if (!description) continue; // Skip rows without description
+
           const debit = parseFloat(row[wCol]) || 0;
           const credit = parseFloat(row[depCol]) || 0;
           const balance = bCol !== -1 ? parseFloat(row[bCol]) || 0 : 0;

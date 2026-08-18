@@ -12,12 +12,27 @@
         if (actionsArea) actionsArea.innerHTML = '';
         if (controls) controls.innerHTML = '';
         target.innerHTML = `
+          <div style="margin-bottom: 16px;">
+            <button class="btn btn-secondary" id="clInlineTabBackNoAcc" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+              ← Back
+            </button>
+          </div>
           <div style="padding: 48px; text-align: center; border: 1.5px dashed var(--slate-200); border-radius: 16px; background: var(--slate-50);">
             <div style="font-size: 32px; margin-bottom: 12px;">🏛️</div>
             <div style="font-size: 14.5px; font-weight: 700; color: var(--slate-700);">No Bank Accounts defined</div>
-            <div style="font-size: 12.5px; color: var(--slate-400); margin-top: 4px;">Please create a Bank account first.</div>
+            <div style="font-size: 12.5px; color: var(--slate-400); margin-top: 4px; margin-bottom: 16px;">Please create a Bank account first.</div>
+            <button class="btn btn-primary" id="clBtnBackToAccounts" style="height:36px; font-size:13px; padding: 0 16px; font-weight:600; cursor:pointer; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+              ← Back to Accounts
+            </button>
           </div>
         `;
+        const handleGoBack = () => {
+          if (typeof window.clSwitchBankingTabGlobal === 'function') {
+            window.clSwitchBankingTabGlobal('details');
+          }
+        };
+        document.getElementById('clInlineTabBackNoAcc')?.addEventListener('click', handleGoBack);
+        document.getElementById('clBtnBackToAccounts')?.addEventListener('click', handleGoBack);
         return;
       }
 
@@ -30,15 +45,34 @@
 
       if (!selectedLedger) {
         target.innerHTML = `
+          <div style="margin-bottom: 16px;">
+            <button class="btn btn-secondary" id="clInlineTabBackNoLdg" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+              ← Back
+            </button>
+          </div>
           <div style="padding: 48px; text-align: center; border: 1.5px dashed var(--slate-200); border-radius: 16px; background: var(--slate-50);">
             <div style="font-size: 14.5px; font-weight: 700; color: var(--slate-700);">Linked ledger not found</div>
+            <div style="margin-top: 16px;">
+              <button class="btn btn-primary" id="clBtnBackToAccountsLdg" style="height:36px; font-size:13px; padding: 0 16px; font-weight:600; cursor:pointer; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                ← Back to Accounts
+              </button>
+            </div>
           </div>
         `;
+        const handleGoBack = () => {
+          if (typeof window.clSwitchBankingTabGlobal === 'function') {
+            window.clSwitchBankingTabGlobal('details');
+          }
+        };
+        document.getElementById('clInlineTabBackNoLdg')?.addEventListener('click', handleGoBack);
+        document.getElementById('clBtnBackToAccountsLdg')?.addEventListener('click', handleGoBack);
         return;
       }
 
       const rawStatementRows = (window.KYA_STORE.uploadedStatements || {})[currentAcc.id] || [];
-      const statementRows = rawStatementRows.map((line, origIdx) => ({ ...line, origIdx }));
+      const statementRows = rawStatementRows
+        .map((line, origIdx) => ({ ...line, origIdx }))
+        .filter(line => line.date && String(line.date).trim() !== '' && line.description && String(line.description).trim() !== '');
 
       let openingBal = parseFloat(selectedLedger.openingBalance) || 0;
       if (statementRows.length > 0) {
@@ -47,7 +81,7 @@
         const parsedFirstDb = parseFloat(firstRow.debit) || 0;
         const parsedFirstCr = parseFloat(firstRow.credit) || 0;
         if (parsedFirstBal !== 0) {
-          openingBal = parsedFirstBal - parsedFirstDb + parsedFirstCr;
+          openingBal = parsedFirstBal + parsedFirstDb - parsedFirstCr;
         }
       }
 
@@ -131,8 +165,6 @@
       const periodDebitedBal = periodRows.reduce((sum, r) => sum + (parseFloat(r.debit) || 0), 0);
       const periodCreditedBal = periodRows.reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
 
-      const allDisplayedSelected = displayRows.length > 0 && displayRows.every(r => _clStatementSelectedIndices.has(r.origIdx));
-
       const isReconciliationMode = (_clActiveTopTab === 'banking' && _clActiveBankingTab === 'reconciliation') || (_clActiveTopTab === 'books' && _clBooksSubtab === 'reconciliation');
       const allLedgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).filter(l => l.type === 'ledger');
       window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
@@ -142,12 +174,23 @@
 
       const bankLedger = coaLedgers.find(l => l.id === currentAcc.ledgerId) || { name: currentAcc.name };
 
+      const allUnreconciledRows = statementRows.filter(line => !window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
+      const allConfirmedRows = statementRows.filter(line => !!window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
+
       const unreconciledRows = displayRows.filter(line => !window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
       const confirmedRows = displayRows.filter(line => !!window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
 
       const reconTargetRows = isReconciliationMode
         ? (_clReconSubSection === 'reconciliation' ? unreconciledRows : confirmedRows)
         : displayRows;
+
+      const totalTargetRowsCount = isReconciliationMode
+        ? (_clReconSubSection === 'reconciliation' ? allUnreconciledRows.length : allConfirmedRows.length)
+        : statementRows.length;
+
+      const showingCountText = `Showing ${reconTargetRows.length} of ${totalTargetRowsCount} entries`;
+
+      const allDisplayedSelected = reconTargetRows.length > 0 && reconTargetRows.every(r => _clStatementSelectedIndices.has(r.origIdx));
 
       let rowsHtml = '';
       if (reconTargetRows.length > 0) {
@@ -175,7 +218,7 @@
 
             if (_clReconSubSection === 'reconciliation') {
               rowsHtml += `
-                <tr style="${isChecked ? 'background: #eff6ff;' : ''}">
+                <tr class="cl-recon-row" style="${isChecked ? 'background: #eff6ff;' : ''}; cursor: pointer;">
                   ${_clStatementSelectMode ? `
                     <td style="text-align: center; width: 42px;">
                       <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
@@ -626,7 +669,9 @@
           }
 
           // Update entries count
-          document.getElementById('clStmtShowingCount').textContent = `Showing ${displayRows.length} of ${statementRows.length} entries`;
+          if (document.getElementById('clStmtShowingCount')) {
+            document.getElementById('clStmtShowingCount').textContent = showingCountText;
+          }
 
           // Update sub-section toggle buttons in header if in reconciliation mode
           if (actionsArea && isReconciliationMode) {
@@ -708,7 +753,7 @@
               <div style="display: flex; align-items: center; justify-content: space-between; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <span style="font-size: 13px; font-weight: 700; color: #1e40af;">
-                    📌 ${_clStatementSelectedIndices.size} of ${displayRows.length} entries selected
+                    📌 ${_clStatementSelectedIndices.size} of ${reconTargetRows.length} entries selected
                   </span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -745,7 +790,7 @@
                   </select>
                 </div>
                 <div id="clStmtShowingCount" style="font-size: 12.5px; color: var(--slate-400); font-weight: 600;">
-                  Showing ${displayRows.length} of ${statementRows.length} entries
+                  ${showingCountText}
                 </div>
               </div>
 
@@ -930,7 +975,25 @@
         });
       });
 
+      const clearActiveRowHighlights = () => {
+        document.querySelectorAll('#clStmtTableBody tr').forEach(r => {
+          r.classList.remove('cl-recon-active-row');
+          if (r.dataset.origBg !== undefined) {
+            r.style.background = r.dataset.origBg;
+            r.style.boxShadow = '';
+          }
+        });
+      };
+
       document.querySelectorAll('.cl-recon-ledger-btn').forEach(btn => {
+        const tr = btn.closest('tr');
+        if (tr) {
+          tr.addEventListener('click', (ev) => {
+            if (ev.target.closest('.cl-stmt-row-cb') || ev.target.closest('.cl-recon-clear-btn') || ev.target.closest('.cl-recon-ledger-btn')) return;
+            btn.click();
+          });
+        }
+
         function goToPrevRow() {
           const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
           const currentBtnIdx = allBtns.indexOf(btn);
@@ -1023,6 +1086,7 @@
             });
           }
 
+          clearActiveRowHighlights();
           const existingPopover = document.getElementById('clReconLedgerPopover');
           if (existingPopover) existingPopover.remove();
 
@@ -1059,8 +1123,11 @@
           const existingPopover = document.getElementById('clReconLedgerPopover');
           if (existingPopover) {
             const wasSameBtn = existingPopover.dataset.btnIndex === btn.dataset.index;
+            clearActiveRowHighlights();
             existingPopover.remove();
             if (wasSameBtn) return;
+          } else {
+            clearActiveRowHighlights();
           }
 
           const origIdx = btn.dataset.index;
@@ -1069,10 +1136,14 @@
           const currentSelectedLedger = allLedgers.find(l => String(l.id) === String(currentSelectedId));
 
           const tr = btn.closest('tr');
-          const origRowBg = tr ? tr.style.background : '';
           if (tr) {
-            tr.style.background = '#fef9c3';
-            tr.style.transition = 'background 0.2s ease';
+            if (tr.dataset.origBg === undefined) {
+              tr.dataset.origBg = tr.style.background || '';
+            }
+            tr.classList.add('cl-recon-active-row');
+            tr.style.background = '#dbeafe';
+            tr.style.boxShadow = 'inset 4px 0 0 #2563eb';
+            tr.style.transition = 'background 0.15s ease, box-shadow 0.15s ease';
           }
 
           const popover = document.createElement('div');
@@ -1408,7 +1479,11 @@
           popover.addEventListener('keydown', handleKeydown);
 
           const closePopover = () => {
-            if (tr) tr.style.background = origRowBg;
+            if (tr) {
+              tr.classList.remove('cl-recon-active-row');
+              tr.style.background = tr.dataset.origBg || '';
+              tr.style.boxShadow = '';
+            }
             popover.remove();
             document.removeEventListener('click', closeHandler);
           };
@@ -1427,9 +1502,9 @@
 
       document.getElementById('clStmtSelectAllCb')?.addEventListener('change', (e) => {
         if (e.target.checked) {
-          displayRows.forEach(r => _clStatementSelectedIndices.add(r.origIdx));
+          reconTargetRows.forEach(r => _clStatementSelectedIndices.add(r.origIdx));
         } else {
-          displayRows.forEach(r => _clStatementSelectedIndices.delete(r.origIdx));
+          reconTargetRows.forEach(r => _clStatementSelectedIndices.delete(r.origIdx));
         }
         renderActiveSubtab();
       });
