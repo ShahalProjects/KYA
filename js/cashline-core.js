@@ -205,6 +205,41 @@
         background: #1d4ed8;
       }
 
+      /* Glass Controls for Header Area */
+      .cl-glass-control {
+        height: 34px;
+        background: rgba(255, 255, 255, 0.18) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.35) !important;
+        border-radius: 8px !important;
+        color: #ffffff !important;
+        font-size: 12.5px !important;
+        font-weight: 600 !important;
+        padding: 0 10px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+        transition: all 0.15s ease !important;
+        outline: none !important;
+        box-sizing: border-box;
+      }
+      .cl-glass-control:hover {
+        background: rgba(255, 255, 255, 0.26) !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
+      }
+      .cl-glass-control:focus {
+        background: rgba(255, 255, 255, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.75) !important;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+      }
+      .cl-glass-control option {
+        background: #ffffff !important;
+        color: #1e293b !important;
+        font-weight: 500 !important;
+      }
+      .cl-glass-control[type="date"] {
+        color-scheme: dark;
+      }
+
       /* Form inputs styling */
       .cl-form-group {
         display: flex;
@@ -478,7 +513,7 @@
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="7" cy="15" r="1.5" fill="currentColor"/><circle cx="12" cy="15" r="1"/></svg>`;
     } else if (_clActiveTopTab === 'books') {
       title = 'Books';
-      subtitle = 'Record cashbook receipts/payments and clear outstanding bank transactions';
+      subtitle = 'Record cashbook receipts/payments and view cash & bank transactions';
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
     } else if (_clActiveTopTab === 'cashflow') {
       title = 'Cashflow';
@@ -643,44 +678,11 @@
 
   function renderBooksTab(mainArea, actionsArea) {
     mainArea.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1.5px solid var(--slate-100); padding-bottom: 14px; flex-wrap: wrap; gap: 12px; width: 100%;">
-        <div style="display: flex; gap: 8px;">
-          <button class="btn ${_clBooksSubtab === 'cashbook' ? 'btn-primary' : 'btn-secondary'}" id="clBooksSubTabCashbook" style="height: 34px; font-size: 12.5px; border-radius: 6px; padding: 0 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            <svg viewBox="0 0 20 20" fill="none" width="13" height="13" style="stroke: currentColor; stroke-width: 1.8;">
-              <path d="M3 5.5A2.5 2.5 0 015.5 3h9A2.5 2.5 0 0117 5.5v9a2.5 2.5 0 01-2.5 2.5h-9A2.5 2.5 0 013 14.5v-9z"/>
-              <path d="M7 6h6M7 10h6M7 14h4"/>
-            </svg>
-            Cashbook
-          </button>
-          <button class="btn ${_clBooksSubtab === 'reconciliation' ? 'btn-primary' : 'btn-secondary'}" id="clBooksSubTabRecon" style="height: 34px; font-size: 12.5px; border-radius: 6px; padding: 0 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            <svg viewBox="0 0 20 20" fill="none" width="13" height="13" style="stroke: currentColor; stroke-width: 1.8;">
-              <path d="M16.5 6.5l-8 8-4-4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Reconciliation
-          </button>
-        </div>
-        <div id="clBooksControlsArea" style="display: flex; gap: 8px; align-items: center;"></div>
-      </div>
       <div id="clBooksSubContentArea" style="width: 100%;"></div>
     `;
 
-    mainArea.querySelector('#clBooksSubTabCashbook').addEventListener('click', () => {
-      _clBooksSubtab = 'cashbook';
-      renderBooksTab(mainArea, actionsArea);
-    });
-    mainArea.querySelector('#clBooksSubTabRecon').addEventListener('click', () => {
-      _clBooksSubtab = 'reconciliation';
-      renderBooksTab(mainArea, actionsArea);
-    });
-
     const subContent = document.getElementById('clBooksSubContentArea');
-    const controls = document.getElementById('clBooksControlsArea');
-
-    if (_clBooksSubtab === 'cashbook') {
-      renderCashbookView(subContent, controls, null);
-    } else if (_clBooksSubtab === 'reconciliation') {
-      renderReconciliationView(subContent, controls, actionsArea);
-    }
+    renderCashbookView(subContent, null, actionsArea);
   }
 
   function renderActiveSubtab() {

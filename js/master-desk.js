@@ -2962,6 +2962,21 @@
       };
 
       if (nameInp) {
+        nameInp.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && (!nameInp.value || nameInp.value.trim() === '')) {
+            if (_masterDeskReturnContext) {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelMasterDeskReturn();
+            }
+          } else if (e.key === 'Escape') {
+            if (_masterDeskReturnContext) {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelMasterDeskReturn();
+            }
+          }
+        });
         nameInp.addEventListener('input', () => {
           validateLedgerNameInputLive();
           validateMasterLedgerAliasesLive();
@@ -3154,6 +3169,17 @@
               else if (typeof window.openTab === 'function') window.openTab('journal');
               if (typeof window.onLedgerCreatedForJournal === 'function') {
                 window.onLedgerCreatedForJournal(newLedger, ctx.rowId);
+              }
+              return;
+            }
+
+            if (ctx.returnTab === 'cashline') {
+              if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
+              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
+              if (typeof openTab === 'function') openTab('cashline');
+              else if (typeof window.openTab === 'function') window.openTab('cashline');
+              if (typeof window.onLedgerCreatedForCashline === 'function') {
+                window.onLedgerCreatedForCashline(newLedger, ctx);
               }
               return;
             }
@@ -3373,6 +3399,21 @@
       };
 
       if (nameInp) {
+        nameInp.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && (!nameInp.value || nameInp.value.trim() === '')) {
+            if (_masterDeskReturnContext) {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelMasterDeskReturn();
+            }
+          } else if (e.key === 'Escape') {
+            if (_masterDeskReturnContext) {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelMasterDeskReturn();
+            }
+          }
+        });
         nameInp.addEventListener('input', () => {
           validateCustomerNameInputLive();
           validateMasterCustomerAliasesLive();
@@ -3509,6 +3550,22 @@
 
             if (typeof window.onPartyCreatedForSales === 'function') {
               window.onPartyCreatedForSales(newCustomer, 'customer');
+            }
+            return;
+          }
+
+          if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'cashline') {
+            const ctx = _masterDeskReturnContext;
+            _masterDeskReturnContext = null;
+            _masterCustomerAliases = [];
+
+            if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
+            else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
+            if (typeof openTab === 'function') openTab('cashline');
+            else if (typeof window.openTab === 'function') window.openTab('cashline');
+
+            if (typeof window.onPartyCreatedForCashline === 'function') {
+              window.onPartyCreatedForCashline(newCustomer, 'customer', ctx);
             }
             return;
           }
@@ -3727,6 +3784,21 @@
       };
 
       if (nameInp) {
+        nameInp.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && (!nameInp.value || nameInp.value.trim() === '')) {
+            if (_masterDeskReturnContext) {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelMasterDeskReturn();
+            }
+          } else if (e.key === 'Escape') {
+            if (_masterDeskReturnContext) {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelMasterDeskReturn();
+            }
+          }
+        });
         nameInp.addEventListener('input', () => {
           validateSupplierNameInputLive();
           validateMasterSupplierAliasesLive();
@@ -3863,6 +3935,22 @@
 
             if (typeof window.onPartyCreatedForPurchase === 'function') {
               window.onPartyCreatedForPurchase(newSupplier, 'supplier');
+            }
+            return;
+          }
+
+          if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'cashline') {
+            const ctx = _masterDeskReturnContext;
+            _masterDeskReturnContext = null;
+            _masterSupplierAliases = [];
+
+            if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
+            else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
+            if (typeof openTab === 'function') openTab('cashline');
+            else if (typeof window.openTab === 'function') window.openTab('cashline');
+
+            if (typeof window.onPartyCreatedForCashline === 'function') {
+              window.onPartyCreatedForCashline(newSupplier, 'supplier', ctx);
             }
             return;
           }
@@ -8261,6 +8349,10 @@
       } else if (targetTab === 'journal') {
         if (typeof window.onLedgerCreationCancelledForJournal === 'function') {
           window.onLedgerCreationCancelledForJournal(ctx.rowId, ctx.initialName);
+        }
+      } else if (targetTab === 'cashline') {
+        if (typeof window.onCreationCancelledForCashline === 'function') {
+          window.onCreationCancelledForCashline(ctx);
         }
       }
       return true;

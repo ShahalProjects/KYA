@@ -204,6 +204,41 @@
         background: #1d4ed8;
       }
 
+      /* Glass Controls for Header Area */
+      .cl-glass-control {
+        height: 34px;
+        background: rgba(255, 255, 255, 0.18) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.35) !important;
+        border-radius: 8px !important;
+        color: #ffffff !important;
+        font-size: 12.5px !important;
+        font-weight: 600 !important;
+        padding: 0 10px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+        transition: all 0.15s ease !important;
+        outline: none !important;
+        box-sizing: border-box;
+      }
+      .cl-glass-control:hover {
+        background: rgba(255, 255, 255, 0.26) !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
+      }
+      .cl-glass-control:focus {
+        background: rgba(255, 255, 255, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.75) !important;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+      }
+      .cl-glass-control option {
+        background: #ffffff !important;
+        color: #1e293b !important;
+        font-weight: 500 !important;
+      }
+      .cl-glass-control[type="date"] {
+        color-scheme: dark;
+      }
+
       /* Form inputs styling */
       .cl-form-group {
         display: flex;
@@ -477,7 +512,7 @@
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="7" cy="15" r="1.5" fill="currentColor"/><circle cx="12" cy="15" r="1"/></svg>`;
     } else if (_clActiveTopTab === 'books') {
       title = 'Books';
-      subtitle = 'Record cashbook receipts/payments and clear outstanding bank transactions';
+      subtitle = 'Record cashbook receipts/payments and view cash & bank transactions';
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
     } else if (_clActiveTopTab === 'cashflow') {
       title = 'Cashflow';
@@ -642,44 +677,11 @@
 
   function renderBooksTab(mainArea, actionsArea) {
     mainArea.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1.5px solid var(--slate-100); padding-bottom: 14px; flex-wrap: wrap; gap: 12px; width: 100%;">
-        <div style="display: flex; gap: 8px;">
-          <button class="btn ${_clBooksSubtab === 'cashbook' ? 'btn-primary' : 'btn-secondary'}" id="clBooksSubTabCashbook" style="height: 34px; font-size: 12.5px; border-radius: 6px; padding: 0 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            <svg viewBox="0 0 20 20" fill="none" width="13" height="13" style="stroke: currentColor; stroke-width: 1.8;">
-              <path d="M3 5.5A2.5 2.5 0 015.5 3h9A2.5 2.5 0 0117 5.5v9a2.5 2.5 0 01-2.5 2.5h-9A2.5 2.5 0 013 14.5v-9z"/>
-              <path d="M7 6h6M7 10h6M7 14h4"/>
-            </svg>
-            Cashbook
-          </button>
-          <button class="btn ${_clBooksSubtab === 'reconciliation' ? 'btn-primary' : 'btn-secondary'}" id="clBooksSubTabRecon" style="height: 34px; font-size: 12.5px; border-radius: 6px; padding: 0 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            <svg viewBox="0 0 20 20" fill="none" width="13" height="13" style="stroke: currentColor; stroke-width: 1.8;">
-              <path d="M16.5 6.5l-8 8-4-4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Reconciliation
-          </button>
-        </div>
-        <div id="clBooksControlsArea" style="display: flex; gap: 8px; align-items: center;"></div>
-      </div>
       <div id="clBooksSubContentArea" style="width: 100%;"></div>
     `;
 
-    mainArea.querySelector('#clBooksSubTabCashbook').addEventListener('click', () => {
-      _clBooksSubtab = 'cashbook';
-      renderBooksTab(mainArea, actionsArea);
-    });
-    mainArea.querySelector('#clBooksSubTabRecon').addEventListener('click', () => {
-      _clBooksSubtab = 'reconciliation';
-      renderBooksTab(mainArea, actionsArea);
-    });
-
     const subContent = document.getElementById('clBooksSubContentArea');
-    const controls = document.getElementById('clBooksControlsArea');
-
-    if (_clBooksSubtab === 'cashbook') {
-      renderCashbookView(subContent, controls, null);
-    } else if (_clBooksSubtab === 'reconciliation') {
-      renderReconciliationView(subContent, controls, actionsArea);
-    }
+    renderCashbookView(subContent, null, actionsArea);
   }
 
   function renderActiveSubtab() {
@@ -1983,6 +1985,18 @@
   function renderCashbookView(target, controls, actionsArea) {
     const isBankingMode = _clActiveTopTab === 'banking';
 
+    function formatToDDMMYYYY(dateStr) {
+      if (!dateStr) return '';
+      const parts = String(dateStr).trim().split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        return String(dateStr).trim();
+      }
+      return String(dateStr).trim();
+    }
+
     if (isBankingMode) {
       const bankAccounts = window.KYA_STORE.bankAccounts || [];
       if (bankAccounts.length === 0) {
@@ -2062,15 +2076,6 @@
         }
       }
 
-      function formatToDDMMYYYY(dateStr) {
-        if (!dateStr) return '';
-        const parts = dateStr.split('-');
-        if (parts.length === 3) {
-          return `${parts[2]}-${parts[1]}-${parts[0]}`;
-        }
-        return dateStr;
-      }
-
       // Chronological sort to calculate running balances correctly
       const chronoRows = [...statementRows].sort((a, b) => a.date.localeCompare(b.date));
       let runningBal = openingBal;
@@ -2142,8 +2147,30 @@
       const periodDebitedBal = periodRows.reduce((sum, r) => sum + (parseFloat(r.debit) || 0), 0);
       const periodCreditedBal = periodRows.reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
 
-      const isReconciliationMode = (_clActiveTopTab === 'banking' && _clActiveBankingTab === 'reconciliation') || (_clActiveTopTab === 'books' && _clBooksSubtab === 'reconciliation');
-      const allLedgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).filter(l => l.type === 'ledger');
+      const isReconciliationMode = (_clActiveTopTab === 'banking' && _clActiveBankingTab === 'reconciliation');
+      const rawLedgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).filter(l => l.type === 'ledger');
+      const rawCustomers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : (window.KYA_STORE?.customers || []);
+      const rawSuppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : (window.KYA_STORE?.suppliers || []);
+
+      const customerLedgers = rawCustomers.map(c => ({
+        id: c.id,
+        name: c.name,
+        aliases: c.aliases || [],
+        type: 'customer',
+        groupName: 'Customer',
+        sgId: 'sg-tr'
+      }));
+
+      const supplierLedgers = rawSuppliers.map(s => ({
+        id: s.id,
+        name: s.name,
+        aliases: s.aliases || [],
+        type: 'supplier',
+        groupName: 'Supplier',
+        sgId: 'sg-tp'
+      }));
+
+      const allLedgers = [...rawLedgers, ...customerLedgers, ...supplierLedgers];
       window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
       window.KYA_STORE.reconciliationState = window.KYA_STORE.reconciliationState || {};
       window.KYA_STORE.statementDeptMapping = window.KYA_STORE.statementDeptMapping || {};
@@ -2158,11 +2185,11 @@
       const confirmedRows = displayRows.filter(line => !!window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
 
       const reconTargetRows = isReconciliationMode
-        ? (_clReconSubSection === 'reconciliation' ? unreconciledRows : confirmedRows)
+        ? (_clReconSubSection === 'reconciliation' ? displayRows : confirmedRows)
         : displayRows;
 
       const totalTargetRowsCount = isReconciliationMode
-        ? (_clReconSubSection === 'reconciliation' ? allUnreconciledRows.length : allConfirmedRows.length)
+        ? (_clReconSubSection === 'reconciliation' ? statementRows.length : allConfirmedRows.length)
         : statementRows.length;
 
       const showingCountText = `Showing ${reconTargetRows.length} of ${totalTargetRowsCount} entries`;
@@ -2334,10 +2361,10 @@
       } else {
         const colCount = isReconciliationMode ? (_clReconSubSection === 'confirmation' ? (_clStatementSelectMode ? 6 : 5) : (_clStatementSelectMode ? 5 : 4)) : (_clStatementSelectMode ? 6 : 5);
         const emptyTitle = isReconciliationMode
-          ? (_clReconSubSection === 'reconciliation' ? 'No transactions pending reconciliation' : 'No confirmed transactions yet')
+          ? (_clReconSubSection === 'confirmation' ? 'No confirmed transactions yet' : 'No statement entries found')
           : 'No statement entries found';
         const emptySub = isReconciliationMode
-          ? (_clReconSubSection === 'reconciliation' ? 'All statement entries have been mapped and moved to Confirmation.' : 'Select ledgers in the Reconciliation section to confirm transactions.')
+          ? (_clReconSubSection === 'confirmation' ? 'Select ledgers in the Reconciliation section to confirm transactions.' : 'Try adjusting your search query, date filters, or import a new statement.')
           : 'Try adjusting your search query, date filters, or import a new statement.';
 
         rowsHtml = `
@@ -3129,20 +3156,12 @@
           popover.tabIndex = -1;
 
           const btnRect = btn.getBoundingClientRect();
-          const popoverWidth = Math.max(300, Math.min(360, btnRect.width || 280));
+          const popoverWidth = Math.max(280, Math.min(340, btnRect.width || 280));
           
           const spaceBelow = window.innerHeight - btnRect.bottom;
           const spaceAbove = btnRect.top;
-          const placeAbove = spaceBelow < 240 && spaceAbove > spaceBelow;
-
-          let maxListHeight;
-          if (placeAbove) {
-            const availableHeight = Math.max(160, spaceAbove - 20);
-            maxListHeight = Math.max(90, Math.min(220, availableHeight - 165));
-          } else {
-            const availableHeight = Math.max(160, spaceBelow - 20);
-            maxListHeight = Math.max(90, Math.min(220, availableHeight - 165));
-          }
+          const placeAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
+          const maxListHeight = Math.max(100, Math.min(220, (placeAbove ? spaceAbove : spaceBelow) - 70));
 
           popover.style.cssText = `
             position: fixed;
@@ -3150,15 +3169,14 @@
             width: ${popoverWidth}px;
             background: #ffffff;
             border: 1.5px solid #cbd5e1;
-            border-radius: 12px;
-            box-shadow: 0 20px 35px -5px rgba(15, 23, 42, 0.2), 0 10px 15px -5px rgba(15, 23, 42, 0.1);
-            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+            padding: 8px;
             font-family: Inter, sans-serif;
             box-sizing: border-box;
             outline: none;
           `;
 
-          // Align right edge of popover with right edge of button to prevent hiding Description/Amount columns
           let leftPos = btnRect.right - popoverWidth;
           if (leftPos < 10) leftPos = Math.max(10, btnRect.left);
           if (leftPos + popoverWidth > window.innerWidth - 10) {
@@ -3166,7 +3184,6 @@
           }
           popover.style.left = `${leftPos}px`;
 
-          // Vertical positioning: strictly above or below without overlapping the row/button
           if (placeAbove) {
             popover.style.bottom = `${window.innerHeight - btnRect.top + 4}px`;
             popover.style.top = 'auto';
@@ -3176,63 +3193,16 @@
           }
 
           popover.innerHTML = `
-            <div style="position: sticky; top: 0; background: #ffffff; z-index: 10; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid #f1f5f9;">
-              <!-- Transaction Summary Header -->
-              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="min-width: 0; flex: 1; padding-right: 8px;">
-                  <div style="font-size: 11.5px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${ohEsc(btn.dataset.description || '')}">
-                    ${ohEsc(btn.dataset.description || '—')}
-                  </div>
-                  <div style="font-size: 10px; color: #64748b; margin-top: 1px; display: flex; gap: 6px;">
-                    <span>${btn.dataset.date || ''}</span>
-                    <span>•</span>
-                    <span style="font-weight: 600; color: ${btn.dataset.typeColor || 'var(--slate-800)'};">${btn.dataset.type || ''}</span>
-                  </div>
-                </div>
-                <div style="font-size: 12.5px; font-weight: 800; color: ${btn.dataset.typeColor || 'var(--slate-800)'}; white-space: nowrap;">
-                  ${btn.dataset.amount || ''}
-                </div>
-              </div>
-
-              <!-- Currently Selected Ledger Banner -->
-              ${currentSelectedLedger ? `
-                <div id="clReconCurrentSelectionBanner" style="background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-                  <div style="min-width: 0; flex: 1; padding-right: 8px;">
-                    <div style="font-size: 9.5px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px;">Currently Selected:</div>
-                    <div style="font-size: 12.5px; font-weight: 800; color: #1e3a8a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                      ✓ ${ohEsc(currentSelectedLedger.name)}
-                    </div>
-                  </div>
-                  <button type="button" id="clBtnClearCurrentSelection" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-                    <svg viewBox="0 0 15 15" fill="none" style="width: 12px; height: 12px; display: block;" stroke="currentColor">
-                      <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                    </svg>
-                    <span>Remove</span>
-                  </button>
-                </div>
-              ` : ''}
-
-              <!-- Dedicated Search Input Box -->
-              <div style="position: relative; margin-bottom: 6px;">
-                <input type="text" id="clReconSearchInput" placeholder="Search ledger name..." style="width: 100%; height: 32px; font-size: 12px; padding: 0 8px 0 28px; border: 1.5px solid #cbd5e1; border-radius: 6px; outline: none; box-sizing: border-box; font-family: Inter, sans-serif; background: #fff;" autocomplete="off" />
-                <span style="position: absolute; left: 8px; top: 7px; font-size: 12px; color: #94a3b8; pointer-events: none;">🔍</span>
-              </div>
-
-              <!-- Category filter tabs -->
-              <div id="clReconCategoryTabs" style="display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none;">
-                <button type="button" class="cl-cat-tab active" data-cat="all" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #2563eb; background: #eff6ff; color: #2563eb; cursor: pointer; white-space: nowrap;">All</button>
-                <button type="button" class="cl-cat-tab" data-cat="expenses" style="padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Expenses</button>
-                <button type="button" class="cl-cat-tab" data-cat="income" style="padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Income</button>
-                <button type="button" class="cl-cat-tab" data-cat="assets" style="padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap;">Assets/Liab</button>
-              </div>
+            <div style="position: relative; margin-bottom: 6px;">
+              <input type="text" id="clReconSearchInput" placeholder="Search ledger..." style="width: 100%; height: 32px; font-size: 12.5px; padding: 0 8px 0 28px; border: 1.5px solid #cbd5e1; border-radius: 6px; outline: none; box-sizing: border-box; font-family: inherit; background: #fff; color: #1e293b;" autocomplete="off" />
+              <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; color: #94a3b8; pointer-events: none;">
+                <svg width="13" height="13" viewBox="0 0 17 17" fill="none">
+                  <circle cx="7.5" cy="7.5" r="5" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M11.5 11.5l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </span>
             </div>
-            <div id="clReconLedgerList" style="max-height: ${maxListHeight}px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 2px;">
-            </div>
-            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b; font-weight: 500;">
-              <span>Type to search</span>
-              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 3px; font-size:9px;">↑↓</kbd> Navigate</span>
-              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 3px; font-size:9px;">↵</kbd> Select</span>
-              <span><kbd style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:3px; padding:1px 3px; font-size:9px;">Bksp</kbd> Remove</span>
+            <div id="clReconLedgerList" style="max-height: ${maxListHeight}px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin;">
             </div>
           `;
 
@@ -3240,16 +3210,72 @@
 
           const searchInput = popover.querySelector('#clReconSearchInput');
           const listContainer = popover.querySelector('#clReconLedgerList');
-          const clearBannerBtn = popover.querySelector('#clBtnClearCurrentSelection');
-          if (clearBannerBtn) {
-            clearBannerBtn.addEventListener('click', () => {
-              closePopover();
-              selectOptionAndAdvance('', 'none');
-            });
-          }
 
           let activeIndex = 0;
-          let currentCatFilter = 'all';
+
+          function getGroupDotColor(ledgerId) {
+            const l = allLedgers.find(x => String(x.id) === String(ledgerId));
+            if (!l) return '#94a3b8';
+            if (l.type === 'customer') return '#10b981';
+            if (l.type === 'supplier') return '#f59e0b';
+            const sg = (typeof COA_SYS_SGS !== 'undefined') ? COA_SYS_SGS.find(s => s.id === l.sgId) : null;
+            const GROUP_COLORS = {
+              assets: '#3b82f6',
+              'equity-liabilities': '#8b5cf6',
+              income: '#10b981',
+              expense: '#f59e0b',
+            };
+            return (sg && GROUP_COLORS[sg.main]) || '#94a3b8';
+          }
+
+          function highlightText(text, q) {
+            if (!q) return ohEsc(text);
+            const idx = text.toLowerCase().indexOf(q.toLowerCase());
+            if (idx < 0) return ohEsc(text);
+            return ohEsc(text.slice(0, idx)) +
+              `<span class="cl-recon-hl" style="background: #fef08a; color: #854d0e; font-weight: 700; border-radius: 2px; padding: 0 1px;">${ohEsc(text.slice(idx, idx + q.length))}</span>` +
+              ohEsc(text.slice(idx + q.length));
+          }
+
+          function handleCreateAction(createType, searchVal) {
+            closePopover();
+            const creationCtx = {
+              returnTab: 'cashline',
+              origIdx: origIdx,
+              bankId: bankId,
+              reconBankId: _clReconBankId,
+              activeTopTab: _clActiveTopTab,
+              activeBankingTab: _clActiveBankingTab,
+              reconSubSection: _clReconSubSection,
+              statementSearchQuery: _clStatementSearchQuery
+            };
+            window._clPendingReconCreation = creationCtx;
+            const initialName = (searchVal || '').trim();
+            if (createType === 'ledger') {
+              if (typeof window.openMasterDeskCreateLedger === 'function') {
+                window.openMasterDeskCreateLedger({
+                  ...creationCtx,
+                  initialName: initialName
+                });
+              }
+            } else if (createType === 'customer') {
+              if (typeof window.openMasterDeskCreateParty === 'function') {
+                window.openMasterDeskCreateParty({
+                  ...creationCtx,
+                  type: 'customer',
+                  initialName: initialName
+                });
+              }
+            } else if (createType === 'supplier') {
+              if (typeof window.openMasterDeskCreateParty === 'function') {
+                window.openMasterDeskCreateParty({
+                  ...creationCtx,
+                  type: 'supplier',
+                  initialName: initialName
+                });
+              }
+            }
+          }
 
           function updateHighlight() {
             const opts = Array.from(listContainer.querySelectorAll('.cl-recon-opt'));
@@ -3258,119 +3284,178 @@
             if (activeIndex >= opts.length) activeIndex = opts.length - 1;
 
             opts.forEach((opt, idx) => {
-              const isSel = String(opt.dataset.id) === String(currentSelectedId);
-              if (idx === activeIndex) {
-                opt.style.background = isSel ? '#bfdbfe' : '#f1f5f9';
-                opt.style.border = isSel ? '2px solid #2563eb' : '1px solid #2563eb';
-                opt.scrollIntoView({ block: 'nearest' });
+              const isHighlight = (idx === activeIndex);
+              const isClearBtn = opt.dataset.id === '' && !opt.dataset.createType;
+              const createType = opt.dataset.createType;
+              const isSel = String(opt.dataset.id) === String(currentSelectedId) && !isClearBtn && !createType;
+              const nameEl = opt.querySelector('.cl-recon-opt-name');
+              const hlEls = opt.querySelectorAll('.cl-recon-hl');
+              const grpEl = opt.querySelector('.cl-recon-opt-grp');
+              const checkEl = opt.querySelector('.cl-recon-opt-check');
+
+              if (createType) {
+                if (createType === 'ledger') {
+                  opt.style.background = isHighlight ? '#2563eb' : '#eff6ff';
+                  opt.style.color = isHighlight ? '#ffffff' : '#2563eb';
+                  if (nameEl) nameEl.style.color = isHighlight ? '#ffffff' : '#2563eb';
+                } else if (createType === 'customer') {
+                  opt.style.background = isHighlight ? '#059669' : '#ecfdf5';
+                  opt.style.color = isHighlight ? '#ffffff' : '#059669';
+                  if (nameEl) nameEl.style.color = isHighlight ? '#ffffff' : '#059669';
+                } else if (createType === 'supplier') {
+                  opt.style.background = isHighlight ? '#d97706' : '#fffbeb';
+                  opt.style.color = isHighlight ? '#ffffff' : '#d97706';
+                  if (nameEl) nameEl.style.color = isHighlight ? '#ffffff' : '#d97706';
+                }
+              } else if (isClearBtn) {
+                if (isHighlight) {
+                  opt.style.background = '#dc2626';
+                  opt.style.color = '#ffffff';
+                } else {
+                  opt.style.background = '#fef2f2';
+                  opt.style.color = '#dc2626';
+                }
+              } else if (isHighlight) {
+                opt.style.background = '#2563eb';
+                opt.style.color = '#ffffff';
+                if (nameEl) nameEl.style.color = '#ffffff';
+                hlEls.forEach(hl => {
+                  hl.style.background = 'rgba(255, 255, 255, 0.3)';
+                  hl.style.color = '#ffffff';
+                });
+                if (grpEl) grpEl.style.color = 'rgba(255, 255, 255, 0.8)';
+                if (checkEl) checkEl.style.color = '#ffffff';
+              } else if (isSel) {
+                opt.style.background = '#eff6ff';
+                opt.style.color = '#1e40af';
+                if (nameEl) nameEl.style.color = '#1e40af';
+                hlEls.forEach(hl => {
+                  hl.style.background = '#fef08a';
+                  hl.style.color = '#854d0e';
+                });
+                if (grpEl) grpEl.style.color = '#64748b';
+                if (checkEl) checkEl.style.color = '#2563eb';
               } else {
-                opt.style.border = isSel ? '2px solid #2563eb' : '1px solid transparent';
-                opt.style.background = isSel ? '#dbeafe' : 'transparent';
+                opt.style.background = 'transparent';
+                opt.style.color = '#334155';
+                if (nameEl) nameEl.style.color = '#1e293b';
+                hlEls.forEach(hl => {
+                  hl.style.background = '#fef08a';
+                  hl.style.color = '#854d0e';
+                });
+                if (grpEl) grpEl.style.color = '#94a3b8';
+                if (checkEl) checkEl.style.color = 'transparent';
+              }
+
+              if (isHighlight) {
+                opt.scrollIntoView({ block: 'nearest' });
               }
             });
           }
 
-          function renderOptions(filterQuery = '', cat = currentCatFilter) {
+          function renderOptions(filterQuery = '') {
             const query = filterQuery.toLowerCase().trim();
-            currentCatFilter = cat;
+            const rawQuery = filterQuery.trim();
 
-            let categoryFiltered = allLedgers;
-            if (cat === 'expenses') {
-              categoryFiltered = allLedgers.filter(l => {
-                const g = (getLedgerGroup(l.id) || '').toLowerCase();
-                return g.includes('expense') || g.includes('purchase') || g.includes('direct') || g.includes('indirect') || g.includes('cost');
-              });
-            } else if (cat === 'income') {
-              categoryFiltered = allLedgers.filter(l => {
-                const g = (getLedgerGroup(l.id) || '').toLowerCase();
-                return g.includes('income') || g.includes('sale') || g.includes('revenue') || g.includes('gain');
-              });
-            } else if (cat === 'assets') {
-              categoryFiltered = allLedgers.filter(l => {
-                const g = (getLedgerGroup(l.id) || '').toLowerCase();
-                return g.includes('asset') || g.includes('liab') || g.includes('bank') || g.includes('capital') || g.includes('loan') || g.includes('duty') || g.includes('tax');
-              });
-            }
-
-            const filtered = categoryFiltered.filter(l => {
+            const filtered = allLedgers.filter(l => {
               if (!query) return true;
-              const nameMatch = l.name.toLowerCase().includes(query);
-              const groupMatch = (getLedgerGroup(l.id) || '').toLowerCase().includes(query);
-              return nameMatch || groupMatch;
+              const nameMatch = l.name && l.name.toLowerCase().includes(query);
+              const grp = (l.groupName || getLedgerGroup(l.id) || (l.type === 'customer' ? 'Customer' : (l.type === 'supplier' ? 'Supplier' : ''))).toLowerCase();
+              const groupMatch = grp.includes(query);
+              const aliasMatch = l.aliases && l.aliases.some(a => a.toLowerCase().includes(query));
+              return nameMatch || groupMatch || aliasMatch;
             });
 
-            // Sort so exact/prefix matches come first
             if (query) {
               filtered.sort((a, b) => {
-                const aStart = a.name.toLowerCase().startsWith(query);
-                const bStart = b.name.toLowerCase().startsWith(query);
-                if (aStart && !bStart) return -1;
-                if (!aStart && bStart) return 1;
-                return 0;
+                const aStart = a.name.toLowerCase().startsWith(query) ? 0 : 1;
+                const bStart = b.name.toLowerCase().startsWith(query) ? 0 : 1;
+                return aStart - bStart || a.name.localeCompare(b.name);
               });
             }
 
-            let html = `
-              <div class="cl-recon-opt" data-id="" style="padding: 8px 10px; font-size: 12px; font-weight: 700; color: #dc2626; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #fff5f5; border: 1px dashed #fca5a5; margin-bottom: 4px;">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                  <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px; display: block;" stroke="currentColor">
-                    <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                  </svg>
-                  <span>Clear / Remove Selected Ledger</span>
+            let html = '';
+
+            if (currentSelectedId && !query) {
+              html += `
+                <div class="cl-recon-opt" data-id="" style="padding: 7px 10px; font-size: 12px; font-weight: 600; color: #dc2626; background: #fef2f2; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.1s ease; margin-bottom: 2px;">
+                  <span style="font-size: 12px; line-height: 1;">✕</span>
+                  <span>Clear Selection</span>
                 </div>
-                <kbd style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 3px; padding: 1px 5px; font-size: 9px; color: #991b1b;">Backspace</kbd>
-              </div>
-            `;
+              `;
+            }
 
             if (filtered.length > 0) {
               filtered.forEach(l => {
                 const isSel = String(l.id) === String(currentSelectedId);
-                const groupName = getLedgerGroup(l.id);
+                const groupName = l.groupName || getLedgerGroup(l.id) || (l.type === 'customer' ? 'Customer' : (l.type === 'supplier' ? 'Supplier' : ''));
+                const dotColor = getGroupDotColor(l.id);
 
                 html += `
-                  <div class="cl-recon-opt" data-id="${l.id}" style="padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.1s ease; border: 1.5px solid ${isSel ? '#2563eb' : 'transparent'}; background: ${isSel ? '#dbeafe' : 'transparent'};">
-                    <div style="display: flex; flex-direction: column; gap: 1.5px; min-width: 0; padding-right: 8px;">
-                      <div style="font-size: 12.5px; font-weight: ${isSel ? '800' : '600'}; color: ${isSel ? '#1e40af' : '#1e293b'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        ${isSel ? '<span style="color: #2563eb; margin-right: 4px;">✓</span>' : ''}${ohEsc(l.name)}
-                      </div>
-                      ${groupName ? `
-                        <div style="font-size: 10.5px; font-weight: 500; color: ${isSel ? '#2563eb' : '#64748b'}; display: flex; align-items: center; gap: 4px;">
-                          <span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: ${isSel ? '#2563eb' : '#94a3b8'}; flex-shrink: 0;"></span>
-                          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${ohEsc(groupName)}</span>
-                        </div>
-                      ` : ''}
+                  <div class="cl-recon-opt" data-id="${l.id}" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: background 0.1s ease; background: ${isSel ? '#eff6ff' : 'transparent'}; color: ${isSel ? '#1e40af' : '#334155'}; user-select: none;">
+                    <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+                      <span style="width: 7px; height: 7px; border-radius: 50%; background: ${dotColor}; flex-shrink: 0;"></span>
+                      <span class="cl-recon-opt-name" style="font-size: 12.5px; font-weight: ${isSel ? '700' : '500'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: ${isSel ? '#1e40af' : '#1e293b'};">
+                        ${highlightText(l.name, query)}
+                      </span>
                     </div>
-                    ${isSel ? `
-                      <div style="background: #2563eb; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 10.5px; font-weight: 800; flex-shrink: 0;">
-                        ✓ Selected
-                      </div>
-                    ` : ''}
+                    <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                      ${groupName ? `<span class="cl-recon-opt-grp" style="font-size: 10.5px; color: ${isSel ? '#64748b' : '#94a3b8'}; font-weight: 500; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${ohEsc(groupName)}</span>` : ''}
+                      ${isSel ? `<span class="cl-recon-opt-check" style="color: #2563eb; font-weight: 800; font-size: 12px;">✓</span>` : ''}
+                    </div>
                   </div>
                 `;
               });
             } else {
-              html += `<div style="padding: 16px 10px; font-size: 12px; color: #94a3b8; text-align: center;">No matching ledgers</div>`;
+              html += `
+                <div style="padding: 8px 6px 4px; font-size: 11.5px; font-weight: 600; color: #64748b; text-align: center;">No matching accounts</div>
+                <div style="border-top: 1px dashed #e2e8f0; padding-top: 6px; margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
+                  <div class="cl-recon-opt cl-recon-create-opt" data-create-type="ledger" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #2563eb; background: #eff6ff; border: 1px dashed #bfdbfe; transition: all 0.1s ease;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span class="cl-recon-opt-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Create Ledger ${rawQuery ? `"${ohEsc(rawQuery)}"` : ''}</span>
+                  </div>
+                  <div class="cl-recon-opt cl-recon-create-opt" data-create-type="customer" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px dashed #a7f3d0; transition: all 0.1s ease;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span class="cl-recon-opt-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Create Customer ${rawQuery ? `"${ohEsc(rawQuery)}"` : ''}</span>
+                  </div>
+                  <div class="cl-recon-opt cl-recon-create-opt" data-create-type="supplier" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #d97706; background: #fffbeb; border: 1px dashed #fde68a; transition: all 0.1s ease;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span class="cl-recon-opt-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Create Vendor / Supplier ${rawQuery ? `"${ohEsc(rawQuery)}"` : ''}</span>
+                  </div>
+                </div>
+              `;
             }
 
             listContainer.innerHTML = html;
 
-            listContainer.querySelectorAll('.cl-recon-opt').forEach((opt, idx) => {
+            const opts = Array.from(listContainer.querySelectorAll('.cl-recon-opt'));
+            opts.forEach((opt, idx) => {
               opt.addEventListener('mouseenter', () => {
                 activeIndex = idx;
                 updateHighlight();
               });
-              opt.addEventListener('click', () => {
-                closePopover();
-                selectOptionAndAdvance(opt.dataset.id, 'next');
+              opt.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                if (opt.dataset.createType) {
+                  handleCreateAction(opt.dataset.createType, searchInput.value);
+                } else {
+                  closePopover();
+                  selectOptionAndAdvance(opt.dataset.id, 'next');
+                }
               });
             });
 
-            activeIndex = (query && filtered.length > 0) ? 1 : 0;
+            if (currentSelectedId && !query) {
+              const selIdx = opts.findIndex(o => String(o.dataset.id) === String(currentSelectedId));
+              activeIndex = selIdx >= 0 ? selIdx : 0;
+            } else {
+              activeIndex = 0;
+            }
             updateHighlight();
           }
 
           searchInput.addEventListener('input', () => {
-            renderOptions(searchInput.value, currentCatFilter);
+            renderOptions(searchInput.value);
           });
 
           searchInput.addEventListener('focus', () => {
@@ -3382,67 +3467,45 @@
             searchInput.style.boxShadow = 'none';
           });
 
-          searchInput.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Backspace' && searchInput.value === '') {
-              ev.preventDefault();
-              if (btn.dataset.selectedId) {
-                closePopover();
-                selectOptionAndAdvance('', 'none');
-              } else {
-                closePopover();
-                goToPrevRow();
-              }
-            } else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Enter' || ev.key === 'Escape') {
-              handleKeydown(ev);
-            }
-          });
-
-          popover.querySelectorAll('.cl-cat-tab').forEach(tabBtn => {
-            tabBtn.addEventListener('click', () => {
-              popover.querySelectorAll('.cl-cat-tab').forEach(t => {
-                t.style.border = '1px solid #e2e8f0';
-                t.style.background = '#fff';
-                t.style.color = '#64748b';
-                t.style.fontWeight = '600';
-              });
-              tabBtn.style.border = '1px solid #2563eb';
-              tabBtn.style.background = '#eff6ff';
-              tabBtn.style.color = '#2563eb';
-              tabBtn.style.fontWeight = '700';
-
-              renderOptions(searchInput.value, tabBtn.dataset.cat);
-              searchInput.focus();
-            });
-          });
-
           renderOptions();
 
           const handleKeydown = (ev) => {
             const opts = Array.from(listContainer.querySelectorAll('.cl-recon-opt'));
             if (ev.key === 'ArrowDown') {
               ev.preventDefault();
+              ev.stopPropagation();
               if (opts.length > 0) {
                 activeIndex = (activeIndex + 1) % opts.length;
                 updateHighlight();
               }
             } else if (ev.key === 'ArrowUp') {
               ev.preventDefault();
+              ev.stopPropagation();
               if (opts.length > 0) {
                 activeIndex = (activeIndex - 1 + opts.length) % opts.length;
                 updateHighlight();
               }
             } else if (ev.key === 'Enter') {
               ev.preventDefault();
+              ev.stopPropagation();
               if (opts.length > 0 && activeIndex >= 0 && activeIndex < opts.length) {
-                closePopover();
-                selectOptionAndAdvance(opts[activeIndex].dataset.id, 'next');
+                const opt = opts[activeIndex];
+                if (opt.dataset.createType) {
+                  handleCreateAction(opt.dataset.createType, searchInput.value);
+                } else {
+                  const chosenId = opt.dataset.id;
+                  closePopover();
+                  selectOptionAndAdvance(chosenId, 'next');
+                }
               }
             } else if (ev.key === 'Escape') {
               ev.preventDefault();
+              ev.stopPropagation();
               closePopover();
               btn.focus();
-            } else if (ev.key === 'Backspace' && document.activeElement !== searchInput) {
+            } else if (ev.key === 'Backspace' && searchInput.value === '') {
               ev.preventDefault();
+              ev.stopPropagation();
               if (btn.dataset.selectedId) {
                 closePopover();
                 selectOptionAndAdvance('', 'none');
@@ -3533,20 +3596,115 @@
       if (fromVal && entry.date < fromVal) return;
       if (toVal && entry.date > toVal) return;
 
+      const selName = (selectedLedger?.name || '').trim().toLowerCase();
+
       (entry.allRows || []).forEach(row => {
-        if (row.particular.trim() === selectedLedger.name.trim()) {
+        if ((row.particular || '').trim().toLowerCase() === selName) {
           const dr = parseFloat(row.debit) || 0;
           const cr = parseFloat(row.credit) || 0;
 
-          cbLines.push({
-            id: entry.id,
-            date: entry.date,
-            voucherNo: entry.voucherNo || '—',
-            opposite: getOppositeParticulars(entry, selectedLedger.name, dr > 0),
-            narration: entry.narration || '',
-            receipt: dr,
-            payment: cr
-          });
+          if (dr > 0) {
+            let oppRows = (entry.allRows || []).filter(r => (parseFloat(r.credit) || 0) > 0 && (r.particular || '').trim().toLowerCase() !== selName);
+            if (oppRows.length === 0) {
+              oppRows = (entry.allRows || []).filter(r => (r.particular || '').trim().toLowerCase() !== selName);
+            }
+
+            if (oppRows.length === 0) {
+              cbLines.push({
+                id: entry.id,
+                date: entry.date,
+                voucherNo: entry.voucherNo || '—',
+                opposite: '—',
+                narration: entry.narration || '',
+                receipt: dr,
+                payment: 0,
+                uploadedDoc: entry.uploadedDoc || null
+              });
+            } else if (oppRows.length === 1) {
+              cbLines.push({
+                id: entry.id,
+                date: entry.date,
+                voucherNo: entry.voucherNo || '—',
+                opposite: (oppRows[0].particular || '—').trim(),
+                narration: entry.narration || '',
+                receipt: dr,
+                payment: 0,
+                uploadedDoc: entry.uploadedDoc || null
+              });
+            } else {
+              const totalOppCr = oppRows.reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
+              oppRows.forEach(opp => {
+                const oppCr = parseFloat(opp.credit) || 0;
+                const lineAmt = totalOppCr > 0 ? (oppCr / totalOppCr) * dr : (dr / oppRows.length);
+                cbLines.push({
+                  id: entry.id,
+                  date: entry.date,
+                  voucherNo: entry.voucherNo || '—',
+                  opposite: (opp.particular || '—').trim(),
+                  narration: entry.narration || '',
+                  receipt: lineAmt,
+                  payment: 0,
+                  uploadedDoc: entry.uploadedDoc || null
+                });
+              });
+            }
+          } else if (cr > 0) {
+            let oppRows = (entry.allRows || []).filter(r => (parseFloat(r.debit) || 0) > 0 && (r.particular || '').trim().toLowerCase() !== selName);
+            if (oppRows.length === 0) {
+              oppRows = (entry.allRows || []).filter(r => (r.particular || '').trim().toLowerCase() !== selName);
+            }
+
+            if (oppRows.length === 0) {
+              cbLines.push({
+                id: entry.id,
+                date: entry.date,
+                voucherNo: entry.voucherNo || '—',
+                opposite: '—',
+                narration: entry.narration || '',
+                receipt: 0,
+                payment: cr,
+                uploadedDoc: entry.uploadedDoc || null
+              });
+            } else if (oppRows.length === 1) {
+              cbLines.push({
+                id: entry.id,
+                date: entry.date,
+                voucherNo: entry.voucherNo || '—',
+                opposite: (oppRows[0].particular || '—').trim(),
+                narration: entry.narration || '',
+                receipt: 0,
+                payment: cr,
+                uploadedDoc: entry.uploadedDoc || null
+              });
+            } else {
+              const totalOppDr = oppRows.reduce((sum, r) => sum + (parseFloat(r.debit) || 0), 0);
+              oppRows.forEach(opp => {
+                const oppDr = parseFloat(opp.debit) || 0;
+                const lineAmt = totalOppDr > 0 ? (oppDr / totalOppDr) * cr : (cr / oppRows.length);
+                cbLines.push({
+                  id: entry.id,
+                  date: entry.date,
+                  voucherNo: entry.voucherNo || '—',
+                  opposite: (opp.particular || '—').trim(),
+                  narration: entry.narration || '',
+                  receipt: 0,
+                  payment: lineAmt,
+                  uploadedDoc: entry.uploadedDoc || null
+                });
+              });
+            }
+          } else {
+            cbLines.push({
+              id: entry.id,
+              date: entry.date,
+              voucherNo: entry.voucherNo || '—',
+              opposite: getOppositeParticulars(entry, selectedLedger.name, true),
+              narration: entry.narration || '',
+              receipt: 0,
+              payment: 0,
+              uploadedDoc: entry.uploadedDoc || null
+            });
+          }
         }
       });
     });
@@ -3555,7 +3713,7 @@
 
     let rowsHtml = `
       <tr style="background:#fafbfc; font-weight: 700;">
-        <td colspan="4">Opening Balance</td>
+        <td colspan="3">Opening Balance</td>
         <td class="num-val">—</td>
         <td class="num-val">—</td>
         <td class="num-val" style="color:var(--slate-800);">${fmtAmt(openingBal)}</td>
@@ -3563,50 +3721,58 @@
     `;
 
     let runningBal = openingBal;
+    let totalReceipt = 0;
+    let totalPayment = 0;
     cbLines.forEach((line) => {
+      totalReceipt += (line.receipt || 0);
+      totalPayment += (line.payment || 0);
       runningBal = runningBal + line.receipt - line.payment;
       rowsHtml += `
         <tr>
-          <td>${line.date}</td>
-          <td>
-            <span style="font-family: monospace; font-weight: 700; color: var(--slate-700); cursor:pointer; text-decoration:underline dotted;" 
-                  onclick="window.viewVoucherFromStatement(${line.id})" title="Click to view voucher">${line.voucherNo}</span>
+          <td style="white-space: nowrap;">${formatToDDMMYYYY(line.date)}</td>
+          <td style="white-space: nowrap;">
+            <span style="font-family: monospace; font-weight: 700; color: var(--slate-700); cursor:pointer; text-decoration:underline dotted; white-space: nowrap;" 
+                  onclick="window.viewVoucherFromStatement(${line.id})" title="Click to view voucher">${ohEsc(line.voucherNo)}</span>
           </td>
           <td>
             <div style="font-weight: 600; color: var(--slate-800);">${ohEsc(line.opposite)}</div>
             ${line.narration ? `<div style="font-size: 11.5px; color: var(--slate-400); font-weight: 500; margin-top: 2px;">${ohEsc(line.narration)}</div>` : ''}
           </td>
-          <td style="text-align: center;">
-            ${line.receipt > 0 
-              ? `<span class="cl-badge reconciled" style="font-size:10px;">Receipt</span>` 
-              : `<span class="cl-badge unreconciled" style="font-size:10px; background:#fef2f2; color:#ef4444; border-color:#fee2e2;">Payment</span>`
-            }
-          </td>
-          <td class="num-val" style="color: var(--emerald-600);">${line.receipt > 0 ? fmtAmt(line.receipt) : '—'}</td>
-          <td class="num-val" style="color: var(--red-600);">${line.payment > 0 ? fmtAmt(line.payment) : '—'}</td>
-          <td class="num-val">${fmtAmt(runningBal)}</td>
+          <td class="num-val" style="color: var(--emerald-600); white-space: nowrap;">${line.receipt > 0 ? fmtAmt(line.receipt) : '—'}</td>
+          <td class="num-val" style="color: var(--red-600); white-space: nowrap;">${line.payment > 0 ? fmtAmt(line.payment) : '—'}</td>
+          <td class="num-val" style="white-space: nowrap;">${fmtAmt(runningBal)}</td>
         </tr>
       `;
     });
 
     if (actionsArea) {
       actionsArea.innerHTML = `
-        <button class="btn btn-success" id="btnClRecordReceipt" style="height: 32px; font-size: 12.5px; padding: 0 12px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-          ＋ Receipt
-        </button>
-        <button class="btn btn-danger" id="btnClRecordPayment" style="height: 32px; font-size: 12.5px; padding: 0 12px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-          － Payment
-        </button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="clCbSelectAccount" class="cl-glass-control" style="cursor: pointer; width: 145px;">
+            ${cceAccounts.map(a => `<option value="${a.id}" ${a.id.toString() === selectedLedger.id.toString() ? 'selected' : ''}>${ohEsc(a.name)}</option>`).join('')}
+          </select>
+          <input type="date" id="clCbFromDate" class="cl-glass-control" value="${fromVal}" style="width: 125px;" />
+          <input type="date" id="clCbToDate" class="cl-glass-control" value="${toVal}" style="width: 125px;" />
+        </div>
       `;
-      document.getElementById('btnClRecordReceipt').addEventListener('click', () => {
-        showFastEntryModal('Receipt', selectedLedger);
+      if (controls && controls !== actionsArea) {
+        controls.innerHTML = '';
+      }
+      document.getElementById('clCbSelectAccount')?.addEventListener('change', (e) => {
+        _clCashbookAccountId = e.target.value;
+        renderActiveSubtab();
       });
-      document.getElementById('btnClRecordPayment').addEventListener('click', () => {
-        showFastEntryModal('Payment', selectedLedger);
+      document.getElementById('clCbFromDate')?.addEventListener('change', (e) => {
+        _clCashflowDateFrom = e.target.value;
+        syncGlobalDates(_clCashflowDateFrom, _clCashflowDateTo);
+        renderActiveSubtab();
       });
-    }
-
-    if (controls) {
+      document.getElementById('clCbToDate')?.addEventListener('change', (e) => {
+        _clCashflowDateTo = e.target.value;
+        syncGlobalDates(_clCashflowDateFrom, _clCashflowDateTo);
+        renderActiveSubtab();
+      });
+    } else if (controls) {
       controls.innerHTML = `
         <div style="display: flex; gap: 8px; align-items: center;">
           <select id="clCbSelectAccount" class="je-input" style="height: 34px; font-size: 13px; padding: 0 8px; cursor: pointer; background: #fff; border-radius: 6px; width: 140px;">
@@ -3616,33 +3782,105 @@
           <input type="date" id="clCbToDate" class="je-input" value="${toVal}" style="height: 34px; font-size: 13px; padding: 0 8px; border-radius: 6px; width: 120px;" />
         </div>
       `;
-      document.getElementById('clCbSelectAccount').addEventListener('change', (e) => {
+      document.getElementById('clCbSelectAccount')?.addEventListener('change', (e) => {
         _clCashbookAccountId = e.target.value;
         renderActiveSubtab();
       });
-      document.getElementById('clCbFromDate').addEventListener('change', (e) => {
+      document.getElementById('clCbFromDate')?.addEventListener('change', (e) => {
         _clCashflowDateFrom = e.target.value;
         syncGlobalDates(_clCashflowDateFrom, _clCashflowDateTo);
         renderActiveSubtab();
       });
-      document.getElementById('clCbToDate').addEventListener('change', (e) => {
+      document.getElementById('clCbToDate')?.addEventListener('change', (e) => {
         _clCashflowDateTo = e.target.value;
         syncGlobalDates(_clCashflowDateFrom, _clCashflowDateTo);
         renderActiveSubtab();
       });
     }
 
+    const oppOpts = (typeof coaLedgers !== 'undefined' ? coaLedgers : [])
+      .filter(l => l.type === 'ledger' && (!selectedLedger || l.id !== selectedLedger.id))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .map(l => `<option value="${l.id}">${ohEsc(l.name)}</option>`)
+      .join('');
+
+    const pendingState = window._clPendingQuickEntryState;
+    const todayStr = (pendingState && pendingState.quickDate) ? pendingState.quickDate : new Date().toISOString().split('T')[0];
+    const nextVoucher = (pendingState && pendingState.quickVoucher) ? pendingState.quickVoucher : ((typeof genVoucherNo === 'function') ? genVoucherNo() : `JV-${new Date().getFullYear()}-${String(typeof jvCounter !== 'undefined' ? jvCounter : 1).padStart(3, '0')}`);
+    const initialType = (pendingState && pendingState.quickType) ? pendingState.quickType : 'Receipt';
+    const initialAmount = (pendingState && pendingState.quickAmount) ? pendingState.quickAmount : '';
+    const initialLedgerId = (pendingState && pendingState.quickLedgerId) ? pendingState.quickLedgerId : '';
+    const initialLedgerName = (pendingState && pendingState.quickLedgerSearch) ? pendingState.quickLedgerSearch : '';
+
     target.innerHTML = `
-      <div class="recon-stats" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 20px; padding: 12px 16px;">
+      <!-- Quick Direct Entry Bar -->
+      <div class="cl-quick-entry-bar" style="background: #ffffff; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+        <div style="display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; width: 100%;">
+          <!-- Date -->
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em;">Date</label>
+            <input type="date" id="clQuickEntryDate" class="je-input" value="${todayStr}" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; width: 130px;" />
+          </div>
+
+          <!-- Voucher No -->
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em;">Voucher No.</label>
+            <input type="text" id="clQuickEntryVoucher" class="je-input" value="${nextVoucher}" placeholder="Voucher No" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; width: 120px;" />
+          </div>
+
+          <!-- Ledger (Searchable) -->
+          <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 200px;">
+            <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em;">Ledger</label>
+            <div class="cl-searchable-ledger-wrap" style="position: relative; width: 100%;">
+              <input type="text" id="clQuickEntryLedgerSearch" class="je-input" value="${ohEsc(initialLedgerName)}" placeholder="Search or select Ledger..." autocomplete="off" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 28px 0 10px; border-radius: 6px; width: 100%; cursor: pointer;" />
+              <input type="hidden" id="clQuickEntryLedger" value="${ohEsc(initialLedgerId)}" />
+              <span style="position: absolute; right: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--slate-400); font-size: 10px;">▼</span>
+
+              <div id="clQuickEntryLedgerDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1.5px solid var(--slate-200); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1); z-index: 1000; padding: 6px; max-height: 240px; overflow-y: auto; box-sizing: border-box;">
+                <div id="clQuickEntryLedgerOptions" style="display: flex; flex-direction: column; gap: 2px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Receipt / Payment dropdown -->
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em;">Receipt / Payment</label>
+            <select id="clQuickEntryType" class="je-input" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 8px; cursor: pointer; background: #fff; border-radius: 6px; width: 140px;">
+              <option value="Receipt" ${initialType === 'Receipt' ? 'selected' : ''}>Receipt</option>
+              <option value="Payment" ${initialType === 'Payment' ? 'selected' : ''}>Payment</option>
+            </select>
+          </div>
+
+          <!-- Amount -->
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em;">Amount (₹)</label>
+            <input type="number" step="0.01" min="0" id="clQuickEntryAmount" class="je-input" value="${ohEsc(initialAmount)}" placeholder="0.00" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; width: 115px;" />
+          </div>
+
+          <!-- Post Button -->
+          <div style="display: flex; align-items: flex-end;">
+            <button id="clBtnQuickPost" class="btn btn-primary" style="height: 34px; padding: 0 18px; font-size: 13px; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap;">
+              <svg viewBox="0 0 20 20" fill="none" width="14" height="14" style="stroke: currentColor; stroke-width: 2.2;">
+                <path d="M4 10l4 4 8-8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Post
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="recon-stats" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px; padding: 12px 16px;">
         <div class="recon-stat-card">
           <span class="recon-stat-label">Opening Balance</span>
           <span class="recon-stat-val">${fmtAmt(openingBal)}</span>
         </div>
         <div class="recon-stat-card">
-          <span class="recon-stat-label">Net Period Change</span>
-          <span class="recon-stat-val" style="color: ${closingBal >= openingBal ? 'var(--emerald-600)' : 'var(--red-600)'};">
-            ${fmtAmt(closingBal - openingBal)}
-          </span>
+          <span class="recon-stat-label">Total Receipt</span>
+          <span class="recon-stat-val" style="color: var(--emerald-600);">${fmtAmt(totalReceipt)}</span>
+        </div>
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">Total Payment</span>
+          <span class="recon-stat-val" style="color: var(--red-600);">${fmtAmt(totalPayment)}</span>
         </div>
         <div class="recon-stat-card">
           <span class="recon-stat-label">Closing Balance</span>
@@ -3654,13 +3892,12 @@
         <table class="cl-table">
           <thead>
             <tr>
-              <th style="width: 100px;">Date</th>
-              <th style="width: 100px;">Voucher</th>
+              <th style="width: 110px; white-space: nowrap;">Date</th>
+              <th style="width: 110px; white-space: nowrap;">Voucher</th>
               <th>Opposite Account / Description</th>
-              <th style="width: 90px; text-align: center;">Type</th>
-              <th style="text-align: right; width: 120px;">Receipt (Dr)</th>
-              <th style="text-align: right; width: 120px;">Payment (Cr)</th>
-              <th style="text-align: right; width: 130px;">Running Bal</th>
+              <th style="text-align: right; width: 120px;">Receipt</th>
+              <th style="text-align: right; width: 120px;">Payment</th>
+              <th style="text-align: right; width: 130px;">Balance</th>
             </tr>
           </thead>
           <tbody>
@@ -3669,6 +3906,440 @@
         </table>
       </div>
     `;
+
+    const getAvailableLedgerList = () => {
+      const list = (typeof coaLedgers !== 'undefined' ? coaLedgers : [])
+        .filter(l => l.type === 'ledger' && (!selectedLedger || l.id !== selectedLedger.id))
+        .map(l => ({ id: l.id, name: l.name }));
+
+      const existingNames = new Set(list.map(l => (l.name || '').trim().toLowerCase()));
+
+      const customers = (typeof getKyaCustomers === 'function' ? getKyaCustomers() : (window.KYA_STORE?.customers || []));
+      customers.forEach(c => {
+        if (c && c.name && !existingNames.has(c.name.trim().toLowerCase())) {
+          list.push({ id: `cust_${c.id}`, name: c.name, isCustomer: true });
+          existingNames.add(c.name.trim().toLowerCase());
+        }
+      });
+
+      const suppliers = (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : (window.KYA_STORE?.suppliers || []));
+      suppliers.forEach(s => {
+        if (s && s.name && !existingNames.has(s.name.trim().toLowerCase())) {
+          list.push({ id: `supp_${s.id}`, name: s.name, isSupplier: true });
+          existingNames.add(s.name.trim().toLowerCase());
+        }
+      });
+
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return list;
+    };
+
+    // Searchable Ledger Setup
+    const setupSearchableLedger = () => {
+      const searchInp = document.getElementById('clQuickEntryLedgerSearch');
+      const hiddenInp = document.getElementById('clQuickEntryLedger');
+      const dropdown = document.getElementById('clQuickEntryLedgerDropdown');
+      const optionsContainer = document.getElementById('clQuickEntryLedgerOptions');
+      const wrap = searchInp?.closest('.cl-searchable-ledger-wrap');
+
+      if (!searchInp || !hiddenInp || !dropdown || !optionsContainer) return;
+
+      const availableLedgers = getAvailableLedgerList();
+
+      let highlightedIndex = -1;
+      let currentFiltered = [];
+
+      const renderOptions = (filterText = '') => {
+        optionsContainer.innerHTML = '';
+        const q = filterText.toLowerCase().trim();
+
+        currentFiltered = availableLedgers.filter(l => {
+          if (!q) return true;
+          return (l.name || '').toLowerCase().includes(q);
+        });
+
+        if (currentFiltered.length === 0) {
+          optionsContainer.innerHTML = `
+            <div style="padding: 8px 6px 4px; font-size: 11.5px; font-weight: 600; color: var(--slate-400); text-align: center;">No matching ledgers, customers or vendors</div>
+            <div style="border-top: 1px dashed var(--slate-200); padding-top: 6px; margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
+              <div class="cl-ledger-create-btn" data-create-type="ledger" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #2563eb; background: #eff6ff; border: 1px dashed #bfdbfe; transition: all 0.1s ease;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Create Ledger ${q ? `"${ohEsc(filterText.trim())}"` : ''}</span>
+              </div>
+              <div class="cl-ledger-create-btn" data-create-type="customer" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px dashed #a7f3d0; transition: all 0.1s ease;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Create Customer ${q ? `"${ohEsc(filterText.trim())}"` : ''}</span>
+              </div>
+              <div class="cl-ledger-create-btn" data-create-type="supplier" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #d97706; background: #fffbeb; border: 1px dashed #fde68a; transition: all 0.1s ease;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Create Vendor / Supplier ${q ? `"${ohEsc(filterText.trim())}"` : ''}</span>
+              </div>
+            </div>
+          `;
+          attachCreateListeners();
+          return;
+        }
+
+        currentFiltered.forEach((l, idx) => {
+          const isSelected = hiddenInp.value === String(l.id);
+          const item = document.createElement('div');
+          item.className = 'cl-ledger-opt-item';
+          item.dataset.index = idx;
+          item.dataset.id = l.id;
+          item.style.cssText = `
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            background: ${isSelected ? 'var(--blue-50)' : 'transparent'};
+            color: ${isSelected ? 'var(--blue-700)' : 'var(--slate-800)'};
+            font-weight: ${isSelected ? '700' : '500'};
+            transition: all 0.12s ease;
+          `;
+          item.textContent = l.name;
+
+          item.addEventListener('mouseenter', () => {
+            highlightedIndex = idx;
+            updateHighlight();
+          });
+
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectLedger(l);
+          });
+
+          optionsContainer.appendChild(item);
+        });
+
+        if (q) {
+          const createSection = document.createElement('div');
+          createSection.style.cssText = 'border-top: 1px dashed var(--slate-200); padding-top: 6px; margin-top: 6px; display: flex; flex-direction: column; gap: 4px;';
+          createSection.innerHTML = `
+            <div class="cl-ledger-create-btn" data-create-type="ledger" style="padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; color: #2563eb; background: #eff6ff; border: 1px dashed #bfdbfe; transition: all 0.1s ease;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Create Ledger "${ohEsc(filterText.trim())}"</span>
+            </div>
+            <div class="cl-ledger-create-btn" data-create-type="customer" style="padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px dashed #a7f3d0; transition: all 0.1s ease;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Create Customer "${ohEsc(filterText.trim())}"</span>
+            </div>
+            <div class="cl-ledger-create-btn" data-create-type="supplier" style="padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; color: #d97706; background: #fffbeb; border: 1px dashed #fde68a; transition: all 0.1s ease;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Create Vendor / Supplier "${ohEsc(filterText.trim())}"</span>
+            </div>
+          `;
+          optionsContainer.appendChild(createSection);
+        }
+
+        attachCreateListeners();
+
+        highlightedIndex = 0;
+        updateHighlight();
+      };
+
+      const attachCreateListeners = () => {
+        optionsContainer.querySelectorAll('.cl-ledger-create-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleQuickCreate(btn.dataset.createType, searchInp.value);
+          });
+        });
+      };
+
+      const handleQuickCreate = (createType, name) => {
+        dropdown.style.display = 'none';
+        const initialName = (name || searchInp.value || '').trim();
+        const ctx = {
+          returnTab: 'cashline',
+          isCashbookQuickEntry: true,
+          activeTopTab: typeof _clActiveTopTab !== 'undefined' ? _clActiveTopTab : 'banking',
+          activeBankingTab: typeof _clActiveBankingTab !== 'undefined' ? _clActiveBankingTab : 'books',
+          cashbookAccountId: typeof _clCashbookAccountId !== 'undefined' ? _clCashbookAccountId : null,
+          quickDate: document.getElementById('clQuickEntryDate')?.value || '',
+          quickVoucher: document.getElementById('clQuickEntryVoucher')?.value || '',
+          quickType: document.getElementById('clQuickEntryType')?.value || 'Receipt',
+          quickAmount: document.getElementById('clQuickEntryAmount')?.value || '',
+          quickLedgerSearch: initialName,
+          initialName: initialName
+        };
+        window._clPendingQuickEntryState = ctx;
+
+        if (createType === 'ledger') {
+          if (typeof window.openMasterDeskCreateLedger === 'function') {
+            window.openMasterDeskCreateLedger(ctx);
+          } else {
+            const newId = Date.now() + Math.floor(Math.random() * 1000);
+            if (typeof coaLedgers !== 'undefined' && initialName) {
+              coaLedgers.push({
+                id: newId,
+                sgId: 'sg-oe',
+                glId: null,
+                name: initialName,
+                code: '',
+                openingBalance: 0,
+                type: 'ledger'
+              });
+              hiddenInp.value = newId;
+              searchInp.value = initialName;
+              window._clPendingQuickEntryState = null;
+              showToast(`Ledger "${initialName}" created.`, 'success');
+              document.getElementById('clQuickEntryAmount')?.focus();
+            }
+          }
+        } else if (createType === 'customer') {
+          if (typeof window.openMasterDeskCreateParty === 'function') {
+            window.openMasterDeskCreateParty({ ...ctx, type: 'customer' });
+          } else {
+            const newId = Date.now() + Math.floor(Math.random() * 1000);
+            if (initialName) {
+              if (window.KYA_STORE && Array.isArray(window.KYA_STORE.customers)) {
+                window.KYA_STORE.customers.push({ id: newId, name: initialName });
+              }
+              hiddenInp.value = `cust_${newId}`;
+              searchInp.value = initialName;
+              window._clPendingQuickEntryState = null;
+              showToast(`Customer "${initialName}" created.`, 'success');
+              document.getElementById('clQuickEntryAmount')?.focus();
+            }
+          }
+        } else if (createType === 'supplier') {
+          if (typeof window.openMasterDeskCreateParty === 'function') {
+            window.openMasterDeskCreateParty({ ...ctx, type: 'supplier' });
+          } else {
+            const newId = Date.now() + Math.floor(Math.random() * 1000);
+            if (initialName) {
+              if (window.KYA_STORE && Array.isArray(window.KYA_STORE.suppliers)) {
+                window.KYA_STORE.suppliers.push({ id: newId, name: initialName });
+              }
+              hiddenInp.value = `supp_${newId}`;
+              searchInp.value = initialName;
+              window._clPendingQuickEntryState = null;
+              showToast(`Vendor "${initialName}" created.`, 'success');
+              document.getElementById('clQuickEntryAmount')?.focus();
+            }
+          }
+        }
+      };
+
+      if (pendingState) {
+        window._clPendingQuickEntryState = null;
+        if (initialLedgerId) {
+          setTimeout(() => document.getElementById('clQuickEntryAmount')?.focus(), 60);
+        } else {
+          setTimeout(() => document.getElementById('clQuickEntryLedgerSearch')?.focus(), 60);
+        }
+      }
+
+      const updateHighlight = () => {
+        const items = optionsContainer.querySelectorAll('.cl-ledger-opt-item');
+        items.forEach((it, i) => {
+          if (i === highlightedIndex) {
+            it.style.background = 'var(--blue-50)';
+            it.style.color = 'var(--blue-700)';
+            it.scrollIntoView({ block: 'nearest' });
+          } else {
+            const isSel = hiddenInp.value === it.dataset.id;
+            it.style.background = isSel ? 'var(--blue-50)' : 'transparent';
+            it.style.color = isSel ? 'var(--blue-700)' : 'var(--slate-800)';
+          }
+        });
+      };
+
+      const selectLedger = (l) => {
+        hiddenInp.value = l.id;
+        searchInp.value = l.name;
+        dropdown.style.display = 'none';
+        document.getElementById('clQuickEntryAmount')?.focus();
+      };
+
+      const openDropdown = () => {
+        renderOptions(searchInp.value);
+        dropdown.style.display = 'block';
+      };
+
+      const closeDropdown = () => {
+        dropdown.style.display = 'none';
+      };
+
+      searchInp.addEventListener('focus', () => {
+        searchInp.select();
+        openDropdown();
+      });
+
+      searchInp.addEventListener('click', () => {
+        openDropdown();
+      });
+
+      searchInp.addEventListener('input', (e) => {
+        hiddenInp.value = '';
+        openDropdown();
+        renderOptions(e.target.value);
+      });
+
+      searchInp.addEventListener('keydown', (e) => {
+        if (dropdown.style.display === 'none') {
+          if (e.key === 'ArrowDown' || e.key === 'Enter') {
+            openDropdown();
+            return;
+          }
+        }
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (highlightedIndex < currentFiltered.length - 1) {
+            highlightedIndex++;
+            updateHighlight();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (highlightedIndex > 0) {
+            highlightedIndex--;
+            updateHighlight();
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (currentFiltered[highlightedIndex]) {
+            selectLedger(currentFiltered[highlightedIndex]);
+          }
+        } else if (e.key === 'Escape') {
+          closeDropdown();
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        if (wrap && !wrap.contains(e.target)) {
+          closeDropdown();
+        }
+      });
+    };
+
+    setupSearchableLedger();
+
+    // Hook up Quick Post listener
+    const handleQuickPost = () => {
+      const date = document.getElementById('clQuickEntryDate')?.value;
+      const voucherNo = document.getElementById('clQuickEntryVoucher')?.value?.trim() || ((typeof genVoucherNo === 'function') ? genVoucherNo() : `JV-${new Date().getFullYear()}-001`);
+      let oppId = document.getElementById('clQuickEntryLedger')?.value || '';
+      const searchVal = document.getElementById('clQuickEntryLedgerSearch')?.value?.trim() || '';
+      const type = document.getElementById('clQuickEntryType')?.value || 'Receipt';
+      const amt = parseFloat(document.getElementById('clQuickEntryAmount')?.value) || 0;
+
+      const availableLedgers = getAvailableLedgerList();
+
+      if (!date) {
+        showToast('Please select a date.', 'warning');
+        return;
+      }
+
+      // If oppId is not set, try auto-resolving from search input
+      if (!oppId && searchVal) {
+        const matched = availableLedgers.find(l => (l.name || '').toLowerCase() === searchVal.toLowerCase())
+                     || availableLedgers.find(l => (l.name || '').toLowerCase().includes(searchVal.toLowerCase()));
+        if (matched) {
+          oppId = matched.id;
+        }
+      }
+
+      if (!oppId) {
+        showToast('Please search and select a valid ledger, customer or vendor.', 'warning');
+        document.getElementById('clQuickEntryLedgerSearch')?.focus();
+        return;
+      }
+      if (amt <= 0) {
+        showToast('Please enter a valid amount greater than 0.', 'warning');
+        return;
+      }
+      if (!selectedLedger) {
+        showToast('Please select a Cash/Bank account.', 'warning');
+        return;
+      }
+
+      // Resolve Opp Ledger Name
+      let oppName = '';
+      const chosenItem = availableLedgers.find(l => String(l.id) === String(oppId));
+      if (chosenItem) {
+        oppName = chosenItem.name;
+        if (typeof coaLedgers !== 'undefined') {
+          let existing = coaLedgers.find(l => l.type === 'ledger' && (l.name || '').trim().toLowerCase() === oppName.trim().toLowerCase());
+          if (!existing) {
+            const sgId = chosenItem.isCustomer ? 'sg-tr' : (chosenItem.isSupplier ? 'sg-tp' : 'sg-oe');
+            existing = {
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              sgId: sgId,
+              glId: null,
+              name: oppName,
+              code: '',
+              openingBalance: 0,
+              type: 'ledger'
+            };
+            coaLedgers.push(existing);
+          }
+        }
+      } else {
+        const coaLdg = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => String(l.id) === String(oppId));
+        if (coaLdg) oppName = coaLdg.name;
+      }
+
+      if (!oppName) {
+        showToast('Selected ledger / party not found.', 'warning');
+        return;
+      }
+
+      const newEntry = {
+        id: Date.now(),
+        date,
+        voucherNo,
+        narration: '',
+        type: 'Journal',
+        amount: amt.toFixed(2),
+        preparedBy: '',
+        departmentId: '',
+        isBudget: false,
+        allRows: []
+      };
+
+      if (type === 'Receipt') {
+        newEntry.allRows.push(
+          { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: oppName, debit: '', credit: amt.toFixed(2) }
+        );
+      } else {
+        newEntry.allRows.push(
+          { id: 1, type: 'By', particular: oppName, debit: amt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
+        );
+      }
+
+      if (type === 'Receipt') {
+        newEntry.allRows.push(
+          { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: oppLedger.name, debit: '', credit: amt.toFixed(2) }
+        );
+      } else {
+        newEntry.allRows.push(
+          { id: 1, type: 'By', particular: oppLedger.name, debit: amt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
+        );
+      }
+
+      if (typeof postedEntries !== 'undefined') {
+        postedEntries.push(newEntry);
+      }
+      if (typeof jvCounter !== 'undefined') {
+        jvCounter++;
+      }
+
+      showToast(`Entry posted successfully. Voucher: ${voucherNo}`, 'success');
+
+      renderActiveSubtab();
+      if (typeof refreshAllReports === 'function') refreshAllReports();
+      if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    };
+
+    document.getElementById('clBtnQuickPost')?.addEventListener('click', handleQuickPost);
+    document.getElementById('clQuickEntryAmount')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleQuickPost();
+    });
   }
 
   // ── Modal for Rapid Cash Receipts / Payments ──────────────────────
@@ -4047,5 +4718,99 @@
       renderActiveSubtab();
     });
   }
+
+  window.onLedgerCreatedForCashline = function(newLedger, ctx) {
+    const p = ctx || window._clPendingQuickEntryState || window._clPendingReconCreation;
+    if (p) {
+      if (p.activeTopTab) _clActiveTopTab = p.activeTopTab;
+      if (p.activeBankingTab) _clActiveBankingTab = p.activeBankingTab;
+      if (p.cashbookAccountId) _clCashbookAccountId = p.cashbookAccountId;
+      if (p.reconBankId) _clReconBankId = p.reconBankId;
+      if (p.reconSubSection) _clReconSubSection = p.reconSubSection;
+      
+      if (p.isCashbookQuickEntry && newLedger) {
+        window._clPendingQuickEntryState = {
+          ...p,
+          quickLedgerId: newLedger.id,
+          quickLedgerSearch: newLedger.name
+        };
+      }
+
+      const bankId = p.bankId || p.reconBankId;
+      const origIdx = p.origIdx;
+      if (newLedger && bankId && origIdx !== undefined) {
+        window.KYA_STORE = window.KYA_STORE || {};
+        window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
+        window.KYA_STORE.statementLedgerMapping[`${bankId}_${origIdx}`] = newLedger.id;
+      }
+    }
+    window._clPendingReconCreation = null;
+    if (typeof renderCashlinePanel === 'function') {
+      renderCashlinePanel();
+    } else if (typeof renderActiveSubtab === 'function') {
+      renderActiveSubtab();
+    }
+  };
+
+  window.onPartyCreatedForCashline = function(newParty, partyType, ctx) {
+    const p = ctx || window._clPendingQuickEntryState || window._clPendingReconCreation;
+    if (p) {
+      if (p.activeTopTab) _clActiveTopTab = p.activeTopTab;
+      if (p.activeBankingTab) _clActiveBankingTab = p.activeBankingTab;
+      if (p.cashbookAccountId) _clCashbookAccountId = p.cashbookAccountId;
+      if (p.reconBankId) _clReconBankId = p.reconBankId;
+      if (p.reconSubSection) _clReconSubSection = p.reconSubSection;
+
+      if (p.isCashbookQuickEntry && newParty) {
+        const prefix = partyType === 'customer' ? 'cust_' : 'supp_';
+        window._clPendingQuickEntryState = {
+          ...p,
+          quickLedgerId: `${prefix}${newParty.id}`,
+          quickLedgerSearch: newParty.name
+        };
+      }
+
+      const bankId = p.bankId || p.reconBankId;
+      const origIdx = p.origIdx;
+      if (newParty && bankId && origIdx !== undefined) {
+        window.KYA_STORE = window.KYA_STORE || {};
+        window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
+        window.KYA_STORE.statementLedgerMapping[`${bankId}_${origIdx}`] = newParty.id;
+      }
+    }
+    window._clPendingReconCreation = null;
+    if (typeof renderCashlinePanel === 'function') {
+      renderCashlinePanel();
+    } else if (typeof renderActiveSubtab === 'function') {
+      renderActiveSubtab();
+    }
+  };
+
+  window.onCreationCancelledForCashline = function(ctx) {
+    const p = ctx || window._clPendingQuickEntryState || window._clPendingReconCreation;
+    if (p) {
+      if (p.activeTopTab) _clActiveTopTab = p.activeTopTab;
+      if (p.activeBankingTab) _clActiveBankingTab = p.activeBankingTab;
+      if (p.cashbookAccountId) _clCashbookAccountId = p.cashbookAccountId;
+      if (p.reconBankId) _clReconBankId = p.reconBankId;
+      if (p.reconSubSection) _clReconSubSection = p.reconSubSection;
+
+      if (p.isCashbookQuickEntry) {
+        window._clPendingQuickEntryState = p;
+      }
+    }
+    window._clPendingReconCreation = null;
+    if (typeof renderCashlinePanel === 'function') {
+      renderCashlinePanel();
+    } else if (typeof renderActiveSubtab === 'function') {
+      renderActiveSubtab();
+    }
+    if (p && p.origIdx !== undefined) {
+      setTimeout(() => {
+        const btn = document.querySelector(`.cl-recon-ledger-btn[data-index="${p.origIdx}"]`);
+        if (btn) btn.focus();
+      }, 60);
+    }
+  };
 
 })();

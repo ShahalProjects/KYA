@@ -5555,5 +5555,22 @@ tr.cl-recon-row:hover:not(.cl-recon-active-row) {
   background: #f8fafc;
 }
 
-
-
+/* Confirmation Table Styles */
+tr.cl-confirm-row {
+  transition: background 0.15s ease;
+}
+tr.cl-confirm-row:hover {
+  background: #f8fafc !important;
+}
+.cl-recon-type-btn {
+  transition: all 0.15s ease;
+}
+.cl-recon-type-btn:hover:not(.active) {
+  background: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+.cl-btn-revert-single:hover {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+  color: #dc2626 !important;
+}
