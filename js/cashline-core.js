@@ -688,6 +688,7 @@
   function renderActiveSubtab() {
     renderActiveTabContent();
   }
+  window.renderActiveSubtab = renderActiveSubtab;
 
   // ── Helper: Format balances ───────────────────────────────────────
   function fmtAmt(v) {

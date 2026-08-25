@@ -1967,18 +1967,10 @@
               </svg>
               <span>Create Ledger</span>
             </button>
-            <button type="button" class="je-drop-create-item party-create-entity-btn" style="width: 100%; justify-content: center; background: #f0fdf4; color: #16a34a; border-color: #bbf7d0;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              <span>Create ${isSales ? 'Customer' : 'Supplier'}</span>
-            </button>
           </div>
         `;
 
         const btnCreateLedger = emptyWrap.querySelector('.party-create-ledger-btn');
-        const btnCreateEntity = emptyWrap.querySelector('.party-create-entity-btn');
 
         if (btnCreateLedger) {
           btnCreateLedger.addEventListener('mousedown', (e) => {
@@ -1991,24 +1983,6 @@
               window.openMasterDeskCreateLedger({
                 initialName: q,
                 groupVal: isSales ? 'sg:sg-tr' : 'sg:sg-tp',
-                returnTab: isSales ? 'sales_voucher' : 'purchase_voucher',
-                selectId: selectId
-              });
-            }
-          });
-        }
-
-        if (btnCreateEntity) {
-          btnCreateEntity.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropdown.style.display = 'none';
-            hidePartyHoverCard();
-            const q = searchInput.value.trim();
-            if (typeof window.openMasterDeskCreateParty === 'function') {
-              window.openMasterDeskCreateParty({
-                type: isSales ? 'customer' : 'supplier',
-                initialName: q,
                 returnTab: isSales ? 'sales_voucher' : 'purchase_voucher',
                 selectId: selectId
               });

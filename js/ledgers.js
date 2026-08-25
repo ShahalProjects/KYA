@@ -490,9 +490,23 @@
     let periodDebitSum = 0;
     let periodCreditSum = 0;
 
+    const custs = (ledger.sgId === 'sg-tr' || (ledger.name || '').trim().toLowerCase() === 'trade receivables')
+      ? (typeof getKyaCustomers === 'function' ? getKyaCustomers() : [])
+      : [];
+    const supps = (ledger.sgId === 'sg-tp' || (ledger.name || '').trim().toLowerCase() === 'trade payables')
+      ? (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [])
+      : [];
+    const custNames = new Set(custs.map(c => (c.name || '').trim().toLowerCase()));
+    const suppNames = new Set(supps.map(s => (s.name || '').trim().toLowerCase()));
+
     postedEntries.forEach(entry => {
       (entry.allRows || []).forEach(row => {
-        if (row.particular.trim().toLowerCase() === ledger.name.trim().toLowerCase()) {
+        const rowPart = (row.particular || '').trim().toLowerCase();
+        const isMatch = (rowPart === ledger.name.trim().toLowerCase()) ||
+          (custNames.size > 0 && custNames.has(rowPart)) ||
+          (suppNames.size > 0 && suppNames.has(rowPart));
+
+        if (isMatch) {
           const dr = parseFloat(row.debit) || 0;
           const cr = parseFloat(row.credit) || 0;
           
@@ -778,13 +792,27 @@
     const balances = calculateLedgerBalances(ledger, dateFrom, dateTo);
 
     // Filter transactions
+    const custs = (ledger.sgId === 'sg-tr' || (ledger.name || '').trim().toLowerCase() === 'trade receivables')
+      ? (typeof getKyaCustomers === 'function' ? getKyaCustomers() : [])
+      : [];
+    const supps = (ledger.sgId === 'sg-tp' || (ledger.name || '').trim().toLowerCase() === 'trade payables')
+      ? (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [])
+      : [];
+    const custNames = new Set(custs.map(c => (c.name || '').trim().toLowerCase()));
+    const suppNames = new Set(supps.map(s => (s.name || '').trim().toLowerCase()));
+
     const ledgerTrans = [];
     postedEntries.forEach(entry => {
       if (dateFrom && entry.date < dateFrom) return;
       if (dateTo && entry.date > dateTo) return;
 
       (entry.allRows || []).forEach(row => {
-        if (row.particular.trim().toLowerCase() === ledger.name.trim().toLowerCase()) {
+        const rowPart = (row.particular || '').trim().toLowerCase();
+        const isMatch = (rowPart === ledger.name.trim().toLowerCase()) ||
+          (custNames.size > 0 && custNames.has(rowPart)) ||
+          (suppNames.size > 0 && suppNames.has(rowPart));
+
+        if (isMatch) {
           const dr = parseFloat(row.debit) || 0;
           const cr = parseFloat(row.credit) || 0;
           if (dr > 0 || cr > 0) {
@@ -792,7 +820,7 @@
               id: entry.id,
               date: entry.date,
               voucherNo: entry.voucherNo || '-',
-              particulars: getOppositeParticulars(entry, ledger.name, dr > 0),
+              particulars: getOppositeParticulars(entry, row.particular, dr > 0),
               debit: dr,
               credit: cr
             });
@@ -1091,6 +1119,15 @@
 
     const balances = calculateLedgerBalances(ledger, dateFrom, dateTo);
 
+    const custs = (ledger.sgId === 'sg-tr' || (ledger.name || '').trim().toLowerCase() === 'trade receivables')
+      ? (typeof getKyaCustomers === 'function' ? getKyaCustomers() : [])
+      : [];
+    const supps = (ledger.sgId === 'sg-tp' || (ledger.name || '').trim().toLowerCase() === 'trade payables')
+      ? (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [])
+      : [];
+    const custNames = new Set(custs.map(c => (c.name || '').trim().toLowerCase()));
+    const suppNames = new Set(supps.map(s => (s.name || '').trim().toLowerCase()));
+
     const ledgerTrans = [];
     let totalDebit = 0;
     let totalCredit = 0;
@@ -1100,7 +1137,12 @@
       if (dateTo && entry.date > dateTo) return;
 
       (entry.allRows || []).forEach(row => {
-        if (row.particular.trim().toLowerCase() === ledger.name.trim().toLowerCase()) {
+        const rowPart = (row.particular || '').trim().toLowerCase();
+        const isMatch = (rowPart === ledger.name.trim().toLowerCase()) ||
+          (custNames.size > 0 && custNames.has(rowPart)) ||
+          (suppNames.size > 0 && suppNames.has(rowPart));
+
+        if (isMatch) {
           const dr = parseFloat(row.debit) || 0;
           const cr = parseFloat(row.credit) || 0;
           if (dr > 0 || cr > 0) {
@@ -1110,7 +1152,7 @@
               id: entry.id,
               date: entry.date,
               voucherNo: entry.voucherNo || '-',
-              particulars: getOppositeParticulars(entry, ledger.name, dr > 0),
+              particulars: getOppositeParticulars(entry, row.particular, dr > 0),
               debit: dr,
               credit: cr
             });
@@ -1812,13 +1854,13 @@
   };
 
   window.viewVoucherFromStatement = function(id) {
-    const entry = postedEntries.find(e => e.id === id);
+    const entry = postedEntries.find(e => String(e.id) === String(id));
     if (!entry) return;
 
     const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
     if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
       const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
-      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => String(v.journalEntryId) === String(entry.id) || String(v.invoiceNo) === cleanNo);
       if (salesVoucher) {
         viewPrintInvoice(salesVoucher.id);
         return;
@@ -1829,30 +1871,38 @@
   };
 
   window.editVoucherFromStatement = function(id) {
-    const entry = postedEntries.find(e => e.id === id);
+    const entry = postedEntries.find(e => String(e.id) === String(id));
     if (!entry) return;
 
     const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
     if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
       const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
-      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => String(v.journalEntryId) === String(entry.id) || String(v.invoiceNo) === cleanNo);
       if (salesVoucher) {
         loadSalesInvoice(salesVoucher, false);
         return;
       }
     }
 
-    loadJournalEntry(entry, false);
+    const currentTab = (typeof activeTabId !== 'undefined' && activeTabId) ? activeTabId : 'chart';
+    const returnContext = {
+      tabId: currentTab,
+      clActiveTopTab: typeof _clActiveTopTab !== 'undefined' ? _clActiveTopTab : 'books',
+      clActiveBankingTab: typeof _clActiveBankingTab !== 'undefined' ? _clActiveBankingTab : 'details',
+      clCashbookAccountId: typeof _clCashbookAccountId !== 'undefined' ? _clCashbookAccountId : null
+    };
+
+    loadJournalEntry(entry, false, returnContext);
   };
 
   window.deleteVoucherFromStatement = function(id) {
-    const entry = postedEntries.find(e => e.id === id);
+    const entry = postedEntries.find(e => String(e.id) === String(id));
     if (!entry) return;
 
     const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
     if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
       const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
-      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => v.journalEntryId === entry.id || String(v.invoiceNo) === cleanNo);
+      const salesVoucher = window.KYA_STORE.salesVouchers.find(v => String(v.journalEntryId) === String(entry.id) || String(v.invoiceNo) === cleanNo);
       if (salesVoucher) {
         const isRet = !!salesVoucher.isReturn;
         showKyaConfirm({
@@ -1864,16 +1914,23 @@
           okBg: 'var(--red-600)',
           onConfirm: () => {
             const list = window.KYA_STORE.salesVouchers || [];
-            const idx = list.findIndex(v => v.id === salesVoucher.id);
+            const idx = list.findIndex(v => String(v.id) === String(salesVoucher.id));
             if (idx > -1) list.splice(idx, 1);
             window.KYA_STORE.salesVouchers = list;
             
-            postedEntries = postedEntries.filter(e => e.id !== entry.id);
+            postedEntries = postedEntries.filter(e => String(e.id) !== String(entry.id));
+            if (entry.reconKey && window.KYA_STORE?.reconciliationState) {
+              delete window.KYA_STORE.reconciliationState[entry.reconKey];
+            }
             
             showToast(isRet ? `Sales Reversal "${salesVoucher.invoiceNo}" deleted.` : `Invoice "${salesVoucher.invoiceNo}" deleted.`, 'success');
-            renderLedgerStatementView();
-            refreshAllReports();
-            triggerAutoBackup();
+            if (typeof window.refreshAllAppViews === 'function') {
+              window.refreshAllAppViews();
+            } else {
+              renderLedgerStatementView();
+              refreshAllReports();
+              triggerAutoBackup();
+            }
           }
         });
         return;
@@ -1885,14 +1942,21 @@
       message: `Permanently delete voucher <strong>${entry.voucherNo || '—'}</strong>?<br>This action cannot be undone.`,
       confirmLabel: '✕ Delete',
       iconBg: '#fee2e2', iconColor: '#dc2626',
-      iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       okBg: '#dc2626',
       onConfirm: () => {
-        postedEntries = postedEntries.filter(e => e.id !== id);
+        postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
+        if (entry.reconKey && window.KYA_STORE?.reconciliationState) {
+          delete window.KYA_STORE.reconciliationState[entry.reconKey];
+        }
         showToast(`Journal voucher "${entry.voucherNo}" deleted.`, 'success');
-        renderLedgerStatementView();
-        refreshAllReports();
-        triggerAutoBackup();
+        if (typeof window.refreshAllAppViews === 'function') {
+          window.refreshAllAppViews();
+        } else {
+          renderLedgerStatementView();
+          refreshAllReports();
+          triggerAutoBackup();
+        }
       }
     });
   };
@@ -1902,12 +1966,20 @@
       document.getElementById(oid)?.remove();
     });
 
+    const currentTab = (typeof activeTabId !== 'undefined' && activeTabId) ? activeTabId : 'cashline';
+    const returnContext = {
+      tabId: currentTab,
+      clActiveTopTab: typeof _clActiveTopTab !== 'undefined' ? _clActiveTopTab : 'books',
+      clActiveBankingTab: typeof _clActiveBankingTab !== 'undefined' ? _clActiveBankingTab : 'details',
+      clCashbookAccountId: typeof _clCashbookAccountId !== 'undefined' ? _clCashbookAccountId : null
+    };
+
     if (isDraft) {
-      const entry = draftedEntries.find(e => e.id === id);
-      if (entry) loadJournalEntry(entry, true);
+      const entry = draftedEntries.find(e => String(e.id) === String(id));
+      if (entry) loadJournalEntry(entry, true, returnContext);
     } else {
-      const entry = postedEntries.find(e => e.id === id);
-      if (entry) loadJournalEntry(entry, false);
+      const entry = postedEntries.find(e => String(e.id) === String(id));
+      if (entry) loadJournalEntry(entry, false, returnContext);
     }
   };
 
@@ -1922,26 +1994,75 @@
         confirmLabel: '✕ Delete',
         okBg: '#dc2626',
         onConfirm: () => {
-          draftedEntries = draftedEntries.filter(e => e.id !== id);
+          draftedEntries = draftedEntries.filter(e => String(e.id) !== String(id));
           showToast('Draft deleted successfully.', 'success');
-          renderDraftedPanel();
-          triggerAutoBackup();
+          if (typeof window.refreshAllAppViews === 'function') {
+            window.refreshAllAppViews();
+          } else {
+            renderDraftedPanel();
+            triggerAutoBackup();
+          }
         }
       });
     } else {
-      const entry = postedEntries.find(e => e.id === id);
+      const entry = postedEntries.find(e => String(e.id) === String(id));
       if (entry) {
+        const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
+        if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
+          const cleanNo = entry.voucherNo.replace('SV-', '').replace('SR-', '');
+          const salesVoucher = window.KYA_STORE.salesVouchers.find(v => String(v.journalEntryId) === String(entry.id) || String(v.invoiceNo) === cleanNo);
+          if (salesVoucher) {
+            const isRet = !!salesVoucher.isReturn;
+            showKyaConfirm({
+              title: isRet ? 'Delete Posted Reversal?' : 'Delete Posted Invoice?',
+              message: isRet
+                ? 'Are you sure you want to delete this sales reversal? This will also delete the corresponding journal entry and cannot be undone.'
+                : 'Are you sure you want to delete this sales invoice? This will also delete the corresponding journal entry and cannot be undone.',
+              confirmLabel: 'Delete',
+              okBg: 'var(--red-600)',
+              onConfirm: () => {
+                const list = window.KYA_STORE.salesVouchers || [];
+                const idx = list.findIndex(v => String(v.id) === String(salesVoucher.id));
+                if (idx > -1) list.splice(idx, 1);
+                window.KYA_STORE.salesVouchers = list;
+                
+                postedEntries = postedEntries.filter(e => String(e.id) !== String(entry.id));
+                if (entry.reconKey && window.KYA_STORE?.reconciliationState) {
+                  delete window.KYA_STORE.reconciliationState[entry.reconKey];
+                }
+                
+                showToast(isRet ? `Sales Reversal "${salesVoucher.invoiceNo}" deleted.` : `Invoice "${salesVoucher.invoiceNo}" deleted.`, 'success');
+                if (typeof window.refreshAllAppViews === 'function') {
+                  window.refreshAllAppViews();
+                } else {
+                  renderLedgerStatementView();
+                  refreshAllReports();
+                  triggerAutoBackup();
+                }
+              }
+            });
+            return;
+          }
+        }
+
         showKyaConfirm({
           title: 'Delete this journal entry?',
           message: `Permanently delete voucher <strong>${entry.voucherNo || '—'}</strong>?<br>This action cannot be undone.`,
           confirmLabel: '✕ Delete',
           okBg: '#dc2626',
           onConfirm: () => {
-            postedEntries = postedEntries.filter(e => e.id !== id);
+            postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
+            if (entry.reconKey && window.KYA_STORE?.reconciliationState) {
+              delete window.KYA_STORE.reconciliationState[entry.reconKey];
+            }
             showToast(`Journal voucher "${entry.voucherNo}" deleted.`, 'success');
-            renderLedgerStatementView();
-            refreshAllReports();
-            triggerAutoBackup();
+            if (typeof window.refreshAllAppViews === 'function') {
+              window.refreshAllAppViews();
+            } else {
+              renderLedgerStatementView();
+              refreshAllReports();
+              triggerAutoBackup();
+            }
           }
         });
       }

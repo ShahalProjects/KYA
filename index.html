@@ -148,6 +148,17 @@
         <span class="nav-label">Journal Entry</span>
       </div>
 
+      <div class="nav-item" id="nav-cashline" data-panel="cashline" role="button" tabindex="0" aria-label="Cashline">
+        <!-- Bank card/piggy SVG -->
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <rect x="2" y="5" width="16" height="11" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+          <line x1="2" y1="9" x2="18" y2="9" stroke="currentColor" stroke-width="1.6"/>
+          <rect x="5" y="12" width="4" height="2.5" rx="0.5" fill="currentColor"/>
+          <circle cx="14" cy="12.5" r="1" fill="currentColor"/>
+        </svg>
+        <span class="nav-label">Cashline</span>
+      </div>
+
       <div class="nav-item" id="nav-voucher-desk" data-panel="voucher-desk" role="button" tabindex="0" aria-label="Voucher Desk">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
           <rect x="3" y="4" width="14" height="12" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
@@ -155,18 +166,6 @@
           <path d="M7 10v2a1 1 0 001 1h4a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span class="nav-label">Voucher Desk</span>
-      </div>
-
-
-      <div class="nav-item" id="nav-chart" data-panel="chart" role="button" tabindex="0" aria-label="Chart of Accounts">
-        <!-- Tree icon -->
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-          <rect x="2" y="7" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="13" y="3" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="13" y="13" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M7 9h3M10 9V5h3M10 9v6h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <span class="nav-label">Chart of Accounts</span>
       </div>
 
       <div class="nav-section-label">Reports</div>
@@ -195,15 +194,15 @@
         <span class="nav-label">Balance Sheet</span>
       </div>
 
-      <div class="nav-item" id="nav-cashline" data-panel="cashline" role="button" tabindex="0" aria-label="Cashline">
-        <!-- Bank card/piggy SVG -->
+      <div class="nav-item" id="nav-chart" data-panel="chart" role="button" tabindex="0" aria-label="Chart of Accounts">
+        <!-- Tree icon -->
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-          <rect x="2" y="5" width="16" height="11" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
-          <line x1="2" y1="9" x2="18" y2="9" stroke="currentColor" stroke-width="1.6"/>
-          <rect x="5" y="12" width="4" height="2.5" rx="0.5" fill="currentColor"/>
-          <circle cx="14" cy="12.5" r="1" fill="currentColor"/>
+          <rect x="2" y="7" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="13" y="3" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="13" y="13" width="5" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M7 9h3M10 9V5h3M10 9v6h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <span class="nav-label">Cashline</span>
+        <span class="nav-label">Chart of Accounts</span>
       </div>
 
       <div class="nav-section-label">Hub</div>
@@ -758,13 +757,11 @@
             </div>
             <div class="je-field">
               <label>Transaction Type</label>
-              <div style="display:flex; align-items:center; gap:10px; height:42px;">
-                <span id="jeBudgetLabelLeft" style="font-size:13px; font-weight:700; color:var(--slate-800);">Non Budget</span>
-                <label class="switch-toggle" style="margin-bottom:0;">
-                  <input type="checkbox" id="jeBudgetToggle">
-                  <span class="switch-slider"></span>
-                </label>
-                <span id="jeBudgetLabelRight" style="font-size:13px; font-weight:600; color:var(--slate-400);">Budget</span>
+              <div class="je-tx-slider-wrap">
+                <input type="checkbox" id="jeBudgetToggle" style="display:none;" />
+                <div class="je-tx-slider-bg non-budget-active" id="jeTxSliderBg"></div>
+                <button type="button" class="je-tx-slider-btn active" id="btnJeTxNonBudget">Non Budget</button>
+                <button type="button" class="je-tx-slider-btn" id="btnJeTxBudget">Budget</button>
               </div>
             </div>
           </div>
@@ -2008,21 +2005,39 @@
       <!-- Settings Panel -->
       <div id="panel-settings" role="region" aria-label="Settings" style="display:none">
 
-
+        <!-- Page header with top blue switch like sales -->
+        <div class="panel-header" style="border-bottom: 1.5px solid var(--slate-100); padding-bottom: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%;">
+          <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-primary" id="settingsTopTabMain" type="button" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              Main
+            </button>
+            <button class="btn-sales-action" id="settingsTopTabConfig" type="button" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              Configuration
+            </button>
+          </div>
+        </div>
 
         <div class="table-card" style="padding: 24px 28px;">
           <!-- Colored header strip -->
           <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
             <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
               <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--white);">
+                <svg id="settingsCardHeaderIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--white);">
                   <circle cx="12" cy="12" r="3"/>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51 1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </div>
               <div>
-                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Settings</div>
-                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Configure your preferences, vault, and backups</div>
+                <div class="je-card-title-text" id="settingsCardTitle" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Settings</div>
+                <div class="je-card-subtitle-text" id="settingsCardSubtitle" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Configure your preferences, vault, and backups</div>
               </div>
             </div>
             <div class="panel-actions" id="settingsHeaderActions" style="display: flex; gap: 8px; align-items: center;"></div>
@@ -2031,39 +2046,177 @@
           <div class="oh-layout">
           <!-- Left Options Cards (Sidebar) -->
           <div class="oh-sub-tabs" role="tablist" aria-label="Settings sections">
-            <!-- Vault Option -->
-            <button class="oh-sub-tab" id="settingsTabVault" role="tab" aria-selected="false" aria-controls="settings-vault-view">
-              <div class="oh-tab-icon-wrap">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </div>
-              <span class="oh-tab-text">Vault</span>
-            </button>
-            
-            <!-- Keyboard Shortcuts Option -->
-            <button class="oh-sub-tab" id="settingsTabShortcuts" role="tab" aria-selected="false" aria-controls="settings-shortcuts-view">
-              <div class="oh-tab-icon-wrap">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="4" width="20" height="16" rx="2" ry="2"/>
-                  <line x1="6" y1="8" x2="6.01" y2="8"/>
-                  <line x1="10" y1="8" x2="10.01" y2="8"/>
-                  <line x1="14" y1="8" x2="14.01" y2="8"/>
-                  <line x1="18" y1="8" x2="18.01" y2="8"/>
-                  <line x1="6" y1="12" x2="6.01" y2="12"/>
-                  <line x1="18" y1="12" x2="18.01" y2="12"/>
-                  <line x1="10" y1="12" x2="14" y2="12"/>
-                </svg>
-              </div>
-              <span class="oh-tab-text">Keyboard Shortcuts</span>
-            </button>
+            <!-- 1. Main Sections (Vault, Shortcuts) -->
+            <div id="settingsMainSubTabs" style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+              <!-- Vault Option -->
+              <button class="oh-sub-tab active" id="settingsTabVault" role="tab" aria-selected="true" aria-controls="settings-vault-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Vault</span>
+              </button>
+              
+              <!-- Keyboard Shortcuts Option -->
+              <button class="oh-sub-tab" id="settingsTabShortcuts" role="tab" aria-selected="false" aria-controls="settings-shortcuts-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2" ry="2"/>
+                    <line x1="6" y1="8" x2="6.01" y2="8"/>
+                    <line x1="10" y1="8" x2="10.01" y2="8"/>
+                    <line x1="14" y1="8" x2="14.01" y2="8"/>
+                    <line x1="18" y1="8" x2="18.01" y2="8"/>
+                    <line x1="6" y1="12" x2="6.01" y2="12"/>
+                    <line x1="18" y1="12" x2="18.01" y2="12"/>
+                    <line x1="10" y1="12" x2="14" y2="12"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Keyboard Shortcuts</span>
+              </button>
+            </div>
+
+            <!-- 2. Configuration Sections (Sales, Purchase, Journal, Cashline) -->
+            <div id="settingsConfigSubTabs" style="display: none; flex-direction: column; gap: 4px; width: 100%;">
+              <!-- Sales Voucher Option -->
+              <button class="oh-sub-tab" id="configTabSales" role="tab" aria-selected="false" aria-controls="config-sales-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <path d="M3 3h2l.4 2M5.4 5h11.6l-1.3 7H6.2L4.5 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+                    <circle cx="14" cy="16" r="1.5" fill="currentColor"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Sales Voucher</span>
+              </button>
+
+              <!-- Purchase Voucher Option -->
+              <button class="oh-sub-tab" id="configTabPurchase" role="tab" aria-selected="false" aria-controls="config-purchase-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <path d="M4 6h12l1.5 11H2.5L4 6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                    <path d="M7 8V5a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Purchase Voucher</span>
+              </button>
+
+              <!-- Journal Entry Option -->
+              <button class="oh-sub-tab" id="configTabJournal" role="tab" aria-selected="false" aria-controls="config-journal-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <rect x="3" y="2" width="13" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                    <rect x="3" y="2" width="4" height="16" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/>
+                    <line x1="9.5" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                    <line x1="9.5" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                    <line x1="9.5" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Journal Entry</span>
+              </button>
+
+              <!-- Cashline Option -->
+              <button class="oh-sub-tab" id="configTabCashline" role="tab" aria-selected="false" aria-controls="config-cashline-view">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <rect x="2" y="5" width="16" height="11" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+                    <line x1="2" y1="9" x2="18" y2="9" stroke="currentColor" stroke-width="1.6"/>
+                    <rect x="5" y="12" width="4" height="2.5" rx="0.5" fill="currentColor"/>
+                    <circle cx="14" cy="12.5" r="1" fill="currentColor"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Cashline</span>
+              </button>
+            </div>
           </div>
 
           <!-- Right Content Views -->
           <div class="oh-content-area">
+            <!-- Configuration: Cashline View -->
+            <div id="config-cashline-view" role="tabpanel" style="display:none">
+              <div class="vault-container">
+                <div class="vault-grid">
+                  <div class="vault-card" style="grid-column: 1 / -1;">
+                    <div class="vault-action-row">
+                      <div class="v-action-text">
+                        <span class="v-action-lbl">More Options Before Post</span>
+                        <span class="v-action-desc">Enable additional configuration and options before posting entries to books</span>
+                      </div>
+                      <div style="display: flex; align-items: center;">
+                        <div class="books-opt-segmented" style="display: inline-flex; background: var(--slate-200); border-radius: 8px; padding: 3px; gap: 3px;">
+                          <button type="button" id="btnBooksMoreOptionsOff" style="border: none; padding: 6px 16px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; background: var(--white); color: var(--slate-800); box-shadow: 0 1px 2px rgba(0,0,0,0.06);">OFF</button>
+                          <button type="button" id="btnBooksMoreOptionsOn" style="border: none; padding: 6px 16px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; background: transparent; color: var(--slate-500);">ON</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Save Changes Action Row -->
+                <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                  <button type="button" id="btnCashlineConfigSave" class="btn btn-primary" style="height: 40px; padding: 0 24px; font-size: 13.5px; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(37,99,235,0.28);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                      <polyline points="17 21 17 13 7 13 7 21"/>
+                      <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Configuration: Sales Voucher View -->
+            <div id="config-sales-view" role="tabpanel" style="display:none">
+              <div class="vault-container">
+                <h3 class="vault-sec-title">Sales Voucher Configuration</h3>
+                <div class="vault-card" style="width: 100%; box-sizing: border-box;">
+                  <div class="vault-action-row">
+                    <div class="v-action-text">
+                      <span class="v-action-lbl">Sales Voucher Preferences</span>
+                      <span class="v-action-desc">Default settings and numbering rules for Sales Invoices, Orders, and Returns</span>
+                    </div>
+                    <span class="badge badge-secondary" style="font-weight: 700;">Standard</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Configuration: Purchase Voucher View -->
+            <div id="config-purchase-view" role="tabpanel" style="display:none">
+              <div class="vault-container">
+                <h3 class="vault-sec-title">Purchase Voucher Configuration</h3>
+                <div class="vault-card" style="width: 100%; box-sizing: border-box;">
+                  <div class="vault-action-row">
+                    <div class="v-action-text">
+                      <span class="v-action-lbl">Purchase Voucher Preferences</span>
+                      <span class="v-action-desc">Default settings and purchase tracking preferences</span>
+                    </div>
+                    <span class="badge badge-secondary" style="font-weight: 700;">Standard</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Configuration: Journal Entry View -->
+            <div id="config-journal-view" role="tabpanel" style="display:none">
+              <div class="vault-container">
+                <h3 class="vault-sec-title">Journal Entry Configuration</h3>
+                <div class="vault-card" style="width: 100%; box-sizing: border-box;">
+                  <div class="vault-action-row">
+                    <div class="v-action-text">
+                      <span class="v-action-lbl">Journal Entry Preferences</span>
+                      <span class="v-action-desc">Posting validation, narration requirements, and journal defaults</span>
+                    </div>
+                    <span class="badge badge-secondary" style="font-weight: 700;">Standard</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Settings Empty / Landing View -->
-            <div id="settings-empty-view" role="tabpanel">
+            <div id="settings-empty-view" role="tabpanel" style="display:none">
               <div class="oh-empty-wrap">
                 <div class="oh-empty-icon-ring">
                   <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -2071,8 +2224,8 @@
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
                 </div>
-                <div class="oh-empty-title">Settings</div>
-                <div class="oh-empty-subtitle">Select an option from the left menu to configure preferences, vault backups, and shortcuts.</div>
+                <div class="oh-empty-title">Settings &amp; Configuration</div>
+                <div class="oh-empty-subtitle">Select an option from the left menu to configure preferences.</div>
               </div>
             </div>
 
@@ -2958,7 +3111,7 @@
 
 <script src="js/exportPdf.js"></script>
 <script src="js/exportExcel.js"></script>
-<script src="js/app-shell.js"></script>
+<script src="js/app-shell.js?v=20260825_1"></script>
 <script src="js/master-desk.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/coa.js"></script>
@@ -2972,7 +3125,7 @@
 <script src="js/onehub-reminders-view.js"></script>
 <script src="js/vault-core.js"></script>
 <script src="js/ledgers.js"></script>
-<script src="js/vault-settings.js"></script>
+<script src="js/vault-settings.js?v=20260825_7"></script>
 <script src="js/sales-form.js"></script>
 <script src="js/sales-posting.js"></script>
 <script src="js/sales-helpers.js"></script>
@@ -2984,7 +3137,7 @@
 <script src="js/cashline-accounts.js?v=20260723_2"></script>
 <script src="js/cashline-statement-import.js?v=20260818_1"></script>
 <script src="js/cashline-reconciliation.js?v=20260723_2"></script>
-<script src="js/cashline-cashbook.js?v=20260822_17"></script>
+<script src="js/cashline-cashbook.js?v=20260825_7"></script>
 <script src="js/cashline-fastentry-cashflow.js?v=20260723_2"></script>
 
 </body>

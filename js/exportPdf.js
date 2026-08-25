@@ -2030,6 +2030,7 @@
   global.exportLedgerStatementToPDF = exportStatementToPDF;
   global.exportCustomerStatementToPDF = exportStatementToPDF;
   global.exportSupplierStatementToPDF = exportStatementToPDF;
+  global.exportCashbookToPDF = exportStatementToPDF;
   global.exportVoucherToPDF = exportVoucherToPDF;
   global.exportInvoiceToPDF = exportInvoiceToPDF;
   global.exportVoucherDeskToPDF = exportVoucherDeskToPDF;

@@ -1548,14 +1548,6 @@
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     <span class="cl-recon-opt-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Create Ledger ${rawQuery ? `"${ohEsc(rawQuery)}"` : ''}</span>
                   </div>
-                  <div class="cl-recon-opt cl-recon-create-opt" data-create-type="customer" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px dashed #a7f3d0; transition: all 0.1s ease;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    <span class="cl-recon-opt-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Create Customer ${rawQuery ? `"${ohEsc(rawQuery)}"` : ''}</span>
-                  </div>
-                  <div class="cl-recon-opt cl-recon-create-opt" data-create-type="supplier" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #d97706; background: #fffbeb; border: 1px dashed #fde68a; transition: all 0.1s ease;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    <span class="cl-recon-opt-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Create Vendor / Supplier ${rawQuery ? `"${ohEsc(rawQuery)}"` : ''}</span>
-                  </div>
                 </div>
               `;
             }
@@ -1699,6 +1691,33 @@
     }
 
     // --- BOOKS MODE (Cash & Cash Equivalents general ledger cashbook) ---
+    function evaluateMathExpression(str) {
+      let clean = (str || '').toString().replace(/,/g, '').trim();
+      if (!clean) return 0;
+      clean = clean.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)');
+      if (!/^[0-9.+\-*/()\s]+$/.test(clean)) {
+        return NaN;
+      }
+      try {
+        const result = Function(`"use strict"; return (${clean})`)();
+        return typeof result === 'number' && isFinite(result) ? result : NaN;
+      } catch (e) {
+        return NaN;
+      }
+    }
+
+    function parseAmt(str) {
+      const cleanStr = (str || '').toString().replace(/,/g, '').trim();
+      if (/[\+\-\*\/\%]/.test(cleanStr)) {
+        const evalVal = evaluateMathExpression(cleanStr);
+        if (!isNaN(evalVal)) {
+          return evalVal;
+        }
+      }
+      const v = parseFloat(cleanStr);
+      return isNaN(v) ? 0 : v;
+    }
+
     const cceAccounts = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
     if (cceAccounts.length === 0) {
       if (actionsArea) actionsArea.innerHTML = '';
@@ -1893,6 +1912,63 @@
           </select>
           <input type="date" id="clCbFromDate" class="cl-glass-control" value="${fromVal}" style="width: 125px;" />
           <input type="date" id="clCbToDate" class="cl-glass-control" value="${toVal}" style="width: 125px;" />
+          
+          <!-- 3-dot more options dropdown -->
+          <div class="rpt-more-wrap" style="position: relative;">
+            <button class="rpt-more-btn" id="clBooksMoreBtn" title="More Options" type="button" aria-label="More Options">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="12" cy="5" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+              </svg>
+            </button>
+            <div class="rpt-more-dropdown" id="clBooksMoreDropdown" style="top: calc(100% + 8px); right: 0; min-width: 170px;">
+              <!-- Export Submenu -->
+              <div class="rpt-submenu-wrap" id="clBooksExportSubmenuWrap">
+                <button class="rpt-menu-item rpt-submenu-btn" id="clBooksExportMenuBtn" type="button">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>Export</span>
+                  </div>
+                  <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
+                    <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="rpt-submenu-dropdown" id="clBooksExportSubmenu">
+                  <button class="rpt-menu-item" id="clBooksExportPdf" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    PDF
+                  </button>
+                  <button class="rpt-menu-item" id="clBooksExportExcel" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="8" y1="13" x2="16" y2="17"></line>
+                      <line x1="16" y1="13" x2="8" y2="17"></line>
+                    </svg>
+                    Excel
+                  </button>
+                </div>
+              </div>
+              <div class="rpt-menu-sep"></div>
+              <button class="rpt-menu-item" id="clBooksConfigBtn" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51 1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Configuration</span>
+              </button>
+            </div>
+          </div>
         </div>
       `;
       if (controls && controls !== actionsArea) {
@@ -1912,6 +1988,95 @@
         syncGlobalDates(_clCashflowDateFrom, _clCashflowDateTo);
         renderActiveSubtab();
       });
+
+      // 3-dot dropdown wiring
+      const moreBtn = document.getElementById('clBooksMoreBtn');
+      const moreDropdown = document.getElementById('clBooksMoreDropdown');
+      const submenuWrap = document.getElementById('clBooksExportSubmenuWrap');
+      const submenu = document.getElementById('clBooksExportSubmenu');
+      const exportMenuBtn = document.getElementById('clBooksExportMenuBtn');
+
+      if (moreBtn && moreDropdown) {
+        moreBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          moreDropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', (e) => {
+          if (!moreDropdown.contains(e.target) && e.target !== moreBtn) {
+            moreDropdown.classList.remove('open');
+            if (submenu) submenu.classList.remove('open');
+          }
+        });
+      }
+
+      if (exportMenuBtn && submenu) {
+        exportMenuBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          submenu.classList.toggle('open');
+        });
+      }
+
+      let subCloseTimer = null;
+      if (submenuWrap && submenu) {
+        submenuWrap.addEventListener('mouseenter', () => {
+          if (subCloseTimer) clearTimeout(subCloseTimer);
+          submenu.classList.add('open');
+        });
+        submenuWrap.addEventListener('mouseleave', () => {
+          subCloseTimer = setTimeout(() => {
+            submenu.classList.remove('open');
+          }, 300);
+        });
+        submenu.addEventListener('mouseenter', () => {
+          if (subCloseTimer) clearTimeout(subCloseTimer);
+          submenu.classList.add('open');
+        });
+      }
+
+      document.getElementById('clBooksExportPdf')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        moreDropdown?.classList.remove('open');
+        submenu?.classList.remove('open');
+        const data = getCashbookExportData();
+        if (data && typeof window.exportStatementToPDF === 'function') {
+          await window.exportStatementToPDF(data);
+        } else {
+          console.error('exportStatementToPDF is not available');
+        }
+      });
+
+      document.getElementById('clBooksExportExcel')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        moreDropdown?.classList.remove('open');
+        submenu?.classList.remove('open');
+        const data = getCashbookExportData();
+        if (data && typeof window.exportStatementToExcel === 'function') {
+          await window.exportStatementToExcel(data);
+        } else {
+          console.error('exportStatementToExcel is not available');
+        }
+      });
+
+      document.getElementById('clBooksConfigBtn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        moreDropdown?.classList.remove('open');
+        if (submenu) submenu.classList.remove('open');
+        window._clOpenedConfigFromBooks = true;
+        try { sessionStorage.setItem('kya_cl_opened_config_from_books', 'true'); } catch (err) {}
+        if (typeof _settingsActiveTab !== 'undefined') _settingsActiveTab = 'cashline';
+        if (typeof window._settingsActiveTab !== 'undefined') window._settingsActiveTab = 'cashline';
+        if (typeof openTab === 'function') {
+          openTab('settings');
+        } else if (typeof window.openTab === 'function') {
+          window.openTab('settings');
+        }
+        if (typeof switchSettingsTab === 'function') {
+          switchSettingsTab('cashline');
+        } else if (typeof window.switchSettingsTab === 'function') {
+          window.switchSettingsTab('cashline');
+        }
+      });
     } else if (controls) {
       controls.innerHTML = `
         <div style="display: flex; gap: 8px; align-items: center;">
@@ -1920,6 +2085,63 @@
           </select>
           <input type="date" id="clCbFromDate" class="je-input" value="${fromVal}" style="height: 34px; font-size: 13px; padding: 0 8px; border-radius: 6px; width: 120px;" />
           <input type="date" id="clCbToDate" class="je-input" value="${toVal}" style="height: 34px; font-size: 13px; padding: 0 8px; border-radius: 6px; width: 120px;" />
+          
+          <!-- 3-dot more options dropdown -->
+          <div class="rpt-more-wrap" style="position: relative;">
+            <button class="rpt-more-btn" id="clBooksMoreBtn" title="More Options" type="button" aria-label="More Options" style="background: var(--slate-100); border: 1px solid var(--slate-200); color: var(--slate-700); height: 34px; width: 34px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="12" cy="5" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+              </svg>
+            </button>
+            <div class="rpt-more-dropdown" id="clBooksMoreDropdown" style="top: calc(100% + 8px); right: 0; min-width: 170px;">
+              <!-- Export Submenu -->
+              <div class="rpt-submenu-wrap" id="clBooksExportSubmenuWrap">
+                <button class="rpt-menu-item rpt-submenu-btn" id="clBooksExportMenuBtn" type="button">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>Export</span>
+                  </div>
+                  <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
+                    <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="rpt-submenu-dropdown" id="clBooksExportSubmenu">
+                  <button class="rpt-menu-item" id="clBooksExportPdf" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    PDF
+                  </button>
+                  <button class="rpt-menu-item" id="clBooksExportExcel" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="8" y1="13" x2="16" y2="17"></line>
+                      <line x1="16" y1="13" x2="8" y2="17"></line>
+                    </svg>
+                    Excel
+                  </button>
+                </div>
+              </div>
+              <div class="rpt-menu-sep"></div>
+              <button class="rpt-menu-item" id="clBooksConfigBtn" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51 1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Configuration</span>
+              </button>
+            </div>
+          </div>
         </div>
       `;
       document.getElementById('clCbSelectAccount')?.addEventListener('change', (e) => {
@@ -1936,6 +2158,95 @@
         syncGlobalDates(_clCashflowDateFrom, _clCashflowDateTo);
         renderActiveSubtab();
       });
+
+      // 3-dot dropdown wiring (controls fallback)
+      const moreBtn = document.getElementById('clBooksMoreBtn');
+      const moreDropdown = document.getElementById('clBooksMoreDropdown');
+      const submenuWrap = document.getElementById('clBooksExportSubmenuWrap');
+      const submenu = document.getElementById('clBooksExportSubmenu');
+      const exportMenuBtn = document.getElementById('clBooksExportMenuBtn');
+
+      if (moreBtn && moreDropdown) {
+        moreBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          moreDropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', (e) => {
+          if (!moreDropdown.contains(e.target) && e.target !== moreBtn) {
+            moreDropdown.classList.remove('open');
+            if (submenu) submenu.classList.remove('open');
+          }
+        });
+      }
+
+      if (exportMenuBtn && submenu) {
+        exportMenuBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          submenu.classList.toggle('open');
+        });
+      }
+
+      let subCloseTimer = null;
+      if (submenuWrap && submenu) {
+        submenuWrap.addEventListener('mouseenter', () => {
+          if (subCloseTimer) clearTimeout(subCloseTimer);
+          submenu.classList.add('open');
+        });
+        submenuWrap.addEventListener('mouseleave', () => {
+          subCloseTimer = setTimeout(() => {
+            submenu.classList.remove('open');
+          }, 300);
+        });
+        submenu.addEventListener('mouseenter', () => {
+          if (subCloseTimer) clearTimeout(subCloseTimer);
+          submenu.classList.add('open');
+        });
+      }
+
+      document.getElementById('clBooksExportPdf')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        moreDropdown?.classList.remove('open');
+        submenu?.classList.remove('open');
+        const data = getCashbookExportData();
+        if (data && typeof window.exportStatementToPDF === 'function') {
+          await window.exportStatementToPDF(data);
+        } else {
+          console.error('exportStatementToPDF is not available');
+        }
+      });
+
+      document.getElementById('clBooksExportExcel')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        moreDropdown?.classList.remove('open');
+        submenu?.classList.remove('open');
+        const data = getCashbookExportData();
+        if (data && typeof window.exportStatementToExcel === 'function') {
+          await window.exportStatementToExcel(data);
+        } else {
+          console.error('exportStatementToExcel is not available');
+        }
+      });
+
+      document.getElementById('clBooksConfigBtn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        moreDropdown?.classList.remove('open');
+        if (submenu) submenu.classList.remove('open');
+        window._clOpenedConfigFromBooks = true;
+        try { sessionStorage.setItem('kya_cl_opened_config_from_books', 'true'); } catch (err) {}
+        if (typeof _settingsActiveTab !== 'undefined') _settingsActiveTab = 'cashline';
+        if (typeof window._settingsActiveTab !== 'undefined') window._settingsActiveTab = 'cashline';
+        if (typeof openTab === 'function') {
+          openTab('settings');
+        } else if (typeof window.openTab === 'function') {
+          window.openTab('settings');
+        }
+        if (typeof switchSettingsTab === 'function') {
+          switchSettingsTab('cashline');
+        } else if (typeof window.switchSettingsTab === 'function') {
+          window.switchSettingsTab('cashline');
+        }
+      });
     }
 
     const oppOpts = (typeof coaLedgers !== 'undefined' ? coaLedgers : [])
@@ -1947,7 +2258,7 @@
     const pendingState = window._clPendingQuickEntryState;
     const todayStr = (pendingState && pendingState.quickDate) ? pendingState.quickDate : new Date().toISOString().split('T')[0];
     const nextVoucher = (pendingState && pendingState.quickVoucher) ? pendingState.quickVoucher : ((typeof genVoucherNo === 'function') ? genVoucherNo() : `JV-${new Date().getFullYear()}-${String(typeof jvCounter !== 'undefined' ? jvCounter : 1).padStart(3, '0')}`);
-    const initialType = (pendingState && pendingState.quickType) ? pendingState.quickType : 'Receipt';
+    const initialType = (pendingState && pendingState.quickType) ? pendingState.quickType : '';
     const initialAmount = (pendingState && pendingState.quickAmount) ? pendingState.quickAmount : '';
     const initialLedgerId = (pendingState && pendingState.quickLedgerId) ? pendingState.quickLedgerId : '';
     const initialLedgerName = (pendingState && pendingState.quickLedgerSearch) ? pendingState.quickLedgerSearch : '';
@@ -1986,6 +2297,7 @@
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em;">Receipt / Payment</label>
             <select id="clQuickEntryType" class="je-input" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 8px; cursor: pointer; background: #fff; border-radius: 6px; width: 140px;">
+              <option value="" ${!initialType ? 'selected' : ''} disabled hidden>Select</option>
               <option value="Receipt" ${initialType === 'Receipt' ? 'selected' : ''}>Receipt</option>
               <option value="Payment" ${initialType === 'Payment' ? 'selected' : ''}>Payment</option>
             </select>
@@ -1994,7 +2306,7 @@
           <!-- Amount -->
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 11px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em;">Amount (₹)</label>
-            <input type="number" step="0.01" min="0" id="clQuickEntryAmount" class="je-input" value="${ohEsc(initialAmount)}" placeholder="0.00" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; width: 115px;" />
+            <input type="text" inputmode="decimal" id="clQuickEntryAmount" class="je-input" value="${ohEsc(initialAmount)}" placeholder="0.00" style="height: 34px; font-size: 12.5px; font-weight: 600; padding: 0 8px; border-radius: 6px; width: 115px;" />
           </div>
 
           <!-- Post Button -->
@@ -2034,7 +2346,7 @@
             <tr>
               <th style="width: 110px; white-space: nowrap;">Date</th>
               <th style="width: 110px; white-space: nowrap;">Voucher</th>
-              <th>Opposite Account / Description</th>
+              <th>Ledger</th>
               <th style="text-align: right; width: 120px;">Receipt</th>
               <th style="text-align: right; width: 120px;">Payment</th>
               <th style="text-align: right; width: 130px;">Balance</th>
@@ -2100,19 +2412,11 @@
 
         if (currentFiltered.length === 0) {
           optionsContainer.innerHTML = `
-            <div style="padding: 8px 6px 4px; font-size: 11.5px; font-weight: 600; color: var(--slate-400); text-align: center;">No matching ledgers, customers or vendors</div>
+            <div style="padding: 8px 6px 4px; font-size: 11.5px; font-weight: 600; color: var(--slate-400); text-align: center;">No matching ledgers</div>
             <div style="border-top: 1px dashed var(--slate-200); padding-top: 6px; margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
               <div class="cl-ledger-create-btn" data-create-type="ledger" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #2563eb; background: #eff6ff; border: 1px dashed #bfdbfe; transition: all 0.1s ease;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 <span>Create Ledger ${q ? `"${ohEsc(filterText.trim())}"` : ''}</span>
-              </div>
-              <div class="cl-ledger-create-btn" data-create-type="customer" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px dashed #a7f3d0; transition: all 0.1s ease;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>Create Customer ${q ? `"${ohEsc(filterText.trim())}"` : ''}</span>
-              </div>
-              <div class="cl-ledger-create-btn" data-create-type="supplier" style="padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #d97706; background: #fffbeb; border: 1px dashed #fde68a; transition: all 0.1s ease;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>Create Vendor / Supplier ${q ? `"${ohEsc(filterText.trim())}"` : ''}</span>
               </div>
             </div>
           `;
@@ -2158,14 +2462,6 @@
             <div class="cl-ledger-create-btn" data-create-type="ledger" style="padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; color: #2563eb; background: #eff6ff; border: 1px dashed #bfdbfe; transition: all 0.1s ease;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               <span>Create Ledger "${ohEsc(filterText.trim())}"</span>
-            </div>
-            <div class="cl-ledger-create-btn" data-create-type="customer" style="padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px dashed #a7f3d0; transition: all 0.1s ease;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              <span>Create Customer "${ohEsc(filterText.trim())}"</span>
-            </div>
-            <div class="cl-ledger-create-btn" data-create-type="supplier" style="padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; color: #d97706; background: #fffbeb; border: 1px dashed #fde68a; transition: all 0.1s ease;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              <span>Create Vendor / Supplier "${ohEsc(filterText.trim())}"</span>
             </div>
           `;
           optionsContainer.appendChild(createSection);
@@ -2682,6 +2978,367 @@
 
     setupOppCellPopovers();
 
+    const commitQuickPost = (entryData) => {
+      const {
+        date,
+        voucherNo,
+        oppName,
+        type,
+        amt,
+        departmentId = '',
+        isBudget = false,
+        narration = '',
+        uploadedDoc = null
+      } = entryData;
+
+      const newEntry = {
+        id: Date.now(),
+        date,
+        voucherNo,
+        narration: (narration || '').trim(),
+        type: 'Journal',
+        amount: amt.toFixed(2),
+        preparedBy: '',
+        departmentId: departmentId || '',
+        isBudget: !!isBudget,
+        uploadedDoc: uploadedDoc || null,
+        allRows: []
+      };
+
+      if (type === 'Receipt') {
+        newEntry.allRows.push(
+          { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: oppName, debit: '', credit: amt.toFixed(2) }
+        );
+      } else {
+        newEntry.allRows.push(
+          { id: 1, type: 'By', particular: oppName, debit: amt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
+        );
+      }
+
+      if (typeof postedEntries !== 'undefined') {
+        postedEntries.push(newEntry);
+      }
+      if (typeof jvCounter !== 'undefined') {
+        jvCounter++;
+      }
+
+      showToast(`Entry posted successfully. Voucher: ${voucherNo}`, 'success');
+
+      renderActiveSubtab();
+      if (typeof refreshAllReports === 'function') refreshAllReports();
+      if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    };
+
+    const showEditEntryBeforePostModal = (entryData) => {
+      const { date, voucherNo, oppName, type, amt } = entryData;
+
+      document.getElementById('clEditEntryBeforePostOverlay')?.remove();
+
+      const depts = (typeof ohDepartments !== 'undefined' ? ohDepartments : []).filter(d => d.id !== 'all');
+      const deptOptions = depts.map(d => `<option value="${d.id}">${ohEsc(d.name)}</option>`).join('');
+
+      const overlay = document.createElement('div');
+      overlay.className = 'fj-overlay';
+      overlay.id = 'clEditEntryBeforePostOverlay';
+      overlay.setAttribute('tabindex', '-1');
+
+      overlay.innerHTML = `
+        <div class="fj-card" style="width:min(96vw,560px);" onclick="event.stopPropagation()">
+          <!-- Header -->
+          <div class="fj-head" style="background:linear-gradient(90deg,#2563eb,#3b82f6);display:flex;justify-content:space-between;align-items:center;padding:18px 24px;">
+            <div>
+              <div class="fj-head-title" style="font-size:16px;font-weight:700;">Edit Entry</div>
+              <div class="fj-head-sub" style="font-size:12px;opacity:0.85;">${ohEsc(voucherNo)} &nbsp;·&nbsp; ${ohEsc(date)} &nbsp;·&nbsp; ${ohEsc(type)} ₹${amt.toFixed(2)}</div>
+            </div>
+            <button class="fj-close-btn" id="clEditBeforePostClose">✕</button>
+          </div>
+
+          <!-- Body -->
+          <div class="fj-body" style="padding:22px 24px 24px;">
+            <!-- Summary Info Badge Card -->
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+              <div>
+                <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Account</span>
+                <div style="font-size:13px;font-weight:700;color:#1e293b;">${ohEsc(selectedLedger.name)}</div>
+              </div>
+              <div>
+                <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Ledger / Party</span>
+                <div style="font-size:13px;font-weight:700;color:#1e293b;">${ohEsc(oppName)}</div>
+              </div>
+              <div>
+                <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Type</span>
+                <div style="font-size:13px;font-weight:700;color:${type === 'Receipt' ? '#059669' : '#dc2626'};">${ohEsc(type)}</div>
+              </div>
+              <div>
+                <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Amount</span>
+                <div style="font-size:14px;font-weight:800;color:#2563eb;">₹${amt.toFixed(2)}</div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;">
+              <!-- Department -->
+              <div>
+                <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Department</label>
+                <select id="clEditBeforePostDept" style="width:100%;height:38px;font-size:13px;font-weight:600;padding:0 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;color:#1e293b;cursor:pointer;box-sizing:border-box;outline:none;font-family:var(--font-main);">
+                  <option value="">— Select Department —</option>
+                  ${deptOptions}
+                </select>
+              </div>
+
+              <!-- Transaction Type -->
+              <div>
+                <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Transaction Type</label>
+                <div style="display:inline-flex;align-items:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:9px;padding:2px;height:38px;box-sizing:border-box;user-select:none;">
+                  <button type="button" id="clEditBeforePostNonBudgetBtn"
+                    style="border:none;cursor:pointer;padding:6px 16px;font-size:12px;font-weight:700;border-radius:7px;font-family:var(--font-main);transition:all 0.15s ease;background:#2563eb;color:#ffffff;box-shadow:0 1px 4px rgba(37,99,235,0.3);">Non-Budget</button>
+                  <button type="button" id="clEditBeforePostBudgetBtn"
+                    style="border:none;cursor:pointer;padding:6px 16px;font-size:12px;font-weight:700;border-radius:7px;font-family:var(--font-main);transition:all 0.15s ease;background:transparent;color:#64748b;">Budget</button>
+                </div>
+              </div>
+
+              <!-- Narration -->
+              <div style="grid-column:1/-1;">
+                <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Narration</label>
+                <input type="text" id="clEditBeforePostNarration"
+                  value=""
+                  placeholder="Enter narration…"
+                  style="width:100%;height:38px;font-size:13px;font-weight:500;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:8px;box-sizing:border-box;outline:none;color:#1e293b;font-family:var(--font-main);" />
+              </div>
+
+              <!-- Upload Document / Attachment -->
+              <div style="grid-column:1/-1;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:5px;margin:0;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                    &nbsp;Upload Document / Attachment
+                  </label>
+                  <span id="clEditBeforePostDocStatusBadge" style="display:none;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:#ecfdf5;color:#059669;text-transform:uppercase;">Attached</span>
+                </div>
+
+                <input type="file" id="clEditBeforePostDocFileInput" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+                <div id="clEditBeforePostDocDropzone" style="border:1.5px dashed #cbd5e1;border-radius:10px;padding:12px 14px;text-align:center;background:#ffffff;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='#2563eb';this.style.background='#eff6ff';" onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#ffffff';">
+                  <!-- Empty State -->
+                  <div id="clEditBeforePostDocEmptyState" style="display:flex;align-items:center;justify-content:center;gap:10px;">
+                    <div style="width:28px;height:28px;border-radius:50%;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;color:#2563eb;flex-shrink:0;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:flex-start;text-align:left;">
+                      <span style="font-size:12.5px;font-weight:600;color:#334155;">Click or Drag to Upload Document</span>
+                      <span style="font-size:10.5px;color:#94a3b8;">PDF, Image, Excel, Word (Max 10MB)</span>
+                    </div>
+                  </div>
+
+                  <!-- Selected State -->
+                  <div id="clEditBeforePostDocSelectedState" style="display:none;align-items:center;justify-content:space-between;gap:10px;">
+                    <div style="display:flex;align-items:center;gap:10px;overflow:hidden;">
+                      <div id="clEditBeforePostDocFileIcon" style="width:30px;height:30px;border-radius:6px;background:#dbeafe;color:#1e40af;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-transform:uppercase;">
+                        DOC
+                      </div>
+                      <div style="display:flex;flex-direction:column;align-items:flex-start;overflow:hidden;text-align:left;">
+                        <span id="clEditBeforePostDocFileName" style="font-size:12.5px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;"></span>
+                        <span id="clEditBeforePostDocFileSize" style="font-size:10.5px;color:#64748b;font-weight:500;"></span>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                      <a id="clEditBeforePostDocPreviewBtn" href="#" target="_blank" style="padding:4px 9px;font-size:11.5px;font-weight:600;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Download / View document">
+                        View
+                      </a>
+                      <button id="clEditBeforePostDocRemoveBtn" type="button" style="background:none;border:none;color:#dc2626;cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center;" title="Remove document">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px;">
+              <button id="clEditBeforePostCancel" style="height:38px;padding:0 20px;font-size:13px;font-weight:600;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;font-family:var(--font-main);">Cancel</button>
+              <button id="clEditBeforePostSubmit" style="height:38px;padding:0 22px;font-size:13px;font-weight:700;border-radius:9px;border:none;background:#2563eb;color:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,0.28);font-family:var(--font-main);display:inline-flex;align-items:center;gap:6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Post Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      let currentUploadedDoc = null;
+      const formatDocBytes = (bytes) => {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      };
+
+      const updateDocUI = (doc) => {
+        currentUploadedDoc = doc;
+        const emptyState = document.getElementById('clEditBeforePostDocEmptyState');
+        const selectedState = document.getElementById('clEditBeforePostDocSelectedState');
+        const badge = document.getElementById('clEditBeforePostDocStatusBadge');
+        const nameEl = document.getElementById('clEditBeforePostDocFileName');
+        const sizeEl = document.getElementById('clEditBeforePostDocFileSize');
+        const iconEl = document.getElementById('clEditBeforePostDocFileIcon');
+        const previewBtn = document.getElementById('clEditBeforePostDocPreviewBtn');
+        const fileInp = document.getElementById('clEditBeforePostDocFileInput');
+
+        if (!doc || !doc.fileData) {
+          if (emptyState) emptyState.style.display = 'flex';
+          if (selectedState) selectedState.style.display = 'none';
+          if (badge) badge.style.display = 'none';
+          if (fileInp) fileInp.value = '';
+          return;
+        }
+
+        if (emptyState) emptyState.style.display = 'none';
+        if (selectedState) selectedState.style.display = 'flex';
+        if (badge) badge.style.display = 'inline-block';
+
+        if (nameEl) nameEl.textContent = doc.fileName || 'Attachment';
+        if (sizeEl) sizeEl.textContent = doc.fileSize || formatDocBytes(doc.fileBytes || 0);
+
+        const ext = (doc.fileName || '').split('.').pop().toUpperCase();
+        if (iconEl) {
+          iconEl.textContent = ext.substring(0, 4) || 'DOC';
+          if (['PDF'].includes(ext)) {
+            iconEl.style.background = '#fee2e2'; iconEl.style.color = '#991b1b';
+          } else if (['JPG','JPEG','PNG','WEBP'].includes(ext)) {
+            iconEl.style.background = '#e0e7ff'; iconEl.style.color = '#3730a3';
+          } else if (['XLS','XLSX','CSV'].includes(ext)) {
+            iconEl.style.background = '#dcfce7'; iconEl.style.color = '#166534';
+          } else {
+            iconEl.style.background = '#dbeafe'; iconEl.style.color = '#1e40af';
+          }
+        }
+
+        if (previewBtn) {
+          previewBtn.href = doc.fileData;
+          previewBtn.download = doc.fileName || 'document';
+        }
+      };
+
+      const handleDocUpload = (file) => {
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) {
+          showToast('File size exceeds 10MB limit.', 'error');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const doc = {
+            fileName: file.name,
+            fileSize: formatDocBytes(file.size),
+            fileBytes: file.size,
+            fileData: ev.target.result
+          };
+          updateDocUI(doc);
+          showToast(`Document "${file.name}" attached.`, 'success');
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const docFileInp = document.getElementById('clEditBeforePostDocFileInput');
+      const docDropzone = document.getElementById('clEditBeforePostDocDropzone');
+      const docRemoveBtn = document.getElementById('clEditBeforePostDocRemoveBtn');
+
+      if (docDropzone && docFileInp) {
+        docDropzone.addEventListener('click', (ev) => {
+          if (ev.target.closest('#clEditBeforePostDocRemoveBtn') || ev.target.closest('#clEditBeforePostDocPreviewBtn')) return;
+          docFileInp.click();
+        });
+
+        docFileInp.addEventListener('change', () => {
+          if (docFileInp.files && docFileInp.files[0]) {
+            handleDocUpload(docFileInp.files[0]);
+          }
+        });
+
+        docDropzone.addEventListener('dragover', (ev) => {
+          ev.preventDefault();
+          docDropzone.style.borderColor = '#2563eb';
+          docDropzone.style.background = '#eff6ff';
+        });
+
+        docDropzone.addEventListener('dragleave', () => {
+          docDropzone.style.borderColor = '#cbd5e1';
+          docDropzone.style.background = '#ffffff';
+        });
+
+        docDropzone.addEventListener('drop', (ev) => {
+          ev.preventDefault();
+          docDropzone.style.borderColor = '#cbd5e1';
+          docDropzone.style.background = '#ffffff';
+          if (ev.dataTransfer?.files && ev.dataTransfer.files[0]) {
+            handleDocUpload(ev.dataTransfer.files[0]);
+          }
+        });
+      }
+
+      if (docRemoveBtn) {
+        docRemoveBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          updateDocUI(null);
+          showToast('Attached document removed.', 'info');
+        });
+      }
+
+      let isBudget = false;
+      const budgetBtn = document.getElementById('clEditBeforePostBudgetBtn');
+      const nonBudgetBtn = document.getElementById('clEditBeforePostNonBudgetBtn');
+      const refreshToggle = () => {
+        const activeStyle   = 'border:none; cursor:pointer; padding:6px 16px; font-size:12px; font-weight:700; border-radius:7px; font-family:var(--font-main); transition:all 0.15s ease; background:#2563eb; color:#ffffff; box-shadow:0 1px 4px rgba(37,99,235,0.3);';
+        const inactiveStyle = 'border:none; cursor:pointer; padding:6px 16px; font-size:12px; font-weight:700; border-radius:7px; font-family:var(--font-main); transition:all 0.15s ease; background:transparent; color:#64748b;';
+        if (isBudget) {
+          budgetBtn.style.cssText    = activeStyle;
+          nonBudgetBtn.style.cssText = inactiveStyle;
+        } else {
+          nonBudgetBtn.style.cssText = activeStyle;
+          budgetBtn.style.cssText    = inactiveStyle;
+        }
+      };
+      budgetBtn.addEventListener('click', () => { isBudget = true; refreshToggle(); });
+      nonBudgetBtn.addEventListener('click', () => { isBudget = false; refreshToggle(); });
+
+      const removeModal = () => {
+        overlay.remove();
+      };
+
+      document.getElementById('clEditBeforePostClose')?.addEventListener('click', removeModal);
+      document.getElementById('clEditBeforePostCancel')?.addEventListener('click', removeModal);
+      overlay.addEventListener('click', (ev) => { if (ev.target === overlay) removeModal(); });
+      overlay.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') removeModal(); });
+
+      document.getElementById('clEditBeforePostSubmit')?.addEventListener('click', () => {
+        const departmentId = document.getElementById('clEditBeforePostDept')?.value || '';
+        const narration = document.getElementById('clEditBeforePostNarration')?.value || '';
+        
+        removeModal();
+        commitQuickPost({
+          ...entryData,
+          departmentId,
+          isBudget,
+          narration,
+          uploadedDoc: currentUploadedDoc
+        });
+      });
+    };
+
     // Hook up Quick Post listener
 
     const handleQuickPost = () => {
@@ -2689,8 +3346,9 @@
       const voucherNo = document.getElementById('clQuickEntryVoucher')?.value?.trim() || ((typeof genVoucherNo === 'function') ? genVoucherNo() : `JV-${new Date().getFullYear()}-001`);
       let oppId = document.getElementById('clQuickEntryLedger')?.value || '';
       const searchVal = document.getElementById('clQuickEntryLedgerSearch')?.value?.trim() || '';
-      const type = document.getElementById('clQuickEntryType')?.value || 'Receipt';
-      const amt = parseFloat(document.getElementById('clQuickEntryAmount')?.value) || 0;
+      const type = document.getElementById('clQuickEntryType')?.value || '';
+      const amtVal = document.getElementById('clQuickEntryAmount')?.value || '';
+      const amt = parseAmt(amtVal) || 0;
 
       const availableLedgers = getAvailableLedgerList();
 
@@ -2713,8 +3371,14 @@
         document.getElementById('clQuickEntryLedgerSearch')?.focus();
         return;
       }
+      if (!type) {
+        showToast('Please select Receipt or Payment.', 'warning');
+        document.getElementById('clQuickEntryType')?.focus();
+        return;
+      }
       if (amt <= 0) {
         showToast('Please enter a valid amount greater than 0.', 'warning');
+        document.getElementById('clQuickEntryAmount')?.focus();
         return;
       }
       if (!selectedLedger) {
@@ -2753,49 +3417,48 @@
         return;
       }
 
-      const newEntry = {
-        id: Date.now(),
+      const isMoreOptionsOn = localStorage.getItem('kya_books_more_options_before_post') === 'true' || window._clBooksMoreOptionsBeforePost === true;
+
+      const entryPayload = {
         date,
         voucherNo,
-        narration: '',
-        type: 'Journal',
-        amount: amt.toFixed(2),
-        preparedBy: '',
-        departmentId: '',
-        isBudget: false,
-        allRows: []
+        oppName,
+        type,
+        amt
       };
 
-      if (type === 'Receipt') {
-        newEntry.allRows.push(
-          { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
-          { id: 2, type: 'To', particular: oppName, debit: '', credit: amt.toFixed(2) }
-        );
+      if (isMoreOptionsOn) {
+        showEditEntryBeforePostModal(entryPayload);
       } else {
-        newEntry.allRows.push(
-          { id: 1, type: 'By', particular: oppName, debit: amt.toFixed(2), credit: '' },
-          { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
-        );
+        commitQuickPost(entryPayload);
       }
-
-      if (typeof postedEntries !== 'undefined') {
-        postedEntries.push(newEntry);
-      }
-      if (typeof jvCounter !== 'undefined') {
-        jvCounter++;
-      }
-
-      showToast(`Entry posted successfully. Voucher: ${voucherNo}`, 'success');
-
-      renderActiveSubtab();
-      if (typeof refreshAllReports === 'function') refreshAllReports();
-      if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
     };
 
     document.getElementById('clBtnQuickPost')?.addEventListener('click', handleQuickPost);
-    document.getElementById('clQuickEntryAmount')?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handleQuickPost();
-    });
+    const amtInput = document.getElementById('clQuickEntryAmount');
+    if (amtInput) {
+      amtInput.addEventListener('blur', () => {
+        const raw = amtInput.value.trim();
+        if (!raw) return;
+        const v = parseAmt(raw);
+        if (!isNaN(v) && v > 0) {
+          amtInput.value = v.toFixed(2);
+        } else if (isNaN(v) || v <= 0) {
+          amtInput.value = '';
+        }
+      });
+      amtInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const raw = amtInput.value.trim();
+          const v = parseAmt(raw);
+          if (!isNaN(v) && v > 0) {
+            amtInput.value = v.toFixed(2);
+          }
+          handleQuickPost();
+        }
+      });
+    }
   }
 
   window.onLedgerCreatedForCashline = function(newLedger, ctx) {
@@ -2891,3 +3554,117 @@
       }, 60);
     }
   };
+
+  // ── Cashbook Export Data Builder ─────────────────────────────────
+  function getCashbookExportData() {
+    const cceAccounts = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
+    if (!cceAccounts.length) return null;
+    const selectedLedger = cceAccounts.find(l => l.id.toString() === _clCashbookAccountId) || cceAccounts[0];
+    if (!selectedLedger) return null;
+
+    const fromVal = _clCashflowDateFrom || '';
+    const toVal = _clCashflowDateTo || '';
+    const balData = typeof calculateLedgerBalances === 'function' ? calculateLedgerBalances(selectedLedger, fromVal, toVal) : { openingBalance: 0, closingBalance: 0, periodNet: 0 };
+
+    const ledgerTrans = [];
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    const selName = (selectedLedger.name || '').trim().toLowerCase();
+
+    postedEntries.forEach(entry => {
+      if (fromVal && entry.date < fromVal) return;
+      if (toVal && entry.date > toVal) return;
+
+      (entry.allRows || []).forEach(row => {
+        if ((row.particular || '').trim().toLowerCase() === selName) {
+          const dr = parseFloat(row.debit) || 0;
+          const cr = parseFloat(row.credit) || 0;
+
+          if (dr > 0) {
+            let oppRows = (entry.allRows || []).filter(r => (parseFloat(r.credit) || 0) > 0 && (r.particular || '').trim().toLowerCase() !== selName);
+            if (oppRows.length === 0) oppRows = (entry.allRows || []).filter(r => (r.particular || '').trim().toLowerCase() !== selName);
+
+            totalDebit += dr;
+            if (oppRows.length <= 1) {
+              ledgerTrans.push({
+                id: entry.id,
+                date: entry.date,
+                voucherNo: entry.voucherNo || '-',
+                particulars: oppRows.length === 1 ? oppRows[0].particular : (typeof getOppositeParticulars === 'function' ? getOppositeParticulars(entry, selectedLedger.name, true) : '—'),
+                debit: dr,
+                credit: 0
+              });
+            } else {
+              const totalOppCr = oppRows.reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
+              oppRows.forEach(opp => {
+                const oppCr = parseFloat(opp.credit) || 0;
+                const lineAmt = totalOppCr > 0 ? (oppCr / totalOppCr) * dr : (dr / oppRows.length);
+                ledgerTrans.push({
+                  id: entry.id,
+                  date: entry.date,
+                  voucherNo: entry.voucherNo || '-',
+                  particulars: opp.particular || '—',
+                  debit: lineAmt,
+                  credit: 0
+                });
+              });
+            }
+          } else if (cr > 0) {
+            let oppRows = (entry.allRows || []).filter(r => (parseFloat(r.debit) || 0) > 0 && (r.particular || '').trim().toLowerCase() !== selName);
+            if (oppRows.length === 0) oppRows = (entry.allRows || []).filter(r => (r.particular || '').trim().toLowerCase() !== selName);
+
+            totalCredit += cr;
+            if (oppRows.length <= 1) {
+              ledgerTrans.push({
+                id: entry.id,
+                date: entry.date,
+                voucherNo: entry.voucherNo || '-',
+                particulars: oppRows.length === 1 ? oppRows[0].particular : (typeof getOppositeParticulars === 'function' ? getOppositeParticulars(entry, selectedLedger.name, false) : '—'),
+                debit: 0,
+                credit: cr
+              });
+            } else {
+              const totalOppDr = oppRows.reduce((sum, r) => sum + (parseFloat(r.debit) || 0), 0);
+              oppRows.forEach(opp => {
+                const oppDr = parseFloat(opp.debit) || 0;
+                const lineAmt = totalOppDr > 0 ? (oppDr / totalOppDr) * cr : (cr / oppRows.length);
+                ledgerTrans.push({
+                  id: entry.id,
+                  date: entry.date,
+                  voucherNo: entry.voucherNo || '-',
+                  particulars: opp.particular || '—',
+                  debit: 0,
+                  credit: lineAmt
+                });
+              });
+            }
+          }
+        }
+      });
+    });
+
+    ledgerTrans.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
+    const companyName = activeCo.name || 'KYA Accounting';
+
+    return {
+      companyName,
+      type: 'cashbook',
+      title: `${(selectedLedger.name || 'CASH & BANK BOOK').toUpperCase()} STATEMENT`,
+      accountName: selectedLedger.name,
+      code: selectedLedger.code || '',
+      subgroupName: 'Cash & Cash Equivalents',
+      dateFrom: fromVal,
+      dateTo: toVal,
+      openingBalance: balData.openingBalance,
+      periodNet: balData.periodNet,
+      closingBalance: balData.closingBalance,
+      totalDebit,
+      totalCredit,
+      transactions: ledgerTrans
+    };
+  }
+  window.getCashbookExportData = getCashbookExportData;
+

@@ -2475,6 +2475,67 @@
     }
     .je-input::placeholder { color: var(--slate-400); font-weight: 400; }
 
+    /* Transaction Type Box Slider */
+    .je-tx-slider-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: 42px;
+      background: #f1f5f9;
+      border: 1.5px solid var(--slate-300);
+      border-radius: 9px;
+      padding: 3px;
+      box-sizing: border-box;
+      user-select: none;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+      width: 100%;
+    }
+    .je-tx-slider-bg {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      left: 3px;
+      width: calc(50% - 3px);
+      background: #ffffff;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(15,23,42,.1), 0 1px 2px rgba(0,0,0,.04);
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 1;
+    }
+    .je-tx-slider-bg.non-budget-active {
+      transform: translateX(0);
+    }
+    .je-tx-slider-bg.budget-active {
+      transform: translateX(100%);
+    }
+    .je-tx-slider-btn {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      font-family: var(--font-main);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--slate-500);
+      cursor: pointer;
+      z-index: 2;
+      border-radius: 6px;
+      user-select: none;
+      transition: color 0.18s ease, font-weight 0.18s ease;
+      outline: none;
+      padding: 0;
+    }
+    .je-tx-slider-btn:hover {
+      color: var(--slate-800);
+    }
+    .je-tx-slider-btn.active {
+      color: var(--blue-700);
+      font-weight: 700;
+    }
+
     /* Entry table section */
     .je-table-section {
       padding: 24px 28px 0;
@@ -2670,6 +2731,60 @@
     .je-particulars-wrap:focus-within .je-particulars-arrow { color: var(--blue-400); }
     .je-particulars-arrow svg { width: 14px; height: 14px; display: block; }
 
+    /* Particulars right addons container (closing balance badge + dropdown arrow) */
+    .je-particulars-right-addons {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .je-particulars-right-addons .je-particulars-arrow {
+      position: static;
+      transform: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .je-particulars-bal-badge {
+      font-size: 11.5px;
+      font-weight: 600;
+      font-family: var(--font-main);
+      padding: 2px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      line-height: 1.2;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      transition: all 0.15s ease;
+      letter-spacing: -0.01em;
+      user-select: none;
+    }
+    .je-particulars-bal-badge.bal-dr {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .je-particulars-bal-badge.bal-cr {
+      background: #fdf4ff;
+      color: #7e22ce;
+      border: 1px solid #f0abfc;
+    }
+    .je-particulars-bal-badge.bal-zero {
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+    }
+    .je-particulars-input.has-bal-badge {
+      padding-right: 150px;
+    }
+
     /* ── Global portal dropdown ── */
     #je-portal-dropdown {
       position: fixed;
@@ -2756,6 +2871,30 @@
       border-radius: 5px;
       padding: 2px 6px;
       flex-shrink: 0;
+    }
+
+    /* Account badge for customer / supplier */
+    .je-drop-badge {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      line-height: 1.2;
+    }
+    .je-drop-badge.badge-customer {
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+    .je-drop-badge.badge-supplier {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
     }
 
     /* Empty state */
@@ -3097,6 +3236,69 @@
       z-index:2; transition:color .18s; border-radius:9px;
     }
     .coa-slider-btn.active { color:#0f172a; }
+
+    /* ── Master Desk Create Ledger - Save As Slider Toggle ── */
+    .master-saveas-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .master-saveas-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--slate-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .master-saveas-slider-wrap {
+      position: relative;
+      display: flex;
+      background: #e2e8f0;
+      border-radius: 8px;
+      padding: 2px;
+      height: 30px;
+      width: 154px;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    .master-saveas-slider-bg {
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      left: 2px;
+      width: calc(50% - 2px);
+      background: #ffffff;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 1;
+    }
+    .master-saveas-slider-bg.party-active {
+      transform: translateX(100%);
+    }
+    .master-saveas-slider-bg.ledger-active {
+      transform: translateX(0);
+    }
+    .master-saveas-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      z-index: 2;
+      border-radius: 6px;
+      padding: 0;
+      transition: color 0.18s ease;
+      font-family: inherit;
+    }
+    .master-saveas-btn.active {
+      color: #1d4ed8;
+    }
 
     .coa-modal-group-box {
       border:1.5px solid #e2e8f0; border-radius:16px; padding:16px 16px 12px;

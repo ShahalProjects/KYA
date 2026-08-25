@@ -1856,6 +1856,7 @@
   global.exportLedgerStatementToExcel = exportStatementToExcel;
   global.exportCustomerStatementToExcel = exportStatementToExcel;
   global.exportSupplierStatementToExcel = exportStatementToExcel;
+  global.exportCashbookToExcel = exportStatementToExcel;
   global.exportVoucherToExcel = exportVoucherToExcel;
   global.exportInvoiceToExcel = exportInvoiceToExcel;
   global.exportVoucherDeskToExcel = exportVoucherDeskToExcel;

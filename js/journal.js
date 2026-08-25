@@ -108,22 +108,16 @@
   // ── Budget toggle UI updater ──────────────────────────────────────
   function updateJeBudgetToggleUI() {
     const tog = document.getElementById('jeBudgetToggle');
-    const left = document.getElementById('jeBudgetLabelLeft');
-    const right = document.getElementById('jeBudgetLabelRight');
-    if (!tog || !left || !right) return;
-    if (tog.checked) {
-      // Budget active
-      left.style.color  = 'var(--slate-400)';
-      left.style.fontWeight = '600';
-      right.style.color = 'var(--blue-600)';
-      right.style.fontWeight = '700';
-    } else {
-      // Non Budget active
-      left.style.color  = 'var(--slate-800)';
-      left.style.fontWeight = '700';
-      right.style.color = 'var(--slate-400)';
-      right.style.fontWeight = '600';
+    const bg = document.getElementById('jeTxSliderBg');
+    const btnNon = document.getElementById('btnJeTxNonBudget');
+    const btnBud = document.getElementById('btnJeTxBudget');
+    if (!tog) return;
+    const isBudget = !!tog.checked;
+    if (bg) {
+      bg.className = 'je-tx-slider-bg ' + (isBudget ? 'budget-active' : 'non-budget-active');
     }
+    if (btnNon) btnNon.classList.toggle('active', !isBudget);
+    if (btnBud) btnBud.classList.toggle('active', isBudget);
   }
 
   // ── Document Attachment Helpers ────────────────────────────────────
@@ -276,7 +270,7 @@
     window._editingJournalEntry = null;
   }
 
-  function loadJournalEntry(entry, isDraft) {
+  function loadJournalEntry(entry, isDraft, returnContext) {
     openTab('journal');
     
     document.getElementById('jeDate').value = entry.date || '';
@@ -297,7 +291,7 @@
       updateJeBudgetToggleUI();
     }
     
-    jeRows = JSON.parse(JSON.stringify(entry.allRows));
+    jeRows = JSON.parse(JSON.stringify(entry.allRows || []));
     jeCounter = 1;
     jeRows.forEach(row => {
       row.id = jeCounter++;
@@ -308,8 +302,13 @@
     updateJeDocUI(entry.uploadedDoc || null);
     setupJeDocEventListeners();
     
-    window._editingJournalEntry = { id: entry.id, isDraft: isDraft };
+    window._editingJournalEntry = { 
+      id: entry.id, 
+      isDraft: isDraft,
+      returnContext: returnContext || window._pendingJournalReturnContext || null
+    };
   }
+  window.loadJournalEntry = loadJournalEntry;
 
   // ── Sync voucher chip with input ──────────────────────────────────
   document.getElementById('jeVoucherNo').addEventListener('input', function() {
@@ -506,17 +505,21 @@
     el.id = 'je-portal-dropdown';
     document.body.appendChild(el);
 
-    // Group accent colours matching CoA main groups
+    // Group accent colours matching CoA main groups and party types
     const GROUP_COLORS = {
       assets:               '#3b82f6',
       'equity-liabilities': '#8b5cf6',
       income:               '#10b981',
       expense:              '#f59e0b',
+      customers:            '#0284c7',
+      suppliers:            '#d97706',
     };
 
-    function _dotColor(l) {
+    function _dotColor(item) {
+      if (item.category === 'customer') return '#0284c7';
+      if (item.category === 'supplier') return '#d97706';
       const sg = (typeof COA_SYS_SGS !== 'undefined')
-        ? COA_SYS_SGS.find(s => s.id === l.sgId) : null;
+        ? COA_SYS_SGS.find(s => s.id === item.sgId) : null;
       return (sg && GROUP_COLORS[sg.main]) || '#94a3b8';
     }
 
@@ -576,17 +579,77 @@
       _highlightIdx = -1;
       const q = (query || '').toLowerCase().trim();
 
-      const matches = coaLedgers
-        .filter(l => {
-          if (l.type !== 'ledger') return false;
-          const nm = l.name.toLowerCase().includes(q);
-          const ak = l.aliases && l.aliases.some(a => a.toLowerCase().includes(q));
-          return nm || ak;
+      const items = [];
+
+      // 1. Chart of Accounts Ledgers
+      if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+        coaLedgers.forEach(l => {
+          if (l.type !== 'ledger') return;
+          const sg = (typeof COA_SYS_SGS !== 'undefined') ? COA_SYS_SGS.find(s => s.id === l.sgId) : null;
+          const grpKey = sg ? sg.main : '__other__';
+          items.push({
+            name: l.name,
+            aliases: l.aliases || [],
+            code: l.code || '',
+            category: 'ledger',
+            groupKey: grpKey,
+            sgId: l.sgId,
+            raw: l
+          });
+        });
+      }
+
+      // 2. Customers
+      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+      custs.forEach(c => {
+        items.push({
+          name: c.name,
+          aliases: c.aliases || [],
+          code: c.code || '',
+          category: 'customer',
+          groupKey: 'customers',
+          raw: c
+        });
+      });
+
+      // 3. Suppliers
+      const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+      supps.forEach(s => {
+        items.push({
+          name: s.name,
+          aliases: s.aliases || [],
+          code: s.code || '',
+          category: 'supplier',
+          groupKey: 'suppliers',
+          raw: s
+        });
+      });
+
+      const GROUP_ORDER = {
+        'assets': 1,
+        'equity-liabilities': 2,
+        'income': 3,
+        'expense': 4,
+        'customers': 5,
+        'suppliers': 6,
+        '__other__': 7
+      };
+
+      const matches = items
+        .filter(item => {
+          const nm = (item.name || '').toLowerCase().includes(q);
+          const ak = item.aliases && item.aliases.some(a => (a || '').toLowerCase().includes(q));
+          const cd = (item.code || '').toLowerCase().includes(q);
+          return nm || ak || cd;
         })
         .sort((a, b) => {
-          const as = a.name.toLowerCase().startsWith(q) ? 0 : 1;
-          const bs = b.name.toLowerCase().startsWith(q) ? 0 : 1;
-          return as - bs || a.name.localeCompare(b.name);
+          const ga = GROUP_ORDER[a.groupKey] || 99;
+          const gb = GROUP_ORDER[b.groupKey] || 99;
+          if (ga !== gb) return ga - gb;
+
+          const as = (a.name || '').toLowerCase().startsWith(q) ? 0 : 1;
+          const bs = (b.name || '').toLowerCase().startsWith(q) ? 0 : 1;
+          return as - bs || (a.name || '').localeCompare(b.name || '');
         });
 
       el.innerHTML = '';
@@ -599,7 +662,7 @@
             <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
             <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
-          <span class="je-drop-empty-txt">No ledger found</span>
+          <span class="je-drop-empty-txt">No account, customer, or supplier found</span>
           <button type="button" class="je-drop-create-item" id="jeDropCreateLedgerBtn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -627,14 +690,13 @@
       } else {
         const GROUP_LABELS = {
           assets: 'Assets', 'equity-liabilities': 'Equity & Liabilities',
-          income: 'Income', expense: 'Expense'
+          income: 'Income', expense: 'Expense',
+          customers: 'Customers', suppliers: 'Suppliers'
         };
         let lastGroup = null;
 
         matches.forEach(acct => {
-          const sg     = (typeof COA_SYS_SGS !== 'undefined')
-            ? COA_SYS_SGS.find(s => s.id === acct.sgId) : null;
-          const grpKey = sg ? sg.main : '__other__';
+          const grpKey = acct.groupKey || '__other__';
 
           if (grpKey !== lastGroup) {
             lastGroup = grpKey;
@@ -647,9 +709,16 @@
           const item = document.createElement('div');
           item.className = 'je-drop-item';
           const akaStr = acct.aliases && acct.aliases.length > 0 ? ` [A.K.A: ${acct.aliases.join(', ')}]` : '';
+          const badgeHtml = acct.category === 'customer'
+            ? `<span class="je-drop-badge badge-customer">Customer</span>`
+            : (acct.category === 'supplier'
+              ? `<span class="je-drop-badge badge-supplier">Supplier</span>`
+              : '');
+
           item.innerHTML = `
             <span class="je-drop-dot" style="background:${_dotColor(acct)}"></span>
             <span class="je-drop-name">${_hl(acct.name, query)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${_hl(akaStr, query)}</span>` : ''}</span>
+            ${badgeHtml}
             ${acct.code ? `<span class="je-drop-code">${acct.code}</span>` : ''}
           `;
           item.addEventListener('mousedown', e => {
@@ -731,7 +800,11 @@
         const tr = document.querySelector(`[data-row-id="${targetRow.id}"]`);
         if (tr) {
           const inp = tr.querySelector('.je-particulars-input');
-          if (inp) inp.value = newLedger.name;
+          if (inp) {
+            inp.value = newLedger.name;
+            const wrap = inp.closest('.je-particulars-wrap');
+            if (wrap) updateParticularsBalanceBadge(wrap, newLedger.name);
+          }
         }
         focusDebitOfRow(targetRow.id);
       }, 60);
@@ -760,6 +833,8 @@
             _jePortal.open(inp, inp.value, function(acct) {
               inp.value = acct.name;
               targetRow.particular = acct.name;
+              const wrap = inp.closest('.je-particulars-wrap');
+              if (wrap) updateParticularsBalanceBadge(wrap, acct.name);
               focusDebitOfRow(targetRow.id);
             });
           }
@@ -767,6 +842,170 @@
       }, 60);
     }
   };
+
+  // ── Calculate net unposted Dr/Cr impact from current form rows ───
+  function getCurrentFormNetImpact(particularName) {
+    if (!particularName || !particularName.trim()) return { dr: 0, cr: 0 };
+    const nameTrimmed = particularName.trim().toLowerCase();
+    let dr = 0;
+    let cr = 0;
+
+    // If editing an existing posted voucher, subtract the original entry's amounts to avoid double-counting
+    let origDr = 0;
+    let origCr = 0;
+    if (window._editingJournalEntry && !window._editingJournalEntry.isDraft && typeof postedEntries !== 'undefined') {
+      const origEntry = postedEntries.find(e => String(e.id) === String(window._editingJournalEntry.id));
+      if (origEntry && Array.isArray(origEntry.allRows)) {
+        origEntry.allRows.forEach(r => {
+          if ((r.particular || '').trim().toLowerCase() === nameTrimmed) {
+            origDr += parseAmt(r.debit);
+            origCr += parseAmt(r.credit);
+          }
+        });
+      }
+    }
+
+    if (Array.isArray(jeRows)) {
+      jeRows.forEach(r => {
+        if ((r.particular || '').trim().toLowerCase() === nameTrimmed) {
+          dr += parseAmt(r.debit);
+          cr += parseAmt(r.credit);
+        }
+      });
+    }
+
+    return {
+      dr: dr - origDr,
+      cr: cr - origCr
+    };
+  }
+
+  // ── Helper to calculate closing balance for an account/party ──────
+  function getAccountClosingBalance(particularName) {
+    if (!particularName || !particularName.trim()) return null;
+    const nameTrimmed = particularName.trim().toLowerCase();
+    const impact = getCurrentFormNetImpact(nameTrimmed);
+
+    // 1. Check Customer
+    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const cust = custs.find(c => (c.name || '').trim().toLowerCase() === nameTrimmed);
+    if (cust) {
+      if (typeof getCustomerStatementData === 'function') {
+        const data = getCustomerStatementData(cust.id);
+        if (data) {
+          const baseBal = data.closingBalance || 0;
+          const liveBal = baseBal + impact.dr - impact.cr;
+          const balType = liveBal > 0.004 ? 'Dr' : (liveBal < -0.004 ? 'Cr' : '');
+          return {
+            amount: Math.abs(liveBal),
+            type: balType,
+            text: `₹${fmtNum(Math.abs(liveBal))}${balType ? ' ' + balType : ''}`,
+            rawBal: liveBal,
+            category: 'customer'
+          };
+        }
+      }
+    }
+
+    // 2. Check Supplier
+    const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+    const supp = supps.find(s => (s.name || '').trim().toLowerCase() === nameTrimmed);
+    if (supp) {
+      if (typeof getSupplierStatementData === 'function') {
+        const data = getSupplierStatementData(supp.id);
+        if (data) {
+          const baseBal = data.closingBalance || 0;
+          const liveBal = baseBal + impact.cr - impact.dr;
+          const balType = liveBal > 0.004 ? 'Cr' : (liveBal < -0.004 ? 'Dr' : '');
+          return {
+            amount: Math.abs(liveBal),
+            type: balType,
+            text: `₹${fmtNum(Math.abs(liveBal))}${balType ? ' ' + balType : ''}`,
+            rawBal: liveBal,
+            category: 'supplier'
+          };
+        }
+      }
+    }
+
+    // 3. Check General CoA Ledger
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      const ldg = coaLedgers.find(l => l.type === 'ledger' && (l.name || '').trim().toLowerCase() === nameTrimmed);
+      if (ldg) {
+        if (typeof calculateLedgerBalances === 'function') {
+          const balances = calculateLedgerBalances(ldg);
+          const mainGroup = typeof getLedgerMainGroup === 'function' ? getLedgerMainGroup(ldg) : 'assets';
+          const isDrGroup = (mainGroup === 'assets' || mainGroup === 'expense');
+          const baseBal = balances.closingBalance || 0;
+          
+          let liveBal = 0;
+          if (isDrGroup) {
+            liveBal = baseBal + impact.dr - impact.cr;
+          } else {
+            liveBal = baseBal + impact.cr - impact.dr;
+          }
+
+          let balType = '';
+          if (liveBal > 0.004) {
+            balType = isDrGroup ? 'Dr' : 'Cr';
+          } else if (liveBal < -0.004) {
+            balType = isDrGroup ? 'Cr' : 'Dr';
+          }
+
+          return {
+            amount: Math.abs(liveBal),
+            type: balType,
+            text: `₹${fmtNum(Math.abs(liveBal))}${balType ? ' ' + balType : ''}`,
+            rawBal: liveBal,
+            category: 'ledger'
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function updateParticularsBalanceBadge(wrap, particularName) {
+    if (!wrap) return;
+    const inp = wrap.querySelector('.je-particulars-input');
+    const balBadge = wrap.querySelector('.je-particulars-bal-badge');
+    if (!balBadge || !inp) return;
+
+    const info = getAccountClosingBalance(particularName || (inp ? inp.value : ''));
+    if (info) {
+      balBadge.textContent = info.text;
+      balBadge.style.display = 'inline-flex';
+      balBadge.title = `Closing Balance: ₹${fmtNum(info.amount)}${info.type ? ' ' + info.type : ''}`;
+      
+      if (info.type === 'Dr') {
+        balBadge.className = 'je-particulars-bal-badge bal-dr';
+      } else if (info.type === 'Cr') {
+        balBadge.className = 'je-particulars-bal-badge bal-cr';
+      } else {
+        balBadge.className = 'je-particulars-bal-badge bal-zero';
+      }
+      inp.classList.add('has-bal-badge');
+    } else {
+      balBadge.textContent = '';
+      balBadge.style.display = 'none';
+      inp.classList.remove('has-bal-badge');
+    }
+  }
+
+  function updateAllParticularsBalanceBadges() {
+    const tbody = document.getElementById('jeEntryBody');
+    if (!tbody) return;
+    const wraps = tbody.querySelectorAll('.je-particulars-wrap');
+    wraps.forEach(wrap => {
+      const inp = wrap.querySelector('.je-particulars-input');
+      const tr = wrap.closest('[data-row-id]');
+      const rowId = tr ? Number(tr.dataset.rowId) : null;
+      const row = (rowId !== null) ? jeRows.find(r => r.id === rowId) : null;
+      const partName = (row && row.particular) ? row.particular : (inp ? inp.value : '');
+      updateParticularsBalanceBadge(wrap, partName);
+    });
+  }
 
   // ── Particulars custom dropdown cell ─────────────────────────────
   function buildParticularsCell(row, isFirstRow) {
@@ -776,19 +1015,30 @@
     const inp = document.createElement('input');
     inp.type = 'text';
     inp.className = 'je-particulars-input';
-    inp.placeholder = 'Select or search ledger…';
-    inp.value = row.particular;
-    inp.setAttribute('aria-label', 'Particulars / ledger account');
+    inp.placeholder = 'Select or search ledger, customer, supplier…';
+    inp.value = row.particular || '';
+    inp.setAttribute('aria-label', 'Particulars / ledger account, customer, or supplier');
     inp.setAttribute('autocomplete', 'off');
     inp.setAttribute('spellcheck', 'false');
+
+    const rightAddons = document.createElement('div');
+    rightAddons.className = 'je-particulars-right-addons';
+
+    const balBadge = document.createElement('span');
+    balBadge.className = 'je-particulars-bal-badge';
+    balBadge.style.display = 'none';
 
     const arrow = document.createElement('span');
     arrow.className = 'je-particulars-arrow';
     arrow.innerHTML = `<svg viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+    rightAddons.appendChild(balBadge);
+    rightAddons.appendChild(arrow);
+
     function _select(acct) {
       inp.value      = acct.name;
       row.particular = acct.name;
+      updateAllParticularsBalanceBadges();
       const tr = inp.closest('[data-row-id]');
       if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
     }
@@ -796,6 +1046,7 @@
     inp.addEventListener('focus', () => _jePortal.open(inp, inp.value, _select));
     inp.addEventListener('input', () => {
       row.particular = inp.value;
+      updateAllParticularsBalanceBadges();
       _jePortal.open(inp, inp.value, _select);
     });
 
@@ -817,7 +1068,7 @@
           _jePortal.selectHighlighted();
         } else {
           if (inp.value.trim() === '') {
-            showToast('Please select a ledger account in Particulars.', 'warning');
+            showToast('Please select a ledger, customer, or supplier in Particulars.', 'warning');
           } else {
             const tr = inp.closest('[data-row-id]');
             if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
@@ -831,7 +1082,7 @@
       } else if (e.key === 'Tab') {
         if (inp.value.trim() === '') {
           e.preventDefault();
-          showToast('Please select a ledger account in Particulars.', 'warning');
+          showToast('Please select a ledger, customer, or supplier in Particulars.', 'warning');
         } else {
           _jePortal.close();
         }
@@ -853,21 +1104,30 @@
         if (val === '') {
           row.particular = '';
         } else {
-          const match = coaLedgers.find(l => l.type === 'ledger' && l.name.toLowerCase() === val);
+          const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+          const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+          const match = (coaLedgers && coaLedgers.find(l => l.type === 'ledger' && (l.name || '').toLowerCase() === val))
+            || custs.find(c => (c.name || '').toLowerCase() === val)
+            || supps.find(s => (s.name || '').toLowerCase() === val);
           if (match) {
             inp.value      = match.name;
             row.particular = match.name;
           } else {
             inp.value      = '';
             row.particular = '';
-            showToast('Please select a valid ledger from the Chart of Accounts.', 'error');
+            showToast('Please select a valid ledger, customer, or supplier.', 'error');
           }
         }
+        updateAllParticularsBalanceBadges();
       }, 200);
     });
 
     wrap.appendChild(inp);
-    wrap.appendChild(arrow);
+    wrap.appendChild(rightAddons);
+
+    // Initialize balance badge if row already has a particular
+    updateParticularsBalanceBadge(wrap, row.particular);
+
     return wrap;
   }
 
@@ -886,12 +1146,32 @@
     const balanced = Math.abs(totalDr - totalCr) < 0.005;
     chip.className = 'je-balance-indicator ' + (balanced ? 'balanced' : 'unbalanced');
     txt.textContent = balanced ? 'Balanced ✓' : 'Unbalanced';
+
+    updateAllParticularsBalanceBadges();
   }
 
   // ── Add row button ────────────────────────────────────────────────
   document.getElementById('jeAddRow').addEventListener('click', () => addRow('By'));
 
   // ── Budget toggle listener ────────────────────────────────────────
+  document.getElementById('btnJeTxNonBudget')?.addEventListener('click', () => {
+    const tog = document.getElementById('jeBudgetToggle');
+    if (tog) {
+      tog.checked = false;
+      updateJeBudgetToggleUI();
+      tog.dispatchEvent(new Event('change'));
+    }
+  });
+
+  document.getElementById('btnJeTxBudget')?.addEventListener('click', () => {
+    const tog = document.getElementById('jeBudgetToggle');
+    if (tog) {
+      tog.checked = true;
+      updateJeBudgetToggleUI();
+      tog.dispatchEvent(new Event('change'));
+    }
+  });
+
   document.getElementById('jeBudgetToggle')?.addEventListener('change', updateJeBudgetToggleUI);
 
   // ── New Entry button ──────────────────────────────────────────────
@@ -920,8 +1200,9 @@
     const firstRow = jeRows[0] || {};
     const amt      = parseAmt(firstRow.debit) || parseAmt(firstRow.credit);
     
-    const isEditDraft = window._editingJournalEntry && window._editingJournalEntry.isDraft;
-    const entryId = isEditDraft ? window._editingJournalEntry.id : Date.now();
+    const editingCtx = window._editingJournalEntry;
+    const isEditDraft = editingCtx && editingCtx.isDraft;
+    const entryId = isEditDraft ? editingCtx.id : Date.now();
     
     const draftData = {
       id:              entryId,
@@ -938,7 +1219,7 @@
     };
     
     if (isEditDraft) {
-      const idx = draftedEntries.findIndex(e => e.id === entryId);
+      const idx = draftedEntries.findIndex(e => String(e.id) === String(entryId));
       if (idx > -1) {
         draftedEntries[idx] = draftData;
       } else {
@@ -952,9 +1233,43 @@
     if (!isEditDraft) {
       jvCounter++;
     }
+
+    const returnContext = editingCtx?.returnContext || window._pendingJournalReturnContext || null;
     window._editingJournalEntry = null;
+    window._pendingJournalReturnContext = null;
+
     triggerAutoBackup();
-    setTimeout(initFormDefaults, 900);
+    if (typeof window.refreshAllAppViews === 'function') {
+      window.refreshAllAppViews();
+    }
+
+    if (returnContext) {
+      if (returnContext.clActiveTopTab && typeof _clActiveTopTab !== 'undefined') {
+        _clActiveTopTab = returnContext.clActiveTopTab;
+      }
+      if (returnContext.clActiveBankingTab && typeof _clActiveBankingTab !== 'undefined') {
+        _clActiveBankingTab = returnContext.clActiveBankingTab;
+      }
+      if (returnContext.clCashbookAccountId && typeof _clCashbookAccountId !== 'undefined') {
+        _clCashbookAccountId = returnContext.clCashbookAccountId;
+      }
+
+      initFormDefaults();
+
+      const returnTabId = returnContext.tabId || 'cashline';
+      if (typeof closeTab === 'function') {
+        closeTab('journal', null, returnTabId);
+      } else if (typeof openTab === 'function') {
+        openTab(returnTabId);
+      }
+
+      if (returnTabId === 'cashline') {
+        if (typeof renderCashlinePanel === 'function') renderCashlinePanel();
+        else if (typeof renderActiveSubtab === 'function') renderActiveSubtab();
+      }
+    } else {
+      setTimeout(initFormDefaults, 900);
+    }
   });
 
   // ── Post Entry ────────────────────────────────────────────────────
@@ -1116,15 +1431,20 @@
     }
     const hasEmpty = jeRows.some(r => !r.particular.trim());
     if (hasEmpty) {
-      showToast('Please select a ledger account for all rows.', 'error');
+      showToast('Please select an account, customer, or supplier for all rows.', 'error');
       return;
     }
+    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
     const invalidRow = jeRows.find(r => {
       const val = r.particular.trim().toLowerCase();
-      return !coaLedgers.some(l => l.type === 'ledger' && l.name.toLowerCase() === val);
+      const isCoa = coaLedgers.some(l => l.type === 'ledger' && (l.name || '').toLowerCase() === val);
+      const isCust = custs.some(c => (c.name || '').toLowerCase() === val);
+      const isSupp = supps.some(s => (s.name || '').toLowerCase() === val);
+      return !isCoa && !isCust && !isSupp;
     });
     if (invalidRow) {
-      showToast(`Invalid ledger name: "${invalidRow.particular}". Please select a ledger from the Chart of Accounts.`, 'error');
+      showToast(`Invalid account name: "${invalidRow.particular}". Please select a valid ledger, customer, or supplier.`, 'error');
       return;
     }
 
@@ -1449,9 +1769,13 @@
         onConfirm: () => {
           postedEntries = postedEntries.filter(e => !_ptSelected.has(e.id));
           _ptSelected.clear();
-          renderPostedPanel();
-          refreshAllReports();
-          triggerAutoBackup();
+          if (typeof window.refreshAllAppViews === 'function') {
+            window.refreshAllAppViews();
+          } else {
+            renderPostedPanel();
+            refreshAllReports();
+            triggerAutoBackup();
+          }
         }
       });
     });
@@ -1471,10 +1795,17 @@
           okBg: '#dc2626',
           onConfirm: () => {
             postedEntries = postedEntries.filter(e => e.id !== id);
+            if (entry.reconKey && window.KYA_STORE?.reconciliationState) {
+              delete window.KYA_STORE.reconciliationState[entry.reconKey];
+            }
             _ptSelected.delete(id);
-            renderPostedPanel();
-            refreshAllReports();
-            triggerAutoBackup();
+            if (typeof window.refreshAllAppViews === 'function') {
+              window.refreshAllAppViews();
+            } else {
+              renderPostedPanel();
+              refreshAllReports();
+              triggerAutoBackup();
+            }
           }
         });
       });
@@ -1570,12 +1901,18 @@
 
     // Validate all rows in all to-be-posted drafts
     for (const entry of toPost) {
-      const invalidRow = entry.allRows.find(r => {
-        const val = r.particular.trim().toLowerCase();
-        return !val || !coaLedgers.some(l => l.type === 'ledger' && l.name.toLowerCase() === val);
+      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+      const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+      const invalidRow = (entry.allRows || []).find(r => {
+        const val = (r.particular || '').trim().toLowerCase();
+        if (!val) return true;
+        const isCoa = coaLedgers.some(l => l.type === 'ledger' && (l.name || '').toLowerCase() === val);
+        const isCust = custs.some(c => (c.name || '').toLowerCase() === val);
+        const isSupp = supps.some(s => (s.name || '').toLowerCase() === val);
+        return !isCoa && !isCust && !isSupp;
       });
       if (invalidRow) {
-        showToast(`Cannot post draft "${entry.voucherNo || '—'}": it references an invalid or deleted ledger: "${invalidRow.particular || 'Empty'}".`, 'error');
+        showToast(`Cannot post draft "${entry.voucherNo || '—'}": it references an invalid or deleted account: "${invalidRow.particular || 'Empty'}".`, 'error');
         return;
       }
     }
@@ -2058,12 +2395,14 @@
     const firstRow = jeRows[0] || {};
     const amt      = parseAmt(firstRow.debit) || parseAmt(firstRow.credit);
     
-    if (window._editingJournalEntry && window._editingJournalEntry.isDraft) {
-      draftedEntries = draftedEntries.filter(e => e.id !== window._editingJournalEntry.id);
+    const editingCtx = window._editingJournalEntry;
+    const isEditDraft = editingCtx && editingCtx.isDraft;
+    if (isEditDraft) {
+      draftedEntries = draftedEntries.filter(e => String(e.id) !== String(editingCtx.id));
     }
     
-    const isEditPosted = window._editingJournalEntry && !window._editingJournalEntry.isDraft;
-    const entryId = isEditPosted ? window._editingJournalEntry.id : Date.now();
+    const isEditPosted = editingCtx && !editingCtx.isDraft;
+    const entryId = isEditPosted ? editingCtx.id : (isEditDraft ? editingCtx.id : Date.now());
     
     const postData = {
       id:             entryId,
@@ -2080,7 +2419,7 @@
     };
 
     if (isEditPosted) {
-      const idx = postedEntries.findIndex(e => e.id === entryId);
+      const idx = postedEntries.findIndex(e => String(e.id) === String(entryId));
       if (idx > -1) {
         postedEntries[idx] = postData;
       } else {
@@ -2091,13 +2430,48 @@
     }
 
     showToast(isEditPosted ? 'Journal entry updated successfully!' : 'Journal entry posted successfully!', 'success');
-    if (!isEditPosted) {
+    if (!isEditPosted && !isEditDraft) {
       jvCounter++;
     }
+
+    const returnContext = editingCtx?.returnContext || window._pendingJournalReturnContext || null;
     window._editingJournalEntry = null;
-    refreshAllReports();
+    window._pendingJournalReturnContext = null;
+
     triggerAutoBackup();
-    setTimeout(initFormDefaults, 900);
+    if (typeof window.refreshAllAppViews === 'function') {
+      window.refreshAllAppViews();
+    } else {
+      refreshAllReports();
+    }
+
+    if (returnContext) {
+      if (returnContext.clActiveTopTab && typeof _clActiveTopTab !== 'undefined') {
+        _clActiveTopTab = returnContext.clActiveTopTab;
+      }
+      if (returnContext.clActiveBankingTab && typeof _clActiveBankingTab !== 'undefined') {
+        _clActiveBankingTab = returnContext.clActiveBankingTab;
+      }
+      if (returnContext.clCashbookAccountId && typeof _clCashbookAccountId !== 'undefined') {
+        _clCashbookAccountId = returnContext.clCashbookAccountId;
+      }
+
+      initFormDefaults();
+
+      const returnTabId = returnContext.tabId || 'cashline';
+      if (typeof closeTab === 'function') {
+        closeTab('journal', null, returnTabId);
+      } else if (typeof openTab === 'function') {
+        openTab(returnTabId);
+      }
+
+      if (returnTabId === 'cashline') {
+        if (typeof renderCashlinePanel === 'function') renderCashlinePanel();
+        else if (typeof renderActiveSubtab === 'function') renderActiveSubtab();
+      }
+    } else {
+      setTimeout(initFormDefaults, 900);
+    }
   }
 
   // ── Voucher Desk state & logic ───────────────────────────────────
@@ -2107,36 +2481,47 @@
 
   function deleteVoucherFromDesk(type, id) {
     if (type === 'Journal') {
-      const isDraft = draftedEntries.some(e => e.id === id);
+      const isDraft = draftedEntries.some(e => String(e.id) === String(id));
       if (isDraft) {
-        const entry = draftedEntries.find(e => e.id === id);
+        const entry = draftedEntries.find(e => String(e.id) === String(id));
         showKyaConfirm({
           title: 'Delete this journal entry?',
           message: `Permanently delete draft <strong>${entry ? entry.voucherNo || '—' : '—'}</strong>?<br>This action cannot be undone.`,
           confirmLabel: '✕ Delete',
           iconBg: '#fee2e2', iconColor: '#dc2626',
-          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           okBg: '#dc2626',
           onConfirm: () => {
-            draftedEntries = draftedEntries.filter(e => e.id !== id);
-            triggerAutoBackup();
-            renderVoucherDeskPanel();
+            draftedEntries = draftedEntries.filter(e => String(e.id) !== String(id));
+            if (typeof window.refreshAllAppViews === 'function') {
+              window.refreshAllAppViews();
+            } else {
+              triggerAutoBackup();
+              renderVoucherDeskPanel();
+            }
           }
         });
       } else {
-        const entry = postedEntries.find(e => e.id === id);
+        const entry = postedEntries.find(e => String(e.id) === String(id));
         showKyaConfirm({
           title: 'Delete this journal entry?',
           message: `Permanently delete voucher <strong>${entry ? entry.voucherNo || '—' : '—'}</strong>?<br>This action cannot be undone.`,
           confirmLabel: '✕ Delete',
           iconBg: '#fee2e2', iconColor: '#dc2626',
-          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           okBg: '#dc2626',
           onConfirm: () => {
-            postedEntries = postedEntries.filter(e => e.id !== id);
-            refreshAllReports();
-            triggerAutoBackup();
-            renderVoucherDeskPanel();
+            postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
+            if (entry && entry.reconKey && window.KYA_STORE?.reconciliationState) {
+              delete window.KYA_STORE.reconciliationState[entry.reconKey];
+            }
+            if (typeof window.refreshAllAppViews === 'function') {
+              window.refreshAllAppViews();
+            } else {
+              refreshAllReports();
+              triggerAutoBackup();
+              renderVoucherDeskPanel();
+            }
           }
         });
       }
@@ -2169,22 +2554,26 @@
           okBg: '#dc2626',
           onConfirm: () => {
             const list = window.KYA_STORE?.salesVouchers || [];
-            const idx = list.findIndex(v => v.id === id || v.journalEntryId === id);
+            const idx = list.findIndex(v => String(v.id) === String(id) || String(v.journalEntryId) === String(id));
             if (idx > -1) {
               const inv = list[idx];
               list.splice(idx, 1);
               window.KYA_STORE.salesVouchers = list;
               if (inv.journalEntryId) {
-                postedEntries = postedEntries.filter(e => e.id !== inv.journalEntryId && e.id !== id);
+                postedEntries = postedEntries.filter(e => String(e.id) !== String(inv.journalEntryId) && String(e.id) !== String(id));
               }
             } else {
-              postedEntries = postedEntries.filter(e => e.id !== id);
+              postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
             }
-            refreshAllReports();
-            if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
-            if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
-            triggerAutoBackup();
-            renderVoucherDeskPanel();
+            if (typeof window.refreshAllAppViews === 'function') {
+              window.refreshAllAppViews();
+            } else {
+              refreshAllReports();
+              if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
+              if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
+              triggerAutoBackup();
+              renderVoucherDeskPanel();
+            }
           }
         });
       }

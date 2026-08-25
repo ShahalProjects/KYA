@@ -500,6 +500,11 @@
 
   function isTradePartyGroup(groupVal) {
     if (!groupVal) return false;
+    return isTradeReceivableGroup(groupVal) || isTradePayableGroup(groupVal);
+  }
+
+  function isTradeReceivableGroup(groupVal) {
+    if (!groupVal) return false;
     const [pType, pId] = groupVal.split(':');
 
     let targetSgId = pId;
@@ -513,14 +518,54 @@
       }
     }
 
-    if (targetSgId === 'sg-tr' || targetSgId === 'sg-tp') return true;
+    if (targetSgId === 'sg-tr') return true;
 
     if (targetName && (
       targetName.includes('receivable') ||
-      targetName.includes('payable') ||
       targetName.includes('debtor') ||
+      targetName.includes('customer')
+    )) {
+      return true;
+    }
+
+    if (typeof COA_SYS_SGS !== 'undefined') {
+      const sg = COA_SYS_SGS.find(s => s.id === targetSgId);
+      if (sg) {
+        if (sg.id === 'sg-tr' || sg.parent === 'sg-tr') return true;
+        const sName = (sg.name || '').toLowerCase();
+        if (
+          sName.includes('receivable') ||
+          sName.includes('debtor') ||
+          sName.includes('customer')
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  function isTradePayableGroup(groupVal) {
+    if (!groupVal) return false;
+    const [pType, pId] = groupVal.split(':');
+
+    let targetSgId = pId;
+    let targetName = '';
+
+    if (pType === 'gl') {
+      const gl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => String(l.id) === String(pId)) : null;
+      if (gl) {
+        targetSgId = gl.sgId;
+        targetName = (gl.name || '').toLowerCase();
+      }
+    }
+
+    if (targetSgId === 'sg-tp') return true;
+
+    if (targetName && (
+      targetName.includes('payable') ||
       targetName.includes('creditor') ||
-      targetName.includes('customer') ||
       targetName.includes('supplier') ||
       targetName.includes('vendor')
     )) {
@@ -530,14 +575,11 @@
     if (typeof COA_SYS_SGS !== 'undefined') {
       const sg = COA_SYS_SGS.find(s => s.id === targetSgId);
       if (sg) {
-        if (sg.id === 'sg-tr' || sg.id === 'sg-tp' || sg.parent === 'sg-tr' || sg.parent === 'sg-tp') return true;
+        if (sg.id === 'sg-tp' || sg.parent === 'sg-tp') return true;
         const sName = (sg.name || '').toLowerCase();
         if (
-          sName.includes('receivable') ||
           sName.includes('payable') ||
-          sName.includes('debtor') ||
           sName.includes('creditor') ||
-          sName.includes('customer') ||
           sName.includes('supplier') ||
           sName.includes('vendor')
         ) {
@@ -2730,6 +2772,8 @@
         });
       }
 
+      let _masterLedgerSaveAsMode = 'ledger';
+
       contentArea.innerHTML = `
         <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
           <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
@@ -2780,7 +2824,7 @@
           <!-- Additional Information (Dynamic for Trade Receivable / Payable) -->
           <div id="masterLedgerAdditionalInfoWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px; transition: all 0.2s ease;">
             
-            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
               <div style="display: flex; align-items: center; gap: 7px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -2788,7 +2832,16 @@
                 </svg>
                 <span>Additional Information</span>
               </div>
-              <span style="font-size: 11px; font-weight: 600; background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; border: 1px solid #dbeafe;">Party Profile</span>
+
+              <!-- Right Side Slide: Save As [ Ledger | Customer / Supplier ] -->
+              <div class="master-saveas-wrap" id="masterLedgerSaveAsWrap" style="display: flex; align-items: center; gap: 8px;">
+                <span class="master-saveas-label">Save As</span>
+                <div class="master-saveas-slider-wrap">
+                  <div class="master-saveas-slider-bg ledger-active" id="masterLedgerSaveAsBg"></div>
+                  <button type="button" class="master-saveas-btn active" id="masterLedgerSaveAsLedgerBtn">Ledger</button>
+                  <button type="button" class="master-saveas-btn" id="masterLedgerSaveAsPartyBtn">Customer</button>
+                </div>
+              </div>
             </div>
 
             <!-- 1. Address & Location Details -->
@@ -2892,13 +2945,65 @@
 
       const searchableGroupControl = initSearchableSelectHelper(contentArea, 'masterLedgerGroupCombinedSel', 'Select Group');
 
-      // Additional Information Dynamic Visibility
+      // Additional Information Dynamic Visibility and Save As Slider Toggle
       const groupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel');
       const addInfoWrap = contentArea.querySelector('#masterLedgerAdditionalInfoWrap');
+      const saveAsLedgerBtn = contentArea.querySelector('#masterLedgerSaveAsLedgerBtn');
+      const saveAsPartyBtn = contentArea.querySelector('#masterLedgerSaveAsPartyBtn');
+      const saveAsBg = contentArea.querySelector('#masterLedgerSaveAsBg');
+      const saveBtn = contentArea.querySelector('#masterLedgerSaveBtn');
+
+      const applySaveAsModeUi = () => {
+        if (!saveAsBg || !saveAsLedgerBtn || !saveAsPartyBtn || !saveBtn) return;
+        const isPay = isTradePayableGroup(groupSel ? groupSel.value : '');
+        const partyLabel = isPay ? 'Supplier' : 'Customer';
+        saveAsPartyBtn.textContent = partyLabel;
+
+        if (_masterLedgerSaveAsMode === 'party' || _masterLedgerSaveAsMode === 'customer' || _masterLedgerSaveAsMode === 'supplier') {
+          _masterLedgerSaveAsMode = isPay ? 'supplier' : 'customer';
+          saveAsBg.className = 'master-saveas-slider-bg party-active';
+          saveAsLedgerBtn.className = 'master-saveas-btn';
+          saveAsPartyBtn.className = 'master-saveas-btn active';
+          saveBtn.textContent = `＋ Create ${partyLabel}`;
+        } else {
+          _masterLedgerSaveAsMode = 'ledger';
+          saveAsBg.className = 'master-saveas-slider-bg ledger-active';
+          saveAsLedgerBtn.className = 'master-saveas-btn active';
+          saveAsPartyBtn.className = 'master-saveas-btn';
+          saveBtn.textContent = '＋ Create Ledger';
+        }
+      };
+
+      if (saveAsLedgerBtn) {
+        saveAsLedgerBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          _masterLedgerSaveAsMode = 'ledger';
+          applySaveAsModeUi();
+        });
+      }
+
+      if (saveAsPartyBtn) {
+        saveAsPartyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const isPay = isTradePayableGroup(groupSel ? groupSel.value : '');
+          _masterLedgerSaveAsMode = isPay ? 'supplier' : 'customer';
+          applySaveAsModeUi();
+        });
+      }
+
       const updateAdditionalInfoVisibility = () => {
         if (!groupSel || !addInfoWrap) return;
-        const isParty = isTradePartyGroup(groupSel.value);
+        const isRec = isTradeReceivableGroup(groupSel.value);
+        const isPay = isTradePayableGroup(groupSel.value);
+        const isParty = isRec || isPay;
+
         addInfoWrap.style.display = isParty ? 'block' : 'none';
+        if (isParty) {
+          applySaveAsModeUi();
+        } else {
+          _masterLedgerSaveAsMode = 'ledger';
+          if (saveBtn) saveBtn.textContent = '＋ Create Ledger';
+        }
       };
 
       if (groupSel) {
@@ -2931,7 +3036,6 @@
         });
       }
 
-      const saveBtn = contentArea.querySelector('#masterLedgerSaveBtn');
       const cancelBtn = contentArea.querySelector('#masterLedgerCancelBtn');
       const nameInp = contentArea.querySelector('#masterLedgerName');
       const nameErr = contentArea.querySelector('#masterLedgerNameError');
@@ -2987,8 +3091,9 @@
         saveBtn.addEventListener('click', () => {
           const name = nameInp ? nameInp.value.trim() : '';
           if (!name) {
-            if (typeof showToast === 'function') showToast('Please enter a ledger name.', 'warning');
-            else alert('Please enter a ledger name.');
+            const targetType = _masterLedgerSaveAsMode === 'customer' ? 'customer' : (_masterLedgerSaveAsMode === 'supplier' ? 'supplier' : 'ledger');
+            if (typeof showToast === 'function') showToast(`Please enter a ${targetType} name.`, 'warning');
+            else alert(`Please enter a ${targetType} name.`);
             if (nameInp) nameInp.focus();
             return;
           }
@@ -3041,6 +3146,233 @@
             }
           }
 
+          const balInp = contentArea.querySelector('#masterLedgerBalance');
+          const balVal = balInp ? balInp.value.trim() : '';
+          const openingBalance = balVal ? parseFloat(balVal) || 0 : 0;
+
+          // Additional Information fields
+          const contactName = contentArea.querySelector('#masterLedgerContactName')?.value?.trim() || '';
+          const address = contentArea.querySelector('#masterLedgerAddress')?.value?.trim() || '';
+          const city = contentArea.querySelector('#masterLedgerCity')?.value?.trim() || '';
+          const pincode = contentArea.querySelector('#masterLedgerPincode')?.value?.trim() || '';
+          const state = contentArea.querySelector('#masterLedgerState')?.value?.trim() || '';
+          const country = contentArea.querySelector('#masterLedgerCountry')?.value?.trim() || 'India';
+          const bankName = contentArea.querySelector('#masterLedgerBankName')?.value?.trim() || '';
+          const accountNo = contentArea.querySelector('#masterLedgerAccountNo')?.value?.trim() || '';
+          const ifsc = contentArea.querySelector('#masterLedgerIfsc')?.value?.trim() || '';
+          const branch = contentArea.querySelector('#masterLedgerBranch')?.value?.trim() || '';
+          const gstin = contentArea.querySelector('#masterLedgerGstin')?.value?.trim() || '';
+          const pan = contentArea.querySelector('#masterLedgerPan')?.value?.trim() || '';
+
+          // ── If Save As "Customer" is selected ──
+          if (_masterLedgerSaveAsMode === 'customer') {
+            const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+            const newCustomer = {
+              id: 'cust-' + Date.now(),
+              name: name,
+              aliases: aliases,
+              openingBalance: openingBalance,
+              contactName: contactName,
+              address: address,
+              city: city,
+              pincode: pincode,
+              state: state,
+              country: country,
+              bankName: bankName,
+              accountNo: accountNo,
+              ifsc: ifsc,
+              branch: branch,
+              gstin: gstin,
+              pan: pan,
+              createdAt: Date.now()
+            };
+
+            customers.push(newCustomer);
+
+            // Ensure central Trade Receivables ledger exists in CoA and update combined balance
+            if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+              let trLedger = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tr' && l.name === 'Trade Receivables');
+              if (!trLedger) {
+                trLedger = { id: 104, name: 'Trade Receivables', sgId: 'sg-tr', type: 'ledger', openingBalance: 0 };
+                coaLedgers.push(trLedger);
+              }
+              const totalCustOp = customers.reduce((sum, c) => sum + (parseFloat(c.openingBalance) || 0), 0);
+              trLedger.openingBalance = totalCustOp;
+            }
+
+            if (typeof _coaExpanded !== 'undefined') {
+              _coaExpanded.add('assets');
+              _coaExpanded.add('sg-tr');
+            }
+
+            if (typeof renderChartPanel === 'function') renderChartPanel();
+            if (typeof refreshAllReports === 'function') refreshAllReports();
+            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+            if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
+
+            showToast(`Customer "${name}" created successfully (linked to Trade Receivables).`, 'success');
+
+            _masterLedgerAliases = [];
+
+            if (_masterDeskReturnContext) {
+              const ctx = _masterDeskReturnContext;
+              _masterDeskReturnContext = null;
+              _masterLedgerAliases = [];
+
+              if (ctx.returnTab === 'sales_voucher') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
+                if (typeof openTab === 'function') openTab('sales_voucher');
+                else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
+                if (typeof window.onPartyCreatedForSales === 'function') {
+                  window.onPartyCreatedForSales(newCustomer, 'customer');
+                }
+                return;
+              }
+
+              if (ctx.returnTab === 'purchase_voucher') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
+                if (typeof openTab === 'function') openTab('purchase_voucher');
+                else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
+                if (typeof window.onPartyCreatedForPurchase === 'function') {
+                  window.onPartyCreatedForPurchase(newCustomer, 'customer');
+                }
+                return;
+              }
+
+              if (ctx.returnTab === 'journal') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'journal');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'journal');
+                if (typeof openTab === 'function') openTab('journal');
+                else if (typeof window.openTab === 'function') window.openTab('journal');
+                if (typeof window.onLedgerCreatedForJournal === 'function') {
+                  window.onLedgerCreatedForJournal(newCustomer, ctx.rowId);
+                }
+                return;
+              }
+
+              if (ctx.returnTab === 'cashline') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
+                if (typeof openTab === 'function') openTab('cashline');
+                else if (typeof window.openTab === 'function') window.openTab('cashline');
+                if (typeof window.onLedgerCreatedForCashline === 'function') {
+                  window.onLedgerCreatedForCashline(newCustomer, ctx);
+                }
+                return;
+              }
+            }
+
+            updateMasterDeskContent();
+            return;
+          }
+
+          // ── If Save As "Supplier" is selected ──
+          if (_masterLedgerSaveAsMode === 'supplier') {
+            const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+            const newSupplier = {
+              id: 'supp-' + Date.now(),
+              name: name,
+              aliases: aliases,
+              openingBalance: openingBalance,
+              contactName: contactName,
+              address: address,
+              city: city,
+              pincode: pincode,
+              state: state,
+              country: country,
+              bankName: bankName,
+              accountNo: accountNo,
+              ifsc: ifsc,
+              branch: branch,
+              gstin: gstin,
+              pan: pan,
+              createdAt: Date.now()
+            };
+
+            suppliers.push(newSupplier);
+
+            // Ensure central Trade Payables ledger exists in CoA and update combined balance
+            if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+              let tpLedger = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tp' && l.name === 'Trade Payables');
+              if (!tpLedger) {
+                tpLedger = { id: 201, name: 'Trade Payables', sgId: 'sg-tp', type: 'ledger', openingBalance: 0 };
+                coaLedgers.push(tpLedger);
+              }
+              const totalSuppOp = suppliers.reduce((sum, s) => sum + (parseFloat(s.openingBalance) || 0), 0);
+              tpLedger.openingBalance = totalSuppOp;
+            }
+
+            if (typeof _coaExpanded !== 'undefined') {
+              _coaExpanded.add('equity-liabilities');
+              _coaExpanded.add('sg-tp');
+            }
+
+            if (typeof renderChartPanel === 'function') renderChartPanel();
+            if (typeof refreshAllReports === 'function') refreshAllReports();
+            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+            if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
+
+            showToast(`Supplier "${name}" created successfully (linked to Trade Payables).`, 'success');
+
+            _masterLedgerAliases = [];
+
+            if (_masterDeskReturnContext) {
+              const ctx = _masterDeskReturnContext;
+              _masterDeskReturnContext = null;
+              _masterLedgerAliases = [];
+
+              if (ctx.returnTab === 'purchase_voucher') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
+                if (typeof openTab === 'function') openTab('purchase_voucher');
+                else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
+                if (typeof window.onPartyCreatedForPurchase === 'function') {
+                  window.onPartyCreatedForPurchase(newSupplier, 'supplier');
+                }
+                return;
+              }
+
+              if (ctx.returnTab === 'sales_voucher') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
+                if (typeof openTab === 'function') openTab('sales_voucher');
+                else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
+                if (typeof window.onPartyCreatedForSales === 'function') {
+                  window.onPartyCreatedForSales(newSupplier, 'supplier');
+                }
+                return;
+              }
+
+              if (ctx.returnTab === 'journal') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'journal');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'journal');
+                if (typeof openTab === 'function') openTab('journal');
+                else if (typeof window.openTab === 'function') window.openTab('journal');
+                if (typeof window.onLedgerCreatedForJournal === 'function') {
+                  window.onLedgerCreatedForJournal(newSupplier, ctx.rowId);
+                }
+                return;
+              }
+
+              if (ctx.returnTab === 'cashline') {
+                if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
+                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
+                if (typeof openTab === 'function') openTab('cashline');
+                else if (typeof window.openTab === 'function') window.openTab('cashline');
+                if (typeof window.onLedgerCreatedForCashline === 'function') {
+                  window.onLedgerCreatedForCashline(newSupplier, ctx);
+                }
+                return;
+              }
+            }
+
+            updateMasterDeskContent();
+            return;
+          }
+
+          // ── Otherwise: Save As "Ledger" in CoA ──
           const [pType, pId] = groupVal.split(':');
           let sgId = '';
           let glId = null;
@@ -3057,24 +3389,6 @@
               sgId = pId;
             }
           }
-
-          const balInp = contentArea.querySelector('#masterLedgerBalance');
-          const balVal = balInp ? balInp.value.trim() : '';
-          const openingBalance = balVal ? parseFloat(balVal) || 0 : 0;
-
-          // Additional Information fields
-          const contactName = contentArea.querySelector('#masterLedgerContactName')?.value?.trim() || '';
-          const address = contentArea.querySelector('#masterLedgerAddress')?.value?.trim() || '';
-          const city = contentArea.querySelector('#masterLedgerCity')?.value?.trim() || '';
-          const pincode = contentArea.querySelector('#masterLedgerPincode')?.value?.trim() || '';
-          const state = contentArea.querySelector('#masterLedgerState')?.value?.trim() || '';
-          const country = contentArea.querySelector('#masterLedgerCountry')?.value?.trim() || '';
-          const bankName = contentArea.querySelector('#masterLedgerBankName')?.value?.trim() || '';
-          const accountNo = contentArea.querySelector('#masterLedgerAccountNo')?.value?.trim() || '';
-          const ifsc = contentArea.querySelector('#masterLedgerIfsc')?.value?.trim() || '';
-          const branch = contentArea.querySelector('#masterLedgerBranch')?.value?.trim() || '';
-          const gstin = contentArea.querySelector('#masterLedgerGstin')?.value?.trim() || '';
-          const pan = contentArea.querySelector('#masterLedgerPan')?.value?.trim() || '';
 
           const newLedgerId = Date.now() + (typeof _coaLedgerCtr !== 'undefined' ? _coaLedgerCtr++ : 0);
           const newLedger = {
@@ -8272,6 +8586,13 @@
           }
           groupSel.dispatchEvent(new Event('change', { bubbles: true }));
         }
+      }
+      if (options.saveAs === 'customer' || options.saveAs === 'supplier') {
+        const partyBtn = document.getElementById('masterLedgerSaveAsPartyBtn');
+        if (partyBtn) partyBtn.click();
+      } else if (options.saveAs === 'ledger') {
+        const ledgerBtn = document.getElementById('masterLedgerSaveAsLedgerBtn');
+        if (ledgerBtn) ledgerBtn.click();
       }
     }, 60);
   }

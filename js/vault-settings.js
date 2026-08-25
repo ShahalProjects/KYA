@@ -397,32 +397,220 @@
   function renderCompanyPanel() {
     renderCompanyPanelOrganizer();
   }
-  function renderSettingsPanel() {
-    switchSettingsTab(_settingsActiveTab);
+  let _booksSettingsWired = false;
+  let _settingsTopTab = 'main'; // 'main' | 'config'
 
-    const tabMap = {
-      settingsTabVault: 'vault',
-      settingsTabShortcuts: 'shortcuts',
-    };
-    Object.entries(tabMap).forEach(([btnId, tab]) => {
-      const btn = document.getElementById(btnId);
-      if (btn && !btn._settingsWired) {
-        btn._settingsWired = true;
-        btn.addEventListener('click', () => switchSettingsTab(tab));
-      }
-    });
+  function initBooksSettingsListeners() {
+    if (_booksSettingsWired) return;
+    _booksSettingsWired = true;
+
+    const toggle = document.getElementById('booksMoreOptionsBeforePostToggle');
+    const btnOn = document.getElementById('btnBooksMoreOptionsOn');
+    const btnOff = document.getElementById('btnBooksMoreOptionsOff');
+
+    function setMoreOptionsState(isOn) {
+      localStorage.setItem('kya_books_more_options_before_post', isOn ? 'true' : 'false');
+      window._clBooksMoreOptionsBeforePost = isOn;
+      updateBooksSettingsUI();
+    }
+
+    if (toggle) {
+      toggle.addEventListener('change', (e) => {
+        setMoreOptionsState(e.target.checked);
+      });
+    }
+
+    if (btnOn) {
+      btnOn.addEventListener('click', () => {
+        setMoreOptionsState(true);
+      });
+    }
+
+    if (btnOff) {
+      btnOff.addEventListener('click', () => {
+        setMoreOptionsState(false);
+      });
+    }
+
+    const saveBtn = document.getElementById('btnCashlineConfigSave');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        const isSaved = localStorage.getItem('kya_books_more_options_before_post');
+        const isOn = isSaved === 'true';
+        localStorage.setItem('kya_books_more_options_before_post', isOn ? 'true' : 'false');
+        window._clBooksMoreOptionsBeforePost = isOn;
+
+        showToast('Cashline configuration saved.', 'success');
+
+        let fromBooks = false;
+        try {
+          if (window._clOpenedConfigFromBooks === true || sessionStorage.getItem('kya_cl_opened_config_from_books') === 'true') {
+            fromBooks = true;
+          }
+        } catch (e) {}
+
+        if (fromBooks) {
+          window._clOpenedConfigFromBooks = false;
+          try { sessionStorage.removeItem('kya_cl_opened_config_from_books'); } catch (e) {}
+
+          if (typeof _clActiveTopTab !== 'undefined') _clActiveTopTab = 'books';
+          if (typeof window._clActiveTopTab !== 'undefined') window._clActiveTopTab = 'books';
+
+          if (typeof closeTab === 'function') {
+            closeTab('settings', null, 'cashline');
+          } else if (typeof window.closeTab === 'function') {
+            window.closeTab('settings', null, 'cashline');
+          } else if (typeof navigateTo === 'function') {
+            navigateTo('cashline');
+          } else if (typeof window.navigateTo === 'function') {
+            window.navigateTo('cashline');
+          } else if (typeof openTab === 'function') {
+            openTab('cashline');
+          } else if (typeof window.openTab === 'function') {
+            window.openTab('cashline');
+          }
+
+          if (typeof renderCashlinePanel === 'function') {
+            renderCashlinePanel();
+          } else if (typeof window.renderCashlinePanel === 'function') {
+            window.renderCashlinePanel();
+          }
+        }
+      });
+    }
   }
 
+  function updateBooksSettingsUI() {
+    const isSaved = localStorage.getItem('kya_books_more_options_before_post');
+    const isOn = isSaved === 'true';
+
+    const toggle = document.getElementById('booksMoreOptionsBeforePostToggle');
+    if (toggle) {
+      toggle.checked = isOn;
+    }
+
+    const btnOn = document.getElementById('btnBooksMoreOptionsOn');
+    const btnOff = document.getElementById('btnBooksMoreOptionsOff');
+
+    if (btnOn) {
+      if (isOn) {
+        btnOn.style.background = 'var(--blue-600)';
+        btnOn.style.color = '#ffffff';
+        btnOn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.12)';
+      } else {
+        btnOn.style.background = 'transparent';
+        btnOn.style.color = 'var(--slate-500)';
+        btnOn.style.boxShadow = 'none';
+      }
+    }
+
+    if (btnOff) {
+      if (!isOn) {
+        btnOff.style.background = 'var(--white)';
+        btnOff.style.color = 'var(--slate-800)';
+        btnOff.style.boxShadow = '0 1px 2px rgba(0,0,0,0.06)';
+      } else {
+        btnOff.style.background = 'transparent';
+        btnOff.style.color = 'var(--slate-500)';
+        btnOff.style.boxShadow = 'none';
+      }
+    }
+  }
+
+  function switchSettingsTopTab(topTab) {
+    _settingsTopTab = topTab;
+    window._settingsTopTab = topTab;
+
+    const btnMain = document.getElementById('settingsTopTabMain');
+    const btnConfig = document.getElementById('settingsTopTabConfig');
+    const mainWrap = document.getElementById('settingsMainSubTabs');
+    const configWrap = document.getElementById('settingsConfigSubTabs');
+    const titleEl = document.getElementById('settingsCardTitle');
+    const subtitleEl = document.getElementById('settingsCardSubtitle');
+
+    if (topTab === 'config' || topTab === 'configuration') {
+      if (btnMain) btnMain.className = 'btn-sales-action';
+      if (btnConfig) btnConfig.className = 'btn btn-primary';
+      if (mainWrap) mainWrap.style.display = 'none';
+      if (configWrap) configWrap.style.display = 'flex';
+      if (titleEl) titleEl.textContent = 'Configuration';
+      if (subtitleEl) subtitleEl.textContent = 'Manage module configurations and posting preferences';
+
+      if (!['sales', 'purchase', 'journal', 'cashline'].includes(_settingsActiveTab)) {
+        _settingsActiveTab = 'cashline';
+      }
+    } else {
+      if (btnMain) btnMain.className = 'btn btn-primary';
+      if (btnConfig) btnConfig.className = 'btn-sales-action';
+      if (mainWrap) mainWrap.style.display = 'flex';
+      if (configWrap) configWrap.style.display = 'none';
+      if (titleEl) titleEl.textContent = 'Settings';
+      if (subtitleEl) subtitleEl.textContent = 'Configure your preferences, vault, and backups';
+
+      if (!['vault', 'shortcuts'].includes(_settingsActiveTab)) {
+        _settingsActiveTab = 'vault';
+      }
+    }
+
+    switchSettingsTab(_settingsActiveTab);
+  }
+  window.switchSettingsTopTab = switchSettingsTopTab;
+
   function switchSettingsTab(tab) {
+    if (!tab) tab = _settingsTopTab === 'config' ? 'cashline' : 'vault';
+    if (tab === 'books') tab = 'cashline';
+
+    // Auto-detect and align top tab
+    if (['sales', 'purchase', 'journal', 'cashline'].includes(tab)) {
+      _settingsTopTab = 'config';
+      window._settingsTopTab = 'config';
+      const btnMain = document.getElementById('settingsTopTabMain');
+      const btnConfig = document.getElementById('settingsTopTabConfig');
+      const mainWrap = document.getElementById('settingsMainSubTabs');
+      const configWrap = document.getElementById('settingsConfigSubTabs');
+      const titleEl = document.getElementById('settingsCardTitle');
+      const subtitleEl = document.getElementById('settingsCardSubtitle');
+      if (btnMain) btnMain.className = 'btn-sales-action';
+      if (btnConfig) btnConfig.className = 'btn btn-primary';
+      if (mainWrap) mainWrap.style.display = 'none';
+      if (configWrap) configWrap.style.display = 'flex';
+      if (titleEl) titleEl.textContent = 'Configuration';
+      if (subtitleEl) subtitleEl.textContent = 'Manage module configurations and posting preferences';
+    } else if (['vault', 'shortcuts'].includes(tab)) {
+      _settingsTopTab = 'main';
+      window._settingsTopTab = 'main';
+      const btnMain = document.getElementById('settingsTopTabMain');
+      const btnConfig = document.getElementById('settingsTopTabConfig');
+      const mainWrap = document.getElementById('settingsMainSubTabs');
+      const configWrap = document.getElementById('settingsConfigSubTabs');
+      const titleEl = document.getElementById('settingsCardTitle');
+      const subtitleEl = document.getElementById('settingsCardSubtitle');
+      if (btnMain) btnMain.className = 'btn btn-primary';
+      if (btnConfig) btnConfig.className = 'btn-sales-action';
+      if (mainWrap) mainWrap.style.display = 'flex';
+      if (configWrap) configWrap.style.display = 'none';
+      if (titleEl) titleEl.textContent = 'Settings';
+      if (subtitleEl) subtitleEl.textContent = 'Configure your preferences, vault, and backups';
+    }
+
     _settingsActiveTab = tab;
+    window._settingsActiveTab = tab;
 
     const allTabs = [
       ['settingsTabVault', 'vault'],
       ['settingsTabShortcuts', 'shortcuts'],
+      ['configTabSales', 'sales'],
+      ['configTabPurchase', 'purchase'],
+      ['configTabJournal', 'journal'],
+      ['configTabCashline', 'cashline'],
     ];
     const allViews = [
       ['settings-vault-view', 'vault'],
       ['settings-shortcuts-view', 'shortcuts'],
+      ['config-sales-view', 'sales'],
+      ['config-purchase-view', 'purchase'],
+      ['config-journal-view', 'journal'],
+      ['config-cashline-view', 'cashline'],
       ['settings-empty-view', ''],
     ];
 
@@ -438,10 +626,46 @@
       if (view) view.style.display = t === tab ? '' : 'none';
     });
 
-    if (tab === 'vault') {
+    if (tab === 'cashline') {
+      initBooksSettingsListeners();
+      updateBooksSettingsUI();
+    } else if (tab === 'vault') {
       initVaultListeners();
       updateVaultUI();
     }
+  }
+  window.switchSettingsTab = switchSettingsTab;
+
+  function renderSettingsPanel() {
+    switchSettingsTab(_settingsActiveTab || (_settingsTopTab === 'config' ? 'cashline' : 'vault'));
+
+    const btnMain = document.getElementById('settingsTopTabMain');
+    if (btnMain && !btnMain._wired) {
+      btnMain._wired = true;
+      btnMain.addEventListener('click', () => switchSettingsTopTab('main'));
+    }
+
+    const btnConfig = document.getElementById('settingsTopTabConfig');
+    if (btnConfig && !btnConfig._wired) {
+      btnConfig._wired = true;
+      btnConfig.addEventListener('click', () => switchSettingsTopTab('config'));
+    }
+
+    const tabMap = {
+      settingsTabVault: 'vault',
+      settingsTabShortcuts: 'shortcuts',
+      configTabSales: 'sales',
+      configTabPurchase: 'purchase',
+      configTabJournal: 'journal',
+      configTabCashline: 'cashline',
+    };
+    Object.entries(tabMap).forEach(([btnId, tab]) => {
+      const btn = document.getElementById(btnId);
+      if (btn && !btn._settingsWired) {
+        btn._settingsWired = true;
+        btn.addEventListener('click', () => switchSettingsTab(tab));
+      }
+    });
   }
 
   async function selectFolderWithHandle(handle) {

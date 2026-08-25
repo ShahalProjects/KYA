@@ -233,6 +233,15 @@
     const ledgerNameLower = (ledger.name || '').trim().toLowerCase();
     if (!ledgerNameLower) return false;
 
+    const custs = (ledger.sgId === 'sg-tr' || ledgerNameLower === 'trade receivables')
+      ? (typeof getKyaCustomers === 'function' ? getKyaCustomers() : [])
+      : [];
+    const supps = (ledger.sgId === 'sg-tp' || ledgerNameLower === 'trade payables')
+      ? (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [])
+      : [];
+    const custNames = new Set(custs.map(c => (c.name || '').trim().toLowerCase()));
+    const suppNames = new Set(supps.map(s => (s.name || '').trim().toLowerCase()));
+
     const entries = (typeof postedEntries !== 'undefined' && Array.isArray(postedEntries)) ? postedEntries : [];
     return entries.some(entry => {
       if (isBalanceSheet) {
@@ -244,7 +253,7 @@
 
       return (entry.allRows || []).some(row => {
         const part = (row.particular || '').trim().toLowerCase();
-        if (part !== ledgerNameLower) return false;
+        if (part !== ledgerNameLower && !custNames.has(part) && !suppNames.has(part)) return false;
         const dr = parseAmt(row.debit);
         const cr = parseAmt(row.credit);
         return dr !== 0 || cr !== 0;
@@ -1853,8 +1862,20 @@
       if (dateTo && entry.date > dateTo) return;
 
       (entry.allRows || []).forEach(row => {
-        const particular = row.particular.trim();
-        const ldg = coaLedgers.find(l => l.type === 'ledger' && l.name.trim() === particular);
+        const particular = (row.particular || '').trim();
+        if (!particular) return;
+        let ldg = coaLedgers.find(l => l.type === 'ledger' && l.name.trim().toLowerCase() === particular.toLowerCase());
+        if (!ldg) {
+          const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+          const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+          const isCust = custs.some(c => (c.name || '').trim().toLowerCase() === particular.toLowerCase());
+          const isSupp = supps.some(s => (s.name || '').trim().toLowerCase() === particular.toLowerCase());
+          if (isCust) {
+            ldg = coaLedgers.find(l => l.type === 'ledger' && (l.sgId === 'sg-tr' || l.name.trim().toLowerCase() === 'trade receivables'));
+          } else if (isSupp) {
+            ldg = coaLedgers.find(l => l.type === 'ledger' && (l.sgId === 'sg-tp' || l.name.trim().toLowerCase() === 'trade payables'));
+          }
+        }
         if (!ldg) return;
 
         const mainGroup = getLedgerMainGroup(ldg);
@@ -2068,11 +2089,31 @@
   }
 
   function refreshAllReports() {
-    if (activeTabId === 'posted') renderPostedPanel();
-    if (activeTabId === 'balance') renderBalanceSheetPanel();
-    if (activeTabId === 'pnl') renderPnlPanel();
-    if (activeTabId === 'trial') renderTrialBalancePanel();
-    if (activeTabId === 'voucher_desk') renderVoucherDeskPanel();
+    if (typeof activeTabId !== 'undefined') {
+      if (activeTabId === 'posted' && typeof renderPostedPanel === 'function') renderPostedPanel();
+      if (activeTabId === 'drafted' && typeof renderDraftedPanel === 'function') renderDraftedPanel();
+      if (activeTabId === 'balance' && typeof renderBalanceSheetPanel === 'function') renderBalanceSheetPanel();
+      if (activeTabId === 'pnl' && typeof renderPnlPanel === 'function') renderPnlPanel();
+      if (activeTabId === 'trial' && typeof renderTrialBalancePanel === 'function') renderTrialBalancePanel();
+      if (activeTabId === 'voucher_desk' && typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+      if (activeTabId === 'cashline') {
+        if (typeof window.renderActiveSubtab === 'function') window.renderActiveSubtab();
+        else if (typeof window.renderCashlinePanel === 'function') window.renderCashlinePanel();
+      }
+      if (activeTabId === 'chart') {
+        if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
+        if (typeof renderCustomerStatementView === 'function') renderCustomerStatementView();
+        if (typeof renderSupplierStatementView === 'function') renderSupplierStatementView();
+        if (typeof renderLedgerListView === 'function') renderLedgerListView();
+      }
+      if (activeTabId === 'onehub' && typeof renderOhBudgetView === 'function') renderOhBudgetView();
+      if ((activeTabId === 'sales_voucher' || activeTabId === 'sales_posted') && typeof renderSalesPostedPanel === 'function') {
+        renderSalesPostedPanel();
+      }
+      if (activeTabId === 'sales_drafted' && typeof renderSalesDraftedPanel === 'function') {
+        renderSalesDraftedPanel();
+      }
+    }
   }
 
   // Bind Date Input Events across all panels to keep them synchronized

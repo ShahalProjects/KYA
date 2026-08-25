@@ -682,6 +682,7 @@
     trial:     { tabId: 'trial' },
     onehub:    { tabId: 'onehub' },
     settings:  { tabId: 'settings' },
+    configuration: { tabId: 'settings' },
     sales:     { tabId: 'sales_voucher' },
     sales_voucher: { tabId: 'sales_voucher' },
     purchase:  { tabId: 'purchase_voucher' },
@@ -807,6 +808,74 @@
   window.openTab = openTab;
   window.closeTab = closeTab;
   window.navigateTo = navigateTo;
+
+  window.refreshAllAppViews = function() {
+    // 1. Cashline Views (Books / Cashbook, Banking / Statement, Banking / Reconciliation, Cashflow)
+    if (typeof window.renderActiveSubtab === 'function') {
+      window.renderActiveSubtab();
+    } else if (typeof window.renderCashlinePanel === 'function') {
+      const clPanel = document.getElementById('panel-cashline');
+      if (clPanel && clPanel.style.display !== 'none') {
+        window.renderCashlinePanel();
+      }
+    }
+
+    // 2. Ledger Views (Statements & Lists)
+    if (typeof renderLedgerStatementView === 'function') {
+      renderLedgerStatementView();
+    }
+    if (typeof renderCustomerStatementView === 'function') {
+      renderCustomerStatementView();
+    }
+    if (typeof renderSupplierStatementView === 'function') {
+      renderSupplierStatementView();
+    }
+    if (typeof renderLedgerListView === 'function') {
+      renderLedgerListView();
+    }
+
+    // 3. Voucher Desk Panel
+    if (typeof renderVoucherDeskPanel === 'function') {
+      renderVoucherDeskPanel();
+    }
+
+    // 4. Journal Panels (Posted & Drafted)
+    if (typeof renderPostedPanel === 'function') {
+      renderPostedPanel();
+    }
+    if (typeof renderDraftedPanel === 'function') {
+      renderDraftedPanel();
+    }
+
+    // 5. Sales Panels (Posted & Drafted)
+    if (typeof renderSalesPostedPanel === 'function') {
+      renderSalesPostedPanel();
+    }
+    if (typeof renderSalesDraftedPanel === 'function') {
+      renderSalesDraftedPanel();
+    }
+
+    // 6. OneHub & Budget Views
+    if (typeof renderOhBudgetView === 'function') {
+      renderOhBudgetView();
+    }
+    if (typeof renderOneHubPanel === 'function') {
+      const ohPanel = document.getElementById('panel-onehub');
+      if (ohPanel && ohPanel.style.display !== 'none') {
+        renderOneHubPanel();
+      }
+    }
+
+    // 7. Financial Reports (P&L, Balance Sheet, Trial Balance)
+    if (typeof refreshAllReports === 'function') {
+      refreshAllReports();
+    }
+
+    // 8. Auto Backup
+    if (typeof triggerAutoBackup === 'function') {
+      triggerAutoBackup();
+    }
+  };
 
   function switchToActivePanel() {
     // Hide all panels
