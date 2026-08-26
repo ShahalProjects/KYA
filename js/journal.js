@@ -28,9 +28,65 @@
     const v = parseFloat(cleanStr);
     return isNaN(v) ? 0 : v;
   }
-  function genVoucherNo() {
-    const y = new Date().getFullYear();
-    return `JV-${y}-${String(jvCounter).padStart(3,'0')}`;
+  function getNextJournalVoucherNo(dateStr, autoIncrement = true) {
+    let targetYear = new Date().getFullYear();
+    if (dateStr) {
+      const parsedDate = new Date(dateStr);
+      if (!isNaN(parsedDate.getTime())) {
+        targetYear = parsedDate.getFullYear();
+      }
+    }
+
+    const allEntries = [
+      ...(typeof postedEntries !== 'undefined' && Array.isArray(postedEntries) ? postedEntries : []),
+      ...(typeof draftedEntries !== 'undefined' && Array.isArray(draftedEntries) ? draftedEntries : []),
+      ...((typeof window !== 'undefined' && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [])
+    ];
+
+    const existingVoucherSet = new Set();
+    let maxSeq = 0;
+
+    allEntries.forEach(e => {
+      const vNo = (e && (e.voucherNo || e.invoiceNo)) ? String(e.voucherNo || e.invoiceNo).trim() : '';
+      if (!vNo) return;
+      existingVoucherSet.add(vNo.toUpperCase());
+
+      const m = vNo.match(/JV-(?:(\d{4})-)?(\d+)/i);
+      if (m) {
+        const yr = m[1] ? parseInt(m[1], 10) : targetYear;
+        const num = parseInt(m[2], 10);
+        if (!isNaN(num) && yr === targetYear) {
+          if (num > maxSeq) maxSeq = num;
+        }
+      }
+    });
+
+    let currentCounter = (typeof jvCounter !== 'undefined' && typeof jvCounter === 'number') ? jvCounter : 1;
+    if (typeof window !== 'undefined' && typeof window.jvCounter === 'number' && window.jvCounter > currentCounter) {
+      currentCounter = window.jvCounter;
+    }
+
+    let candidateNum = Math.max(currentCounter, maxSeq + 1);
+    let candidateVoucher = `JV-${targetYear}-${String(candidateNum).padStart(3, '0')}`;
+
+    while (existingVoucherSet.has(candidateVoucher.toUpperCase())) {
+      candidateNum++;
+      candidateVoucher = `JV-${targetYear}-${String(candidateNum).padStart(3, '0')}`;
+    }
+
+    if (autoIncrement) {
+      const nextCounter = candidateNum + 1;
+      if (typeof jvCounter !== 'undefined') jvCounter = nextCounter;
+      if (typeof window !== 'undefined') window.jvCounter = nextCounter;
+      if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    }
+
+    return candidateVoucher;
+  }
+  if (typeof window !== 'undefined') window.getNextJournalVoucherNo = getNextJournalVoucherNo;
+
+  function genVoucherNo(dateStr) {
+    return getNextJournalVoucherNo(dateStr || (document.getElementById('jeDate')?.value), false);
   }
 
   // ── Focus helpers ─────────────────────────────────────────────────
@@ -271,6 +327,9 @@
   }
 
   function loadJournalEntry(entry, isDraft, returnContext) {
+    const existingReconPop = document.getElementById('clReconLedgerPopover');
+    if (existingReconPop) existingReconPop.remove();
+
     openTab('journal');
     
     document.getElementById('jeDate').value = entry.date || '';
@@ -307,6 +366,14 @@
       isDraft: isDraft,
       returnContext: returnContext || window._pendingJournalReturnContext || null
     };
+
+    if (jeRows.length > 1 && jeRows[0].lockParticular) {
+      setTimeout(() => {
+        focusParticularsOfRow(jeRows[1].id);
+      }, 100);
+    } else {
+      setTimeout(focusFirstParticulars, 100);
+    }
   }
   window.loadJournalEntry = loadJournalEntry;
 
@@ -356,15 +423,22 @@
       sel.setAttribute('aria-label', 'Entry type');
       sel.innerHTML = `<option value="By" ${isBy ? 'selected' : ''}>By</option>
                        <option value="To" ${!isBy ? 'selected' : ''}>To</option>`;
-      sel.addEventListener('change', () => {
-        row.type = sel.value;
-        sel.className = 'je-type-select ' + (sel.value === 'By' ? 'type-by' : 'type-to');
-        // Move any existing amount to the correct bucket
-        if (sel.value === 'By') { row.debit = row.credit || row.debit; row.credit = ''; }
-        else                    { row.credit = row.debit || row.credit; row.debit  = ''; }
-        refreshTotals();
-        renderRows();
-      });
+      if (row.lockType) {
+        sel.disabled = true;
+        sel.style.cursor = 'default';
+        sel.style.opacity = '1';
+        sel.title = 'Bank entry type is fixed';
+      } else {
+        sel.addEventListener('change', () => {
+          row.type = sel.value;
+          sel.className = 'je-type-select ' + (sel.value === 'By' ? 'type-by' : 'type-to');
+          // Move any existing amount to the correct bucket
+          if (sel.value === 'By') { row.debit = row.credit || row.debit; row.credit = ''; }
+          else                    { row.credit = row.debit || row.credit; row.debit  = ''; }
+          refreshTotals();
+          renderRows();
+        });
+      }
       tdType.appendChild(sel);
 
       // ── Particulars
@@ -383,84 +457,94 @@
       inpAmt.className   = 'je-amount-input ' + (isBy ? 'amt-debit' : 'amt-credit');
       inpAmt.setAttribute('aria-label', isBy ? 'Debit amount' : 'Credit amount');
 
-      inpAmt.addEventListener('focus', () => {
-        const thisTr = document.querySelector(`[data-row-id="${row.id}"]`);
-        if (thisTr) {
-          const partInp = thisTr.querySelector('.je-particulars-input');
-          if (partInp && partInp.value.trim() === '') {
-            partInp.focus();
-            showToast('Please select a ledger account in Particulars first.', 'warning');
-          }
-        }
-      });
-
-      inpAmt.addEventListener('input', () => {
-        if (isBy) { row.debit  = inpAmt.value; row.credit = ''; }
-        else      { row.credit = inpAmt.value; row.debit  = ''; }
-        refreshTotals();
-      });
-
-      inpAmt.addEventListener('blur', () => {
-        const v = parseAmt(inpAmt.value);
-        if (v) {
-          const fmt = v.toFixed(2);
-          inpAmt.value = fmt;
-          if (isBy) { row.debit = fmt; row.credit = ''; }
-          else      { row.credit = fmt; row.debit  = ''; }
-        } else {
-          inpAmt.value = '';
-          if (isBy) row.debit = ''; else row.credit = '';
-        }
-        refreshTotals();
-      });
-
-      // ── Keyboard shortcuts on Amount field
-      inpAmt.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || (e.key === ' ' && !/[\+\-\*\/\(]\s*$/.test(inpAmt.value))) {
-          e.preventDefault();
-
-          // Commit current amount first
-          const v = parseAmt(inpAmt.value);
-          if (!v || v <= 0) {
-            showToast('Please enter an amount greater than zero.', 'warning');
-            return;
-          }
-
-          const fmt = v.toFixed(2);
-          inpAmt.value = fmt;
-          if (isBy) row.debit = fmt; else row.credit = fmt;
-          refreshTotals();
-
-          // After committing, re-check balance
-          let totalDr = 0, totalCr = 0;
-          jeRows.forEach(r => { totalDr += parseAmt(r.debit); totalCr += parseAmt(r.credit); });
-          const balanced = totalDr > 0 && Math.abs(totalDr - totalCr) < 0.005;
-
-          if (balanced) {
-            // Entry is balanced → jump straight to Narration
-            document.getElementById('jeNarration').focus();
-          } else {
-            // Not balanced → create next row
-            if (e.key === 'Enter') addRow('To');
-            else                   addRow('By');
-          }
-
-        } else if (e.key === 'Tab') {
-          const v = parseAmt(inpAmt.value);
-          if (!v || v <= 0) {
-            e.preventDefault();
-            showToast('Please enter an amount greater than zero.', 'warning');
-          }
-        } else if (e.key === 'Backspace' && inpAmt.value === '') {
-          // Amount is empty → step back to Particulars of the same row
-          e.preventDefault();
+      if (row.lockAmount) {
+        inpAmt.readOnly = true;
+        inpAmt.style.backgroundColor = '#f8fafc';
+        inpAmt.style.color = '#1e293b';
+        inpAmt.style.fontWeight = '700';
+        inpAmt.style.cursor = 'not-allowed';
+        inpAmt.tabIndex = -1;
+        inpAmt.title = 'Bank statement amount is fixed and cannot be edited';
+      } else {
+        inpAmt.addEventListener('focus', () => {
           const thisTr = document.querySelector(`[data-row-id="${row.id}"]`);
           if (thisTr) {
             const partInp = thisTr.querySelector('.je-particulars-input');
-            if (partInp) partInp.focus();
+            if (partInp && partInp.value.trim() === '') {
+              partInp.focus();
+              showToast('Please select a ledger account in Particulars first.', 'warning');
+            }
           }
-        }
-      });
+        });
+
+        inpAmt.addEventListener('input', () => {
+          if (isBy) { row.debit  = inpAmt.value; row.credit = ''; }
+          else      { row.credit = inpAmt.value; row.debit  = ''; }
+          refreshTotals();
+        });
+
+        inpAmt.addEventListener('blur', () => {
+          const v = parseAmt(inpAmt.value);
+          if (v) {
+            const fmt = v.toFixed(2);
+            inpAmt.value = fmt;
+            if (isBy) { row.debit = fmt; row.credit = ''; }
+            else      { row.credit = fmt; row.debit  = ''; }
+          } else {
+            inpAmt.value = '';
+            if (isBy) row.debit = ''; else row.credit = '';
+          }
+          refreshTotals();
+        });
+
+        // ── Keyboard shortcuts on Amount field
+        inpAmt.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || (e.key === ' ' && !/[\+\-\*\/\(]\s*$/.test(inpAmt.value))) {
+            e.preventDefault();
+
+            // Commit current amount first
+            const v = parseAmt(inpAmt.value);
+            if (!v || v <= 0) {
+              showToast('Please enter an amount greater than zero.', 'warning');
+              return;
+            }
+
+            const fmt = v.toFixed(2);
+            inpAmt.value = fmt;
+            if (isBy) row.debit = fmt; else row.credit = fmt;
+            refreshTotals();
+
+            // After committing, re-check balance
+            let totalDr = 0, totalCr = 0;
+            jeRows.forEach(r => { totalDr += parseAmt(r.debit); totalCr += parseAmt(r.credit); });
+            const balanced = totalDr > 0 && Math.abs(totalDr - totalCr) < 0.005;
+
+            if (balanced) {
+              // Entry is balanced → jump straight to Narration
+              document.getElementById('jeNarration').focus();
+            } else {
+              // Not balanced → create next row
+              if (e.key === 'Enter') addRow('To');
+              else                   addRow('By');
+            }
+
+          } else if (e.key === 'Tab') {
+            const v = parseAmt(inpAmt.value);
+            if (!v || v <= 0) {
+              e.preventDefault();
+              showToast('Please enter an amount greater than zero.', 'warning');
+            }
+          } else if (e.key === 'Backspace' && inpAmt.value === '') {
+            // Amount is empty → step back to Particulars of the same row
+            e.preventDefault();
+            const thisTr = document.querySelector(`[data-row-id="${row.id}"]`);
+            if (thisTr) {
+              const partInp = thisTr.querySelector('.je-particulars-input');
+              if (partInp) partInp.focus();
+            }
+          }
+        });
+      }
 
       tdAmt.appendChild(inpAmt);
 
@@ -474,20 +558,28 @@
           <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
       `;
-      delBtn.addEventListener('click', () => {
-        if (isFirst) {
-          // First row: clear fields rather than removing the row
-          row.particular = '';
-          row.debit      = '';
-          row.credit     = '';
-          refreshTotals();
-          renderRows();
-          focusParticularsOfRow(row.id);
-        } else {
-          focusPrevRowDebit(row.id);
-          deleteRow(row.id);
-        }
-      });
+      if (row.isBankRow || row.lockDelete) {
+        delBtn.disabled = true;
+        delBtn.style.opacity = '0.2';
+        delBtn.style.cursor = 'not-allowed';
+        delBtn.style.pointerEvents = 'none';
+        delBtn.title = 'Bank statement line cannot be deleted';
+      } else {
+        delBtn.addEventListener('click', () => {
+          if (isFirst) {
+            // First row: clear fields rather than removing the row
+            row.particular = '';
+            row.debit      = '';
+            row.credit     = '';
+            refreshTotals();
+            renderRows();
+            focusParticularsOfRow(row.id);
+          } else {
+            focusPrevRowDebit(row.id);
+            deleteRow(row.id);
+          }
+        });
+      }
       tdDel.appendChild(delBtn);
 
       tr.appendChild(tdSno);
@@ -1035,92 +1127,105 @@
     rightAddons.appendChild(balBadge);
     rightAddons.appendChild(arrow);
 
-    function _select(acct) {
-      inp.value      = acct.name;
-      row.particular = acct.name;
-      updateAllParticularsBalanceBadges();
-      const tr = inp.closest('[data-row-id]');
-      if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
-    }
+    if (row.lockParticular) {
+      inp.readOnly = true;
+      inp.style.backgroundColor = '#f8fafc';
+      inp.style.color = '#1e293b';
+      inp.style.fontWeight = '600';
+      inp.style.cursor = 'default';
+      inp.title = 'Bank account is fixed from statement';
+      arrow.style.display = 'none';
+      setTimeout(() => {
+        updateParticularsBalanceBadge(wrap, row.particular);
+      }, 50);
+    } else {
+      function _select(acct) {
+        inp.value      = acct.name;
+        row.particular = acct.name;
+        updateAllParticularsBalanceBadges();
+        const tr = inp.closest('[data-row-id]');
+        if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
+      }
 
-    inp.addEventListener('focus', () => _jePortal.open(inp, inp.value, _select));
-    inp.addEventListener('input', () => {
-      row.particular = inp.value;
-      updateAllParticularsBalanceBadges();
-      _jePortal.open(inp, inp.value, _select);
-    });
+      inp.addEventListener('focus', () => _jePortal.open(inp, inp.value, _select));
+      inp.addEventListener('input', () => {
+        row.particular = inp.value;
+        updateAllParticularsBalanceBadges();
+        _jePortal.open(inp, inp.value, _select);
+      });
 
-    inp.addEventListener('keydown', e => {
-      const open = _jePortal.isOpen();
+      inp.addEventListener('keydown', e => {
+        const open = _jePortal.isOpen();
 
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (!open) _jePortal.open(inp, inp.value, _select);
-        _jePortal.moveHighlight(1);
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!open) _jePortal.open(inp, inp.value, _select);
+          _jePortal.moveHighlight(1);
 
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        _jePortal.moveHighlight(-1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          _jePortal.moveHighlight(-1);
 
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (open) {
-          _jePortal.selectHighlighted();
-        } else {
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (open) {
+            _jePortal.selectHighlighted();
+          } else {
+            if (inp.value.trim() === '') {
+              showToast('Please select a ledger, customer, or supplier in Particulars.', 'warning');
+            } else {
+              const tr = inp.closest('[data-row-id]');
+              if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
+            }
+          }
+
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          _jePortal.close();
+
+        } else if (e.key === 'Tab') {
           if (inp.value.trim() === '') {
+            e.preventDefault();
             showToast('Please select a ledger, customer, or supplier in Particulars.', 'warning');
           } else {
-            const tr = inp.closest('[data-row-id]');
-            if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
+            _jePortal.close();
           }
-        }
 
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        _jePortal.close();
-
-      } else if (e.key === 'Tab') {
-        if (inp.value.trim() === '') {
+        } else if (e.key === 'Backspace' && !isFirstRow && inp.value === '') {
           e.preventDefault();
-          showToast('Please select a ledger, customer, or supplier in Particulars.', 'warning');
-        } else {
           _jePortal.close();
+          focusPrevRowDebit(row.id);
+          deleteRow(row.id);
         }
+      });
 
-      } else if (e.key === 'Backspace' && !isFirstRow && inp.value === '') {
-        e.preventDefault();
-        _jePortal.close();
-        focusPrevRowDebit(row.id);
-        deleteRow(row.id);
-      }
-    });
-
-    inp.addEventListener('blur', () => {
-      // Give portal mousedown time to fire before validating
-      setTimeout(() => {
-        if (_jePortal.isOpen()) return;
-        if (window._jeOpeningMasterDesk) return;
-        const val = inp.value.trim().toLowerCase();
-        if (val === '') {
-          row.particular = '';
-        } else {
-          const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-          const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
-          const match = (coaLedgers && coaLedgers.find(l => l.type === 'ledger' && (l.name || '').toLowerCase() === val))
-            || custs.find(c => (c.name || '').toLowerCase() === val)
-            || supps.find(s => (s.name || '').toLowerCase() === val);
-          if (match) {
-            inp.value      = match.name;
-            row.particular = match.name;
-          } else {
-            inp.value      = '';
+      inp.addEventListener('blur', () => {
+        // Give portal mousedown time to fire before validating
+        setTimeout(() => {
+          if (_jePortal.isOpen()) return;
+          if (window._jeOpeningMasterDesk) return;
+          const val = inp.value.trim().toLowerCase();
+          if (val === '') {
             row.particular = '';
-            showToast('Please select a valid ledger, customer, or supplier.', 'error');
+          } else {
+            const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+            const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+            const match = (coaLedgers && coaLedgers.find(l => l.type === 'ledger' && (l.name || '').toLowerCase() === val))
+              || custs.find(c => (c.name || '').toLowerCase() === val)
+              || supps.find(s => (s.name || '').toLowerCase() === val);
+            if (match) {
+              inp.value      = match.name;
+              row.particular = match.name;
+            } else {
+              inp.value      = '';
+              row.particular = '';
+              showToast('Please select a valid ledger, customer, or supplier.', 'error');
+            }
           }
-        }
-        updateAllParticularsBalanceBadges();
-      }, 200);
-    });
+          updateAllParticularsBalanceBadges();
+        }, 200);
+      });
+    }
 
     wrap.appendChild(inp);
     wrap.appendChild(rightAddons);
@@ -1182,9 +1287,38 @@
 
   // ── Clear button ──────────────────────────────────────────────────
   document.getElementById('btnClearJE').addEventListener('click', () => {
-    initFormDefaults();
-    // Focus first particulars after reset
-    setTimeout(focusFirstParticulars, 80);
+    const returnContext = window._editingJournalEntry?.returnContext || window._pendingJournalReturnContext;
+    if (returnContext) {
+      if (returnContext.cashlineNavState && typeof window.setCashlineNavigationState === 'function') {
+        window.setCashlineNavigationState(returnContext.cashlineNavState);
+      } else if (typeof window.setCashlineNavigationState === 'function') {
+        window.setCashlineNavigationState({
+          activeTopTab: returnContext.clActiveTopTab,
+          activeBankingTab: returnContext.clActiveBankingTab,
+          reconBankId: returnContext.clReconBankId,
+          cashbookAccountId: returnContext.clCashbookAccountId,
+          reconSubSection: returnContext.clReconSubSection,
+          reconFilter: returnContext.clReconFilter
+        });
+      }
+      window._editingJournalEntry = null;
+      window._pendingJournalReturnContext = null;
+      initFormDefaults();
+      const returnTabId = returnContext.tabId || 'cashline';
+      if (typeof closeTab === 'function') {
+        closeTab('journal', null, returnTabId);
+      } else if (typeof openTab === 'function') {
+        openTab(returnTabId);
+      }
+      if (returnTabId === 'cashline') {
+        if (typeof renderCashlinePanel === 'function') renderCashlinePanel();
+        else if (typeof window.renderCashlinePanel === 'function') window.renderCashlinePanel();
+      }
+    } else {
+      initFormDefaults();
+      // Focus first particulars after reset
+      setTimeout(focusFirstParticulars, 80);
+    }
   });
 
   // ── Save Draft ────────────────────────────────────────────────────
@@ -1244,14 +1378,17 @@
     }
 
     if (returnContext) {
-      if (returnContext.clActiveTopTab && typeof _clActiveTopTab !== 'undefined') {
-        _clActiveTopTab = returnContext.clActiveTopTab;
-      }
-      if (returnContext.clActiveBankingTab && typeof _clActiveBankingTab !== 'undefined') {
-        _clActiveBankingTab = returnContext.clActiveBankingTab;
-      }
-      if (returnContext.clCashbookAccountId && typeof _clCashbookAccountId !== 'undefined') {
-        _clCashbookAccountId = returnContext.clCashbookAccountId;
+      if (returnContext.cashlineNavState && typeof window.setCashlineNavigationState === 'function') {
+        window.setCashlineNavigationState(returnContext.cashlineNavState);
+      } else if (typeof window.setCashlineNavigationState === 'function') {
+        window.setCashlineNavigationState({
+          activeTopTab: returnContext.clActiveTopTab,
+          activeBankingTab: returnContext.clActiveBankingTab,
+          reconBankId: returnContext.clReconBankId,
+          cashbookAccountId: returnContext.clCashbookAccountId,
+          reconSubSection: returnContext.clReconSubSection,
+          reconFilter: returnContext.clReconFilter
+        });
       }
 
       initFormDefaults();
@@ -1265,6 +1402,7 @@
 
       if (returnTabId === 'cashline') {
         if (typeof renderCashlinePanel === 'function') renderCashlinePanel();
+        else if (typeof window.renderCashlinePanel === 'function') window.renderCashlinePanel();
         else if (typeof renderActiveSubtab === 'function') renderActiveSubtab();
       }
     } else {
@@ -1287,7 +1425,34 @@
   const cancelBtn = document.getElementById('btnJeCancel');
   if (cancelBtn) {
     cancelBtn.addEventListener('click', () => {
-      showToast('Cancel is an upcoming feature!', 'info');
+      const returnContext = window._editingJournalEntry?.returnContext || window._pendingJournalReturnContext;
+      if (returnContext) {
+        if (returnContext.cashlineNavState && typeof window.setCashlineNavigationState === 'function') {
+          window.setCashlineNavigationState(returnContext.cashlineNavState);
+        } else if (typeof window.setCashlineNavigationState === 'function') {
+          window.setCashlineNavigationState({
+            activeTopTab: returnContext.clActiveTopTab,
+            activeBankingTab: returnContext.clActiveBankingTab,
+            reconBankId: returnContext.clReconBankId,
+            cashbookAccountId: returnContext.clCashbookAccountId,
+            reconSubSection: returnContext.clReconSubSection,
+            reconFilter: returnContext.clReconFilter
+          });
+        }
+        window._editingJournalEntry = null;
+        window._pendingJournalReturnContext = null;
+        initFormDefaults();
+        const returnTabId = returnContext.tabId || 'cashline';
+        if (typeof closeTab === 'function') closeTab('journal', null, returnTabId);
+        else if (typeof openTab === 'function') openTab(returnTabId);
+        if (returnTabId === 'cashline') {
+          if (typeof renderCashlinePanel === 'function') renderCashlinePanel();
+          else if (typeof window.renderCashlinePanel === 'function') window.renderCashlinePanel();
+        }
+      } else {
+        initFormDefaults();
+        showToast('Journal entry reset.', 'info');
+      }
     });
   }
 
@@ -1699,7 +1864,7 @@
                 <td><span class="pt-vbadge">${e.voucherNo}</span>${e.uploadedDoc && e.uploadedDoc.fileData ? `<span title="Attachment: ${typeof ohEsc === 'function' ? ohEsc(e.uploadedDoc.fileName) : e.uploadedDoc.fileName}" style="margin-left: 5px; color: #2563eb; display: inline-flex; vertical-align: middle;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>` : ''}</td>
                 <td>${e.preparedBy}</td>
                 <td style="font-weight:500;color:#1e293b">${e.firstParticular || '—'}</td>
-                <td style="text-align:right"><span class="pt-amt">₹&thinsp;${e.amount}</span></td>
+                <td style="text-align:right"><span class="pt-amt">₹&thinsp;${e.amount || (e.allRows && e.allRows[0] ? (e.allRows[0].debit || e.allRows[0].credit) : '0.00')}</span></td>
                 <td style="text-align:center;white-space:nowrap">
                   <button class="pt-view-btn pt-edit" data-id="${e.id}" title="Edit journal entry" style="margin-right:4px">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -2418,6 +2583,47 @@
       uploadedDoc:    window._jeUploadedDoc || null,
     };
 
+    const returnContext = editingCtx?.returnContext || window._pendingJournalReturnContext || null;
+
+    if (returnContext && returnContext.reconKey) {
+      postData.reconKey = returnContext.reconKey;
+      window.KYA_STORE = window.KYA_STORE || {};
+      window.KYA_STORE.reconciliationState = window.KYA_STORE.reconciliationState || {};
+      window.KYA_STORE.statementConfirmed = window.KYA_STORE.statementConfirmed || {};
+      window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
+      window.KYA_STORE.statementNarrationMapping = window.KYA_STORE.statementNarrationMapping || {};
+      window.KYA_STORE.statementDeptMapping = window.KYA_STORE.statementDeptMapping || {};
+      window.KYA_STORE.statementTypeMapping = window.KYA_STORE.statementTypeMapping || {};
+      window.KYA_STORE.statementDocMapping = window.KYA_STORE.statementDocMapping || {};
+
+      window.KYA_STORE.reconciliationState[returnContext.reconKey] = postData.date;
+      window.KYA_STORE.statementConfirmed[returnContext.reconKey] = true;
+
+      // Identify contra ledger(s)
+      const bankName = returnContext.bankLedgerName || '';
+      const oppRows = (postData.allRows || []).filter(r => r.particular && r.particular !== bankName);
+      let contraLedgerId = '';
+      if (oppRows.length > 0) {
+        const firstOpp = oppRows[0].particular;
+        const foundLedger = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.name === firstOpp);
+        if (foundLedger) contraLedgerId = foundLedger.id;
+        else contraLedgerId = firstOpp;
+      }
+      if (contraLedgerId) {
+        window.KYA_STORE.statementLedgerMapping[returnContext.reconKey] = contraLedgerId;
+      }
+      if (postData.narration) {
+        window.KYA_STORE.statementNarrationMapping[returnContext.reconKey] = postData.narration;
+      }
+      if (postData.departmentId) {
+        window.KYA_STORE.statementDeptMapping[returnContext.reconKey] = postData.departmentId;
+      }
+      window.KYA_STORE.statementTypeMapping[returnContext.reconKey] = postData.isBudget ? 'budget' : 'non-budget';
+      if (postData.uploadedDoc) {
+        window.KYA_STORE.statementDocMapping[returnContext.reconKey] = postData.uploadedDoc;
+      }
+    }
+
     if (isEditPosted) {
       const idx = postedEntries.findIndex(e => String(e.id) === String(entryId));
       if (idx > -1) {
@@ -2434,7 +2640,6 @@
       jvCounter++;
     }
 
-    const returnContext = editingCtx?.returnContext || window._pendingJournalReturnContext || null;
     window._editingJournalEntry = null;
     window._pendingJournalReturnContext = null;
 
@@ -2446,14 +2651,17 @@
     }
 
     if (returnContext) {
-      if (returnContext.clActiveTopTab && typeof _clActiveTopTab !== 'undefined') {
-        _clActiveTopTab = returnContext.clActiveTopTab;
-      }
-      if (returnContext.clActiveBankingTab && typeof _clActiveBankingTab !== 'undefined') {
-        _clActiveBankingTab = returnContext.clActiveBankingTab;
-      }
-      if (returnContext.clCashbookAccountId && typeof _clCashbookAccountId !== 'undefined') {
-        _clCashbookAccountId = returnContext.clCashbookAccountId;
+      if (returnContext.cashlineNavState && typeof window.setCashlineNavigationState === 'function') {
+        window.setCashlineNavigationState(returnContext.cashlineNavState);
+      } else if (typeof window.setCashlineNavigationState === 'function') {
+        window.setCashlineNavigationState({
+          activeTopTab: returnContext.clActiveTopTab,
+          activeBankingTab: returnContext.clActiveBankingTab,
+          reconBankId: returnContext.clReconBankId,
+          cashbookAccountId: returnContext.clCashbookAccountId,
+          reconSubSection: returnContext.clReconSubSection,
+          reconFilter: returnContext.clReconFilter
+        });
       }
 
       initFormDefaults();
@@ -2467,6 +2675,7 @@
 
       if (returnTabId === 'cashline') {
         if (typeof renderCashlinePanel === 'function') renderCashlinePanel();
+        else if (typeof window.renderCashlinePanel === 'function') window.renderCashlinePanel();
         else if (typeof renderActiveSubtab === 'function') renderActiveSubtab();
       }
     } else {
@@ -2608,13 +2817,24 @@
         type = 'Purchase';
       }
 
+      let formattedAmount = e.amount;
+      if (!formattedAmount || formattedAmount === 'undefined') {
+        let calcAmt = 0;
+        if (Array.isArray(e.allRows) && e.allRows.length > 0) {
+          const firstDebit = parseFloat(e.allRows[0].debit) || 0;
+          const firstCredit = parseFloat(e.allRows[0].credit) || 0;
+          calcAmt = firstDebit || firstCredit || 0;
+        }
+        formattedAmount = typeof fmtNum === 'function' ? fmtNum(calcAmt) : (calcAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      }
+
       list.push({
         id: e.id,
         date: e.date,
         voucherNo: e.voucherNo,
         type: type,
-        particulars: e.narration || e.firstParticular || '—',
-        amount: e.amount,
+        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
+        amount: formattedAmount,
         isDraft: false,
         raw: e
       });
@@ -2627,7 +2847,7 @@
         date: e.date,
         voucherNo: e.voucherNo,
         type: 'Journal',
-        particulars: e.narration || e.firstParticular || '—',
+        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
         amount: e.amount,
         isDraft: true,
         raw: e
@@ -2648,7 +2868,7 @@
         date: d.date,
         voucherNo: d.invoiceNo || 'Draft',
         type: vType,
-        particulars: d.notes || (`Draft ${vType}${custName ? ' for ' + custName : ''}`),
+        particulars: custName || `Draft ${vType}`,
         amount: vAmt,
         isDraft: true,
         raw: d
@@ -2681,7 +2901,7 @@
           date: v.date,
           voucherNo: vNo,
           type: vType,
-          particulars: v.notes || (`${vType}${custName ? ' for ' + custName : ''}`),
+          particulars: custName || vType,
           amount: vAmt,
           isDraft: false,
           raw: v
@@ -2791,7 +3011,7 @@
                 <th>Date</th>
                 <th>Voucher No.</th>
                 <th>Type</th>
-                <th>Particulars / Narration</th>
+                <th>Particulars</th>
                 <th style="text-align: right;">Amount</th>
                 <th style="text-align: center;">Status</th>
               </tr>
@@ -2923,14 +3143,25 @@
         type = 'Purchase';
       }
 
+      let formattedAmount = e.amount;
+      if (!formattedAmount || formattedAmount === 'undefined') {
+        let calcAmt = 0;
+        if (Array.isArray(e.allRows) && e.allRows.length > 0) {
+          const firstDebit = parseFloat(e.allRows[0].debit) || 0;
+          const firstCredit = parseFloat(e.allRows[0].credit) || 0;
+          calcAmt = firstDebit || firstCredit || 0;
+        }
+        formattedAmount = typeof fmtNum === 'function' ? fmtNum(calcAmt) : (calcAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      }
+
       list.push({
         id: e.id,
         date: e.date,
         voucherNo: e.voucherNo,
         type: type,
         rawType: (type === 'Journal Entry' ? 'Journal' : (type === 'Sales Reversal' ? 'Reversal' : (type === 'Sales Order' ? 'Order' : (type === 'Purchase' ? 'Purchase' : 'Invoice')))),
-        particulars: e.narration || e.firstParticular || '—',
-        amount: e.amount,
+        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
+        amount: formattedAmount,
         status: 'Posted',
         isDraft: false
       });
@@ -2944,7 +3175,7 @@
         voucherNo: e.voucherNo,
         type: 'Journal Entry',
         rawType: 'Journal',
-        particulars: e.narration || e.firstParticular || '—',
+        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
         amount: e.amount,
         status: 'Draft',
         isDraft: true
@@ -2966,7 +3197,7 @@
         voucherNo: d.invoiceNo || 'Draft',
         type: vType,
         rawType: d.isReturn ? 'Reversal' : (d.isOrder ? 'Order' : 'Invoice'),
-        particulars: d.notes || (`Draft ${vType}${custName ? ' for ' + custName : ''}`),
+        particulars: custName || `Draft ${vType}`,
         amount: vAmt,
         status: 'Draft',
         isDraft: true
@@ -3006,7 +3237,7 @@
           voucherNo: vNo,
           type: vType,
           rawType: v.isReturn ? 'Reversal' : (v.isOrder ? 'Order' : 'Invoice'),
-          particulars: v.notes || (`${vType}${custName ? ' for ' + custName : ''}`),
+          particulars: custName || vType,
           amount: vAmt,
           status: status,
           isDraft: false

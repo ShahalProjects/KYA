@@ -422,6 +422,33 @@
   let _clCashflowDateFrom = '';
   let _clCashflowDateTo = '';
 
+  window.setCashlineNavigationState = function(state) {
+    if (!state) return;
+    if (state.activeTopTab !== undefined) _clActiveTopTab = state.activeTopTab;
+    if (state.activeBankingTab !== undefined) _clActiveBankingTab = state.activeBankingTab;
+    if (state.reconBankId !== undefined) _clReconBankId = state.reconBankId;
+    if (state.cashbookAccountId !== undefined) _clCashbookAccountId = state.cashbookAccountId;
+    if (state.reconSubSection !== undefined) _clReconSubSection = state.reconSubSection;
+    if (state.reconFilter !== undefined) _clReconFilter = state.reconFilter;
+    if (state.statementSearchQuery !== undefined) _clStatementSearchQuery = state.statementSearchQuery;
+    if (state.statementFromDate !== undefined) _clStatementFromDate = state.statementFromDate;
+    if (state.statementToDate !== undefined) _clStatementToDate = state.statementToDate;
+  };
+
+  window.getCashlineNavigationState = function() {
+    return {
+      activeTopTab: _clActiveTopTab,
+      activeBankingTab: _clActiveBankingTab,
+      reconBankId: _clReconBankId,
+      cashbookAccountId: _clCashbookAccountId,
+      reconSubSection: _clReconSubSection,
+      reconFilter: _clReconFilter,
+      statementSearchQuery: _clStatementSearchQuery,
+      statementFromDate: _clStatementFromDate,
+      statementToDate: _clStatementToDate,
+    };
+  };
+
   // ── Initialize KYA Store Future Variables ──────────────────────────
   function initClStore() {
     window.KYA_STORE = window.KYA_STORE || {};
@@ -429,6 +456,12 @@
     window.KYA_STORE.reconciliationState = window.KYA_STORE.reconciliationState || {};
     window.KYA_STORE.uploadedStatements = window.KYA_STORE.uploadedStatements || {};
     window.KYA_STORE.statementMappings = window.KYA_STORE.statementMappings || {};
+    window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
+    window.KYA_STORE.statementDeptMapping = window.KYA_STORE.statementDeptMapping || {};
+    window.KYA_STORE.statementTypeMapping = window.KYA_STORE.statementTypeMapping || {};
+    window.KYA_STORE.statementConfirmed = window.KYA_STORE.statementConfirmed || {};
+    window.KYA_STORE.statementNarrationMapping = window.KYA_STORE.statementNarrationMapping || {};
+    window.KYA_STORE.statementDocMapping = window.KYA_STORE.statementDocMapping || {};
   }
 
   // ── Sync Bank Accounts with COA ────────────────────────────────────
@@ -734,18 +767,18 @@
     });
 
     const statsHtml = `
-      <div class="cl-stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px;">
-        <div class="cl-stat-card" style="background: var(--white); border: 1.5px solid var(--slate-150); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 11px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em;">No. of Accounts</span>
-          <span style="font-size: 24px; font-weight: 800; color: var(--slate-800);">${accounts.length}</span>
+      <div class="recon-stats" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 20px; padding: 12px 16px;">
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">No. of Accounts</span>
+          <span class="recon-stat-val">${accounts.length}</span>
         </div>
-        <div class="cl-stat-card" style="background: var(--white); border: 1.5px solid var(--slate-150); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 11px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em;">Bank Balance</span>
-          <span style="font-size: 24px; font-weight: 800; color: var(--slate-800);">${fmtAmt(totalBookBal)}</span>
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">Bank Balance</span>
+          <span class="recon-stat-val" style="color: var(--emerald-600);">${fmtAmt(totalReconciledBal)}</span>
         </div>
-        <div class="cl-stat-card" style="background: var(--white); border: 1.5px solid var(--slate-150); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 11px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em;">Book Balance</span>
-          <span style="font-size: 24px; font-weight: 800; color: var(--emerald-600);">${fmtAmt(totalReconciledBal)}</span>
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">Book Balance</span>
+          <span class="recon-stat-val" style="color: var(--blue-700);">${fmtAmt(totalBookBal)}</span>
         </div>
       </div>
     `;
@@ -1416,14 +1449,9 @@
     overlay.innerHTML = `
       <div style="background: #fff; border-radius: 24px; padding: 32px; width: 92%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); position: relative; box-sizing: border-box; max-height: 90vh; overflow-y: auto;">
         
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-          <div style="width: 44px; height: 44px; border-radius: 12px; background: var(--blue-50); color: var(--blue-600); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
-            🏛️
-          </div>
-          <div>
-            <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--slate-900);">${ohEsc(acc.name)}</h3>
-            <p style="margin: 2px 0 0 0; font-size: 13px; color: var(--slate-400);">${ohEsc(acc.bankName)}</p>
-          </div>
+        <div style="margin-bottom: 24px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--slate-900);">${ohEsc(acc.name)}</h3>
+          <p style="margin: 2px 0 0 0; font-size: 13px; color: var(--slate-400);">${ohEsc(acc.bankName)}</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 28px;">
@@ -1444,8 +1472,8 @@
 
           <!-- Debit Card details -->
           <div style="grid-column: 1 / -1; border-top: 1px solid var(--slate-100); padding-top: 16px; margin-top: 4px;">
-            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-              💳 Debit Card Information
+            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px;">
+              Debit Card Information
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
               <div style="grid-column: 1 / -1; background: var(--slate-50); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--slate-100);">
@@ -1465,8 +1493,8 @@
 
           <!-- Statement & Balance details -->
           <div style="grid-column: 1 / -1; border-top: 1px solid var(--slate-100); padding-top: 16px; margin-top: 4px;">
-            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-              📊 Statement & Balances
+            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px;">
+              Statement & Balances
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
               <div style="background: var(--slate-50); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--slate-100);">
@@ -2009,7 +2037,6 @@
             </button>
           </div>
           <div style="padding: 48px; text-align: center; border: 1.5px dashed var(--slate-200); border-radius: 16px; background: var(--slate-50);">
-            <div style="font-size: 32px; margin-bottom: 12px;">🏛️</div>
             <div style="font-size: 14.5px; font-weight: 700; color: var(--slate-700);">No Bank Accounts defined</div>
             <div style="font-size: 12.5px; color: var(--slate-400); margin-top: 4px; margin-bottom: 16px;">Please create a Bank account first.</div>
             <button class="btn btn-primary" id="clBtnBackToAccounts" style="height:36px; font-size:13px; padding: 0 16px; font-weight:600; cursor:pointer; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
@@ -2175,21 +2202,29 @@
       window.KYA_STORE.reconciliationState = window.KYA_STORE.reconciliationState || {};
       window.KYA_STORE.statementDeptMapping = window.KYA_STORE.statementDeptMapping || {};
       window.KYA_STORE.statementTypeMapping = window.KYA_STORE.statementTypeMapping || {};
+      window.KYA_STORE.statementConfirmed = window.KYA_STORE.statementConfirmed || {};
+
+      const isRowConfirmed = (key) => {
+        return !!(
+          (window.KYA_STORE.statementConfirmed && window.KYA_STORE.statementConfirmed[key]) ||
+          (window.KYA_STORE.reconciliationState && window.KYA_STORE.reconciliationState[key])
+        );
+      };
 
       const bankLedger = coaLedgers.find(l => l.id === currentAcc.ledgerId) || { name: currentAcc.name };
 
-      const allUnreconciledRows = statementRows.filter(line => !window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
-      const allConfirmedRows = statementRows.filter(line => !!window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
+      const allUnreconciledRows = statementRows.filter(line => !isRowConfirmed(`${currentAcc.id}_${line.origIdx}`));
+      const allConfirmedRows = statementRows.filter(line => isRowConfirmed(`${currentAcc.id}_${line.origIdx}`));
 
-      const unreconciledRows = displayRows.filter(line => !window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
-      const confirmedRows = displayRows.filter(line => !!window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${line.origIdx}`]);
+      const unreconciledRows = displayRows.filter(line => !isRowConfirmed(`${currentAcc.id}_${line.origIdx}`));
+      const confirmedRows = displayRows.filter(line => isRowConfirmed(`${currentAcc.id}_${line.origIdx}`));
 
       const reconTargetRows = isReconciliationMode
-        ? (_clReconSubSection === 'reconciliation' ? displayRows : confirmedRows)
+        ? (_clReconSubSection === 'reconciliation' ? unreconciledRows : confirmedRows)
         : displayRows;
 
       const totalTargetRowsCount = isReconciliationMode
-        ? (_clReconSubSection === 'reconciliation' ? statementRows.length : allConfirmedRows.length)
+        ? (_clReconSubSection === 'reconciliation' ? allUnreconciledRows.length : allConfirmedRows.length)
         : statementRows.length;
 
       const showingCountText = `Showing ${reconTargetRows.length} of ${totalTargetRowsCount} entries`;
@@ -2206,8 +2241,7 @@
           const key = `${currentAcc.id}_${line.origIdx}`;
           let isPosted = !!window.KYA_STORE.reconciliationState[key];
           if (isPosted && typeof postedEntries !== 'undefined') {
-            const voucherCode = 'REC-' + (Number(line.origIdx) + 1);
-            const existsInJournal = postedEntries.some(e => e.reconKey === key || e.voucherNo === voucherCode);
+            const existsInJournal = postedEntries.some(e => e.reconKey === key);
             if (!existsInJournal) {
               isPosted = false;
               delete window.KYA_STORE.reconciliationState[key];
@@ -2229,8 +2263,10 @@
                     </td>
                   ` : ''}
                   <td style="white-space: nowrap;">${formatToDDMMYYYY(line.date)}</td>
-                  <td>
-                    <div style="font-weight: 600; color: var(--slate-800);">${ohEsc(line.description || '—')}</div>
+                  <td class="cl-recon-desc-cell" data-index="${line.origIdx}" title="Click description to open Journal Entry (e.g. split into multiple ledgers)" style="cursor: pointer;">
+                    <div style="font-weight: 600; color: var(--slate-800);">
+                      <span class="cl-recon-desc-text" style="text-decoration: underline dotted; text-underline-offset: 3px;">${ohEsc(line.description || '—')}</span>
+                    </div>
                   </td>
                   <td class="num-val" style="color: ${amtColor}; text-align: right;">${amtDisplay}</td>
                   <td style="width: 280px; position: relative;">
@@ -2271,68 +2307,53 @@
                 </tr>
               `;
             } else {
-              // Confirmation section row: Date, Journal Entry Model (normal text at top), Description (under model), Department, Transaction Type (slider toggle), Action
-              const savedDeptId = window.KYA_STORE.statementDeptMapping[key] || '';
-              const savedTxType = window.KYA_STORE.statementTypeMapping[key] || 'non-budget';
-              const depts = (typeof ohDepartments !== 'undefined' ? ohDepartments : []).filter(d => d.id !== 'all');
-              const isBudgetTx = savedTxType === 'budget';
+              // Confirmation section row: Date, Ledger & Narration (clickable), Debit, Credit, Action (Post / Revert)
+              const displayNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || '—';
+              const attachedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
 
               rowsHtml += `
-                <tr style="${isChecked ? 'background: #eff6ff;' : ''}">
+                <tr class="cl-confirm-row" style="background: ${isPosted ? '#fafdfb' : (isChecked ? '#eff6ff' : '#ffffff')}; border-bottom: 1px solid #f1f5f9;">
                   ${_clStatementSelectMode ? `
-                    <td style="text-align: center; width: 42px; vertical-align: top; padding-top: 12px;">
+                    <td style="text-align: center; width: 42px; vertical-align: middle; padding: 12px 8px;">
                       <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
                     </td>
                   ` : ''}
-                  <td style="white-space: nowrap; vertical-align: top; padding-top: 12px;">${formatToDDMMYYYY(line.date)}</td>
-                  <td style="vertical-align: top; padding-top: 10px; min-width: 280px;">
-                    <div style="margin-bottom: 6px; font-size: 12px; line-height: 1.4;">
-                      ${dbVal > 0 ? `
-                        <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                          <span><strong style="color: #2563eb; font-size: 11.5px;">By</strong> ${ohEsc(savedLedger?.name || '—')}</span>
-                          <span style="font-weight: 700; color: var(--red-600); margin-left: 16px;">${fmtAmt(dbVal)}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding: 2px 0; padding-left: 12px;">
-                          <span><strong style="color: #059669; font-size: 11.5px;">To</strong> ${ohEsc(bankLedger?.name || currentAcc.name)}</span>
-                          <span style="font-weight: 700; color: var(--red-600); margin-left: 16px;">${fmtAmt(dbVal)}</span>
-                        </div>
-                      ` : `
-                        <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                          <span><strong style="color: #2563eb; font-size: 11.5px;">By</strong> ${ohEsc(bankLedger?.name || currentAcc.name)}</span>
-                          <span style="font-weight: 700; color: var(--emerald-600); margin-left: 16px;">${fmtAmt(crVal)}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding: 2px 0; padding-left: 12px;">
-                          <span><strong style="color: #059669; font-size: 11.5px;">To</strong> ${ohEsc(savedLedger?.name || '—')}</span>
-                          <span style="font-weight: 700; color: var(--emerald-600); margin-left: 16px;">${fmtAmt(crVal)}</span>
-                        </div>
-                      `}
+                  <!-- 1. Date -->
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 12px 14px; width: 110px;">
+                    <div style="font-weight: 600; color: var(--slate-700); font-size: 13px;">${formatToDDMMYYYY(line.date)}</div>
+                  </td>
+                  <!-- 2. Ledger & Narration (Clickable to open Edit Entry popup) -->
+                  <td class="cl-confirm-ledger-cell" data-index="${line.origIdx}" style="vertical-align: middle; padding: 10px 14px; cursor: pointer;" title="Click to edit entry">
+                    <div style="font-weight: 700; color: #1e293b; font-size: 13.5px; margin-bottom: 3px; display: flex; align-items: center; gap: 6px;">
+                      <span class="cl-confirm-ledger-name" style="text-decoration: underline dotted; text-underline-offset: 3px;">${ohEsc(savedLedger?.name || '—')}</span>
+                      ${(attachedDoc && attachedDoc.fileData) ? `<span title="Attachment: ${ohEsc(attachedDoc.fileName)}" style="color: #2563eb; display: inline-flex;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>` : ''}
                     </div>
-                    <div style="font-weight: 500; color: var(--slate-600); font-size: 12px; line-height: 1.3;">${ohEsc(line.description || '—')}</div>
+                    <div style="font-size: 12px; color: #64748b; font-weight: 500; line-height: 1.35;" title="${ohEsc(displayNarration)}">${ohEsc(displayNarration)}</div>
                   </td>
-                  <td style="vertical-align: top; padding-top: 10px; width: 150px;">
-                    <select class="je-input cl-recon-dept-select" data-index="${line.origIdx}" style="height: 32px; font-size: 12px; width: 100%; padding: 0 6px; cursor: pointer; background: #fff; border-radius: 6px;">
-                      <option value="">&mdash; Select Dept &mdash;</option>
-                      ${depts.map(d => `<option value="${d.id}" ${String(d.id) === String(savedDeptId) ? 'selected' : ''}>${ohEsc(d.name)}</option>`).join('')}
-                    </select>
+                  <!-- 3. Debit -->
+                  <td class="num-val" style="vertical-align: middle; text-align: right; padding: 12px 14px; width: 130px; font-weight: 700; font-size: 13.5px; color: var(--red-600);">
+                    ${dbVal > 0 ? fmtAmt(dbVal) : '—'}
                   </td>
-                  <td style="vertical-align: top; padding-top: 12px; width: 140px;">
-                    <label class="cl-recon-type-toggle" style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
-                      <div style="position: relative; width: 38px; height: 20px; background: ${isBudgetTx ? '#2563eb' : '#cbd5e1'}; border-radius: 10px; transition: background 0.2s ease;">
-                        <input type="checkbox" class="cl-recon-type-checkbox" data-index="${line.origIdx}" ${isBudgetTx ? 'checked' : ''} style="opacity: 0; width: 0; height: 0; position: absolute;">
-                        <span style="position: absolute; top: 2px; left: ${isBudgetTx ? '20px' : '2px'}; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: left 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"></span>
-                      </div>
-                      <span style="font-size: 12px; font-weight: 600; color: ${isBudgetTx ? '#1e40af' : 'var(--slate-600)'};">
-                        ${isBudgetTx ? 'Budget' : 'Non Budget'}
-                      </span>
-                    </label>
+                  <!-- 4. Credit -->
+                  <td class="num-val" style="vertical-align: middle; text-align: right; padding: 12px 14px; width: 130px; font-weight: 700; font-size: 13.5px; color: var(--emerald-600);">
+                    ${crVal > 0 ? fmtAmt(crVal) : '—'}
                   </td>
-                  <td style="width: 140px; text-align: right; vertical-align: top; padding-top: 10px;">
+                  <!-- 5. Action (Icon only) -->
+                  <td style="vertical-align: middle; padding: 10px 14px; width: 100px; text-align: right;">
                     ${isPosted ? `
-                      <span class="cl-badge reconciled" style="font-size: 11.5px; padding: 4px 10px;">Posted</span>
+                      <div style="display: flex; justify-content: flex-end; align-items: center;">
+                        <span title="Posted to books" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #ecfdf5; border: 1.5px solid #a7f3d0; color: #047857; border-radius: 8px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#047857" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </span>
+                      </div>
                     ` : `
-                      <div style="display: flex; gap: 6px; justify-content: flex-end;">
-                        <button type="button" class="btn btn-success btn-sm cl-btn-post-single" data-index="${line.origIdx}" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 6px; cursor: pointer;">Post</button>
-                        <button type="button" class="btn btn-secondary btn-sm cl-btn-revert-single" data-index="${line.origIdx}" style="padding: 4px 8px; font-size: 11.5px; font-weight: 600; border-radius: 6px; cursor: pointer;">Revert</button>
+                      <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                        <button type="button" class="btn btn-success cl-btn-post-single" data-index="${line.origIdx}" title="Post entry to books" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 6px rgba(5,150,105,0.25);">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </button>
+                        <button type="button" class="cl-btn-revert-single" data-index="${line.origIdx}" title="Revert entry back to Reconciliation" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #ffffff; color: #64748b; cursor: pointer; transition: all 0.15s ease;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                        </button>
                       </div>
                     `}
                   </td>
@@ -2370,7 +2391,6 @@
         rowsHtml = `
           <tr>
             <td colspan="${colCount}" style="text-align: center; color: var(--slate-400); padding: 48px;">
-              <div style="font-size: 28px; margin-bottom: 8px;">${isReconciliationMode && _clReconSubSection === 'confirmation' ? '✅' : '📄'}</div>
               <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-700);">${ohEsc(emptyTitle)}</div>
               <div style="font-size: 12px; margin-top: 4px; color: var(--slate-400);">${ohEsc(emptySub)}</div>
             </td>
@@ -2383,20 +2403,19 @@
         if (isReconciliationMode) {
           actionsArea.innerHTML = `
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" id="clSubTabReconSection" style="height: 32px; padding: 0 12px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease; border: ${_clReconSubSection === 'reconciliation' ? 'none' : '1px solid rgba(255,255,255,0.35)'}; background: ${_clReconSubSection === 'reconciliation' ? '#ffffff' : 'rgba(255,255,255,0.18)'}; color: ${_clReconSubSection === 'reconciliation' ? '#1e40af' : '#ffffff'};">
-                Reconciliation <span style="background: ${_clReconSubSection === 'reconciliation' ? '#dbeafe' : 'rgba(255,255,255,0.25)'}; color: ${_clReconSubSection === 'reconciliation' ? '#1e40af' : '#ffffff'}; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 800;">${unreconciledRows.length}</span>
-              </button>
-              <button type="button" id="clSubTabConfirmSection" style="height: 32px; padding: 0 12px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease; border: ${_clReconSubSection === 'confirmation' ? 'none' : '1px solid rgba(255,255,255,0.35)'}; background: ${_clReconSubSection === 'confirmation' ? '#ffffff' : 'rgba(255,255,255,0.18)'}; color: ${_clReconSubSection === 'confirmation' ? '#1e40af' : '#ffffff'};">
-                Confirmation <span style="background: ${_clReconSubSection === 'confirmation' ? '#dbeafe' : 'rgba(255,255,255,0.25)'}; color: ${_clReconSubSection === 'confirmation' ? '#1e40af' : '#ffffff'}; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 800;">${confirmedRows.length}</span>
-              </button>
+              <select id="clReconSectionSelect" style="height: 32px; padding: 0 12px 0 10px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; border: 1.5px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: #ffffff; outline: none; font-family: inherit;">
+                <option value="reconciliation" ${_clReconSubSection === 'reconciliation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
+                  Reconciliation
+                </option>
+                <option value="confirmation" ${_clReconSubSection === 'confirmation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
+                  Confirmation
+                </option>
+              </select>
             </div>
           `;
-          actionsArea.querySelector('#clSubTabReconSection')?.addEventListener('click', () => {
-            _clReconSubSection = 'reconciliation';
-            renderActiveSubtab();
-          });
-          actionsArea.querySelector('#clSubTabConfirmSection')?.addEventListener('click', () => {
-            _clReconSubSection = 'confirmation';
+          actionsArea.querySelector('#clReconSectionSelect')?.addEventListener('change', (e) => {
+            _clReconSubSection = e.target.value;
+            _clStatementSelectedIndices.clear();
             renderActiveSubtab();
           });
         } else {
@@ -2536,18 +2555,29 @@
             const selectedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
             if (!selectedLedger) return;
 
-            const voucherCode = 'REC-' + (Number(origIdx) + 1);
+            const voucherCode = (typeof window.getNextJournalVoucherNo === 'function')
+              ? window.getNextJournalVoucherNo(line.date, true)
+              : ((typeof getNextJournalVoucherNo === 'function') ? getNextJournalVoucherNo(line.date, true) : `JV-${new Date().getFullYear()}-001`);
             const savedDeptId = window.KYA_STORE.statementDeptMapping[key] || '';
             const savedType = window.KYA_STORE.statementTypeMapping[key] || 'non-budget';
+            const savedNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || 'Bank Reconciliation Entry';
+            const savedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
+
+            const firstParticularName = dbVal > 0 ? selectedLedger.name : bankLedger.name;
+            const formattedAmt = typeof fmtNum === 'function' ? fmtNum(amt) : Number(amt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             const newEntry = {
               id: Date.now() + Math.floor(Math.random() * 1000),
               date: line.date,
               voucherNo: voucherCode,
               reconKey: key,
+              preparedBy: 'Bank Reconciliation',
+              firstParticular: firstParticularName,
+              amount: formattedAmt,
               departmentId: savedDeptId,
               isBudget: savedType === 'budget',
-              narration: line.description || 'Bank Reconciliation Entry',
+              narration: savedNarration,
+              uploadedDoc: savedDoc,
               allRows: dbVal > 0 ? [
                 { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
                 { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
@@ -2559,7 +2589,7 @@
 
             if (typeof postedEntries !== 'undefined') postedEntries.push(newEntry);
             window.KYA_STORE.reconciliationState[key] = line.date;
-            showToast('Journal Entry posted to books!', 'success');
+            showToast(`Journal Entry ${voucherCode} posted to books!`, 'success');
             renderActiveSubtab();
             if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
           });
@@ -2569,82 +2599,425 @@
           btn.addEventListener('click', (e) => {
             const origIdx = e.currentTarget.dataset.index;
             const key = `${currentAcc.id}_${origIdx}`;
+
+            if (typeof postedEntries !== 'undefined') {
+              const pIdx = postedEntries.findIndex(ent => ent.reconKey === key);
+              if (pIdx !== -1) {
+                postedEntries.splice(pIdx, 1);
+              }
+            }
+
             delete window.KYA_STORE.statementLedgerMapping[key];
             delete window.KYA_STORE.reconciliationState[key];
             delete window.KYA_STORE.statementDeptMapping[key];
             delete window.KYA_STORE.statementTypeMapping[key];
+            if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[key];
+            if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[key];
+            if (window.KYA_STORE.statementConfirmed) {
+              delete window.KYA_STORE.statementConfirmed[key];
+            }
             showToast('Transaction moved back to Reconciliation section.', 'info');
             renderActiveSubtab();
             if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
           });
         });
 
-        document.querySelectorAll('.cl-recon-dept-select').forEach(sel => {
-          sel.addEventListener('change', (e) => {
-            const origIdx = e.target.dataset.index;
-            const key = `${currentAcc.id}_${origIdx}`;
-            window.KYA_STORE.statementDeptMapping[key] = e.target.value;
-          });
-        });
 
-        document.querySelectorAll('.cl-recon-type-checkbox').forEach(chk => {
-          chk.addEventListener('change', (e) => {
-            const origIdx = e.target.dataset.index;
-            const key = `${currentAcc.id}_${origIdx}`;
-            window.KYA_STORE.statementTypeMapping[key] = e.target.checked ? 'budget' : 'non-budget';
-            renderActiveSubtab();
-          });
-        });
 
-        const postAllBtn = document.getElementById('clBtnPostAllConfirmed');
-        if (postAllBtn) {
-          postAllBtn.addEventListener('click', () => {
-            let postCount = 0;
-            confirmedRows.forEach(line => {
-              const key = `${currentAcc.id}_${line.origIdx}`;
-              const voucherCode = 'REC-' + (Number(line.origIdx) + 1);
-              const existsInJournal = typeof postedEntries !== 'undefined' && postedEntries.some(e => e.reconKey === key || e.voucherNo === voucherCode);
-              if (window.KYA_STORE.reconciliationState[key] && existsInJournal) return;
+        // ── Click Ledger Cell in Confirmation table → Open Books Edit Entry modal ──
+        const setupConfirmLedgerPopovers = () => {
+          const POPOVER_ID = 'clConfirmEditEntryOverlay';
 
-              const dbVal = parseFloat(line.debit) || 0;
-              const crVal = parseFloat(line.credit) || 0;
-              const amt = dbVal > 0 ? dbVal : crVal;
-              const savedLedgerId = window.KYA_STORE.statementLedgerMapping[key];
-              const selectedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
-              if (!selectedLedger) return;
+          const removePopover = () => {
+            document.getElementById(POPOVER_ID)?.remove();
+          };
 
-              const savedDeptId = window.KYA_STORE.statementDeptMapping[key] || '';
-              const savedType = window.KYA_STORE.statementTypeMapping[key] || 'non-budget';
+          document.querySelectorAll('.cl-confirm-ledger-cell').forEach(cell => {
+            cell.addEventListener('click', (e) => {
+              e.stopPropagation();
+              removePopover();
 
-              const newEntry = {
-                id: Date.now() + Math.floor(Math.random() * 1000) + postCount,
-                date: line.date,
-                voucherNo: voucherCode,
-                reconKey: key,
-                departmentId: savedDeptId,
-                isBudget: savedType === 'budget',
-                narration: line.description || 'Bank Reconciliation Entry',
-                allRows: dbVal > 0 ? [
-                  { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
-                  { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
-                ] : [
-                  { id: 1, type: 'By', particular: bankLedger.name, debit: amt.toFixed(2), credit: '' },
-                  { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
-                ]
+              const origIdx = cell.dataset.index;
+              const line = statementRows.find(r => String(r.origIdx) === String(origIdx));
+              if (!line) return;
+
+              const key = `${currentAcc.id}_${origIdx}`;
+              const postedEntry = (typeof postedEntries !== 'undefined' ? postedEntries : [])
+                .find(en => en.reconKey === key);
+
+              const currentVoucherDisplay = postedEntry
+                ? postedEntry.voucherNo
+                : ((typeof window.getNextJournalVoucherNo === 'function') ? window.getNextJournalVoucherNo(line.date, false) : `JV-${new Date().getFullYear()}`);
+
+              const currentDeptId = (postedEntry ? postedEntry.departmentId : null) || window.KYA_STORE.statementDeptMapping[key] || '';
+              const currentIsBudget = postedEntry ? (postedEntry.isBudget === true) : (window.KYA_STORE.statementTypeMapping[key] === 'budget');
+              const currentNarration = (postedEntry ? postedEntry.narration : null) || (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || '';
+              let currentUploadedDoc = (postedEntry ? postedEntry.uploadedDoc : null) || (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
+
+              const depts = (typeof ohDepartments !== 'undefined' ? ohDepartments : []).filter(d => d.id !== 'all');
+              const deptOptions = depts.map(d =>
+                `<option value="${d.id}" ${String(d.id) === String(currentDeptId) ? 'selected' : ''}>${ohEsc(d.name)}</option>`
+              ).join('');
+
+              const overlay = document.createElement('div');
+              overlay.className = 'fj-overlay';
+              overlay.id = POPOVER_ID;
+              overlay.setAttribute('tabindex', '-1');
+
+              overlay.innerHTML = `
+                <div class="fj-card" style="width:min(96vw,540px);" onclick="event.stopPropagation()">
+
+                  <!-- Header -->
+                  <div class="fj-head" style="background:linear-gradient(90deg,#2563eb,#3b82f6);display:flex;justify-content:space-between;align-items:center;padding:18px 24px;">
+                    <div>
+                      <div class="fj-head-title" style="font-size:16px;font-weight:700;">Edit Entry</div>
+                      <div class="fj-head-sub" style="font-size:12px;opacity:0.85;">${ohEsc(currentVoucherDisplay)} &nbsp;·&nbsp; ${ohEsc(formatToDDMMYYYY(line.date))}</div>
+                    </div>
+                    <button class="fj-close-btn" id="clConfirmEditClose">✕</button>
+                  </div>
+
+                  <!-- Body -->
+                  <div class="fj-body" style="padding:22px 24px 24px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;">
+
+                      <!-- Department -->
+                      <div>
+                        <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Department</label>
+                        <select id="clConfirmPopDept" style="width:100%;height:38px;font-size:13px;font-weight:600;padding:0 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;color:#1e293b;cursor:pointer;box-sizing:border-box;outline:none;font-family:var(--font-main);">
+                          <option value="">— Select Department —</option>
+                          ${deptOptions}
+                        </select>
+                      </div>
+
+                      <!-- Transaction Type -->
+                      <div>
+                        <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Transaction Type</label>
+                        <div style="display:inline-flex;align-items:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:9px;padding:2px;height:38px;box-sizing:border-box;user-select:none;">
+                          <button type="button" id="clConfirmPopNonBudgetBtn"
+                            style="border:none;cursor:pointer;padding:6px 16px;font-size:12px;font-weight:700;border-radius:7px;font-family:var(--font-main);transition:all 0.15s ease;${!currentIsBudget ? 'background:#2563eb;color:#ffffff;box-shadow:0 1px 4px rgba(37,99,235,0.3);' : 'background:transparent;color:#64748b;'}">Non-Budget</button>
+                          <button type="button" id="clConfirmPopBudgetBtn"
+                            style="border:none;cursor:pointer;padding:6px 16px;font-size:12px;font-weight:700;border-radius:7px;font-family:var(--font-main);transition:all 0.15s ease;${currentIsBudget ? 'background:#2563eb;color:#ffffff;box-shadow:0 1px 4px rgba(37,99,235,0.3);' : 'background:transparent;color:#64748b;'}">Budget</button>
+                        </div>
+                      </div>
+
+                      <!-- Narration (full width) -->
+                      <div style="grid-column:1/-1;">
+                        <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px;">Narration</label>
+                        <input type="text" id="clConfirmPopNarration"
+                          value="${ohEsc(currentNarration)}"
+                          placeholder="Enter narration…"
+                          style="width:100%;height:38px;font-size:13px;font-weight:500;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:8px;box-sizing:border-box;outline:none;color:#1e293b;font-family:var(--font-main);" />
+                      </div>
+
+                      <!-- Upload Document / Attachment (full width) -->
+                      <div style="grid-column:1/-1;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                          <label style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:5px;margin:0;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                            </svg>
+                            &nbsp;Upload Document / Attachment
+                          </label>
+                          <span id="clConfirmDocStatusBadge" style="display:${currentUploadedDoc && currentUploadedDoc.fileData ? 'inline-block' : 'none'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:#ecfdf5;color:#059669;text-transform:uppercase;">Attached</span>
+                        </div>
+
+                        <input type="file" id="clConfirmDocFileInput" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+                        <div id="clConfirmDocDropzone" style="border:1.5px dashed #cbd5e1;border-radius:10px;padding:12px 14px;text-align:center;background:#ffffff;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='#2563eb';this.style.background='#eff6ff';" onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#ffffff';">
+                          
+                          <!-- Empty State -->
+                          <div id="clConfirmDocEmptyState" style="display:${currentUploadedDoc && currentUploadedDoc.fileData ? 'none' : 'flex'};align-items:center;justify-content:center;gap:10px;">
+                            <div style="width:28px;height:28px;border-radius:50%;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;color:#2563eb;flex-shrink:0;">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                              </svg>
+                            </div>
+                            <div style="display:flex;flex-direction:column;align-items:flex-start;text-align:left;">
+                              <span style="font-size:12.5px;font-weight:600;color:#334155;">Click or Drag to Upload Document</span>
+                              <span style="font-size:10.5px;color:#94a3b8;">PDF, Image, Excel, Word (Max 10MB)</span>
+                            </div>
+                          </div>
+
+                          <!-- Selected State -->
+                          <div id="clConfirmDocSelectedState" style="display:${currentUploadedDoc && currentUploadedDoc.fileData ? 'flex' : 'none'};align-items:center;justify-content:space-between;gap:10px;">
+                            <div style="display:flex;align-items:center;gap:10px;overflow:hidden;">
+                              <div id="clConfirmDocFileIcon" style="width:30px;height:30px;border-radius:6px;background:#dbeafe;color:#1e40af;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-transform:uppercase;">
+                                ${((currentUploadedDoc?.fileName || '').split('.').pop() || 'DOC').toUpperCase().substring(0, 4)}
+                              </div>
+                              <div style="display:flex;flex-direction:column;align-items:flex-start;overflow:hidden;text-align:left;">
+                                <span id="clConfirmDocFileName" style="font-size:12.5px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">
+                                  ${ohEsc(currentUploadedDoc?.fileName || '')}
+                                </span>
+                                <span id="clConfirmDocFileSize" style="font-size:10.5px;color:#64748b;font-weight:500;">
+                                  ${ohEsc(currentUploadedDoc?.fileSize || '')}
+                                </span>
+                              </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                              <a id="clConfirmDocPreviewBtn" href="${currentUploadedDoc?.fileData || '#'}" download="${ohEsc(currentUploadedDoc?.fileName || 'document')}" target="_blank" style="padding:4px 9px;font-size:11.5px;font-weight:600;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Download / View document">
+                                View
+                              </a>
+                              <button id="clConfirmDocRemoveBtn" type="button" style="background:none;border:none;color:#dc2626;cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center;" title="Remove document">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                  <line x1="18" y1="6" x2="6" y2="18"/>
+                                  <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <!-- Actions -->
+                    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px;">
+                      <button id="clConfirmPopCancel" style="height:38px;padding:0 20px;font-size:13px;font-weight:600;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;font-family:var(--font-main);">Cancel</button>
+                      <button id="clConfirmPopSave" style="height:38px;padding:0 22px;font-size:13px;font-weight:700;border-radius:9px;border:none;background:#2563eb;color:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,0.28);font-family:var(--font-main);display:inline-flex;align-items:center;gap:6px;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Save Changes
+                      </button>
+                    </div>
+
+                  </div><!-- /fj-body -->
+                </div><!-- /fj-card -->
+              `;
+
+              document.body.appendChild(overlay);
+
+              // Upload logic
+              const formatDocBytes = (bytes) => {
+                if (!bytes || bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
               };
 
-              if (typeof postedEntries !== 'undefined') postedEntries.push(newEntry);
-              window.KYA_STORE.reconciliationState[key] = line.date;
-              postCount++;
+              const updateDocUI = (doc) => {
+                currentUploadedDoc = doc;
+                const emptyState = document.getElementById('clConfirmDocEmptyState');
+                const selectedState = document.getElementById('clConfirmDocSelectedState');
+                const badge = document.getElementById('clConfirmDocStatusBadge');
+                const nameEl = document.getElementById('clConfirmDocFileName');
+                const sizeEl = document.getElementById('clConfirmDocFileSize');
+                const iconEl = document.getElementById('clConfirmDocFileIcon');
+                const previewBtn = document.getElementById('clConfirmDocPreviewBtn');
+                const fileInp = document.getElementById('clConfirmDocFileInput');
+
+                if (!doc || !doc.fileData) {
+                  if (emptyState) emptyState.style.display = 'flex';
+                  if (selectedState) selectedState.style.display = 'none';
+                  if (badge) badge.style.display = 'none';
+                  if (fileInp) fileInp.value = '';
+                  return;
+                }
+
+                if (emptyState) emptyState.style.display = 'none';
+                if (selectedState) selectedState.style.display = 'flex';
+                if (badge) badge.style.display = 'inline-block';
+
+                if (nameEl) nameEl.textContent = doc.fileName || 'Attachment';
+                if (sizeEl) sizeEl.textContent = doc.fileSize || formatDocBytes(doc.fileBytes || 0);
+
+                const ext = (doc.fileName || '').split('.').pop().toUpperCase();
+                if (iconEl) {
+                  iconEl.textContent = ext.substring(0, 4) || 'DOC';
+                  if (['PDF'].includes(ext)) {
+                    iconEl.style.background = '#fee2e2'; iconEl.style.color = '#991b1b';
+                  } else if (['JPG','JPEG','PNG','WEBP'].includes(ext)) {
+                    iconEl.style.background = '#e0e7ff'; iconEl.style.color = '#3730a3';
+                  } else if (['XLS','XLSX','CSV'].includes(ext)) {
+                    iconEl.style.background = '#dcfce7'; iconEl.style.color = '#166534';
+                  } else {
+                    iconEl.style.background = '#dbeafe'; iconEl.style.color = '#1e40af';
+                  }
+                }
+
+                if (previewBtn) {
+                  previewBtn.href = doc.fileData;
+                  previewBtn.download = doc.fileName || 'document';
+                }
+              };
+
+              const handleDocUpload = (file) => {
+                if (!file) return;
+                if (file.size > 10 * 1024 * 1024) {
+                  showToast('File size exceeds 10MB limit.', 'error');
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const doc = {
+                    fileName: file.name,
+                    fileSize: formatDocBytes(file.size),
+                    fileBytes: file.size,
+                    fileData: ev.target.result
+                  };
+                  updateDocUI(doc);
+                  showToast(`Document "${file.name}" attached.`, 'success');
+                };
+                reader.readAsDataURL(file);
+              };
+
+              const dropzone = document.getElementById('clConfirmDocDropzone');
+              const fileInput = document.getElementById('clConfirmDocFileInput');
+              const removeBtn = document.getElementById('clConfirmDocRemoveBtn');
+
+              if (dropzone && fileInput) {
+                dropzone.addEventListener('click', (e) => {
+                  if (e.target.closest('#clConfirmDocPreviewBtn') || e.target.closest('#clConfirmDocRemoveBtn')) return;
+                  fileInput.click();
+                });
+                fileInput.addEventListener('change', (e) => {
+                  const file = e.target.files && e.target.files[0];
+                  if (file) handleDocUpload(file);
+                });
+                dropzone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); dropzone.style.borderColor = '#2563eb'; dropzone.style.background = '#eff6ff'; });
+                dropzone.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); dropzone.style.borderColor = '#cbd5e1'; dropzone.style.background = '#ffffff'; });
+                dropzone.addEventListener('drop', (e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  dropzone.style.borderColor = '#cbd5e1'; dropzone.style.background = '#ffffff';
+                  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                  if (file) handleDocUpload(file);
+                });
+              }
+
+              if (removeBtn) {
+                removeBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  updateDocUI(null);
+                  showToast('Attachment removed.', 'info');
+                });
+              }
+
+              let selectedIsBudget = currentIsBudget;
+              const btnNon = document.getElementById('clConfirmPopNonBudgetBtn');
+              const btnBud = document.getElementById('clConfirmPopBudgetBtn');
+
+              btnNon?.addEventListener('click', () => {
+                selectedIsBudget = false;
+                btnNon.style.background = '#2563eb'; btnNon.style.color = '#ffffff'; btnNon.style.boxShadow = '0 1px 4px rgba(37,99,235,0.3)';
+                btnBud.style.background = 'transparent'; btnBud.style.color = '#64748b'; btnBud.style.boxShadow = 'none';
+              });
+              btnBud?.addEventListener('click', () => {
+                selectedIsBudget = true;
+                btnBud.style.background = '#2563eb'; btnBud.style.color = '#ffffff'; btnBud.style.boxShadow = '0 1px 4px rgba(37,99,235,0.3)';
+                btnNon.style.background = 'transparent'; btnNon.style.color = '#64748b'; btnNon.style.boxShadow = 'none';
+              });
+
+              overlay.querySelector('#clConfirmEditClose')?.addEventListener('click', removePopover);
+              overlay.querySelector('#clConfirmPopCancel')?.addEventListener('click', removePopover);
+              overlay.addEventListener('click', (e) => { if (e.target === overlay) removePopover(); });
+              overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') removePopover(); });
+
+              overlay.querySelector('#clConfirmPopSave')?.addEventListener('click', () => {
+                const newDept = document.getElementById('clConfirmPopDept')?.value || '';
+                const newNarration = document.getElementById('clConfirmPopNarration')?.value.trim() || '';
+
+                window.KYA_STORE.statementDeptMapping = window.KYA_STORE.statementDeptMapping || {};
+                window.KYA_STORE.statementTypeMapping = window.KYA_STORE.statementTypeMapping || {};
+                window.KYA_STORE.statementNarrationMapping = window.KYA_STORE.statementNarrationMapping || {};
+                window.KYA_STORE.statementDocMapping = window.KYA_STORE.statementDocMapping || {};
+
+                window.KYA_STORE.statementDeptMapping[key] = newDept;
+                window.KYA_STORE.statementTypeMapping[key] = selectedIsBudget ? 'budget' : 'non-budget';
+                window.KYA_STORE.statementNarrationMapping[key] = newNarration;
+                window.KYA_STORE.statementDocMapping[key] = currentUploadedDoc || null;
+
+                if (postedEntry) {
+                  postedEntry.departmentId = newDept;
+                  postedEntry.isBudget = selectedIsBudget;
+                  postedEntry.narration = newNarration || line.description || 'Bank Reconciliation Entry';
+                  postedEntry.uploadedDoc = currentUploadedDoc || null;
+                }
+
+                removePopover();
+                showToast('Entry updated successfully!', 'success');
+                renderActiveSubtab();
+                if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+                if (postedEntry && typeof refreshAllReports === 'function') refreshAllReports();
+              });
+            });
+          });
+        };
+
+        setupConfirmLedgerPopovers();
+      }
+
+      function updateReconBottomBar() {
+        const countTextEl = document.getElementById('clReconMappedCountText');
+        const confirmBtn = document.getElementById('clBtnConfirmRecon');
+        if (!countTextEl && !confirmBtn) return;
+
+        const currentUnrecRows = displayRows.filter(r => !isRowConfirmed(`${currentAcc.id}_${r.origIdx}`));
+        const mappedCount = currentUnrecRows.filter(r => {
+          const k = `${currentAcc.id}_${r.origIdx}`;
+          return !!(window.KYA_STORE.statementLedgerMapping && window.KYA_STORE.statementLedgerMapping[k]);
+        }).length;
+        const totalCount = currentUnrecRows.length;
+
+        if (countTextEl) {
+          if (mappedCount === 0) {
+            countTextEl.innerHTML = `<span style="color: #64748b; font-weight: 500;">Select ledgers for transactions to confirm</span> <span style="color: #94a3b8; font-weight: 600;">(${totalCount} pending)</span>`;
+          } else if (mappedCount === totalCount) {
+            countTextEl.innerHTML = `<span style="color: #059669; font-weight: 700;">✓ All ${totalCount} transactions assigned to ledgers</span>`;
+          } else {
+            countTextEl.innerHTML = `<span style="color: #2563eb; font-weight: 700;">✓ ${mappedCount} of ${totalCount} transactions assigned</span> <span style="color: #94a3b8; font-weight: 500;">(${totalCount - mappedCount} remaining)</span>`;
+          }
+        }
+
+        if (confirmBtn) {
+          confirmBtn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Confirm ${mappedCount > 0 ? `(${mappedCount})` : ''}
+          `;
+          if (mappedCount > 0) {
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+          } else {
+            confirmBtn.style.opacity = '0.75';
+          }
+        }
+      }
+
+      function attachReconBottomBarListeners() {
+        updateReconBottomBar();
+        const confirmBtn = document.getElementById('clBtnConfirmRecon');
+        if (confirmBtn) {
+          confirmBtn.addEventListener('click', () => {
+            let toConfirm = [];
+            if (_clStatementSelectMode && _clStatementSelectedIndices.size > 0) {
+              toConfirm = unreconciledRows.filter(r => _clStatementSelectedIndices.has(r.origIdx) && !!(window.KYA_STORE.statementLedgerMapping && window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${r.origIdx}`]));
+              if (toConfirm.length === 0) {
+                showToast('None of the selected transactions have ledgers assigned yet.', 'warning');
+                return;
+              }
+            } else {
+              toConfirm = unreconciledRows.filter(r => {
+                const k = `${currentAcc.id}_${r.origIdx}`;
+                return !!(window.KYA_STORE.statementLedgerMapping && window.KYA_STORE.statementLedgerMapping[k]);
+              });
+              if (toConfirm.length === 0) {
+                showToast('Please select a ledger for at least one transaction before confirming.', 'warning');
+                return;
+              }
+            }
+
+            window.KYA_STORE.statementConfirmed = window.KYA_STORE.statementConfirmed || {};
+            toConfirm.forEach(r => {
+              const k = `${currentAcc.id}_${r.origIdx}`;
+              window.KYA_STORE.statementConfirmed[k] = true;
             });
 
-            if (postCount > 0) {
-              showToast(`Successfully posted ${postCount} journal entry(ies) to books!`, 'success');
-              renderActiveSubtab();
-              if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-            } else {
-              showToast('All confirmed entries are already posted to books.', 'info');
-            }
+            _clReconSubSection = 'confirmation';
+            _clStatementSelectedIndices.clear();
+            showToast(`Successfully confirmed ${toConfirm.length} transaction(s). Ready to post in Confirmation.`, 'success');
+            renderActiveSubtab();
+            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
           });
         }
       }
@@ -2678,23 +3051,23 @@
           }
 
           // Update sub-section toggle buttons in header if in reconciliation mode
+          // Update sub-section dropdown in header if in reconciliation mode
           if (actionsArea && isReconciliationMode) {
             actionsArea.innerHTML = `
               <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" id="clSubTabReconSection" style="height: 32px; padding: 0 12px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease; border: ${_clReconSubSection === 'reconciliation' ? 'none' : '1px solid rgba(255,255,255,0.35)'}; background: ${_clReconSubSection === 'reconciliation' ? '#ffffff' : 'rgba(255,255,255,0.18)'}; color: ${_clReconSubSection === 'reconciliation' ? '#1e40af' : '#ffffff'};">
-                  Reconciliation <span style="background: ${_clReconSubSection === 'reconciliation' ? '#dbeafe' : 'rgba(255,255,255,0.25)'}; color: ${_clReconSubSection === 'reconciliation' ? '#1e40af' : '#ffffff'}; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 800;">${unreconciledRows.length}</span>
-                </button>
-                <button type="button" id="clSubTabConfirmSection" style="height: 32px; padding: 0 12px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease; border: ${_clReconSubSection === 'confirmation' ? 'none' : '1px solid rgba(255,255,255,0.35)'}; background: ${_clReconSubSection === 'confirmation' ? '#ffffff' : 'rgba(255,255,255,0.18)'}; color: ${_clReconSubSection === 'confirmation' ? '#1e40af' : '#ffffff'};">
-                  Confirmation <span style="background: ${_clReconSubSection === 'confirmation' ? '#dbeafe' : 'rgba(255,255,255,0.25)'}; color: ${_clReconSubSection === 'confirmation' ? '#1e40af' : '#ffffff'}; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 800;">${confirmedRows.length}</span>
-                </button>
+                <select id="clReconSectionSelect" style="height: 32px; padding: 0 12px 0 10px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; border: 1.5px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: #ffffff; outline: none; font-family: inherit;">
+                  <option value="reconciliation" ${_clReconSubSection === 'reconciliation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
+                    Reconciliation
+                  </option>
+                  <option value="confirmation" ${_clReconSubSection === 'confirmation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
+                    Confirmation
+                  </option>
+                </select>
               </div>
             `;
-            actionsArea.querySelector('#clSubTabReconSection')?.addEventListener('click', () => {
-              _clReconSubSection = 'reconciliation';
-              renderActiveSubtab();
-            });
-            actionsArea.querySelector('#clSubTabConfirmSection')?.addEventListener('click', () => {
-              _clReconSubSection = 'confirmation';
+            actionsArea.querySelector('#clReconSectionSelect')?.addEventListener('change', (e) => {
+              _clReconSubSection = e.target.value;
+              _clStatementSelectedIndices.clear();
               renderActiveSubtab();
             });
           }
@@ -2710,11 +3083,11 @@
                       <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
                     </th>
                   ` : ''}
-                  <th style="width: 100px;">Date</th>
-                  <th>Journal Entry & Description</th>
-                  <th style="width: 150px;">Department</th>
-                  <th style="width: 140px;">Transaction Type</th>
-                  <th style="text-align: right; width: 140px;">Action</th>
+                  <th style="width: 110px;">Date</th>
+                  <th>Ledger</th>
+                  <th style="text-align: right; width: 130px;">Debit</th>
+                  <th style="text-align: right; width: 130px;">Credit</th>
+                  <th style="text-align: right; width: 100px;">Action</th>
                 `;
               } else {
                 tableHead.innerHTML = `
@@ -2776,8 +3149,32 @@
             batchBar.remove();
           }
 
+          let reconBottomBar = existingContainer.querySelector('#clReconBottomBar');
+          if (isReconciliationMode && _clReconSubSection === 'reconciliation' && unreconciledRows.length > 0) {
+            if (!reconBottomBar) {
+              reconBottomBar = document.createElement('div');
+              reconBottomBar.id = 'clReconBottomBar';
+              existingContainer.appendChild(reconBottomBar);
+            }
+            reconBottomBar.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding: 14px 20px; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);';
+            reconBottomBar.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div id="clReconMappedCountText" style="font-size: 13px; font-weight: 600; color: #475569;"></div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <button type="button" id="clBtnConfirmRecon" class="btn btn-primary" style="height: 38px; padding: 0 22px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2563eb, #1d4ed8); box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: all 0.15s ease;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  Confirm
+                </button>
+              </div>
+            `;
+          } else if (reconBottomBar) {
+            reconBottomBar.remove();
+          }
+
           document.getElementById('clStmtTableBody').innerHTML = rowsHtml;
           attachConfirmationRowListeners();
+          attachReconBottomBarListeners();
         } else {
           // Render the full structure
           target.innerHTML = `
@@ -2885,11 +3282,11 @@
                       ` : ''}
                       ${isReconciliationMode ? `
                         ${_clReconSubSection === 'confirmation' ? `
-                          <th style="width: 100px;">Date</th>
-                          <th>Journal Entry & Description</th>
-                          <th style="width: 150px;">Department</th>
-                          <th style="width: 140px;">Transaction Type</th>
-                          <th style="text-align: right; width: 140px;">Action</th>
+                          <th style="width: 110px;">Date</th>
+                          <th>Ledger</th>
+                          <th style="text-align: right; width: 130px;">Debit</th>
+                          <th style="text-align: right; width: 130px;">Credit</th>
+                          <th style="text-align: right; width: 100px;">Action</th>
                         ` : `
                           <th style="width: 110px;">Date</th>
                           <th>Description</th>
@@ -2910,6 +3307,20 @@
                   </tbody>
                 </table>
               </div>
+
+              ${isReconciliationMode && _clReconSubSection === 'reconciliation' && unreconciledRows.length > 0 ? `
+                <div id="clReconBottomBar" style="display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding: 14px 20px; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="clReconMappedCountText" style="font-size: 13px; font-weight: 600; color: #475569;"></div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="clBtnConfirmRecon" class="btn btn-primary" style="height: 38px; padding: 0 22px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #2563eb, #1d4ed8); box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: all 0.15s ease;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `;
 
@@ -2920,17 +3331,14 @@
             }
           });
 
-          document.getElementById('clSubTabReconSection')?.addEventListener('click', () => {
-            _clReconSubSection = 'reconciliation';
-            renderActiveSubtab();
-          });
-
-          document.getElementById('clSubTabConfirmSection')?.addEventListener('click', () => {
-            _clReconSubSection = 'confirmation';
+          document.getElementById('clReconSectionSelect')?.addEventListener('change', (e) => {
+            _clReconSubSection = e.target.value;
+            _clStatementSelectedIndices.clear();
             renderActiveSubtab();
           });
 
           attachConfirmationRowListeners();
+          attachReconBottomBarListeners();
 
         document.getElementById('clStmtDateFrom').addEventListener('change', (e) => {
           _clStatementFromDate = e.target.value;
@@ -2993,7 +3401,7 @@
         const tr = btn.closest('tr');
         if (tr) {
           tr.addEventListener('click', (ev) => {
-            if (ev.target.closest('.cl-stmt-row-cb') || ev.target.closest('.cl-recon-clear-btn') || ev.target.closest('.cl-recon-ledger-btn')) return;
+            if (ev.target.closest('.cl-stmt-row-cb') || ev.target.closest('.cl-recon-clear-btn') || ev.target.closest('.cl-recon-ledger-btn') || ev.target.closest('.cl-recon-desc-cell')) return;
             btn.click();
           });
         }
@@ -3089,6 +3497,8 @@
               selectOptionAndAdvance('', 'none');
             });
           }
+
+          updateReconBottomBar();
 
           clearActiveRowHighlights();
           const existingPopover = document.getElementById('clReconLedgerPopover');
@@ -3532,6 +3942,103 @@
         });
       });
 
+      // ── Click Description Cell in Reconciliation table → Open Journal Entry (Multiple Ledgers) ──
+      document.querySelectorAll('.cl-recon-desc-cell').forEach(cell => {
+        cell.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const existingPopover = document.getElementById('clReconLedgerPopover');
+          if (existingPopover) {
+            if (typeof clearActiveRowHighlights === 'function') clearActiveRowHighlights();
+            existingPopover.remove();
+          }
+          const origIdx = cell.dataset.index;
+          const line = statementRows.find(r => String(r.origIdx) === String(origIdx));
+          if (!line) return;
+
+          const key = `${currentAcc.id}_${origIdx}`;
+          const dbVal = parseFloat(line.debit) || 0;
+          const crVal = parseFloat(line.credit) || 0;
+          const amt = dbVal > 0 ? dbVal : crVal;
+
+          const savedLedgerId = window.KYA_STORE.statementLedgerMapping[key];
+          const savedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
+          const contraLedgerName = savedLedger ? savedLedger.name : '';
+          const bankName = bankLedger ? bankLedger.name : (currentAcc.accountName || '');
+
+          let initialRows = [];
+          if (dbVal > 0) {
+            // Withdrawal: First entry line is To Bank (Credit, non-editable amount), Second line is By Contra (Debit, editable)
+            initialRows = [
+              { id: 1, type: 'To', particular: bankName, debit: '', credit: amt > 0 ? amt.toFixed(2) : '', isBankRow: true, lockAmount: true, lockType: true, lockParticular: true },
+              { id: 2, type: 'By', particular: contraLedgerName, debit: amt > 0 ? amt.toFixed(2) : '', credit: '', isBankRow: false }
+            ];
+          } else {
+            // Deposit: First entry line is By Bank (Debit, non-editable amount), Second line is To Contra (Credit, editable)
+            initialRows = [
+              { id: 1, type: 'By', particular: bankName, debit: amt > 0 ? amt.toFixed(2) : '', credit: '', isBankRow: true, lockAmount: true, lockType: true, lockParticular: true },
+              { id: 2, type: 'To', particular: contraLedgerName, debit: '', credit: amt > 0 ? amt.toFixed(2) : '', isBankRow: false }
+            ];
+          }
+
+          const nextVoucher = (typeof window.getNextJournalVoucherNo === 'function')
+            ? window.getNextJournalVoucherNo(line.date, false)
+            : `JV-${new Date().getFullYear()}-001`;
+
+          const savedDeptId = window.KYA_STORE.statementDeptMapping[key] || '';
+          const savedType = window.KYA_STORE.statementTypeMapping[key] || 'non-budget';
+          const savedNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || '';
+          const savedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
+
+          const navState = (typeof window.getCashlineNavigationState === 'function')
+            ? window.getCashlineNavigationState()
+            : {
+                activeTopTab: _clActiveTopTab,
+                activeBankingTab: _clActiveBankingTab,
+                reconBankId: currentAcc.id,
+                cashbookAccountId: _clCashbookAccountId || currentAcc.id,
+                reconSubSection: _clReconSubSection,
+                reconFilter: _clReconFilter,
+                statementSearchQuery: _clStatementSearchQuery,
+                statementFromDate: _clStatementFromDate,
+                statementToDate: _clStatementToDate
+              };
+          navState.reconBankId = currentAcc.id;
+
+          const returnContext = {
+            tabId: 'cashline',
+            cashlineNavState: navState,
+            clActiveTopTab: _clActiveTopTab,
+            clActiveBankingTab: _clActiveBankingTab,
+            clReconBankId: currentAcc.id,
+            clCashbookAccountId: _clCashbookAccountId || currentAcc.id,
+            clReconSubSection: _clReconSubSection,
+            clReconFilter: _clReconFilter,
+            reconKey: key,
+            reconBankAccountId: currentAcc.id,
+            reconStatementOrigIdx: line.origIdx,
+            bankLedgerName: bankName
+          };
+
+          const journalEntryPayload = {
+            id: Date.now(),
+            date: line.date,
+            voucherNo: nextVoucher,
+            narration: savedNarration,
+            preparedBy: 'Bank Reconciliation',
+            departmentId: savedDeptId,
+            isBudget: savedType === 'budget',
+            uploadedDoc: savedDoc,
+            allRows: initialRows
+          };
+
+          if (typeof window.loadJournalEntry === 'function') {
+            window.loadJournalEntry(journalEntryPayload, false, returnContext);
+          } else if (typeof loadJournalEntry === 'function') {
+            loadJournalEntry(journalEntryPayload, false, returnContext);
+          }
+        });
+      });
+
       document.getElementById('clStmtSelectAllCb')?.addEventListener('change', (e) => {
         if (e.target.checked) {
           reconTargetRows.forEach(r => _clStatementSelectedIndices.add(r.origIdx));
@@ -3749,16 +4256,20 @@
       rowsHtml += `
         <tr>
           <td style="white-space: nowrap;">${formatToDDMMYYYY(line.date)}</td>
+          <td class="cl-cb-opp-cell" data-entry-id="${line.id}" data-target-opp="${ohEsc(line.opposite)}" style="cursor: pointer; position: relative;"
+              title="Click to edit entry">
+            <div>
+              <div style="font-weight: 600; color: var(--slate-800);">${ohEsc(line.opposite)}</div>
+              ${line.narration ? `<div style="font-size: 11.5px; color: var(--slate-400); font-weight: 500; margin-top: 2px;">${ohEsc(line.narration)}</div>` : ''}
+            </div>
+          </td>
           <td style="white-space: nowrap;">
             <span style="font-family: monospace; font-weight: 700; color: var(--slate-700); cursor:pointer; text-decoration:underline dotted; white-space: nowrap;" 
                   onclick="window.viewVoucherFromStatement(${line.id})" title="Click to view voucher">${ohEsc(line.voucherNo)}</span>
+            ${line.uploadedDoc && line.uploadedDoc.fileData ? `<span title="Attachment: ${typeof ohEsc === 'function' ? ohEsc(line.uploadedDoc.fileName) : line.uploadedDoc.fileName}" style="margin-left: 5px; color: #2563eb; display: inline-flex; vertical-align: middle;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>` : ''}
           </td>
-          <td>
-            <div style="font-weight: 600; color: var(--slate-800);">${ohEsc(line.opposite)}</div>
-            ${line.narration ? `<div style="font-size: 11.5px; color: var(--slate-400); font-weight: 500; margin-top: 2px;">${ohEsc(line.narration)}</div>` : ''}
-          </td>
-          <td class="num-val" style="color: var(--emerald-600); white-space: nowrap;">${line.receipt > 0 ? fmtAmt(line.receipt) : '—'}</td>
           <td class="num-val" style="color: var(--red-600); white-space: nowrap;">${line.payment > 0 ? fmtAmt(line.payment) : '—'}</td>
+          <td class="num-val" style="color: var(--emerald-600); white-space: nowrap;">${line.receipt > 0 ? fmtAmt(line.receipt) : '—'}</td>
           <td class="num-val" style="white-space: nowrap;">${fmtAmt(runningBal)}</td>
         </tr>
       `;
@@ -4187,12 +4698,12 @@
           <span class="recon-stat-val">${fmtAmt(openingBal)}</span>
         </div>
         <div class="recon-stat-card">
-          <span class="recon-stat-label">Total Receipt</span>
-          <span class="recon-stat-val" style="color: var(--emerald-600);">${fmtAmt(totalReceipt)}</span>
-        </div>
-        <div class="recon-stat-card">
           <span class="recon-stat-label">Total Payment</span>
           <span class="recon-stat-val" style="color: var(--red-600);">${fmtAmt(totalPayment)}</span>
+        </div>
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">Total Receipt</span>
+          <span class="recon-stat-val" style="color: var(--emerald-600);">${fmtAmt(totalReceipt)}</span>
         </div>
         <div class="recon-stat-card">
           <span class="recon-stat-label">Closing Balance</span>
@@ -4205,10 +4716,10 @@
           <thead>
             <tr>
               <th style="width: 110px; white-space: nowrap;">Date</th>
-              <th style="width: 110px; white-space: nowrap;">Voucher</th>
               <th>Ledger</th>
-              <th style="text-align: right; width: 120px;">Receipt</th>
+              <th style="width: 110px; white-space: nowrap;">Voucher</th>
               <th style="text-align: right; width: 120px;">Payment</th>
+              <th style="text-align: right; width: 120px;">Receipt</th>
               <th style="text-align: right; width: 130px;">Balance</th>
             </tr>
           </thead>

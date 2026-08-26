@@ -1946,7 +1946,7 @@
       doc.setLineWidth(0.5);
       doc.line(14, 32, pageWidth - 14, 32);
 
-      const tableHeaders = [['#', 'Date', 'Voucher No.', 'Type', 'Particulars / Narration', 'Amount (INR)', 'Status']];
+      const tableHeaders = [['#', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']];
       const tableBody = [];
       let totalAmt = 0;
 

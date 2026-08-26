@@ -878,6 +878,11 @@
   };
 
   function switchToActivePanel() {
+    if (activeTabId !== 'cashline') {
+      const p = document.getElementById('clReconLedgerPopover');
+      if (p) p.remove();
+    }
+
     // Hide all panels
     Object.values(panels).forEach(el => {
       el.style.display = 'none';

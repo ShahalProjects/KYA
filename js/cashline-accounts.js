@@ -31,18 +31,18 @@
     });
 
     const statsHtml = `
-      <div class="cl-stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px;">
-        <div class="cl-stat-card" style="background: var(--white); border: 1.5px solid var(--slate-150); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 11px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em;">No. of Accounts</span>
-          <span style="font-size: 24px; font-weight: 800; color: var(--slate-800);">${accounts.length}</span>
+      <div class="recon-stats" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 20px; padding: 12px 16px;">
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">No. of Accounts</span>
+          <span class="recon-stat-val">${accounts.length}</span>
         </div>
-        <div class="cl-stat-card" style="background: var(--white); border: 1.5px solid var(--slate-150); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 11px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em;">Bank Balance</span>
-          <span style="font-size: 24px; font-weight: 800; color: var(--slate-800);">${fmtAmt(totalBookBal)}</span>
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">Bank Balance</span>
+          <span class="recon-stat-val" style="color: var(--emerald-600);">${fmtAmt(totalReconciledBal)}</span>
         </div>
-        <div class="cl-stat-card" style="background: var(--white); border: 1.5px solid var(--slate-150); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm);">
-          <span style="font-size: 11px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em;">Book Balance</span>
-          <span style="font-size: 24px; font-weight: 800; color: var(--emerald-600);">${fmtAmt(totalReconciledBal)}</span>
+        <div class="recon-stat-card">
+          <span class="recon-stat-label">Book Balance</span>
+          <span class="recon-stat-val" style="color: var(--blue-700);">${fmtAmt(totalBookBal)}</span>
         </div>
       </div>
     `;
@@ -135,14 +135,9 @@
     overlay.innerHTML = `
       <div style="background: #fff; border-radius: 24px; padding: 32px; width: 92%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); position: relative; box-sizing: border-box; max-height: 90vh; overflow-y: auto;">
         
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-          <div style="width: 44px; height: 44px; border-radius: 12px; background: var(--blue-50); color: var(--blue-600); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
-            🏛️
-          </div>
-          <div>
-            <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--slate-900);">${ohEsc(acc.name)}</h3>
-            <p style="margin: 2px 0 0 0; font-size: 13px; color: var(--slate-400);">${ohEsc(acc.bankName)}</p>
-          </div>
+        <div style="margin-bottom: 24px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--slate-900);">${ohEsc(acc.name)}</h3>
+          <p style="margin: 2px 0 0 0; font-size: 13px; color: var(--slate-400);">${ohEsc(acc.bankName)}</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 28px;">
@@ -163,8 +158,8 @@
 
           <!-- Debit Card details -->
           <div style="grid-column: 1 / -1; border-top: 1px solid var(--slate-100); padding-top: 16px; margin-top: 4px;">
-            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-              💳 Debit Card Information
+            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px;">
+              Debit Card Information
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
               <div style="grid-column: 1 / -1; background: var(--slate-50); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--slate-100);">
@@ -184,8 +179,8 @@
 
           <!-- Statement & Balance details -->
           <div style="grid-column: 1 / -1; border-top: 1px solid var(--slate-100); padding-top: 16px; margin-top: 4px;">
-            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-              📊 Statement & Balances
+            <div style="font-size: 12px; font-weight: 800; color: var(--slate-700); margin-bottom: 12px;">
+              Statement & Balances
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
               <div style="background: var(--slate-50); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--slate-100);">

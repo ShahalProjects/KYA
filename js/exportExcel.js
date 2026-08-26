@@ -1757,7 +1757,7 @@
       r4.height = 6;
 
       // Row 5: Header Row
-      const r5 = sheet.addRow(['#', 'Date', 'Voucher No.', 'Type', 'Particulars / Narration', 'Amount (INR)', 'Status']);
+      const r5 = sheet.addRow(['#', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']);
       r5.height = 24;
       for (let c = 1; c <= maxCols; c++) {
         const cell = r5.getCell(c);

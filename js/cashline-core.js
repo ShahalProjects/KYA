@@ -423,6 +423,33 @@
   let _clCashflowDateFrom = '';
   let _clCashflowDateTo = '';
 
+  window.setCashlineNavigationState = function(state) {
+    if (!state) return;
+    if (state.activeTopTab !== undefined) _clActiveTopTab = state.activeTopTab;
+    if (state.activeBankingTab !== undefined) _clActiveBankingTab = state.activeBankingTab;
+    if (state.reconBankId !== undefined) _clReconBankId = state.reconBankId;
+    if (state.cashbookAccountId !== undefined) _clCashbookAccountId = state.cashbookAccountId;
+    if (state.reconSubSection !== undefined) _clReconSubSection = state.reconSubSection;
+    if (state.reconFilter !== undefined) _clReconFilter = state.reconFilter;
+    if (state.statementSearchQuery !== undefined) _clStatementSearchQuery = state.statementSearchQuery;
+    if (state.statementFromDate !== undefined) _clStatementFromDate = state.statementFromDate;
+    if (state.statementToDate !== undefined) _clStatementToDate = state.statementToDate;
+  };
+
+  window.getCashlineNavigationState = function() {
+    return {
+      activeTopTab: _clActiveTopTab,
+      activeBankingTab: _clActiveBankingTab,
+      reconBankId: _clReconBankId,
+      cashbookAccountId: _clCashbookAccountId,
+      reconSubSection: _clReconSubSection,
+      reconFilter: _clReconFilter,
+      statementSearchQuery: _clStatementSearchQuery,
+      statementFromDate: _clStatementFromDate,
+      statementToDate: _clStatementToDate,
+    };
+  };
+
   // ── Initialize KYA Store Future Variables ──────────────────────────
   function initClStore() {
     window.KYA_STORE = window.KYA_STORE || {};
@@ -430,6 +457,12 @@
     window.KYA_STORE.reconciliationState = window.KYA_STORE.reconciliationState || {};
     window.KYA_STORE.uploadedStatements = window.KYA_STORE.uploadedStatements || {};
     window.KYA_STORE.statementMappings = window.KYA_STORE.statementMappings || {};
+    window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
+    window.KYA_STORE.statementDeptMapping = window.KYA_STORE.statementDeptMapping || {};
+    window.KYA_STORE.statementTypeMapping = window.KYA_STORE.statementTypeMapping || {};
+    window.KYA_STORE.statementConfirmed = window.KYA_STORE.statementConfirmed || {};
+    window.KYA_STORE.statementNarrationMapping = window.KYA_STORE.statementNarrationMapping || {};
+    window.KYA_STORE.statementDocMapping = window.KYA_STORE.statementDocMapping || {};
   }
 
   // ── Sync Bank Accounts with COA ────────────────────────────────────
@@ -703,6 +736,64 @@
     const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
     return sg ? sg.name : '';
   }
+
+  // ── Helper: Next Journal Voucher Number Generator ───────────────
+  function getNextJournalVoucherNo(dateStr, autoIncrement = true) {
+    let targetYear = new Date().getFullYear();
+    if (dateStr) {
+      const parsedDate = new Date(dateStr);
+      if (!isNaN(parsedDate.getTime())) {
+        targetYear = parsedDate.getFullYear();
+      }
+    }
+
+    const allEntries = [
+      ...(typeof postedEntries !== 'undefined' && Array.isArray(postedEntries) ? postedEntries : []),
+      ...(typeof draftedEntries !== 'undefined' && Array.isArray(draftedEntries) ? draftedEntries : []),
+      ...((typeof window !== 'undefined' && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [])
+    ];
+
+    const existingVoucherSet = new Set();
+    let maxSeq = 0;
+
+    allEntries.forEach(e => {
+      const vNo = (e && (e.voucherNo || e.invoiceNo)) ? String(e.voucherNo || e.invoiceNo).trim() : '';
+      if (!vNo) return;
+      existingVoucherSet.add(vNo.toUpperCase());
+
+      const m = vNo.match(/JV-(?:(\d{4})-)?(\d+)/i);
+      if (m) {
+        const yr = m[1] ? parseInt(m[1], 10) : targetYear;
+        const num = parseInt(m[2], 10);
+        if (!isNaN(num) && yr === targetYear) {
+          if (num > maxSeq) maxSeq = num;
+        }
+      }
+    });
+
+    let currentCounter = (typeof jvCounter !== 'undefined' && typeof jvCounter === 'number') ? jvCounter : 1;
+    if (typeof window !== 'undefined' && typeof window.jvCounter === 'number' && window.jvCounter > currentCounter) {
+      currentCounter = window.jvCounter;
+    }
+
+    let candidateNum = Math.max(currentCounter, maxSeq + 1);
+    let candidateVoucher = `JV-${targetYear}-${String(candidateNum).padStart(3, '0')}`;
+
+    while (existingVoucherSet.has(candidateVoucher.toUpperCase())) {
+      candidateNum++;
+      candidateVoucher = `JV-${targetYear}-${String(candidateNum).padStart(3, '0')}`;
+    }
+
+    if (autoIncrement) {
+      const nextCounter = candidateNum + 1;
+      if (typeof jvCounter !== 'undefined') jvCounter = nextCounter;
+      if (typeof window !== 'undefined') window.jvCounter = nextCounter;
+      if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    }
+
+    return candidateVoucher;
+  }
+  window.getNextJournalVoucherNo = getNextJournalVoucherNo;
 
 
   // ===================================================================
