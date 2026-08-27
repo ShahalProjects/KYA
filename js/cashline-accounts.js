@@ -483,7 +483,7 @@
 
       const match = uploadedRows.find(sRow => {
         const bookAmt = tx.debit > 0 ? tx.debit : tx.credit;
-        const stmtAmt = tx.debit > 0 ? parseFloat(sRow.debit) || 0 : parseFloat(sRow.credit) || 0;
+        const stmtAmt = tx.debit > 0 ? ((window.parseStatementAmount ? window.parseStatementAmount(sRow.debit) : parseFloat(String(sRow.debit || '').replace(/,/g, ''))) || 0) : ((window.parseStatementAmount ? window.parseStatementAmount(sRow.credit) : parseFloat(String(sRow.credit || '').replace(/,/g, ''))) || 0);
         
         if (Math.abs(bookAmt - stmtAmt) > 0.01) return false;
         

@@ -85,12 +85,12 @@
         .map((line, origIdx) => ({ ...line, origIdx }))
         .filter(line => line.date && String(line.date).trim() !== '' && line.description && String(line.description).trim() !== '');
 
-      let openingBal = parseFloat(selectedLedger.openingBalance) || 0;
+      let openingBal = (window.parseStatementAmount ? window.parseStatementAmount(selectedLedger.openingBalance) : parseFloat(String(selectedLedger.openingBalance || '').replace(/,/g, ''))) || 0;
       if (statementRows.length > 0) {
         const firstRow = statementRows[0];
-        const parsedFirstBal = parseFloat(firstRow.balance) || 0;
-        const parsedFirstDb = parseFloat(firstRow.debit) || 0;
-        const parsedFirstCr = parseFloat(firstRow.credit) || 0;
+        const parsedFirstBal = (window.parseStatementAmount ? window.parseStatementAmount(firstRow.balance) : parseFloat(String(firstRow.balance || '').replace(/,/g, ''))) || 0;
+        const parsedFirstDb = (window.parseStatementAmount ? window.parseStatementAmount(firstRow.debit) : parseFloat(String(firstRow.debit || '').replace(/,/g, ''))) || 0;
+        const parsedFirstCr = (window.parseStatementAmount ? window.parseStatementAmount(firstRow.credit) : parseFloat(String(firstRow.credit || '').replace(/,/g, ''))) || 0;
         if (parsedFirstBal !== 0) {
           openingBal = parsedFirstBal + parsedFirstDb - parsedFirstCr;
         }
@@ -100,9 +100,9 @@
       const chronoRows = [...statementRows].sort((a, b) => a.date.localeCompare(b.date));
       let runningBal = openingBal;
       chronoRows.forEach((line) => {
-        const dbVal = parseFloat(line.debit) || 0;
-        const crVal = parseFloat(line.credit) || 0;
-        const parsedBal = parseFloat(line.balance) || 0;
+        const dbVal = (window.parseStatementAmount ? window.parseStatementAmount(line.debit) : parseFloat(String(line.debit || '').replace(/,/g, ''))) || 0;
+        const crVal = (window.parseStatementAmount ? window.parseStatementAmount(line.credit) : parseFloat(String(line.credit || '').replace(/,/g, ''))) || 0;
+        const parsedBal = (window.parseStatementAmount ? window.parseStatementAmount(line.balance) : parseFloat(String(line.balance || '').replace(/,/g, ''))) || 0;
         if (parsedBal !== 0) {
           runningBal = parsedBal;
         } else {
@@ -130,13 +130,6 @@
           const credit = String(line.credit || '').toLowerCase();
           return desc.includes(query) || dateStr.includes(query) || debit.includes(query) || credit.includes(query);
         });
-      }
-
-      // Sort display rows
-      if (_clStatementSortOrder === 'newest') {
-        displayRows.sort((a, b) => b.date.localeCompare(a.date));
-      } else {
-        displayRows.sort((a, b) => a.date.localeCompare(b.date));
       }
 
       // Calculate stats based on period
@@ -197,12 +190,59 @@
       window.KYA_STORE.statementTypeMapping = window.KYA_STORE.statementTypeMapping || {};
       window.KYA_STORE.statementConfirmed = window.KYA_STORE.statementConfirmed || {};
 
+      const isRowPosted = (origIdx) => {
+        const key = `${currentAcc.id}_${origIdx}`;
+        let isPosted = !!(window.KYA_STORE.reconciliationState && window.KYA_STORE.reconciliationState[key]);
+        if (isPosted && typeof postedEntries !== 'undefined') {
+          const existsInJournal = postedEntries.some(e => e.reconKey === key);
+          if (!existsInJournal) {
+            isPosted = false;
+            delete window.KYA_STORE.reconciliationState[key];
+          }
+        }
+        return isPosted;
+      };
+
       const isRowConfirmed = (key) => {
         return !!(
           (window.KYA_STORE.statementConfirmed && window.KYA_STORE.statementConfirmed[key]) ||
           (window.KYA_STORE.reconciliationState && window.KYA_STORE.reconciliationState[key])
         );
       };
+
+      const isRowLocked = (origIdx) => {
+        const key = `${currentAcc.id}_${origIdx}`;
+        return isRowPosted(origIdx) || isRowConfirmed(key);
+      };
+
+      // Sort display rows
+      if (isReconciliationMode && _clReconSubSection === 'confirmation') {
+        if (_clStatementSortOrder === 'newest') {
+          displayRows.sort((a, b) => b.date.localeCompare(a.date));
+        } else if (_clStatementSortOrder === 'posted') {
+          displayRows.sort((a, b) => {
+            const aPosted = isRowPosted(a.origIdx) ? 1 : 0;
+            const bPosted = isRowPosted(b.origIdx) ? 1 : 0;
+            if (aPosted !== bPosted) return bPosted - aPosted; // posted first
+            return a.date.localeCompare(b.date);
+          });
+        } else if (_clStatementSortOrder === 'non_posted') {
+          displayRows.sort((a, b) => {
+            const aPosted = isRowPosted(a.origIdx) ? 1 : 0;
+            const bPosted = isRowPosted(b.origIdx) ? 1 : 0;
+            if (aPosted !== bPosted) return aPosted - bPosted; // non-posted first
+            return a.date.localeCompare(b.date);
+          });
+        } else {
+          displayRows.sort((a, b) => a.date.localeCompare(b.date));
+        }
+      } else {
+        if (_clStatementSortOrder === 'newest') {
+          displayRows.sort((a, b) => b.date.localeCompare(a.date));
+        } else {
+          displayRows.sort((a, b) => a.date.localeCompare(b.date));
+        }
+      }
 
       const bankLedger = coaLedgers.find(l => l.id === currentAcc.ledgerId) || { name: currentAcc.name };
 
@@ -222,7 +262,9 @@
 
       const showingCountText = `Showing ${reconTargetRows.length} of ${totalTargetRowsCount} entries`;
 
-      const allDisplayedSelected = reconTargetRows.length > 0 && reconTargetRows.every(r => _clStatementSelectedIndices.has(r.origIdx));
+      const isSelectActive = !isReconciliationMode && _clStatementSelectMode;
+      const selectableRows = isSelectActive ? displayRows.filter(r => !isRowLocked(r.origIdx)) : [];
+      const allDisplayedSelected = isSelectActive && selectableRows.length > 0 && selectableRows.every(r => _clStatementSelectedIndices.has(r.origIdx));
 
       let rowsHtml = '';
       if (reconTargetRows.length > 0) {
@@ -230,7 +272,7 @@
           const dbVal = parseFloat(line.debit) || 0;
           const crVal = parseFloat(line.credit) || 0;
           const amt = dbVal > 0 ? dbVal : crVal;
-          const isChecked = _clStatementSelectedIndices.has(line.origIdx);
+          const isChecked = isSelectActive && _clStatementSelectedIndices.has(line.origIdx);
           const key = `${currentAcc.id}_${line.origIdx}`;
           let isPosted = !!window.KYA_STORE.reconciliationState[key];
           if (isPosted && typeof postedEntries !== 'undefined') {
@@ -249,12 +291,7 @@
 
             if (_clReconSubSection === 'reconciliation') {
               rowsHtml += `
-                <tr class="cl-recon-row" style="${isChecked ? 'background: #eff6ff;' : ''}; cursor: pointer;">
-                  ${_clStatementSelectMode ? `
-                    <td style="text-align: center; width: 42px;">
-                      <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
-                    </td>
-                  ` : ''}
+                <tr class="cl-recon-row" style="cursor: pointer;">
                   <td style="white-space: nowrap;">${formatToDDMMYYYY(line.date)}</td>
                   <td class="cl-recon-desc-cell" data-index="${line.origIdx}" title="Click description to open Journal Entry (e.g. split into multiple ledgers)" style="cursor: pointer;">
                     <div style="font-weight: 600; color: var(--slate-800);">
@@ -304,21 +341,17 @@
               const displayNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || '—';
               const attachedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
 
+              const locked = isRowLocked(line.origIdx);
               rowsHtml += `
-                <tr class="cl-confirm-row" style="background: ${isPosted ? '#fafdfb' : (isChecked ? '#eff6ff' : '#ffffff')}; border-bottom: 1px solid #f1f5f9;">
-                  ${_clStatementSelectMode ? `
-                    <td style="text-align: center; width: 42px; vertical-align: middle; padding: 12px 8px;">
-                      <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
-                    </td>
-                  ` : ''}
+                <tr class="cl-confirm-row" style="background: ${isPosted ? '#fafdfb' : '#ffffff'}; border-bottom: 1px solid #f1f5f9;">
                   <!-- 1. Date -->
                   <td style="white-space: nowrap; vertical-align: middle; padding: 12px 14px; width: 110px;">
                     <div style="font-weight: 600; color: var(--slate-700); font-size: 13px;">${formatToDDMMYYYY(line.date)}</div>
                   </td>
-                  <!-- 2. Ledger & Narration (Clickable to open Edit Entry popup) -->
-                  <td class="cl-confirm-ledger-cell" data-index="${line.origIdx}" style="vertical-align: middle; padding: 10px 14px; cursor: pointer;" title="Click to edit entry">
+                  <!-- 2. Ledger & Narration (Clickable to open Edit Entry popup before posting, locked after posting) -->
+                  <td class="cl-confirm-ledger-cell" data-index="${line.origIdx}" data-posted="${isPosted ? '1' : '0'}" style="vertical-align: middle; padding: 10px 14px; ${isPosted ? 'cursor: default;' : 'cursor: pointer;'}" title="${isPosted ? 'Posted to books (Locked)' : 'Click to edit entry'}">
                     <div style="font-weight: 700; color: #1e293b; font-size: 13.5px; margin-bottom: 3px; display: flex; align-items: center; gap: 6px;">
-                      <span class="cl-confirm-ledger-name" style="text-decoration: underline dotted; text-underline-offset: 3px;">${ohEsc(savedLedger?.name || '—')}</span>
+                      <span class="cl-confirm-ledger-name" style="${isPosted ? '' : 'text-decoration: underline dotted; text-underline-offset: 3px;'}">${ohEsc(savedLedger?.name || '—')}</span>
                       ${(attachedDoc && attachedDoc.fileData) ? `<span title="Attachment: ${ohEsc(attachedDoc.fileName)}" style="color: #2563eb; display: inline-flex;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>` : ''}
                     </div>
                     <div style="font-size: 12px; color: #64748b; font-weight: 500; line-height: 1.35;" title="${ohEsc(displayNarration)}">${ohEsc(displayNarration)}</div>
@@ -354,16 +387,35 @@
               `;
             }
           } else {
+            const isConfirmed = !!(window.KYA_STORE.statementConfirmed && window.KYA_STORE.statementConfirmed[key]);
+            const locked = isRowLocked(line.origIdx);
             rowsHtml += `
-              <tr style="${isChecked ? 'background: #eff6ff;' : ''}">
-                ${_clStatementSelectMode ? `
+              <tr style="${(isSelectActive && isChecked) ? 'background: #eff6ff;' : ''}">
+                ${isSelectActive ? `
                   <td style="text-align: center; width: 42px;">
-                    <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                    ${locked ? `
+                      <input type="checkbox" disabled style="width: 16px; height: 16px; opacity: 0.35; cursor: not-allowed;" title="Locked: Reconciled or posted transaction cannot be deleted">
+                    ` : `
+                      <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                    `}
                   </td>
                 ` : ''}
                 <td style="white-space: nowrap;">${formatToDDMMYYYY(line.date)}</td>
                 <td>
-                  <div style="font-weight: 600; color: var(--slate-800);">${ohEsc(line.description || '—')}</div>
+                  <div style="font-weight: 600; color: var(--slate-800); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span>${ohEsc(line.description || '—')}</span>
+                    ${isPosted ? `
+                      <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;" title="Posted to Books">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                        Posted
+                      </span>
+                    ` : (isConfirmed ? `
+                      <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;" title="Reconciled & Ready for Confirmation">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        Confirmed
+                      </span>
+                    ` : '')}
+                  </div>
                 </td>
                 <td class="num-val" style="color: var(--red-600); text-align: right;">${dbVal > 0 ? fmtAmt(dbVal) : '—'}</td>
                 <td class="num-val" style="color: var(--emerald-600); text-align: right;">${crVal > 0 ? fmtAmt(crVal) : '—'}</td>
@@ -373,7 +425,7 @@
           }
         });
       } else {
-        const colCount = isReconciliationMode ? (_clReconSubSection === 'confirmation' ? (_clStatementSelectMode ? 6 : 5) : (_clStatementSelectMode ? 5 : 4)) : (_clStatementSelectMode ? 6 : 5);
+        const colCount = isReconciliationMode ? (_clReconSubSection === 'confirmation' ? 5 : 4) : (isSelectActive ? 6 : 5);
         let emptyTitle = 'No statement entries found';
         let emptySub = 'Try adjusting your search query, date filters, or import a new statement.';
 
@@ -497,10 +549,23 @@
       function confirmDeleteStatementEntries(indicesToDelete, bankId, isAll) {
         if (!indicesToDelete || indicesToDelete.length === 0) return;
 
-        const count = indicesToDelete.length;
+        // Filter out any locked (reconciled/confirmed or posted) entries
+        const deletableIndices = indicesToDelete.filter(idx => !isRowLocked(idx));
+        const lockedCount = indicesToDelete.length - deletableIndices.length;
+
+        if (deletableIndices.length === 0) {
+          showToast('Reconciled or posted transactions cannot be deleted.', 'warning');
+          return;
+        }
+
+        const count = deletableIndices.length;
         const msg = isAll
-          ? `Are you sure you want to delete ALL ${count} statement entries for this bank account? This cannot be undone.`
-          : `Are you sure you want to delete ${count} selected statement entry(ies)?`;
+          ? (lockedCount > 0
+              ? `Are you sure you want to delete ${count} unreconciled statement entries? (${lockedCount} reconciled/posted entries cannot be deleted and will be kept).`
+              : `Are you sure you want to delete ALL ${count} statement entries for this bank account? This cannot be undone.`)
+          : (lockedCount > 0
+              ? `Delete ${count} selected statement entry(ies)? (${lockedCount} reconciled/posted entries cannot be deleted and will be kept).`
+              : `Are you sure you want to delete ${count} selected statement entry(ies)?`);
 
         document.getElementById('kyaConfirmOverlay')?.remove();
         const overlay = document.createElement('div');
@@ -511,7 +576,7 @@
             <div class="kya-confirm-icon" style="background:#fee2e2; color:#dc2626;">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
             </div>
-            <div class="kya-confirm-title">${isAll ? 'Clear Entire Statement' : 'Delete Statement Entries'}</div>
+            <div class="kya-confirm-title">${isAll ? 'Delete Statement Entries' : 'Delete Statement Entries'}</div>
             <div class="kya-confirm-msg">${ohEsc(msg)}</div>
             <div class="kya-confirm-btns">
               <button class="kya-confirm-cancel" id="clConfirmCancel">Cancel</button>
@@ -527,18 +592,34 @@
         overlay.querySelector('#clConfirmOk').addEventListener('click', () => {
           overlay.remove();
           const currentStatements = (window.KYA_STORE.uploadedStatements || {})[bankId] || [];
-          const toDeleteSet = new Set(indicesToDelete);
+          const toDeleteSet = new Set(deletableIndices);
           const updated = currentStatements.filter((_, idx) => !toDeleteSet.has(idx));
           
           window.KYA_STORE.uploadedStatements = window.KYA_STORE.uploadedStatements || {};
           window.KYA_STORE.uploadedStatements[bankId] = updated;
+
+          // Clean up mapping storage for deleted indices
+          deletableIndices.forEach(idx => {
+            const k = `${bankId}_${idx}`;
+            delete window.KYA_STORE.statementLedgerMapping[k];
+            delete window.KYA_STORE.reconciliationState[k];
+            delete window.KYA_STORE.statementDeptMapping[k];
+            delete window.KYA_STORE.statementTypeMapping[k];
+            if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[k];
+            if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[k];
+            if (window.KYA_STORE.statementConfirmed) delete window.KYA_STORE.statementConfirmed[k];
+          });
 
           _clStatementSelectedIndices.clear();
           if (updated.length === 0) {
             _clStatementSelectMode = false;
           }
 
-          showToast(isAll ? 'Bank statement cleared.' : `Deleted ${count} statement entry(ies).`, 'success');
+          if (lockedCount > 0) {
+            showToast(`Deleted ${count} statement entry(ies). ${lockedCount} reconciled/posted entries were protected.`, 'info');
+          } else {
+            showToast(isAll ? 'Bank statement cleared.' : `Deleted ${count} statement entry(ies).`, 'success');
+          }
           renderActiveSubtab();
           triggerAutoBackup();
         });
@@ -638,6 +719,10 @@
 
           document.querySelectorAll('.cl-confirm-ledger-cell').forEach(cell => {
             cell.addEventListener('click', (e) => {
+              if (cell.dataset.posted === '1') {
+                showToast('This transaction has already been posted to books and cannot be edited.', 'info');
+                return;
+              }
               e.stopPropagation();
               removePopover();
 
@@ -993,22 +1078,13 @@
         const confirmBtn = document.getElementById('clBtnConfirmRecon');
         if (confirmBtn) {
           confirmBtn.addEventListener('click', () => {
-            let toConfirm = [];
-            if (_clStatementSelectMode && _clStatementSelectedIndices.size > 0) {
-              toConfirm = unreconciledRows.filter(r => _clStatementSelectedIndices.has(r.origIdx) && !!(window.KYA_STORE.statementLedgerMapping && window.KYA_STORE.statementLedgerMapping[`${currentAcc.id}_${r.origIdx}`]));
-              if (toConfirm.length === 0) {
-                showToast('None of the selected transactions have ledgers assigned yet.', 'warning');
-                return;
-              }
-            } else {
-              toConfirm = unreconciledRows.filter(r => {
-                const k = `${currentAcc.id}_${r.origIdx}`;
-                return !!(window.KYA_STORE.statementLedgerMapping && window.KYA_STORE.statementLedgerMapping[k]);
-              });
-              if (toConfirm.length === 0) {
-                showToast('Please select a ledger for at least one transaction before confirming.', 'warning');
-                return;
-              }
+            const toConfirm = unreconciledRows.filter(r => {
+              const k = `${currentAcc.id}_${r.origIdx}`;
+              return !!(window.KYA_STORE.statementLedgerMapping && window.KYA_STORE.statementLedgerMapping[k]);
+            });
+            if (toConfirm.length === 0) {
+              showToast('Please select a ledger for at least one transaction before confirming.', 'warning');
+              return;
             }
 
             window.KYA_STORE.statementConfirmed = window.KYA_STORE.statementConfirmed || {};
@@ -1072,6 +1148,9 @@
             actionsArea.querySelector('#clReconSectionSelect')?.addEventListener('change', (e) => {
               _clReconSubSection = e.target.value;
               _clStatementSelectedIndices.clear();
+              if (_clReconSubSection !== 'confirmation' && (_clStatementSortOrder === 'non_posted' || _clStatementSortOrder === 'posted')) {
+                _clStatementSortOrder = 'oldest';
+              }
               renderActiveSubtab();
             });
           }
@@ -1082,11 +1161,6 @@
             if (isReconciliationMode) {
               if (_clReconSubSection === 'confirmation') {
                 tableHead.innerHTML = `
-                  ${_clStatementSelectMode ? `
-                    <th style="width: 42px; text-align: center;">
-                      <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
-                    </th>
-                  ` : ''}
                   <th style="width: 110px;">Date</th>
                   <th>Ledger</th>
                   <th style="text-align: right; width: 130px;">Debit</th>
@@ -1095,11 +1169,6 @@
                 `;
               } else {
                 tableHead.innerHTML = `
-                  ${_clStatementSelectMode ? `
-                    <th style="width: 42px; text-align: center;">
-                      <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
-                    </th>
-                  ` : ''}
                   <th style="width: 110px;">Date</th>
                   <th>Description</th>
                   <th style="text-align: right; width: 140px;">Amount</th>
@@ -1108,7 +1177,7 @@
               }
             } else {
               tableHead.innerHTML = `
-                ${_clStatementSelectMode ? `
+                ${isSelectActive ? `
                   <th style="width: 42px; text-align: center;">
                     <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
                   </th>
@@ -1122,9 +1191,29 @@
             }
           }
 
+          // Update sort options in filter bar
+          const sortSelect = existingContainer.querySelector('#clStmtSortOrder');
+          if (sortSelect) {
+            if (isReconciliationMode && _clReconSubSection === 'confirmation') {
+              sortSelect.style.width = '155px';
+              sortSelect.innerHTML = `
+                <option value="oldest" ${_clStatementSortOrder === 'oldest' ? 'selected' : ''}>Oldest First</option>
+                <option value="newest" ${_clStatementSortOrder === 'newest' ? 'selected' : ''}>Newest First</option>
+                <option value="non_posted" ${_clStatementSortOrder === 'non_posted' ? 'selected' : ''}>Non-Posted First</option>
+                <option value="posted" ${_clStatementSortOrder === 'posted' ? 'selected' : ''}>Posted First</option>
+              `;
+            } else {
+              sortSelect.style.width = '140px';
+              sortSelect.innerHTML = `
+                <option value="oldest" ${_clStatementSortOrder === 'oldest' ? 'selected' : ''}>Oldest First</option>
+                <option value="newest" ${_clStatementSortOrder === 'newest' ? 'selected' : ''}>Newest First</option>
+              `;
+            }
+          }
+
           // Render batch bar container if present or update
           let batchBar = document.getElementById('clStmtBatchBar');
-          if (_clStatementSelectMode) {
+          if (isSelectActive) {
             if (!batchBar) {
               batchBar = document.createElement('div');
               batchBar.id = 'clStmtBatchBar';
@@ -1134,7 +1223,7 @@
               <div style="display: flex; align-items: center; justify-content: space-between; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <span style="font-size: 13px; font-weight: 700; color: #1e40af;">
-                    📌 ${_clStatementSelectedIndices.size} of ${reconTargetRows.length} entries selected
+                    ${_clStatementSelectedIndices.size} of ${displayRows.length} entries selected
                   </span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -1214,9 +1303,13 @@
 
                 <div style="display: flex; align-items: center; gap: 6px; margin-left: 10px;">
                   <label style="font-size: 12.5px; font-weight: 600; color: var(--slate-600);">Sort:</label>
-                  <select id="clStmtSortOrder" class="je-input" style="height: 34px; padding: 0 8px; font-size: 12.5px; background: #fff; cursor: pointer; width: 140px;">
+                  <select id="clStmtSortOrder" class="je-input" style="height: 34px; padding: 0 8px; font-size: 12.5px; background: #fff; cursor: pointer; width: ${(isReconciliationMode && _clReconSubSection === 'confirmation') ? '155px' : '140px'};">
                     <option value="oldest" ${_clStatementSortOrder === 'oldest' ? 'selected' : ''}>Oldest First</option>
                     <option value="newest" ${_clStatementSortOrder === 'newest' ? 'selected' : ''}>Newest First</option>
+                    ${(isReconciliationMode && _clReconSubSection === 'confirmation') ? `
+                      <option value="non_posted" ${_clStatementSortOrder === 'non_posted' ? 'selected' : ''}>Non-Posted First</option>
+                      <option value="posted" ${_clStatementSortOrder === 'posted' ? 'selected' : ''}>Posted First</option>
+                    ` : ''}
                   </select>
                 </div>
 
@@ -1231,12 +1324,12 @@
                 </div>
               </div>
 
-              ${_clStatementSelectMode ? `
+              ${isSelectActive ? `
                 <div id="clStmtBatchBar">
                   <div style="display: flex; align-items: center; justify-content: space-between; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                       <span style="font-size: 13px; font-weight: 700; color: #1e40af;">
-                        📌 ${_clStatementSelectedIndices.size} of ${reconTargetRows.length} entries selected
+                        ${_clStatementSelectedIndices.size} of ${displayRows.length} entries selected
                       </span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -1279,11 +1372,6 @@
                 <table class="cl-table">
                   <thead>
                     <tr>
-                      ${_clStatementSelectMode ? `
-                        <th style="width: 42px; text-align: center;">
-                          <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
-                        </th>
-                      ` : ''}
                       ${isReconciliationMode ? `
                         ${_clReconSubSection === 'confirmation' ? `
                           <th style="width: 110px;">Date</th>
@@ -1298,6 +1386,11 @@
                           <th style="width: 280px;">Select Ledger</th>
                         `}
                       ` : `
+                        ${isSelectActive ? `
+                          <th style="width: 42px; text-align: center;">
+                            <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                          </th>
+                        ` : ''}
                         <th style="width: 110px;">Date</th>
                         <th>Description</th>
                         <th style="text-align: right; width: 120px;">Debit</th>
@@ -1338,6 +1431,9 @@
           document.getElementById('clReconSectionSelect')?.addEventListener('change', (e) => {
             _clReconSubSection = e.target.value;
             _clStatementSelectedIndices.clear();
+            if (_clReconSubSection !== 'confirmation' && (_clStatementSortOrder === 'non_posted' || _clStatementSortOrder === 'posted')) {
+              _clStatementSortOrder = 'oldest';
+            }
             renderActiveSubtab();
           });
 
@@ -1950,12 +2046,16 @@
       document.querySelectorAll('.cl-recon-desc-cell').forEach(cell => {
         cell.addEventListener('click', (ev) => {
           ev.stopPropagation();
+          const origIdx = cell.dataset.index;
+          if (isRowLocked(origIdx)) {
+            showToast('This transaction is reconciled/posted and cannot be modified.', 'info');
+            return;
+          }
           const existingPopover = document.getElementById('clReconLedgerPopover');
           if (existingPopover) {
             if (typeof clearActiveRowHighlights === 'function') clearActiveRowHighlights();
             existingPopover.remove();
           }
-          const origIdx = cell.dataset.index;
           const line = statementRows.find(r => String(r.origIdx) === String(origIdx));
           if (!line) return;
 
@@ -2045,9 +2145,11 @@
 
       document.getElementById('clStmtSelectAllCb')?.addEventListener('change', (e) => {
         if (e.target.checked) {
-          reconTargetRows.forEach(r => _clStatementSelectedIndices.add(r.origIdx));
+          selectableRows.forEach(r => {
+            _clStatementSelectedIndices.add(r.origIdx);
+          });
         } else {
-          reconTargetRows.forEach(r => _clStatementSelectedIndices.delete(r.origIdx));
+          selectableRows.forEach(r => _clStatementSelectedIndices.delete(r.origIdx));
         }
         renderActiveSubtab();
       });

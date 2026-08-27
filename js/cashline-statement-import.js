@@ -47,13 +47,58 @@
       const workbook = XLSX.read(data, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
       callback(rows);
     } catch (err) {
       console.error(err);
       showToast('Error parsing Excel file.', 'error');
     }
   }
+
+  // ── Amount / Numeric Value Normalization ───────────────────────────
+  function parseStatementAmount(val) {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') {
+      return isNaN(val) || !isFinite(val) ? 0 : val;
+    }
+    let s = String(val).trim();
+    if (!s || s === '-' || s === '--' || s === '---') return 0;
+    
+    const lower = s.toLowerCase();
+    if (lower === 'nil' || lower === 'null' || lower === 'nan' || lower === 'n/a' || lower === 'na') return 0;
+
+    let isNegative = false;
+    // Check accounting parenthesis e.g. (1,234.50) or ( 1,234.50 )
+    if (/^\s*\((.*)\)\s*$/.test(s)) {
+      isNegative = true;
+      s = s.replace(/^\s*\((.*)\)\s*$/, '$1');
+    } else if (/-\s*$/.test(s)) {
+      // Trailing minus e.g. 1,234.50-
+      isNegative = true;
+      s = s.replace(/-\s*$/, '');
+    } else if (/^\s*-/.test(s)) {
+      // Leading minus e.g. - 1,234.50
+      isNegative = true;
+      s = s.replace(/^\s*-/, '');
+    }
+
+    // Remove Dr/Cr suffixes if any e.g. "1,234.50 Dr" or "1,234.50 Cr"
+    s = s.replace(/\s*(dr|cr)\.?\s*$/i, '');
+
+    // Strip currency symbols, commas, spaces and non-breaking spaces
+    s = s.replace(/[\s\u00A0,]/g, '').replace(/[^0-9.]/g, '');
+
+    // If multiple dots exist (e.g. corrupted format like 1.250.00), handle properly
+    const parts = s.split('.');
+    if (parts.length > 2) {
+      s = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+    }
+
+    let num = parseFloat(s);
+    if (isNaN(num) || !isFinite(num)) return 0;
+    return isNegative ? -num : num;
+  }
+  window.parseStatementAmount = parseStatementAmount;
 
   // ── Date Normalization ─────────────────────────────────────────────
   function parseStatementDate(dateStr) {
@@ -62,8 +107,8 @@
     if (!clean) return '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
     
-    // DD-MM-YYYY or DD/MM/YYYY
-    let m = clean.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    // DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+    let m = clean.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
     if (m) {
       const d = m[1].padStart(2, '0');
       const month = m[2].padStart(2, '0');
@@ -71,8 +116,8 @@
       return `${y}-${month}-${d}`;
     }
 
-    // DD-MM-YY or DD/MM/YY
-    m = clean.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/);
+    // DD-MM-YY or DD/MM/YY or DD.MM.YY
+    m = clean.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
     if (m) {
       const d = m[1].padStart(2, '0');
       const month = m[2].padStart(2, '0');
@@ -514,9 +559,9 @@
           const description = descCol !== -1 ? String(row[descCol] || '').trim() : '';
           if (!description) continue; // Skip rows without description
 
-          const debit = parseFloat(row[wCol]) || 0;
-          const credit = parseFloat(row[depCol]) || 0;
-          const balance = bCol !== -1 ? parseFloat(row[bCol]) || 0 : 0;
+          const debit = Math.abs(parseStatementAmount(row[wCol]));
+          const credit = Math.abs(parseStatementAmount(row[depCol]));
+          const balance = bCol !== -1 ? parseStatementAmount(row[bCol]) : 0;
 
           // Skip if all values are zero
           if (debit === 0 && credit === 0 && balance === 0) continue;
@@ -546,8 +591,8 @@
         const makeMatchKey = (r) => {
           const dateStr = String(r.date || '').trim();
           const descStr = String(r.description || '').trim().toLowerCase();
-          const dr = (parseFloat(r.debit) || 0).toFixed(2);
-          const cr = (parseFloat(r.credit) || 0).toFixed(2);
+          const dr = (parseStatementAmount(r.debit) || 0).toFixed(2);
+          const cr = (parseStatementAmount(r.credit) || 0).toFixed(2);
           return `${dateStr}|${descStr}|${dr}|${cr}`;
         };
 

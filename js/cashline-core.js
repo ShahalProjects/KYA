@@ -580,14 +580,20 @@
 
     // Hook up top-level click events
     panel.querySelector('#clTopTabBanking').addEventListener('click', () => {
+      _clStatementSelectMode = false;
+      _clStatementSelectedIndices.clear();
       _clActiveTopTab = 'banking';
       renderCashlinePanel();
     });
     panel.querySelector('#clTopTabBooks').addEventListener('click', () => {
+      _clStatementSelectMode = false;
+      _clStatementSelectedIndices.clear();
       _clActiveTopTab = 'books';
       renderCashlinePanel();
     });
     panel.querySelector('#clTopTabCashflow').addEventListener('click', () => {
+      _clStatementSelectMode = false;
+      _clStatementSelectedIndices.clear();
       _clActiveTopTab = 'cashflow';
       renderCashlinePanel();
     });
@@ -634,6 +640,13 @@
   }
 
   function switchBankingTab(tab, actionsArea) {
+    if (_clActiveBankingTab !== tab) {
+      _clStatementSelectMode = false;
+      _clStatementSelectedIndices.clear();
+      if (_clStatementSortOrder === 'non_posted' || _clStatementSortOrder === 'posted') {
+        _clStatementSortOrder = 'oldest';
+      }
+    }
     _clActiveBankingTab = tab;
 
     const container = document.getElementById('clBankingLayoutContainer');
