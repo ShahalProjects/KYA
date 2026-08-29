@@ -1837,7 +1837,7 @@
       .tb-table td { padding: 12px 16px; border-bottom: 1.5px solid var(--slate-100); font-size: 13.5px; color: var(--slate-700); }
       .tb-table tr:hover { background: var(--slate-50); }
       .tb-table .num-col { text-align: right; font-family: var(--font-main); font-weight: 600; min-width: 140px; }
-      .tb-table .sl-col { width: 60px; color: var(--slate-400); font-weight: 600; font-size: 12px; }
+      .tb-table .sl-col { width: 70px; color: var(--slate-400); font-weight: 600; font-size: 12px; }
       .tb-table .particulars-col { font-weight: 500; color: var(--slate-800); }
       
       .tb-total-row { background: var(--slate-50) !important; font-weight: 800; font-size: 14px; border-top: 1.5px solid var(--slate-300); border-bottom: 4px double var(--slate-800) !important; color: var(--slate-800); }
@@ -1923,7 +1923,7 @@
       <table class="tb-table">
         <thead>
           <tr>
-            <th class="sl-col">#</th>
+            <th class="sl-col">Sl No</th>
             <th>Particulars</th>
     `;
 

@@ -3007,7 +3007,7 @@
           <table class="pt-table">
             <thead>
               <tr style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500));">
-                <th style="width: 32px; text-align: center;">#</th>
+                <th style="width: 60px; text-align: center;">Sl No</th>
                 <th>Date</th>
                 <th>Voucher No.</th>
                 <th>Type</th>

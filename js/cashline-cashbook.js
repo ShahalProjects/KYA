@@ -217,32 +217,154 @@
 
       // Sort display rows
       if (isReconciliationMode && _clReconSubSection === 'confirmation') {
-        if (_clStatementSortOrder === 'newest') {
-          displayRows.sort((a, b) => b.date.localeCompare(a.date));
-        } else if (_clStatementSortOrder === 'posted') {
+        if (_clConfirmSortColumn && _clConfirmSortDir) {
           displayRows.sort((a, b) => {
+            let res = 0;
+            const aDb = parseFloat(a.debit) || 0;
+            const bDb = parseFloat(b.debit) || 0;
+            const aCr = parseFloat(a.credit) || 0;
+            const bCr = parseFloat(b.credit) || 0;
+
+            const aKey = `${currentAcc.id}_${a.origIdx}`;
+            const bKey = `${currentAcc.id}_${b.origIdx}`;
+            const aLedgerId = window.KYA_STORE.statementLedgerMapping[aKey];
+            const bLedgerId = window.KYA_STORE.statementLedgerMapping[bKey];
+            const aLedger = allLedgers.find(l => String(l.id) === String(aLedgerId));
+            const bLedger = allLedgers.find(l => String(l.id) === String(bLedgerId));
+            const aLedgerName = aLedger ? aLedger.name : '';
+            const bLedgerName = bLedger ? bLedger.name : '';
+
             const aPosted = isRowPosted(a.origIdx) ? 1 : 0;
             const bPosted = isRowPosted(b.origIdx) ? 1 : 0;
-            if (aPosted !== bPosted) return bPosted - aPosted; // posted first
-            return a.date.localeCompare(b.date);
-          });
-        } else if (_clStatementSortOrder === 'non_posted') {
-          displayRows.sort((a, b) => {
-            const aPosted = isRowPosted(a.origIdx) ? 1 : 0;
-            const bPosted = isRowPosted(b.origIdx) ? 1 : 0;
-            if (aPosted !== bPosted) return aPosted - bPosted; // non-posted first
-            return a.date.localeCompare(b.date);
+
+            if (_clConfirmSortColumn === 'date') {
+              res = a.date.localeCompare(b.date);
+            } else if (_clConfirmSortColumn === 'ledger') {
+              res = aLedgerName.localeCompare(bLedgerName);
+            } else if (_clConfirmSortColumn === 'debit') {
+              res = aDb - bDb;
+            } else if (_clConfirmSortColumn === 'credit') {
+              res = aCr - bCr;
+            } else if (_clConfirmSortColumn === 'action') {
+              res = aPosted - bPosted;
+            }
+
+            if (_clConfirmSortDir === 'desc') {
+              res = -res;
+            }
+            return res !== 0 ? res : (a.origIdx - b.origIdx);
           });
         } else {
-          displayRows.sort((a, b) => a.date.localeCompare(b.date));
+          displayRows.sort((a, b) => a.origIdx - b.origIdx);
         }
-      } else {
-        if (_clStatementSortOrder === 'newest') {
-          displayRows.sort((a, b) => b.date.localeCompare(a.date));
+      } else if (isReconciliationMode && _clReconSubSection === 'reconciliation') {
+        if (_clReconSortColumn && _clReconSortDir) {
+          displayRows.sort((a, b) => {
+            let res = 0;
+            const aDb = parseFloat(a.debit) || 0;
+            const bDb = parseFloat(b.debit) || 0;
+            const aCr = parseFloat(a.credit) || 0;
+            const bCr = parseFloat(b.credit) || 0;
+            const aAmt = aDb > 0 ? aDb : aCr;
+            const bAmt = bDb > 0 ? bDb : bCr;
+
+            const aKey = `${currentAcc.id}_${a.origIdx}`;
+            const bKey = `${currentAcc.id}_${b.origIdx}`;
+            const aLedgerId = window.KYA_STORE.statementLedgerMapping[aKey];
+            const bLedgerId = window.KYA_STORE.statementLedgerMapping[bKey];
+            const aLedger = allLedgers.find(l => String(l.id) === String(aLedgerId));
+            const bLedger = allLedgers.find(l => String(l.id) === String(bLedgerId));
+            const aLedgerName = aLedger ? aLedger.name : '';
+            const bLedgerName = bLedger ? bLedger.name : '';
+
+            if (_clReconSortColumn === 'date') {
+              res = a.date.localeCompare(b.date);
+            } else if (_clReconSortColumn === 'description') {
+              res = (a.description || '').localeCompare(b.description || '');
+            } else if (_clReconSortColumn === 'amount') {
+              res = aAmt - bAmt;
+            } else if (_clReconSortColumn === 'ledger') {
+              if (aLedgerName && !bLedgerName) res = -1;
+              else if (!aLedgerName && bLedgerName) res = 1;
+              else res = aLedgerName.localeCompare(bLedgerName);
+            }
+
+            if (_clReconSortDir === 'desc') {
+              res = -res;
+            }
+            return res !== 0 ? res : (a.origIdx - b.origIdx);
+          });
         } else {
-          displayRows.sort((a, b) => a.date.localeCompare(b.date));
+          displayRows.sort((a, b) => a.origIdx - b.origIdx);
+        }
+      } else if (!isReconciliationMode) {
+        if (_clStatementSortColumn && _clStatementSortDir) {
+          displayRows.sort((a, b) => {
+            let res = 0;
+            if (_clStatementSortColumn === 'date') {
+              res = a.date.localeCompare(b.date);
+            } else if (_clStatementSortColumn === 'description') {
+              res = (a.description || '').localeCompare(b.description || '');
+            } else if (_clStatementSortColumn === 'status') {
+              const aKey = `${currentAcc.id}_${a.origIdx}`;
+              const bKey = `${currentAcc.id}_${b.origIdx}`;
+              const aPosted = isRowPosted(a.origIdx);
+              const bPosted = isRowPosted(b.origIdx);
+              const aConf = isRowConfirmed(aKey);
+              const bConf = isRowConfirmed(bKey);
+              // P = 1, C = 2, N = 3
+              const aStat = aPosted ? 1 : (aConf ? 2 : 3);
+              const bStat = bPosted ? 1 : (bConf ? 2 : 3);
+              res = aStat - bStat;
+            } else if (_clStatementSortColumn === 'debit') {
+              const aDb = parseFloat(a.debit) || 0;
+              const bDb = parseFloat(b.debit) || 0;
+              res = aDb - bDb;
+            } else if (_clStatementSortColumn === 'credit') {
+              const aCr = parseFloat(a.credit) || 0;
+              const bCr = parseFloat(b.credit) || 0;
+              res = aCr - bCr;
+            } else if (_clStatementSortColumn === 'balance') {
+              const aBal = parseFloat(a.computedBalance) || 0;
+              const bBal = parseFloat(b.computedBalance) || 0;
+              res = aBal - bBal;
+            }
+            if (_clStatementSortDir === 'desc') {
+              res = -res;
+            }
+            return res !== 0 ? res : (a.origIdx - b.origIdx);
+          });
+        } else {
+          // Normal order (original statement import sequence)
+          displayRows.sort((a, b) => a.origIdx - b.origIdx);
         }
       }
+
+      const getColumnSortIcon = (section, col) => {
+        let curCol = '';
+        let curDir = '';
+        if (section === 'confirmation') {
+          curCol = _clConfirmSortColumn;
+          curDir = _clConfirmSortDir;
+        } else if (section === 'reconciliation') {
+          curCol = _clReconSortColumn;
+          curDir = _clReconSortDir;
+        } else {
+          curCol = _clStatementSortColumn;
+          curDir = _clStatementSortDir;
+        }
+
+        if (curCol !== col) {
+          return `<span style="font-size: 10px; color: #94a3b8; opacity: 0.5; margin-left: 5px;">⇅</span>`;
+        }
+        if (curDir === 'asc') {
+          return `<span style="font-size: 10px; color: #2563eb; font-weight: 800; margin-left: 5px;">▲</span>`;
+        }
+        if (curDir === 'desc') {
+          return `<span style="font-size: 10px; color: #2563eb; font-weight: 800; margin-left: 5px;">▼</span>`;
+        }
+        return `<span style="font-size: 10px; color: #94a3b8; opacity: 0.5; margin-left: 5px;">⇅</span>`;
+      };
 
       const bankLedger = coaLedgers.find(l => l.id === currentAcc.ledgerId) || { name: currentAcc.name };
 
@@ -262,9 +384,26 @@
 
       const showingCountText = `Showing ${reconTargetRows.length} of ${totalTargetRowsCount} entries`;
 
-      const isSelectActive = !isReconciliationMode && _clStatementSelectMode;
-      const selectableRows = isSelectActive ? displayRows.filter(r => !isRowLocked(r.origIdx)) : [];
-      const allDisplayedSelected = isSelectActive && selectableRows.length > 0 && selectableRows.every(r => _clStatementSelectedIndices.has(r.origIdx));
+      const isSelectActive = isReconciliationMode
+        ? (_clReconSubSection === 'confirmation' ? _clConfirmSelectMode : _clReconSelectMode)
+        : _clStatementSelectMode;
+
+      const currentSelectedIndices = isReconciliationMode
+        ? (_clReconSubSection === 'confirmation' ? _clConfirmSelectedIndices : _clReconSelectedIndices)
+        : _clStatementSelectedIndices;
+
+      const selectableRows = isSelectActive ? (
+        isReconciliationMode ? (
+          _clReconSubSection === 'confirmation'
+            ? reconTargetRows.filter(r => {
+                const key = `${currentAcc.id}_${r.origIdx}`;
+                const isPosted = !!window.KYA_STORE.reconciliationState[key] && (typeof postedEntries !== 'undefined' && postedEntries.some(e => e.reconKey === key));
+                return !isPosted;
+              })
+            : reconTargetRows.filter(r => !isRowLocked(r.origIdx))
+        ) : displayRows.filter(r => !isRowLocked(r.origIdx))
+      ) : [];
+      const allDisplayedSelected = isSelectActive && selectableRows.length > 0 && selectableRows.every(r => currentSelectedIndices.has(r.origIdx));
 
       let rowsHtml = '';
       if (reconTargetRows.length > 0) {
@@ -272,7 +411,7 @@
           const dbVal = parseFloat(line.debit) || 0;
           const crVal = parseFloat(line.credit) || 0;
           const amt = dbVal > 0 ? dbVal : crVal;
-          const isChecked = isSelectActive && _clStatementSelectedIndices.has(line.origIdx);
+          const isChecked = isSelectActive && currentSelectedIndices.has(line.origIdx);
           const key = `${currentAcc.id}_${line.origIdx}`;
           let isPosted = !!window.KYA_STORE.reconciliationState[key];
           if (isPosted && typeof postedEntries !== 'undefined') {
@@ -290,8 +429,18 @@
             const savedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
 
             if (_clReconSubSection === 'reconciliation') {
+              const locked = isRowLocked(line.origIdx);
               rowsHtml += `
-                <tr class="cl-recon-row" style="cursor: pointer;">
+                <tr class="cl-recon-row" style="cursor: pointer; ${(isSelectActive && isChecked) ? 'background: #eff6ff;' : ''}">
+                  ${isSelectActive ? `
+                    <td style="text-align: center; width: 42px;">
+                      ${locked ? `
+                        <input type="checkbox" disabled style="width: 16px; height: 16px; opacity: 0.35; cursor: not-allowed;" title="Locked: Reconciled or posted transaction cannot be deleted">
+                      ` : `
+                        <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                      `}
+                    </td>
+                  ` : ''}
                   <td style="white-space: nowrap;">${formatToDDMMYYYY(line.date)}</td>
                   <td class="cl-recon-desc-cell" data-index="${line.origIdx}" title="Click description to open Journal Entry (e.g. split into multiple ledgers)" style="cursor: pointer;">
                     <div style="font-weight: 600; color: var(--slate-800);">
@@ -341,9 +490,18 @@
               const displayNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || '—';
               const attachedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
 
-              const locked = isRowLocked(line.origIdx);
+              const isChecked = isSelectActive && !isPosted && currentSelectedIndices.has(line.origIdx);
               rowsHtml += `
-                <tr class="cl-confirm-row" style="background: ${isPosted ? '#fafdfb' : '#ffffff'}; border-bottom: 1px solid #f1f5f9;">
+                <tr class="cl-confirm-row" style="background: ${(isSelectActive && isChecked) ? '#eff6ff' : (isPosted ? '#fafdfb' : '#ffffff')}; border-bottom: 1px solid #f1f5f9;">
+                  ${isSelectActive ? `
+                    <td style="text-align: center; width: 42px; vertical-align: middle;">
+                      ${isPosted ? `
+                        <input type="checkbox" disabled style="width: 16px; height: 16px; opacity: 0.35; cursor: not-allowed;" title="Posted transaction cannot be selected">
+                      ` : `
+                        <input type="checkbox" class="cl-stmt-row-cb" data-index="${line.origIdx}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                      `}
+                    </td>
+                  ` : ''}
                   <!-- 1. Date -->
                   <td style="white-space: nowrap; vertical-align: middle; padding: 12px 14px; width: 110px;">
                     <div style="font-weight: 600; color: var(--slate-700); font-size: 13px;">${formatToDDMMYYYY(line.date)}</div>
@@ -389,6 +547,10 @@
           } else {
             const isConfirmed = !!(window.KYA_STORE.statementConfirmed && window.KYA_STORE.statementConfirmed[key]);
             const locked = isRowLocked(line.origIdx);
+            const statusLetter = isPosted ? 'P' : (isConfirmed ? 'C' : 'N');
+            const statusTitle = isPosted ? 'Posted' : (isConfirmed ? 'Confirmation' : 'No action taken yet');
+            const statusColor = isPosted ? '#059669' : (isConfirmed ? '#2563eb' : '#64748b');
+
             rowsHtml += `
               <tr style="${(isSelectActive && isChecked) ? 'background: #eff6ff;' : ''}">
                 ${isSelectActive ? `
@@ -402,20 +564,10 @@
                 ` : ''}
                 <td style="white-space: nowrap;">${formatToDDMMYYYY(line.date)}</td>
                 <td>
-                  <div style="font-weight: 600; color: var(--slate-800); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span>${ohEsc(line.description || '—')}</span>
-                    ${isPosted ? `
-                      <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;" title="Posted to Books">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                        Posted
-                      </span>
-                    ` : (isConfirmed ? `
-                      <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;" title="Reconciled & Ready for Confirmation">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                        Confirmed
-                      </span>
-                    ` : '')}
-                  </div>
+                  <span style="font-weight: 600; color: var(--slate-800);">${ohEsc(line.description || '—')}</span>
+                </td>
+                <td style="text-align: center; width: 60px; font-weight: 700; font-size: 13px; color: ${statusColor};" title="${statusTitle}">
+                  ${statusLetter}
                 </td>
                 <td class="num-val" style="color: var(--red-600); text-align: right;">${dbVal > 0 ? fmtAmt(dbVal) : '—'}</td>
                 <td class="num-val" style="color: var(--emerald-600); text-align: right;">${crVal > 0 ? fmtAmt(crVal) : '—'}</td>
@@ -425,7 +577,7 @@
           }
         });
       } else {
-        const colCount = isReconciliationMode ? (_clReconSubSection === 'confirmation' ? 5 : 4) : (isSelectActive ? 6 : 5);
+        const colCount = isReconciliationMode ? (_clReconSubSection === 'confirmation' ? (isSelectActive ? 6 : 5) : (isSelectActive ? 5 : 4)) : (isSelectActive ? 7 : 6);
         let emptyTitle = 'No statement entries found';
         let emptySub = 'Try adjusting your search query, date filters, or import a new statement.';
 
@@ -454,26 +606,217 @@
         `;
       }
 
+      function getBankStatementExportData() {
+        if (!selectedLedger) return null;
+        const fromVal = _clStatementFromDate || '';
+        const toVal = _clStatementToDate || '';
+
+        const trans = [];
+        let totalDebit = 0;
+        let totalCredit = 0;
+
+        statementRows.forEach(line => {
+          if (fromVal && line.date < fromVal) return;
+          if (toVal && line.date > toVal) return;
+          const dr = parseFloat(line.debit) || 0;
+          const cr = parseFloat(line.credit) || 0;
+          totalDebit += dr;
+          totalCredit += cr;
+          trans.push({
+            id: line.origIdx,
+            date: line.date,
+            voucherNo: '—',
+            particulars: line.description || '—',
+            debit: dr,
+            credit: cr
+          });
+        });
+
+        return {
+          title: 'BANK RECONCILIATION STATEMENT',
+          accountName: currentAcc.name || selectedLedger.name,
+          accountNumber: currentAcc.accountNumber || '',
+          bankName: currentAcc.bankName || '',
+          subgroupName: 'Bank Account',
+          dateFrom: fromVal,
+          dateTo: toVal,
+          openingBalance: openingBal,
+          transactions: trans,
+          totalDebit,
+          totalCredit,
+          closingBalance: (openingBal + totalDebit - totalCredit),
+          companyName: (typeof getCompanyProfileData === 'function' ? (getCompanyProfileData()?.name) : '') || 'KYA Accounting'
+        };
+      }
+
+      function renderReconciliationHeaderActions() {
+        if (!actionsArea) return;
+        actionsArea.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="cl-recon-pill-wrap" style="display: inline-flex; align-items: center; background: rgba(0, 0, 0, 0.22); padding: 3px; border-radius: 8px; border: 1.5px solid rgba(255, 255, 255, 0.35); gap: 3px;">
+              <button type="button" id="clBtnSubRecon" class="cl-recon-pill-btn ${_clReconSubSection === 'reconciliation' ? 'active' : ''}" style="height: 28px; padding: 0 12px; font-size: 12.5px; font-weight: ${_clReconSubSection === 'reconciliation' ? '700' : '600'}; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease; ${_clReconSubSection === 'reconciliation' ? 'background: #ffffff; color: #1e3a8a; box-shadow: 0 1px 3px rgba(0,0,0,0.2);' : 'background: transparent; color: rgba(255,255,255,0.85);'}">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L20 4M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+                Reconciliation
+              </button>
+              <button type="button" id="clBtnSubConfirm" class="cl-recon-pill-btn ${_clReconSubSection === 'confirmation' ? 'active' : ''}" style="height: 28px; padding: 0 12px; font-size: 12.5px; font-weight: ${_clReconSubSection === 'confirmation' ? '700' : '600'}; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease; ${_clReconSubSection === 'confirmation' ? 'background: #ffffff; color: #1e3a8a; box-shadow: 0 1px 3px rgba(0,0,0,0.2);' : 'background: transparent; color: rgba(255,255,255,0.85);'}">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Confirmation
+              </button>
+            </div>
+
+            <!-- 3-dot more options dropdown -->
+            <div class="rpt-more-wrap" style="position: relative;">
+              <button class="rpt-more-btn" id="btnClReconMoreMenu" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; font-size: 16px; border-radius: 6px; cursor: pointer; font-weight: 800; transition: all 0.2s ease;" title="More Options" type="button" aria-label="More Options">
+                ⋮
+              </button>
+              <div id="clReconDropdownMenu" class="rpt-more-dropdown" style="display: none; position: absolute; right: 0; top: 38px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); width: 220px; z-index: 1000; overflow: visible; font-family: Inter, sans-serif; padding: 6px 0;">
+                <!-- Export Submenu -->
+                <div class="rpt-submenu-wrap" id="clReconExportSubmenuWrap">
+                  <button class="rpt-menu-item rpt-submenu-btn" id="clReconExportMenuBtn" type="button" style="width: 100%; text-align: left; padding: 9px 16px; background: transparent; border: none; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      <span>Export</span>
+                    </div>
+                    <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
+                      <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                  <div class="rpt-submenu-dropdown" id="clReconExportSubmenu">
+                    <button class="rpt-menu-item" id="clReconExportPdf" type="button">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                      </svg>
+                      PDF
+                    </button>
+                    <button class="rpt-menu-item" id="clReconExportExcel" type="button">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="8" y1="13" x2="16" y2="17"></line>
+                        <line x1="16" y1="13" x2="8" y2="17"></line>
+                      </svg>
+                      Excel
+                    </button>
+                  </div>
+                </div>
+                <div style="height: 1px; background: #f1f5f9; margin: 4px 0;"></div>
+                <button type="button" id="clReconToggleSelectMode" class="cl-dropdown-item rpt-menu-item" style="width: 100%; text-align: left; padding: 9px 16px; background: transparent; border: none; font-size: 13px; font-weight: 600; color: #334155; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m9 12 2 2 4-4"/></svg>
+                  ${(_clReconSubSection === 'confirmation' ? _clConfirmSelectMode : _clReconSelectMode) ? 'Exit Select Mode' : 'Select'}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        actionsArea.querySelector('#clBtnSubRecon')?.addEventListener('click', () => {
+          if (_clReconSubSection === 'reconciliation') return;
+          _clReconSubSection = 'reconciliation';
+          _clStatementSelectedIndices.clear();
+          if (_clStatementSortOrder !== 'oldest' && _clStatementSortOrder !== 'newest') {
+            _clStatementSortOrder = 'oldest';
+          }
+          renderActiveSubtab();
+        });
+
+        actionsArea.querySelector('#clBtnSubConfirm')?.addEventListener('click', () => {
+          if (_clReconSubSection === 'confirmation') return;
+          _clReconSubSection = 'confirmation';
+          _clStatementSelectedIndices.clear();
+          if (_clStatementSortOrder !== 'oldest' && _clStatementSortOrder !== 'newest') {
+            _clStatementSortOrder = 'oldest';
+          }
+          renderActiveSubtab();
+        });
+
+        const moreBtn = actionsArea.querySelector('#btnClReconMoreMenu');
+        const dropdownMenu = actionsArea.querySelector('#clReconDropdownMenu');
+        const submenuWrap = actionsArea.querySelector('#clReconExportSubmenuWrap');
+        const submenu = actionsArea.querySelector('#clReconExportSubmenu');
+        const exportMenuBtn = actionsArea.querySelector('#clReconExportMenuBtn');
+
+        if (moreBtn && dropdownMenu) {
+          moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = dropdownMenu.style.display === 'none';
+            dropdownMenu.style.display = isHidden ? 'flex' : 'none';
+          });
+          document.addEventListener('click', (e) => {
+            if (!moreBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+              dropdownMenu.style.display = 'none';
+              if (submenu) submenu.classList.remove('open');
+            }
+          });
+        }
+
+        if (exportMenuBtn && submenu) {
+          exportMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            submenu.classList.toggle('open');
+          });
+        }
+
+        let subCloseTimer = null;
+        if (submenuWrap && submenu) {
+          submenuWrap.addEventListener('mouseenter', () => {
+            if (subCloseTimer) clearTimeout(subCloseTimer);
+            submenu.classList.add('open');
+          });
+          submenuWrap.addEventListener('mouseleave', () => {
+            subCloseTimer = setTimeout(() => {
+              submenu.classList.remove('open');
+            }, 300);
+          });
+          submenu.addEventListener('mouseenter', () => {
+            if (subCloseTimer) clearTimeout(subCloseTimer);
+            submenu.classList.add('open');
+          });
+        }
+
+        actionsArea.querySelector('#clReconExportPdf')?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (dropdownMenu) dropdownMenu.style.display = 'none';
+          if (submenu) submenu.classList.remove('open');
+          const data = getBankStatementExportData();
+          if (data && typeof window.exportStatementToPDF === 'function') {
+            await window.exportStatementToPDF(data);
+          }
+        });
+
+        actionsArea.querySelector('#clReconExportExcel')?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (dropdownMenu) dropdownMenu.style.display = 'none';
+          if (submenu) submenu.classList.remove('open');
+          const data = getBankStatementExportData();
+          if (data && typeof window.exportStatementToExcel === 'function') {
+            await window.exportStatementToExcel(data);
+          }
+        });
+
+        actionsArea.querySelector('#clReconToggleSelectMode')?.addEventListener('click', () => {
+          if (_clReconSubSection === 'confirmation') {
+            _clConfirmSelectMode = !_clConfirmSelectMode;
+            if (!_clConfirmSelectMode) _clConfirmSelectedIndices.clear();
+          } else {
+            _clReconSelectMode = !_clReconSelectMode;
+            if (!_clReconSelectMode) _clReconSelectedIndices.clear();
+          }
+          if (dropdownMenu) dropdownMenu.style.display = 'none';
+          renderActiveSubtab();
+        });
+      }
+
       // Actions in Blue Card header
       if (actionsArea) {
         if (isReconciliationMode) {
-          actionsArea.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <select id="clReconSectionSelect" style="height: 32px; padding: 0 12px 0 10px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; border: 1.5px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: #ffffff; outline: none; font-family: inherit;">
-                <option value="reconciliation" ${_clReconSubSection === 'reconciliation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
-                  Reconciliation
-                </option>
-                <option value="confirmation" ${_clReconSubSection === 'confirmation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
-                  Confirmation
-                </option>
-              </select>
-            </div>
-          `;
-          actionsArea.querySelector('#clReconSectionSelect')?.addEventListener('change', (e) => {
-            _clReconSubSection = e.target.value;
-            _clStatementSelectedIndices.clear();
-            renderActiveSubtab();
-          });
+          renderReconciliationHeaderActions();
         } else {
           actionsArea.innerHTML = `
             <div style="display: flex; align-items: center; gap: 8px; position: relative;">
@@ -628,53 +971,77 @@
       function attachConfirmationRowListeners() {
         document.querySelectorAll('.cl-btn-post-single').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            const origIdx = e.currentTarget.dataset.index;
-            const line = statementRows.find(r => String(r.origIdx) === String(origIdx));
-            if (!line) return;
+            const origIdx = Number(e.currentTarget.dataset.index);
+            const isPartOfSelection = _clConfirmSelectedIndices && _clConfirmSelectedIndices.has(origIdx);
+            const targetIndices = (isPartOfSelection && _clConfirmSelectedIndices.size > 0)
+              ? Array.from(_clConfirmSelectedIndices)
+              : [origIdx];
 
-            const key = `${currentAcc.id}_${origIdx}`;
-            const dbVal = parseFloat(line.debit) || 0;
-            const crVal = parseFloat(line.credit) || 0;
-            const amt = dbVal > 0 ? dbVal : crVal;
-            const savedLedgerId = window.KYA_STORE.statementLedgerMapping[key];
-            const selectedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
-            if (!selectedLedger) return;
+            let postedCount = 0;
+            let lastVoucherCode = '';
 
-            const voucherCode = (typeof window.getNextJournalVoucherNo === 'function')
-              ? window.getNextJournalVoucherNo(line.date, true)
-              : ((typeof getNextJournalVoucherNo === 'function') ? getNextJournalVoucherNo(line.date, true) : `JV-${new Date().getFullYear()}-001`);
-            const savedDeptId = window.KYA_STORE.statementDeptMapping[key] || '';
-            const savedType = window.KYA_STORE.statementTypeMapping[key] || 'non-budget';
-            const savedNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || 'Bank Reconciliation Entry';
-            const savedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
+            targetIndices.forEach(idx => {
+              const line = statementRows.find(r => String(r.origIdx) === String(idx));
+              if (!line) return;
 
-            const firstParticularName = dbVal > 0 ? selectedLedger.name : bankLedger.name;
-            const formattedAmt = typeof fmtNum === 'function' ? fmtNum(amt) : Number(amt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const key = `${currentAcc.id}_${idx}`;
+              const isPosted = !!window.KYA_STORE.reconciliationState[key] && (typeof postedEntries !== 'undefined' && postedEntries.some(en => en.reconKey === key));
+              if (isPosted) return;
 
-            const newEntry = {
-              id: Date.now() + Math.floor(Math.random() * 1000),
-              date: line.date,
-              voucherNo: voucherCode,
-              reconKey: key,
-              preparedBy: 'Bank Reconciliation',
-              firstParticular: firstParticularName,
-              amount: formattedAmt,
-              departmentId: savedDeptId,
-              isBudget: savedType === 'budget',
-              narration: savedNarration,
-              uploadedDoc: savedDoc,
-              allRows: dbVal > 0 ? [
-                { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
-                { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
-              ] : [
-                { id: 1, type: 'By', particular: bankLedger.name, debit: amt.toFixed(2), credit: '' },
-                { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
-              ]
-            };
+              const dbVal = parseFloat(line.debit) || 0;
+              const crVal = parseFloat(line.credit) || 0;
+              const amt = dbVal > 0 ? dbVal : crVal;
+              const savedLedgerId = window.KYA_STORE.statementLedgerMapping[key];
+              const selectedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
+              if (!selectedLedger) return;
 
-            if (typeof postedEntries !== 'undefined') postedEntries.push(newEntry);
-            window.KYA_STORE.reconciliationState[key] = line.date;
-            showToast(`Journal Entry ${voucherCode} posted to books!`, 'success');
+              const voucherCode = (typeof window.getNextJournalVoucherNo === 'function')
+                ? window.getNextJournalVoucherNo(line.date, true)
+                : ((typeof getNextJournalVoucherNo === 'function') ? getNextJournalVoucherNo(line.date, true) : `JV-${new Date().getFullYear()}-001`);
+              lastVoucherCode = voucherCode;
+              const savedDeptId = window.KYA_STORE.statementDeptMapping[key] || '';
+              const savedType = window.KYA_STORE.statementTypeMapping[key] || 'non-budget';
+              const savedNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || 'Bank Reconciliation Entry';
+              const savedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
+
+              const firstParticularName = dbVal > 0 ? selectedLedger.name : bankLedger.name;
+              const formattedAmt = typeof fmtNum === 'function' ? fmtNum(amt) : Number(amt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+              const newEntry = {
+                id: Date.now() + Math.floor(Math.random() * 100000),
+                date: line.date,
+                voucherNo: voucherCode,
+                reconKey: key,
+                preparedBy: 'Bank Reconciliation',
+                firstParticular: firstParticularName,
+                amount: formattedAmt,
+                departmentId: savedDeptId,
+                isBudget: savedType === 'budget',
+                narration: savedNarration,
+                uploadedDoc: savedDoc,
+                allRows: dbVal > 0 ? [
+                  { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
+                  { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
+                ] : [
+                  { id: 1, type: 'By', particular: bankLedger.name, debit: amt.toFixed(2), credit: '' },
+                  { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
+                ]
+              };
+
+              if (typeof postedEntries !== 'undefined') postedEntries.push(newEntry);
+              window.KYA_STORE.reconciliationState[key] = line.date;
+              postedCount++;
+            });
+
+            if (isPartOfSelection) {
+              _clConfirmSelectedIndices.clear();
+            }
+
+            if (postedCount > 1) {
+              showToast(`Successfully posted ${postedCount} transactions to books!`, 'success');
+            } else if (postedCount === 1) {
+              showToast(`Journal Entry ${lastVoucherCode} posted to books!`, 'success');
+            }
             renderActiveSubtab();
             if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
           });
@@ -682,26 +1049,44 @@
 
         document.querySelectorAll('.cl-btn-revert-single').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            const origIdx = e.currentTarget.dataset.index;
-            const key = `${currentAcc.id}_${origIdx}`;
+            const origIdx = Number(e.currentTarget.dataset.index);
+            const isPartOfSelection = _clConfirmSelectedIndices && _clConfirmSelectedIndices.has(origIdx);
+            const targetIndices = (isPartOfSelection && _clConfirmSelectedIndices.size > 0)
+              ? Array.from(_clConfirmSelectedIndices)
+              : [origIdx];
 
-            if (typeof postedEntries !== 'undefined') {
-              const pIdx = postedEntries.findIndex(ent => ent.reconKey === key);
-              if (pIdx !== -1) {
-                postedEntries.splice(pIdx, 1);
+            let revertedCount = 0;
+            targetIndices.forEach(idx => {
+              const key = `${currentAcc.id}_${idx}`;
+
+              if (typeof postedEntries !== 'undefined') {
+                const pIdx = postedEntries.findIndex(ent => ent.reconKey === key);
+                if (pIdx !== -1) {
+                  postedEntries.splice(pIdx, 1);
+                }
               }
+
+              delete window.KYA_STORE.statementLedgerMapping[key];
+              delete window.KYA_STORE.reconciliationState[key];
+              delete window.KYA_STORE.statementDeptMapping[key];
+              delete window.KYA_STORE.statementTypeMapping[key];
+              if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[key];
+              if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[key];
+              if (window.KYA_STORE.statementConfirmed) {
+                delete window.KYA_STORE.statementConfirmed[key];
+              }
+              revertedCount++;
+            });
+
+            if (isPartOfSelection) {
+              _clConfirmSelectedIndices.clear();
             }
 
-            delete window.KYA_STORE.statementLedgerMapping[key];
-            delete window.KYA_STORE.reconciliationState[key];
-            delete window.KYA_STORE.statementDeptMapping[key];
-            delete window.KYA_STORE.statementTypeMapping[key];
-            if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[key];
-            if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[key];
-            if (window.KYA_STORE.statementConfirmed) {
-              delete window.KYA_STORE.statementConfirmed[key];
+            if (revertedCount > 1) {
+              showToast(`Moved ${revertedCount} transactions back to Reconciliation section.`, 'info');
+            } else {
+              showToast('Transaction moved back to Reconciliation section.', 'info');
             }
-            showToast('Transaction moved back to Reconciliation section.', 'info');
             renderActiveSubtab();
             if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
           });
@@ -1102,6 +1487,74 @@
         }
       }
 
+      function attachStmtSortListeners() {
+        // Statement sorting
+        document.querySelectorAll('.cl-stmt-sort-th').forEach(th => {
+          th.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const col = th.dataset.sort;
+            if (_clStatementSortColumn === col) {
+              if (_clStatementSortDir === 'asc') {
+                _clStatementSortDir = 'desc';
+              } else if (_clStatementSortDir === 'desc') {
+                _clStatementSortColumn = '';
+                _clStatementSortDir = '';
+              } else {
+                _clStatementSortDir = 'asc';
+              }
+            } else {
+              _clStatementSortColumn = col;
+              _clStatementSortDir = 'asc';
+            }
+            renderActiveSubtab();
+          });
+        });
+
+        // Reconciliation sorting
+        document.querySelectorAll('.cl-recon-sort-th').forEach(th => {
+          th.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const col = th.dataset.sort;
+            if (_clReconSortColumn === col) {
+              if (_clReconSortDir === 'asc') {
+                _clReconSortDir = 'desc';
+              } else if (_clReconSortDir === 'desc') {
+                _clReconSortColumn = '';
+                _clReconSortDir = '';
+              } else {
+                _clReconSortDir = 'asc';
+              }
+            } else {
+              _clReconSortColumn = col;
+              _clReconSortDir = 'asc';
+            }
+            renderActiveSubtab();
+          });
+        });
+
+        // Confirmation sorting
+        document.querySelectorAll('.cl-confirm-sort-th').forEach(th => {
+          th.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const col = th.dataset.sort;
+            if (_clConfirmSortColumn === col) {
+              if (_clConfirmSortDir === 'asc') {
+                _clConfirmSortDir = 'desc';
+              } else if (_clConfirmSortDir === 'desc') {
+                _clConfirmSortColumn = '';
+                _clConfirmSortDir = '';
+              } else {
+                _clConfirmSortDir = 'asc';
+              }
+            } else {
+              _clConfirmSortColumn = col;
+              _clConfirmSortDir = 'asc';
+            }
+            renderActiveSubtab();
+          });
+        });
+      }
+
       // Check if statement container already exists in DOM to avoid focus loss
       const existingContainer = document.getElementById('clStmtContainer');
       if (existingContainer) {
@@ -1130,29 +1583,9 @@
             document.getElementById('clStmtShowingCount').textContent = showingCountText;
           }
 
-          // Update sub-section toggle buttons in header if in reconciliation mode
-          // Update sub-section dropdown in header if in reconciliation mode
+          // Update sub-section dropdown and 3-dot menu in header if in reconciliation mode
           if (actionsArea && isReconciliationMode) {
-            actionsArea.innerHTML = `
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <select id="clReconSectionSelect" style="height: 32px; padding: 0 12px 0 10px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; border: 1.5px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: #ffffff; outline: none; font-family: inherit;">
-                  <option value="reconciliation" ${_clReconSubSection === 'reconciliation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
-                    Reconciliation
-                  </option>
-                  <option value="confirmation" ${_clReconSubSection === 'confirmation' ? 'selected' : ''} style="color: #1e293b; background: #ffffff; font-weight: 600;">
-                    Confirmation
-                  </option>
-                </select>
-              </div>
-            `;
-            actionsArea.querySelector('#clReconSectionSelect')?.addEventListener('change', (e) => {
-              _clReconSubSection = e.target.value;
-              _clStatementSelectedIndices.clear();
-              if (_clReconSubSection !== 'confirmation' && (_clStatementSortOrder === 'non_posted' || _clStatementSortOrder === 'posted')) {
-                _clStatementSortOrder = 'oldest';
-              }
-              renderActiveSubtab();
-            });
+            renderReconciliationHeaderActions();
           }
 
           // Update table header & body
@@ -1161,18 +1594,73 @@
             if (isReconciliationMode) {
               if (_clReconSubSection === 'confirmation') {
                 tableHead.innerHTML = `
-                  <th style="width: 110px;">Date</th>
-                  <th>Ledger</th>
-                  <th style="text-align: right; width: 130px;">Debit</th>
-                  <th style="text-align: right; width: 130px;">Credit</th>
-                  <th style="text-align: right; width: 100px;">Action</th>
+                  ${isSelectActive ? `
+                    <th style="width: 42px; text-align: center;">
+                      <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                    </th>
+                  ` : ''}
+                  <th class="cl-confirm-sort-th" data-sort="date" style="width: 110px; cursor: pointer; user-select: none;" title="Click to sort: Older → Newer → Normal">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                      <span>Date</span>
+                      ${getColumnSortIcon('confirmation', 'date')}
+                    </div>
+                  </th>
+                  <th class="cl-confirm-sort-th" data-sort="ledger" style="cursor: pointer; user-select: none;" title="Click to sort: A-Z → Z-A → Normal">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                      <span>Ledger</span>
+                      ${getColumnSortIcon('confirmation', 'ledger')}
+                    </div>
+                  </th>
+                  <th class="cl-confirm-sort-th" data-sort="debit" style="text-align: right; width: 130px; cursor: pointer; user-select: none;" title="Click to sort by Debit">
+                    <div style="display: flex; align-items: center; justify-content: flex-end;">
+                      <span>Debit</span>
+                      ${getColumnSortIcon('confirmation', 'debit')}
+                    </div>
+                  </th>
+                  <th class="cl-confirm-sort-th" data-sort="credit" style="text-align: right; width: 130px; cursor: pointer; user-select: none;" title="Click to sort by Credit">
+                    <div style="display: flex; align-items: center; justify-content: flex-end;">
+                      <span>Credit</span>
+                      ${getColumnSortIcon('confirmation', 'credit')}
+                    </div>
+                  </th>
+                  <th class="cl-confirm-sort-th" data-sort="action" style="text-align: right; width: 100px; cursor: pointer; user-select: none;" title="Click to sort: Non-Posted → Posted → Normal">
+                    <div style="display: flex; align-items: center; justify-content: flex-end;">
+                      <span>Action</span>
+                      ${getColumnSortIcon('confirmation', 'action')}
+                    </div>
+                  </th>
                 `;
               } else {
                 tableHead.innerHTML = `
-                  <th style="width: 110px;">Date</th>
-                  <th>Description</th>
-                  <th style="text-align: right; width: 140px;">Amount</th>
-                  <th style="width: 280px;">Select Ledger</th>
+                  ${isSelectActive ? `
+                    <th style="width: 42px; text-align: center;">
+                      <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                    </th>
+                  ` : ''}
+                  <th class="cl-recon-sort-th" data-sort="date" style="width: 110px; cursor: pointer; user-select: none;" title="Click to sort: Older → Newer → Normal">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                      <span>Date</span>
+                      ${getColumnSortIcon('reconciliation', 'date')}
+                    </div>
+                  </th>
+                  <th class="cl-recon-sort-th" data-sort="description" style="cursor: pointer; user-select: none;" title="Click to sort: A-Z → Z-A → Normal">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                      <span>Description</span>
+                      ${getColumnSortIcon('reconciliation', 'description')}
+                    </div>
+                  </th>
+                  <th class="cl-recon-sort-th" data-sort="amount" style="text-align: right; width: 140px; cursor: pointer; user-select: none;" title="Click to sort by Amount">
+                    <div style="display: flex; align-items: center; justify-content: flex-end;">
+                      <span>Amount</span>
+                      ${getColumnSortIcon('reconciliation', 'amount')}
+                    </div>
+                  </th>
+                  <th class="cl-recon-sort-th" data-sort="ledger" style="width: 280px; cursor: pointer; user-select: none;" title="Click to sort: Mapped → Unmapped → Normal">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                      <span>Select Ledger</span>
+                      ${getColumnSortIcon('reconciliation', 'ledger')}
+                    </div>
+                  </th>
                 `;
               }
             } else {
@@ -1182,56 +1670,84 @@
                     <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
                   </th>
                 ` : ''}
-                <th style="width: 110px;">Date</th>
-                <th>Description</th>
-                <th style="text-align: right; width: 120px;">Debit</th>
-                <th style="text-align: right; width: 120px;">Credit</th>
-                <th style="text-align: right; width: 130px;">Balance</th>
+                <th class="cl-stmt-sort-th" data-sort="date" style="width: 110px; cursor: pointer; user-select: none;" title="Click to sort: Older → Newer → Normal">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span>Date</span>
+                    ${getColumnSortIcon('statement', 'date')}
+                  </div>
+                </th>
+                <th class="cl-stmt-sort-th" data-sort="description" style="cursor: pointer; user-select: none;" title="Click to sort: A-Z → Z-A → Normal">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span>Description</span>
+                    ${getColumnSortIcon('statement', 'description')}
+                  </div>
+                </th>
+                <th class="cl-stmt-sort-th" data-sort="status" style="width: 75px; text-align: center; cursor: pointer; user-select: none;" title="Click to sort: P/C/N → N/C/P → Normal">
+                  <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <span>Status</span>
+                    ${getColumnSortIcon('statement', 'status')}
+                  </div>
+                </th>
+                <th class="cl-stmt-sort-th" data-sort="debit" style="text-align: right; width: 120px; cursor: pointer; user-select: none;" title="Click to sort by Debit">
+                  <div style="display: flex; align-items: center; justify-content: flex-end;">
+                    <span>Debit</span>
+                    ${getColumnSortIcon('statement', 'debit')}
+                  </div>
+                </th>
+                <th class="cl-stmt-sort-th" data-sort="credit" style="text-align: right; width: 120px; cursor: pointer; user-select: none;" title="Click to sort by Credit">
+                  <div style="display: flex; align-items: center; justify-content: flex-end;">
+                    <span>Credit</span>
+                    ${getColumnSortIcon('statement', 'credit')}
+                  </div>
+                </th>
+                <th class="cl-stmt-sort-th" data-sort="balance" style="text-align: right; width: 130px; cursor: pointer; user-select: none;" title="Click to sort by Balance">
+                  <div style="display: flex; align-items: center; justify-content: flex-end;">
+                    <span>Balance</span>
+                    ${getColumnSortIcon('statement', 'balance')}
+                  </div>
+                </th>
               `;
             }
           }
 
-          // Update sort options in filter bar
-          const sortSelect = existingContainer.querySelector('#clStmtSortOrder');
-          if (sortSelect) {
-            if (isReconciliationMode && _clReconSubSection === 'confirmation') {
-              sortSelect.style.width = '155px';
-              sortSelect.innerHTML = `
-                <option value="oldest" ${_clStatementSortOrder === 'oldest' ? 'selected' : ''}>Oldest First</option>
-                <option value="newest" ${_clStatementSortOrder === 'newest' ? 'selected' : ''}>Newest First</option>
-                <option value="non_posted" ${_clStatementSortOrder === 'non_posted' ? 'selected' : ''}>Non-Posted First</option>
-                <option value="posted" ${_clStatementSortOrder === 'posted' ? 'selected' : ''}>Posted First</option>
-              `;
-            } else {
-              sortSelect.style.width = '140px';
-              sortSelect.innerHTML = `
-                <option value="oldest" ${_clStatementSortOrder === 'oldest' ? 'selected' : ''}>Oldest First</option>
-                <option value="newest" ${_clStatementSortOrder === 'newest' ? 'selected' : ''}>Newest First</option>
-              `;
-            }
-          }
+          // Remove any sort dropdown wrap from filter bar
+          const sortSelectWrap = existingContainer.querySelector('#clStmtSortWrap');
+          if (sortSelectWrap) sortSelectWrap.remove();
 
           // Render batch bar container if present or update
           let batchBar = document.getElementById('clStmtBatchBar');
-          if (isSelectActive) {
+          const shouldShowBatchBar = isSelectActive && !(isReconciliationMode && _clReconSubSection === 'reconciliation');
+          if (shouldShowBatchBar) {
             if (!batchBar) {
               batchBar = document.createElement('div');
               batchBar.id = 'clStmtBatchBar';
-              existingContainer.insertBefore(batchBar, document.querySelector('.recon-stats'));
+              existingContainer.insertBefore(batchBar, document.querySelector('.recon-stats') || existingContainer.querySelector('table')?.parentElement);
             }
             batchBar.innerHTML = `
               <div style="display: flex; align-items: center; justify-content: space-between; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <span style="font-size: 13px; font-weight: 700; color: #1e40af;">
-                    ${_clStatementSelectedIndices.size} of ${displayRows.length} entries selected
+                    ${currentSelectedIndices.size} of ${selectableRows.length} ${isReconciliationMode && _clReconSubSection === 'confirmation' ? 'non-posted ' : ''}entries selected
                   </span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  ${_clStatementSelectedIndices.size > 0 ? `
-                    <button id="clBtnDeleteSelectedBatch" class="pt-del-btn" style="height: 34px; padding: 0 16px; font-size: 12.5px;" type="button">
-                      Delete Selected (${_clStatementSelectedIndices.size})
-                    </button>
-                  ` : ''}
+                  ${isReconciliationMode && _clReconSubSection === 'confirmation' ? `
+                    ${currentSelectedIndices.size > 0 ? `
+                      <button id="clBtnPostSelectedBatch" class="btn btn-success" style="height: 34px; padding: 0 16px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(5,150,105,0.25);" type="button">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        Post Selected (${currentSelectedIndices.size})
+                      </button>
+                      <button id="clBtnRevertSelectedBatch" class="btn btn-secondary" style="height: 34px; padding: 0 14px; font-size: 12.5px; font-weight: 600; border-radius: 8px;" type="button">
+                        Revert Selected
+                      </button>
+                    ` : ''}
+                  ` : `
+                    ${currentSelectedIndices.size > 0 ? `
+                      <button id="clBtnDeleteSelectedBatch" class="pt-del-btn" style="height: 34px; padding: 0 16px; font-size: 12.5px;" type="button">
+                        Delete Selected (${currentSelectedIndices.size})
+                      </button>
+                    ` : ''}
+                  `}
                   <button id="clBtnExitSelectMode" class="btn btn-secondary" style="height: 34px; padding: 0 14px; font-size: 12.5px; font-weight: 600; border-radius: 8px;" type="button">
                     Done
                   </button>
@@ -1268,6 +1784,7 @@
           document.getElementById('clStmtTableBody').innerHTML = rowsHtml;
           attachConfirmationRowListeners();
           attachReconBottomBarListeners();
+          attachStmtSortListeners();
         } else {
           // Render the full structure
           target.innerHTML = `
@@ -1301,18 +1818,6 @@
                   <input type="date" id="clStmtDateTo" class="je-input" style="height: 34px; padding: 0 8px; font-size: 12.5px; width: 135px;" value="${_clStatementToDate}" />
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 6px; margin-left: 10px;">
-                  <label style="font-size: 12.5px; font-weight: 600; color: var(--slate-600);">Sort:</label>
-                  <select id="clStmtSortOrder" class="je-input" style="height: 34px; padding: 0 8px; font-size: 12.5px; background: #fff; cursor: pointer; width: ${(isReconciliationMode && _clReconSubSection === 'confirmation') ? '155px' : '140px'};">
-                    <option value="oldest" ${_clStatementSortOrder === 'oldest' ? 'selected' : ''}>Oldest First</option>
-                    <option value="newest" ${_clStatementSortOrder === 'newest' ? 'selected' : ''}>Newest First</option>
-                    ${(isReconciliationMode && _clReconSubSection === 'confirmation') ? `
-                      <option value="non_posted" ${_clStatementSortOrder === 'non_posted' ? 'selected' : ''}>Non-Posted First</option>
-                      <option value="posted" ${_clStatementSortOrder === 'posted' ? 'selected' : ''}>Posted First</option>
-                    ` : ''}
-                  </select>
-                </div>
-
                 <div style="position: relative; flex-grow: 1; min-width: 180px; margin-left: 10px;">
                   <input type="text" id="clStmtSearchInput" placeholder="Search description, amount..." class="je-input" style="width: 100%; height: 34px; padding: 0 12px 0 32px; font-size: 12.5px; box-sizing: border-box;" value="${ohEsc(_clStatementSearchQuery)}" />
                   <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; color: var(--slate-400); pointer-events: none;">
@@ -1324,20 +1829,32 @@
                 </div>
               </div>
 
-              ${isSelectActive ? `
+              ${(isSelectActive && !(isReconciliationMode && _clReconSubSection === 'reconciliation')) ? `
                 <div id="clStmtBatchBar">
                   <div style="display: flex; align-items: center; justify-content: space-between; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 20px;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                       <span style="font-size: 13px; font-weight: 700; color: #1e40af;">
-                        ${_clStatementSelectedIndices.size} of ${displayRows.length} entries selected
+                        ${currentSelectedIndices.size} of ${selectableRows.length} ${isReconciliationMode && _clReconSubSection === 'confirmation' ? 'non-posted ' : ''}entries selected
                       </span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                      ${_clStatementSelectedIndices.size > 0 ? `
-                        <button id="clBtnDeleteSelectedBatch" class="pt-del-btn" style="height: 34px; padding: 0 16px; font-size: 12.5px;" type="button">
-                          Delete Selected (${_clStatementSelectedIndices.size})
-                        </button>
-                      ` : ''}
+                      ${isReconciliationMode && _clReconSubSection === 'confirmation' ? `
+                        ${currentSelectedIndices.size > 0 ? `
+                          <button id="clBtnPostSelectedBatch" class="btn btn-success" style="height: 34px; padding: 0 16px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(5,150,105,0.25);" type="button">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            Post Selected (${currentSelectedIndices.size})
+                          </button>
+                          <button id="clBtnRevertSelectedBatch" class="btn btn-secondary" style="height: 34px; padding: 0 14px; font-size: 12.5px; font-weight: 600; border-radius: 8px;" type="button">
+                            Revert Selected
+                          </button>
+                        ` : ''}
+                      ` : `
+                        ${currentSelectedIndices.size > 0 ? `
+                          <button id="clBtnDeleteSelectedBatch" class="pt-del-btn" style="height: 34px; padding: 0 16px; font-size: 12.5px;" type="button">
+                            Delete Selected (${currentSelectedIndices.size})
+                          </button>
+                        ` : ''}
+                      `}
                       <button id="clBtnExitSelectMode" class="btn btn-secondary" style="height: 34px; padding: 0 14px; font-size: 12.5px; font-weight: 600; border-radius: 8px;" type="button">
                         Done
                       </button>
@@ -1374,16 +1891,71 @@
                     <tr>
                       ${isReconciliationMode ? `
                         ${_clReconSubSection === 'confirmation' ? `
-                          <th style="width: 110px;">Date</th>
-                          <th>Ledger</th>
-                          <th style="text-align: right; width: 130px;">Debit</th>
-                          <th style="text-align: right; width: 130px;">Credit</th>
-                          <th style="text-align: right; width: 100px;">Action</th>
+                          ${isSelectActive ? `
+                            <th style="width: 42px; text-align: center;">
+                              <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                            </th>
+                          ` : ''}
+                          <th class="cl-confirm-sort-th" data-sort="date" style="width: 110px; cursor: pointer; user-select: none;" title="Click to sort: Older → Newer → Normal">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                              <span>Date</span>
+                              ${getColumnSortIcon('confirmation', 'date')}
+                            </div>
+                          </th>
+                          <th class="cl-confirm-sort-th" data-sort="ledger" style="cursor: pointer; user-select: none;" title="Click to sort: A-Z → Z-A → Normal">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                              <span>Ledger</span>
+                              ${getColumnSortIcon('confirmation', 'ledger')}
+                            </div>
+                          </th>
+                          <th class="cl-confirm-sort-th" data-sort="debit" style="text-align: right; width: 130px; cursor: pointer; user-select: none;" title="Click to sort by Debit">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                              <span>Debit</span>
+                              ${getColumnSortIcon('confirmation', 'debit')}
+                            </div>
+                          </th>
+                          <th class="cl-confirm-sort-th" data-sort="credit" style="text-align: right; width: 130px; cursor: pointer; user-select: none;" title="Click to sort by Credit">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                              <span>Credit</span>
+                              ${getColumnSortIcon('confirmation', 'credit')}
+                            </div>
+                          </th>
+                          <th class="cl-confirm-sort-th" data-sort="action" style="text-align: right; width: 100px; cursor: pointer; user-select: none;" title="Click to sort: Non-Posted → Posted → Normal">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                              <span>Action</span>
+                              ${getColumnSortIcon('confirmation', 'action')}
+                            </div>
+                          </th>
                         ` : `
-                          <th style="width: 110px;">Date</th>
-                          <th>Description</th>
-                          <th style="text-align: right; width: 140px;">Amount</th>
-                          <th style="width: 280px;">Select Ledger</th>
+                          ${isSelectActive ? `
+                            <th style="width: 42px; text-align: center;">
+                              <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
+                            </th>
+                          ` : ''}
+                          <th class="cl-recon-sort-th" data-sort="date" style="width: 110px; cursor: pointer; user-select: none;" title="Click to sort: Older → Newer → Normal">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                              <span>Date</span>
+                              ${getColumnSortIcon('reconciliation', 'date')}
+                            </div>
+                          </th>
+                          <th class="cl-recon-sort-th" data-sort="description" style="cursor: pointer; user-select: none;" title="Click to sort: A-Z → Z-A → Normal">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                              <span>Description</span>
+                              ${getColumnSortIcon('reconciliation', 'description')}
+                            </div>
+                          </th>
+                          <th class="cl-recon-sort-th" data-sort="amount" style="text-align: right; width: 140px; cursor: pointer; user-select: none;" title="Click to sort by Amount">
+                            <div style="display: flex; align-items: center; justify-content: flex-end;">
+                              <span>Amount</span>
+                              ${getColumnSortIcon('reconciliation', 'amount')}
+                            </div>
+                          </th>
+                          <th class="cl-recon-sort-th" data-sort="ledger" style="width: 280px; cursor: pointer; user-select: none;" title="Click to sort: Mapped → Unmapped → Normal">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                              <span>Select Ledger</span>
+                              ${getColumnSortIcon('reconciliation', 'ledger')}
+                            </div>
+                          </th>
                         `}
                       ` : `
                         ${isSelectActive ? `
@@ -1391,11 +1963,42 @@
                             <input type="checkbox" id="clStmtSelectAllCb" ${allDisplayedSelected ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb;">
                           </th>
                         ` : ''}
-                        <th style="width: 110px;">Date</th>
-                        <th>Description</th>
-                        <th style="text-align: right; width: 120px;">Debit</th>
-                        <th style="text-align: right; width: 120px;">Credit</th>
-                        <th style="text-align: right; width: 130px;">Balance</th>
+                        <th class="cl-stmt-sort-th" data-sort="date" style="width: 110px; cursor: pointer; user-select: none;" title="Click to sort: Older → Newer → Normal">
+                          <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>Date</span>
+                            ${getColumnSortIcon('statement', 'date')}
+                          </div>
+                        </th>
+                        <th class="cl-stmt-sort-th" data-sort="description" style="cursor: pointer; user-select: none;" title="Click to sort: A-Z → Z-A → Normal">
+                          <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>Description</span>
+                            ${getColumnSortIcon('statement', 'description')}
+                          </div>
+                        </th>
+                        <th class="cl-stmt-sort-th" data-sort="status" style="width: 75px; text-align: center; cursor: pointer; user-select: none;" title="Click to sort: P/C/N → N/C/P → Normal">
+                          <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>Status</span>
+                            ${getColumnSortIcon('statement', 'status')}
+                          </div>
+                        </th>
+                        <th class="cl-stmt-sort-th" data-sort="debit" style="text-align: right; width: 120px; cursor: pointer; user-select: none;" title="Click to sort by Debit">
+                          <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <span>Debit</span>
+                            ${getColumnSortIcon('statement', 'debit')}
+                          </div>
+                        </th>
+                        <th class="cl-stmt-sort-th" data-sort="credit" style="text-align: right; width: 120px; cursor: pointer; user-select: none;" title="Click to sort by Credit">
+                          <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <span>Credit</span>
+                            ${getColumnSortIcon('statement', 'credit')}
+                          </div>
+                        </th>
+                        <th class="cl-stmt-sort-th" data-sort="balance" style="text-align: right; width: 130px; cursor: pointer; user-select: none;" title="Click to sort by Balance">
+                          <div style="display: flex; align-items: center; justify-content: flex-end;">
+                            <span>Balance</span>
+                            ${getColumnSortIcon('statement', 'balance')}
+                          </div>
+                        </th>
                       `}
                     </tr>
                   </thead>
@@ -1428,10 +2031,21 @@
             }
           });
 
-          document.getElementById('clReconSectionSelect')?.addEventListener('change', (e) => {
-            _clReconSubSection = e.target.value;
+          document.getElementById('clBtnSubRecon')?.addEventListener('click', () => {
+            if (_clReconSubSection === 'reconciliation') return;
+            _clReconSubSection = 'reconciliation';
             _clStatementSelectedIndices.clear();
-            if (_clReconSubSection !== 'confirmation' && (_clStatementSortOrder === 'non_posted' || _clStatementSortOrder === 'posted')) {
+            if (_clStatementSortOrder !== 'oldest' && _clStatementSortOrder !== 'newest') {
+              _clStatementSortOrder = 'oldest';
+            }
+            renderActiveSubtab();
+          });
+
+          document.getElementById('clBtnSubConfirm')?.addEventListener('click', () => {
+            if (_clReconSubSection === 'confirmation') return;
+            _clReconSubSection = 'confirmation';
+            _clStatementSelectedIndices.clear();
+            if (_clStatementSortOrder !== 'oldest' && _clStatementSortOrder !== 'newest') {
               _clStatementSortOrder = 'oldest';
             }
             renderActiveSubtab();
@@ -1439,6 +2053,7 @@
 
           attachConfirmationRowListeners();
           attachReconBottomBarListeners();
+          attachStmtSortListeners();
 
         document.getElementById('clStmtDateFrom').addEventListener('change', (e) => {
           _clStatementFromDate = e.target.value;
@@ -1450,7 +2065,30 @@
           renderActiveSubtab();
         });
 
-        document.getElementById('clStmtSortOrder').addEventListener('change', (e) => {
+        document.getElementById('clCbSelectBankInline')?.addEventListener('change', (e) => {
+          _clReconBankId = Number(e.target.value);
+          _clStatementFromDate = '';
+          _clStatementToDate = '';
+          _clStatementSearchQuery = '';
+          _clStatementSortOrder = 'oldest';
+          _clStatementSortColumn = '';
+          _clStatementSortDir = '';
+          _clReconSortColumn = '';
+          _clReconSortDir = '';
+          _clConfirmSortColumn = '';
+          _clConfirmSortDir = '';
+          _clStatementSelectMode = false;
+          _clStatementSelectedIndices.clear();
+          _clReconSelectMode = false;
+          _clReconSelectedIndices.clear();
+          _clConfirmSelectMode = false;
+          _clConfirmSelectedIndices.clear();
+          // Clear target so that it full-renders and resets the HTML state
+          target.innerHTML = '';
+          renderActiveSubtab();
+        });
+
+        document.getElementById('clStmtSortOrder')?.addEventListener('change', (e) => {
           _clStatementSortOrder = e.target.value;
           renderActiveSubtab();
         });
@@ -1460,18 +2098,6 @@
           renderActiveSubtab();
         });
 
-        document.getElementById('clCbSelectBankInline').addEventListener('change', (e) => {
-          _clReconBankId = Number(e.target.value);
-          _clStatementFromDate = '';
-          _clStatementToDate = '';
-          _clStatementSearchQuery = '';
-          _clStatementSortOrder = 'oldest';
-          _clStatementSelectMode = false;
-          _clStatementSelectedIndices.clear();
-          // Clear target so that it full-renders and resets the HTML state
-          target.innerHTML = '';
-          renderActiveSubtab();
-        });
       }
 
       // Wire row checkboxes & action listeners
@@ -1479,9 +2105,9 @@
         cb.addEventListener('change', (e) => {
           const idx = Number(e.target.dataset.index);
           if (e.target.checked) {
-            _clStatementSelectedIndices.add(idx);
+            currentSelectedIndices.add(idx);
           } else {
-            _clStatementSelectedIndices.delete(idx);
+            currentSelectedIndices.delete(idx);
           }
           renderActiveSubtab();
         });
@@ -1496,6 +2122,113 @@
           }
         });
       };
+
+      function updateLedgerButtonUI(targetBtn, targetIdx, targetBankId, chosenLedgerId) {
+        if (!targetBtn) return;
+        targetBtn.dataset.selectedId = chosenLedgerId || '';
+        const l = allLedgers.find(x => String(x.id) === String(chosenLedgerId));
+        if (l) {
+          targetBtn.style.background = '#eff6ff';
+          targetBtn.style.border = '1.5px solid #2563eb';
+          targetBtn.style.color = '#1e3a8a';
+          targetBtn.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+              <span style="color: #2563eb; font-weight: 800; font-size: 12px; background: rgba(37,99,235,0.15); border-radius: 4px; padding: 1px 4px;">✓</span>
+              <span class="cl-recon-ledger-label" style="font-weight: 700; color: #1e3a8a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${ohEsc(l.name)}
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span class="cl-recon-clear-btn" data-index="${targetIdx}" data-account-id="${targetBankId}" title="Remove selection (Backspace)" style="background: rgba(220,38,38,0.1); color: #dc2626; border-radius: 4px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;">
+                <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px; display: block;" stroke="currentColor">
+                  <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <span style="font-size: 8px; color: #3b82f6;">▼</span>
+            </div>
+          `;
+          const dynamicClearBtn = targetBtn.querySelector('.cl-recon-clear-btn');
+          if (dynamicClearBtn) {
+            dynamicClearBtn.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              selectOptionAndAdvanceForBtn(targetBtn, '', 'none');
+            });
+          }
+        } else {
+          targetBtn.style.background = '#ffffff';
+          targetBtn.style.border = '1px solid var(--slate-300)';
+          targetBtn.style.color = 'var(--slate-400)';
+          targetBtn.innerHTML = `
+            <span class="cl-recon-ledger-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--slate-400); font-weight: 500;">
+              Select Ledger...
+            </span>
+            <span style="font-size: 9px; margin-left: 6px; color: var(--slate-400);">▼</span>
+          `;
+        }
+      }
+
+      function selectOptionAndAdvanceForBtn(btn, selectedId, direction = 'next') {
+        const origIdx = btn.dataset.index;
+        const bankId = btn.dataset.accountId;
+
+        window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
+
+        // Check if this row is part of selected entries in reconciliation
+        const isPartOfSelection = _clReconSelectedIndices && _clReconSelectedIndices.has(Number(origIdx));
+        const targetIndices = (isPartOfSelection && _clReconSelectedIndices.size > 0)
+          ? Array.from(_clReconSelectedIndices)
+          : [Number(origIdx)];
+
+        targetIndices.forEach(idx => {
+          if (selectedId) {
+            window.KYA_STORE.statementLedgerMapping[`${bankId}_${idx}`] = selectedId;
+          } else {
+            delete window.KYA_STORE.statementLedgerMapping[`${bankId}_${idx}`];
+          }
+
+          const targetBtn = document.querySelector(`.cl-recon-ledger-btn[data-index="${idx}"][data-account-id="${bankId}"]`);
+          if (targetBtn) {
+            updateLedgerButtonUI(targetBtn, idx, bankId, selectedId);
+          }
+        });
+
+        updateReconBottomBar();
+
+        clearActiveRowHighlights();
+        const existingPopover = document.getElementById('clReconLedgerPopover');
+        if (existingPopover) existingPopover.remove();
+
+        if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+        if (targetIndices.length > 1) {
+          btn.focus();
+          return;
+        }
+
+        if (direction === 'next') {
+          const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
+          const currentBtnIdx = allBtns.indexOf(btn);
+          if (currentBtnIdx > -1 && currentBtnIdx + 1 < allBtns.length) {
+            const nextBtn = allBtns[currentBtnIdx + 1];
+            setTimeout(() => {
+              nextBtn.focus();
+              nextBtn.click();
+            }, 50);
+          }
+        } else if (direction === 'prev') {
+          const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
+          const currentBtnIdx = allBtns.indexOf(btn);
+          if (currentBtnIdx > 0) {
+            const prevBtn = allBtns[currentBtnIdx - 1];
+            setTimeout(() => {
+              prevBtn.focus();
+              prevBtn.click();
+            }, 50);
+          }
+        } else {
+          btn.focus();
+        }
+      }
 
       document.querySelectorAll('.cl-recon-ledger-btn').forEach(btn => {
         const tr = btn.closest('tr');
@@ -1545,90 +2278,7 @@
         }
 
         function selectOptionAndAdvance(selectedId, direction = 'next') {
-          const origIdx = btn.dataset.index;
-          const bankId = btn.dataset.accountId;
-
-          window.KYA_STORE.statementLedgerMapping = window.KYA_STORE.statementLedgerMapping || {};
-          if (selectedId) {
-            window.KYA_STORE.statementLedgerMapping[`${bankId}_${origIdx}`] = selectedId;
-          } else {
-            delete window.KYA_STORE.statementLedgerMapping[`${bankId}_${origIdx}`];
-          }
-
-          const chosenLedger = allLedgers.find(l => String(l.id) === String(selectedId));
-          btn.dataset.selectedId = selectedId || '';
-
-          if (chosenLedger) {
-            btn.style.background = '#eff6ff';
-            btn.style.border = '1.5px solid #2563eb';
-            btn.style.color = '#1e3a8a';
-            btn.innerHTML = `
-              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-                <span style="color: #2563eb; font-weight: 800; font-size: 12px; background: rgba(37,99,235,0.15); border-radius: 4px; padding: 1px 4px;">✓</span>
-                <span class="cl-recon-ledger-label" style="font-weight: 700; color: #1e3a8a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  ${ohEsc(chosenLedger.name)}
-                </span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 4px;">
-                <span class="cl-recon-clear-btn" data-index="${origIdx}" data-account-id="${bankId}" title="Remove selection (Backspace)" style="background: rgba(220,38,38,0.1); color: #dc2626; border-radius: 4px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;">
-                  <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px; display: block;" stroke="currentColor">
-                    <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                  </svg>
-                </span>
-                <span style="font-size: 8px; color: #3b82f6;">▼</span>
-              </div>
-            `;
-          } else {
-            btn.style.background = '#ffffff';
-            btn.style.border = '1px solid var(--slate-300)';
-            btn.style.color = 'var(--slate-400)';
-            btn.innerHTML = `
-              <span class="cl-recon-ledger-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--slate-400); font-weight: 500;">
-                Select Ledger...
-              </span>
-              <span style="font-size: 9px; margin-left: 6px; color: var(--slate-400);">▼</span>
-            `;
-          }
-
-          const dynamicClearBtn = btn.querySelector('.cl-recon-clear-btn');
-          if (dynamicClearBtn) {
-            dynamicClearBtn.addEventListener('click', (ev) => {
-              ev.stopPropagation();
-              selectOptionAndAdvance('', 'none');
-            });
-          }
-
-          updateReconBottomBar();
-
-          clearActiveRowHighlights();
-          const existingPopover = document.getElementById('clReconLedgerPopover');
-          if (existingPopover) existingPopover.remove();
-
-          if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-
-          if (direction === 'next') {
-            const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
-            const currentBtnIdx = allBtns.indexOf(btn);
-            if (currentBtnIdx > -1 && currentBtnIdx + 1 < allBtns.length) {
-              const nextBtn = allBtns[currentBtnIdx + 1];
-              setTimeout(() => {
-                nextBtn.focus();
-                nextBtn.click();
-              }, 50);
-            }
-          } else if (direction === 'prev') {
-            const allBtns = Array.from(document.querySelectorAll('.cl-recon-ledger-btn'));
-            const currentBtnIdx = allBtns.indexOf(btn);
-            if (currentBtnIdx > 0) {
-              const prevBtn = allBtns[currentBtnIdx - 1];
-              setTimeout(() => {
-                prevBtn.focus();
-                prevBtn.click();
-              }, 50);
-            }
-          } else {
-            btn.focus();
-          }
+          selectOptionAndAdvanceForBtn(btn, selectedId, direction);
         }
 
         btn.addEventListener('click', (e) => {
@@ -2146,25 +2796,120 @@
       document.getElementById('clStmtSelectAllCb')?.addEventListener('change', (e) => {
         if (e.target.checked) {
           selectableRows.forEach(r => {
-            _clStatementSelectedIndices.add(r.origIdx);
+            currentSelectedIndices.add(r.origIdx);
           });
         } else {
-          selectableRows.forEach(r => _clStatementSelectedIndices.delete(r.origIdx));
+          selectableRows.forEach(r => currentSelectedIndices.delete(r.origIdx));
         }
         renderActiveSubtab();
       });
 
       document.getElementById('clBtnDeleteSelectedBatch')?.addEventListener('click', () => {
-        if (_clStatementSelectedIndices.size > 0) {
-          confirmDeleteStatementEntries(Array.from(_clStatementSelectedIndices), currentAcc.id, false);
+        if (currentSelectedIndices.size > 0) {
+          confirmDeleteStatementEntries(Array.from(currentSelectedIndices), currentAcc.id, false);
         }
       });
 
+      document.getElementById('clBtnPostSelectedBatch')?.addEventListener('click', () => {
+        if (_clConfirmSelectedIndices.size === 0) return;
+        let postedCount = 0;
+        _clConfirmSelectedIndices.forEach(idx => {
+          const line = statementRows.find(r => String(r.origIdx) === String(idx));
+          if (!line) return;
+          const key = `${currentAcc.id}_${idx}`;
+          const isPosted = !!window.KYA_STORE.reconciliationState[key] && (typeof postedEntries !== 'undefined' && postedEntries.some(e => e.reconKey === key));
+          if (isPosted) return;
+
+          const dbVal = parseFloat(line.debit) || 0;
+          const crVal = parseFloat(line.credit) || 0;
+          const amt = dbVal > 0 ? dbVal : crVal;
+          const savedLedgerId = window.KYA_STORE.statementLedgerMapping[key];
+          const selectedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
+          if (!selectedLedger) return;
+
+          const voucherCode = (typeof window.getNextJournalVoucherNo === 'function')
+            ? window.getNextJournalVoucherNo(line.date, true)
+            : ((typeof getNextJournalVoucherNo === 'function') ? getNextJournalVoucherNo(line.date, true) : `JV-${new Date().getFullYear()}-001`);
+          const savedDeptId = window.KYA_STORE.statementDeptMapping[key] || '';
+          const savedType = window.KYA_STORE.statementTypeMapping[key] || 'non-budget';
+          const savedNarration = (window.KYA_STORE.statementNarrationMapping && window.KYA_STORE.statementNarrationMapping[key]) || line.description || 'Bank Reconciliation Entry';
+          const savedDoc = (window.KYA_STORE.statementDocMapping && window.KYA_STORE.statementDocMapping[key]) || null;
+          const firstParticularName = dbVal > 0 ? selectedLedger.name : bankLedger.name;
+          const formattedAmt = typeof fmtNum === 'function' ? fmtNum(amt) : Number(amt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+          const newEntry = {
+            id: Date.now() + Math.floor(Math.random() * 100000),
+            date: line.date,
+            voucherNo: voucherCode,
+            reconKey: key,
+            preparedBy: 'Bank Reconciliation',
+            firstParticular: firstParticularName,
+            amount: formattedAmt,
+            departmentId: savedDeptId,
+            isBudget: savedType === 'budget',
+            narration: savedNarration,
+            uploadedDoc: savedDoc,
+            allRows: dbVal > 0 ? [
+              { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
+              { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
+            ] : [
+              { id: 1, type: 'By', particular: bankLedger.name, debit: amt.toFixed(2), credit: '' },
+              { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
+            ]
+          };
+
+          if (typeof postedEntries !== 'undefined') postedEntries.push(newEntry);
+          window.KYA_STORE.reconciliationState[key] = line.date;
+          postedCount++;
+        });
+
+        _clConfirmSelectedIndices.clear();
+        showToast(`Successfully posted ${postedCount} transaction(s) to books!`, 'success');
+        renderActiveSubtab();
+        if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+      });
+
+      document.getElementById('clBtnRevertSelectedBatch')?.addEventListener('click', () => {
+        if (_clConfirmSelectedIndices.size === 0) return;
+        let revertedCount = 0;
+        _clConfirmSelectedIndices.forEach(idx => {
+          const key = `${currentAcc.id}_${idx}`;
+          const isPosted = !!window.KYA_STORE.reconciliationState[key] && (typeof postedEntries !== 'undefined' && postedEntries.some(e => e.reconKey === key));
+          if (isPosted) return;
+
+          delete window.KYA_STORE.statementLedgerMapping[key];
+          delete window.KYA_STORE.reconciliationState[key];
+          delete window.KYA_STORE.statementDeptMapping[key];
+          delete window.KYA_STORE.statementTypeMapping[key];
+          if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[key];
+          if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[key];
+          if (window.KYA_STORE.statementConfirmed) delete window.KYA_STORE.statementConfirmed[key];
+          revertedCount++;
+        });
+
+        _clConfirmSelectedIndices.clear();
+        showToast(`Moved ${revertedCount} transaction(s) back to Reconciliation section.`, 'info');
+        renderActiveSubtab();
+        if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+      });
+
       document.getElementById('clBtnExitSelectMode')?.addEventListener('click', () => {
-        _clStatementSelectMode = false;
-        _clStatementSelectedIndices.clear();
+        if (isReconciliationMode) {
+          if (_clReconSubSection === 'confirmation') {
+            _clConfirmSelectMode = false;
+            _clConfirmSelectedIndices.clear();
+          } else {
+            _clReconSelectMode = false;
+            _clReconSelectedIndices.clear();
+          }
+        } else {
+          _clStatementSelectMode = false;
+          _clStatementSelectedIndices.clear();
+        }
         renderActiveSubtab();
       });
+
+      attachStmtSortListeners();
 
       return;
     }

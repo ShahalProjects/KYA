@@ -506,7 +506,7 @@
     if (logoBox) {
       logoBox.addEventListener('mouseenter', () => {
         if (sidebar.classList.contains('collapsed')) {
-          showTooltip(logoBox, 'KYA - Keep Your Accounts (Click to expand)');
+          showTooltip(logoBox, isFullScreen() ? 'Exit Full Screen' : 'Enter Full Screen');
         }
       });
       logoBox.addEventListener('mouseleave', hideTooltip);
@@ -528,6 +528,86 @@
 
   // Initialize sidebar collapse handling
   initSidebarToggle();
+
+
+  /* ======================
+     FULLSCREEN TOGGLE (KYA LOGO)
+  ====================== */
+  function isFullScreen() {
+    return !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+  }
+
+  function toggleFullScreen() {
+    if (!isFullScreen()) {
+      const docEl = document.documentElement;
+      const rfs = docEl.requestFullscreen ||
+                  docEl.webkitRequestFullscreen ||
+                  docEl.mozRequestFullScreen ||
+                  docEl.msRequestFullscreen;
+      if (rfs) {
+        rfs.call(docEl).catch(err => {
+          console.warn('Fullscreen request failed:', err);
+        });
+      }
+    } else {
+      const efs = document.exitFullscreen ||
+                  document.webkitExitFullscreen ||
+                  document.mozCancelFullScreen ||
+                  document.msExitFullscreen;
+      if (efs) {
+        efs.call(document).catch(err => {
+          console.warn('Exit fullscreen failed:', err);
+        });
+      }
+    }
+  }
+
+  function updateFullscreenUI() {
+    const fsBtn = document.getElementById('kyaFullscreenBtn');
+    if (!fsBtn) return;
+    const inFs = isFullScreen();
+    if (inFs) {
+      fsBtn.classList.add('is-fullscreen');
+      fsBtn.setAttribute('title', 'Exit full screen');
+      fsBtn.setAttribute('aria-label', 'Exit full screen');
+    } else {
+      fsBtn.classList.remove('is-fullscreen');
+      fsBtn.setAttribute('title', 'Enter full screen');
+      fsBtn.setAttribute('aria-label', 'Enter full screen');
+    }
+  }
+
+  function initFullscreenToggle() {
+    const fsBtn = document.getElementById('kyaFullscreenBtn');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFullScreen();
+      });
+      fsBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleFullScreen();
+        }
+      });
+    }
+
+    document.addEventListener('fullscreenchange', updateFullscreenUI);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
+    document.addEventListener('mozfullscreenchange', updateFullscreenUI);
+    document.addEventListener('MSFullscreenChange', updateFullscreenUI);
+
+    updateFullscreenUI();
+  }
+
+  // Initialize fullscreen button
+  initFullscreenToggle();
 
 
   /* ======================

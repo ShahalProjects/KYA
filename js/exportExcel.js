@@ -491,7 +491,7 @@
       });
 
       const optCols = data.optionalCols || {};
-      const headers = ['#', 'Particulars'];
+      const headers = ['Sl No', 'Particulars'];
       if (optCols.gl) headers.push('Group Ledger');
       if (optCols.sg) headers.push('Sub Group');
       if (optCols.mg) headers.push('Main Group');
@@ -501,7 +501,7 @@
       const maxCols = headers.length;
       const lastColLetter = String.fromCharCode(64 + maxCols);
 
-      sheet.getColumn(1).width = 8;
+      sheet.getColumn(1).width = 10;
       sheet.getColumn(2).width = 40;
       let currCol = 3;
       if (optCols.gl) { sheet.getColumn(currCol++).width = 24; }
@@ -1714,7 +1714,7 @@
       const maxCols = 7;
       const lastColLetter = 'G';
 
-      sheet.getColumn(1).width = 8;
+      sheet.getColumn(1).width = 10;
       sheet.getColumn(2).width = 14;
       sheet.getColumn(3).width = 20;
       sheet.getColumn(4).width = 20;
@@ -1757,7 +1757,7 @@
       r4.height = 6;
 
       // Row 5: Header Row
-      const r5 = sheet.addRow(['#', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']);
+      const r5 = sheet.addRow(['Sl No', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']);
       r5.height = 24;
       for (let c = 1; c <= maxCols; c++) {
         const cell = r5.getCell(c);

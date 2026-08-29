@@ -612,7 +612,7 @@
       }
 
       const optCols = data.optionalCols || {};
-      const headRow = ['#', 'Particulars'];
+      const headRow = ['Sl No', 'Particulars'];
       if (optCols.gl) headRow.push('Group Ledger');
       if (optCols.sg) headRow.push('Sub Group');
       if (optCols.mg) headRow.push('Main Group');
@@ -715,7 +715,7 @@
 
       // ── AutoTable Generation ────────────────────────────────────────
       const columnStyles = {
-        0: { cellWidth: 12, halign: 'center' },
+        0: { cellWidth: 16, halign: 'center' },
         1: { cellWidth: 'auto', halign: 'left' }
       };
 
@@ -1946,7 +1946,7 @@
       doc.setLineWidth(0.5);
       doc.line(14, 32, pageWidth - 14, 32);
 
-      const tableHeaders = [['#', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']];
+      const tableHeaders = [['Sl No', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']];
       const tableBody = [];
       let totalAmt = 0;
 
@@ -1981,7 +1981,7 @@
         styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, textColor: [51, 65, 85], lineColor: [241, 245, 249], lineWidth: 0.2 },
         headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
         columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
+          0: { cellWidth: 16, halign: 'center' },
           1: { cellWidth: 24, halign: 'left' },
           2: { cellWidth: 32, halign: 'left', fontStyle: 'bold' },
           3: { cellWidth: 30, halign: 'left' },

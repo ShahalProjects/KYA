@@ -240,6 +240,44 @@
         color-scheme: dark;
       }
 
+      /* Reconciliation / Confirmation Pill Switcher */
+      .cl-recon-pill-wrap {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.22);
+        padding: 3px;
+        border-radius: 8px;
+        border: 1.5px solid rgba(255, 255, 255, 0.35);
+        gap: 3px;
+      }
+      .cl-recon-pill-btn {
+        height: 28px;
+        padding: 0 12px;
+        font-size: 12.5px;
+        font-weight: 600;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.85);
+        outline: none;
+        user-select: none;
+      }
+      .cl-recon-pill-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: #ffffff;
+      }
+      .cl-recon-pill-btn.active {
+        background: #ffffff !important;
+        color: #1e3a8a !important;
+        font-weight: 700 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
       /* Form inputs styling */
       .cl-form-group {
         display: flex;
@@ -411,10 +449,23 @@
   // Statement sub-state
   let _clStatementFromDate = '';
   let _clStatementToDate = '';
-  let _clStatementSortOrder = 'oldest'; // 'oldest' (old to new) or 'newest' (new to old)
+  let _clStatementSortOrder = 'oldest'; // For confirmation sub-section
+  let _clStatementSortColumn = ''; // 'date', 'description', 'status', 'debit', 'credit', 'balance'
+  let _clStatementSortDir = ''; // 'asc', 'desc', '' (normal)
   let _clStatementSearchQuery = '';
   let _clStatementSelectMode = false;
   let _clStatementSelectedIndices = new Set();
+
+  // Separate select & sort states for reconciliation & confirmation sub-sections
+  let _clReconSelectMode = false;
+  let _clReconSelectedIndices = new Set();
+  let _clReconSortColumn = '';
+  let _clReconSortDir = '';
+
+  let _clConfirmSelectMode = false;
+  let _clConfirmSelectedIndices = new Set();
+  let _clConfirmSortColumn = '';
+  let _clConfirmSortDir = '';
 
   // Cashbook sub-state
   let _clCashbookAccountId = '';
@@ -643,9 +694,17 @@
     if (_clActiveBankingTab !== tab) {
       _clStatementSelectMode = false;
       _clStatementSelectedIndices.clear();
-      if (_clStatementSortOrder === 'non_posted' || _clStatementSortOrder === 'posted') {
-        _clStatementSortOrder = 'oldest';
-      }
+      _clReconSelectMode = false;
+      _clReconSelectedIndices.clear();
+      _clConfirmSelectMode = false;
+      _clConfirmSelectedIndices.clear();
+      _clStatementSortColumn = '';
+      _clStatementSortDir = '';
+      _clReconSortColumn = '';
+      _clReconSortDir = '';
+      _clConfirmSortColumn = '';
+      _clConfirmSortDir = '';
+      _clStatementSortOrder = 'oldest';
     }
     _clActiveBankingTab = tab;
 

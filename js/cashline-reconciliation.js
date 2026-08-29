@@ -19,6 +19,7 @@
   function renderReconciliationView(target, controls, actionsArea) {
     return renderCashbookView(target, controls, actionsArea);
   }
+  window.renderReconciliationView = renderReconciliationView;
 
   // ── Toggle Reconciled State ───────────────────────────────────────
   window.clToggleReconcile = function(key, checked) {
@@ -162,6 +163,7 @@
       triggerAutoBackup();
     });
   }
+  window.showAdjustmentModal = showAdjustmentModal;
 
 
   // ===================================================================
