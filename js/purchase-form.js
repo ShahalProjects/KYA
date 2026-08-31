@@ -730,14 +730,14 @@
     const hdr = document.getElementById('purchaseTableHeader');
     if (!hdr) return;
     hdr.innerHTML = `
-      <th class="col-item" style="text-align: left; padding-left: 6px;">Description (Product / Expense)</th>
+      <th class="col-item" style="text-align: left; padding-left: 8px;">Description (Product / Expense)</th>
       <th class="col-hsn" style="width: 90px; text-align: left;">HSN/SAC</th>
-      <th class="col-qty" style="width: 60px; text-align: right;">Qty</th>
-      <th class="col-unit" style="width: 60px; text-align: center;">Unit</th>
-      <th class="col-rate" style="width: 95px; text-align: right;">Rate / Price</th>
-      <th class="col-disc" style="width: 100px; text-align: right;">Discount</th>
-      <th class="col-tax" style="width: 70px; text-align: right; padding-right: 4px;">Tax</th>
-      <th class="col-amt" style="width: 105px; text-align: right;">Amount</th>
+      <th class="col-qty" style="width: 65px; text-align: right;">Qty</th>
+      <th class="col-unit" style="width: 65px; text-align: center;">Unit</th>
+      <th class="col-rate" style="width: 100px; text-align: right;">Rate / Price</th>
+      <th class="col-disc" style="width: 105px; text-align: right;">Discount</th>
+      <th class="col-tax" style="width: 75px; text-align: right; padding-right: 6px;">Tax</th>
+      <th class="col-amt" style="width: 110px; text-align: right; padding-right: 8px;">Amount</th>
       <th class="col-del" style="width: 36px; text-align: center;"></th>
     `;
   }
@@ -793,35 +793,35 @@
       tr.dataset.rowIndex = index;
 
       tr.innerHTML = `
-        <td style="padding: 4px 6px;">
+        <td class="sales-cell-item" style="padding: 4px 8px;">
           <div style="position: relative; display: flex; align-items: center; width: 100%;">
-            <input type="text" class="purchase-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Select or type Description (Product / Expense)" style="border: none; background: transparent; box-shadow: none; padding: 0 16px 0 0; width: 100%; font-weight: 500; font-size: 13.5px;" autocomplete="off" />
-            <span class="sales-row-drop-arrow" style="position: absolute; right: 2px; pointer-events: none; color: #94a3b8; font-size: 10px;">▼</span>
+            <input type="text" class="purchase-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Select or type Description (Product / Expense)" style="border: none; background: transparent; box-shadow: none; padding: 0 18px 0 0; width: 100%; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none;" autocomplete="off" />
+            <span class="sales-row-drop-arrow" style="position: absolute; right: 2px; pointer-events: none; color: var(--slate-400); font-size: 10px;">▼</span>
           </div>
         </td>
-        <td style="width: 90px; padding: 4px;">
-          <input type="text" class="purchase-row-hsn je-input" value="${ohEsc(row.hsn || '')}" placeholder="HSN/SAC" style="border: none; background: transparent; box-shadow: none; padding: 0; font-size: 12.5px; font-family: monospace, inherit;" />
+        <td class="sales-cell-hsn" style="width: 90px; padding: 4px 6px;">
+          <input type="text" class="purchase-row-hsn je-input" value="${ohEsc(row.hsn || '')}" placeholder="HSN/SAC" style="border: none; background: transparent; box-shadow: none; padding: 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" />
         </td>
-        <td style="width: 60px; padding: 4px;">
-          <input type="number" class="purchase-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px;" />
+        <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
+          <input type="number" class="purchase-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
         </td>
-        <td style="width: 60px; padding: 4px; text-align: center;">
-          <input type="text" class="purchase-row-unit je-input" value="${ohEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px;" />
+        <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
+          <input type="text" class="purchase-row-unit je-input" value="${ohEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" />
         </td>
-        <td style="width: 95px; padding: 4px;">
-          <input type="text" inputmode="decimal" class="purchase-row-rate je-input" value="${row.rate === 0 || row.rate === undefined ? '' : (typeof row.rate === 'number' ? row.rate.toFixed(2) : row.rate)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px;" />
+        <td class="sales-cell-rate" style="width: 100px; padding: 4px 6px;">
+          <input type="text" inputmode="decimal" class="purchase-row-rate je-input" value="${row.rate === 0 || row.rate === undefined ? '' : (typeof row.rate === 'number' ? row.rate.toFixed(2) : row.rate)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
         </td>
-        <td style="width: 100px; padding: 4px;">
+        <td class="sales-cell-disc" style="width: 105px; padding: 4px 6px;">
           <div style="display: flex; gap: 2px; align-items: center; justify-content: flex-end;">
-            <input type="text" inputmode="decimal" class="purchase-row-discount je-input" value="${row.discount === 0 || row.discount === undefined ? '' : (typeof row.discount === 'number' ? row.discount.toFixed(2) : row.discount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 55px; padding: 0; font-weight: 600; font-size: 13px;" />
-            <select class="purchase-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 22px; padding: 0; font-weight: 700; cursor: pointer; text-align: center; text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none; font-size: 12px;">
+            <input type="text" inputmode="decimal" class="purchase-row-discount je-input" value="${row.discount === 0 || row.discount === undefined ? '' : (typeof row.discount === 'number' ? row.discount.toFixed(2) : row.discount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 55px; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none;" />
+            <select class="purchase-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 22px; padding: 0; font-weight: 700; cursor: pointer; text-align: center; text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none; font-size: 12px; color: var(--blue-600); outline: none;">
               <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
               <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
             </select>
           </div>
         </td>
-        <td style="width: 70px; padding: 4px;">
-          <select class="purchase-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px;" ${isZeroTax ? 'disabled' : ''}>
+        <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
+          <select class="purchase-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${isZeroTax ? 'disabled' : ''}>
             <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
             <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
             <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
@@ -829,11 +829,11 @@
             <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
           </select>
         </td>
-        <td style="width: 105px; padding: 4px;">
-          <input type="text" inputmode="decimal" class="purchase-row-amount-input je-input" value="${row.amount === 0 || row.amount === undefined ? '' : Number(row.amount).toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 700; width: 100%; font-size: 13.5px;" />
+        <td class="sales-cell-amt" style="width: 110px; padding: 4px 6px;">
+          <input type="text" inputmode="decimal" class="purchase-row-amount-input je-input" value="${row.amount === 0 || row.amount === undefined ? '' : Number(row.amount).toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 700; width: 100%; font-size: 13.5px; color: var(--slate-900); outline: none;" />
         </td>
-        <td style="width: 36px; padding: 4px; text-align: center;">
-          <button type="button" class="purchase-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; margin: 0 auto;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
+        <td class="sales-del-cell" style="width: 36px; padding: 2px; text-align: center; border: none !important; background: transparent !important; box-shadow: none !important;">
+          <button type="button" class="purchase-del-row" style="background: none; border: none !important; outline: none !important; box-shadow: none !important; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; margin: 0 auto; transition: background 0.15s;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
             <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px;">
               <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
             </svg>

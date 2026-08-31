@@ -2687,6 +2687,8 @@
   let _vdSearch = '';
   let _vdTypeFilter = 'All';
   let _vdStatusFilter = 'All';
+  let _vdSelectMode = false;
+  let _vdSelectedKeys = new Set();
 
   function deleteVoucherFromDesk(type, id) {
     if (type === 'Journal') {
@@ -2789,6 +2791,82 @@
     }
   }
 
+  function getVoucherParticularsName(e, type) {
+    if (!e) return '—';
+    const isSales = (type === 'Invoice' || type === 'Order' || type === 'Reversal' || type === 'Sales Invoice' || type === 'Sales Order' || type === 'Sales Reversal' || (e.preparedBy === 'Sales Module'));
+    const isPurch = (type === 'Purchase' || type === 'Purchase Voucher' || (e.preparedBy === 'Purchase Module'));
+
+    // 1. Sales Voucher / Customer Name
+    if (isSales) {
+      if (e.partyOverride && e.partyOverride.name) return e.partyOverride.name;
+      if (e.customerName && e.customerName.trim() !== '') return e.customerName.trim();
+      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+      if (e.customerId) {
+        const cust = custs.find(c => String(c.id) === String(e.customerId)) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => String(l.id) === String(e.customerId)) : null);
+        if (cust && cust.name) return cust.name;
+      }
+      const salesList = [
+        ...(window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers) ? window.KYA_STORE.salesVouchers : []),
+        ...(window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts) ? window.KYA_STORE.salesVouchersDrafts : [])
+      ];
+      const sv = salesList.find(v => 
+        (v.journalEntryId && String(v.journalEntryId) === String(e.id)) || 
+        String(v.id) === String(e.id) || 
+        v.invoiceNo === e.voucherNo || 
+        `SV-${v.invoiceNo}` === e.voucherNo || 
+        `SR-${v.invoiceNo}` === e.voucherNo || 
+        `SO-${v.invoiceNo}` === e.voucherNo
+      );
+      if (sv) {
+        if (sv.partyOverride && sv.partyOverride.name) return sv.partyOverride.name;
+        if (sv.customerName && sv.customerName.trim() !== '') return sv.customerName.trim();
+        const cust = custs.find(c => String(c.id) === String(sv.customerId)) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => String(l.id) === String(sv.customerId)) : null);
+        if (cust && cust.name) return cust.name;
+      }
+    }
+
+    // 2. Purchase Voucher / Supplier Name
+    if (isPurch) {
+      if (e.partyOverride && e.partyOverride.name) return e.partyOverride.name;
+      if (e.vendorName && e.vendorName.trim() !== '') return e.vendorName.trim();
+      if (e.supplierName && e.supplierName.trim() !== '') return e.supplierName.trim();
+      const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+      const sid = e.vendorId || e.supplierId;
+      if (sid) {
+        const supp = supps.find(s => String(s.id) === String(sid)) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => String(l.id) === String(sid)) : null);
+        if (supp && supp.name) return supp.name;
+      }
+      const purchList = [
+        ...(window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers) ? window.KYA_STORE.purchaseVouchers : []),
+        ...(window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchersDrafts) ? window.KYA_STORE.purchaseVouchersDrafts : [])
+      ];
+      const pv = purchList.find(v => 
+        String(v.id) === String(e.id) || 
+        v.invoiceNo === e.voucherNo || 
+        `PV-${v.invoiceNo}` === e.voucherNo
+      );
+      if (pv) {
+        if (pv.partyOverride && pv.partyOverride.name) return pv.partyOverride.name;
+        if (pv.vendorName && pv.vendorName.trim() !== '') return pv.vendorName.trim();
+        const supp = supps.find(s => String(s.id) === String(pv.vendorId)) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => String(l.id) === String(pv.vendorId)) : null);
+        if (supp && supp.name) return supp.name;
+      }
+    }
+
+    // 3. Journal Entry / Ledger Name
+    if (e.firstParticular && e.firstParticular !== '—' && e.firstParticular !== 'undefined') {
+      return e.firstParticular;
+    }
+    if (Array.isArray(e.allRows)) {
+      const validRow = e.allRows.find(r => r && r.particular && r.particular.trim() !== '' && r.particular !== '—');
+      if (validRow) return validRow.particular;
+    }
+    if (e.particulars && e.particulars !== '—') return e.particulars;
+    if (e.oppName) return e.oppName;
+
+    return '—';
+  }
+
   function renderVoucherDeskPanel() {
     const wrap = document.getElementById('voucherDeskWrap');
     if (!wrap) return;
@@ -2833,7 +2911,7 @@
         date: e.date,
         voucherNo: e.voucherNo,
         type: type,
-        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
+        particulars: getVoucherParticularsName(e, type),
         amount: formattedAmount,
         isDraft: false,
         raw: e
@@ -2847,7 +2925,7 @@
         date: e.date,
         voucherNo: e.voucherNo,
         type: 'Journal',
-        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
+        particulars: getVoucherParticularsName(e, 'Journal'),
         amount: e.amount,
         isDraft: true,
         raw: e
@@ -2857,9 +2935,6 @@
     // 3. Process Sales drafts from KYA_STORE
     const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
     salesDrafts.forEach(d => {
-      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-      const cust = custs.find(c => String(c.id) === String(d.customerId));
-      const custName = cust ? cust.name : (d.customerName || '');
       const vType = d.isReturn ? 'Reversal' : (d.isOrder ? 'Order' : 'Invoice');
       const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -2868,7 +2943,7 @@
         date: d.date,
         voucherNo: d.invoiceNo || 'Draft',
         type: vType,
-        particulars: custName || `Draft ${vType}`,
+        particulars: getVoucherParticularsName(d, vType),
         amount: vAmt,
         isDraft: true,
         raw: d
@@ -2888,9 +2963,6 @@
       ));
 
       if (!alreadyInList) {
-        const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-        const cust = custs.find(c => String(c.id) === String(v.customerId));
-        const custName = cust ? cust.name : (v.customerName || '');
         const vType = v.isReturn ? 'Reversal' : (v.isOrder ? 'Order' : 'Invoice');
         const prefix = v.isReturn ? 'SR-' : (v.isOrder ? 'SO-' : 'SV-');
         const vNo = (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-')) ? v.invoiceNo : `${prefix}${v.invoiceNo}`;
@@ -2901,7 +2973,7 @@
           date: v.date,
           voucherNo: vNo,
           type: vType,
-          particulars: custName || vType,
+          particulars: getVoucherParticularsName(v, vType),
           amount: vAmt,
           isDraft: false,
           raw: v
@@ -2909,7 +2981,51 @@
       }
     });
 
-    // 5. Update Stat counters
+    // 5. Process Purchase drafts
+    const purchDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchersDrafts)) ? window.KYA_STORE.purchaseVouchersDrafts : [];
+    purchDrafts.forEach(d => {
+      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const vNo = d.invoiceNo ? (d.invoiceNo.startsWith('PV-') ? d.invoiceNo : `PV-${d.invoiceNo}`) : 'Draft';
+
+      list.push({
+        id: d.id,
+        date: d.date,
+        voucherNo: vNo,
+        type: 'Purchase',
+        particulars: getVoucherParticularsName(d, 'Purchase'),
+        amount: vAmt,
+        isDraft: true,
+        raw: d
+      });
+    });
+
+    // 6. Process Purchase Posted
+    const purchPosted = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers)) ? window.KYA_STORE.purchaseVouchers : [];
+    purchPosted.forEach(v => {
+      const alreadyInList = list.some(item => !item.isDraft && (
+        item.id === v.id || 
+        item.voucherNo === v.invoiceNo || 
+        item.voucherNo === `PV-${v.invoiceNo}`
+      ));
+
+      if (!alreadyInList) {
+        const vNo = v.invoiceNo ? (v.invoiceNo.startsWith('PV-') ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
+        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        list.push({
+          id: v.id,
+          date: v.date,
+          voucherNo: vNo,
+          type: 'Purchase',
+          particulars: getVoucherParticularsName(v, 'Purchase'),
+          amount: vAmt,
+          isDraft: false,
+          raw: v
+        });
+      }
+    });
+
+    // 7. Update Stat counters
     const totalJournal = list.filter(e => e.type === 'Journal' && !e.isDraft).length;
     const totalSales = list.filter(e => (e.type === 'Invoice' || e.type === 'Order' || e.type === 'Reversal') && !e.isDraft).length;
     const totalDrafts = list.filter(e => e.isDraft).length;
@@ -2928,7 +3044,9 @@
     list.sort((a, b) => {
       const dComp = (b.date || '').localeCompare(a.date || '');
       if (dComp !== 0) return dComp;
-      return b.id - a.id;
+      const vComp = (a.voucherNo || '').localeCompare(b.voucherNo || '', undefined, { numeric: true, sensitivity: 'base' });
+      if (vComp !== 0) return vComp;
+      return (Number(a.id) || 0) - (Number(b.id) || 0);
     });
 
     let filtered = list.filter(e => {
@@ -2951,6 +3069,16 @@
       return true;
     });
 
+    const allKeys = filtered.map(e => `${e.type}_${e.id}_${e.isDraft}`);
+    const allChecked = allKeys.length > 0 && allKeys.every(k => _vdSelectedKeys.has(k));
+    const selCount = [..._vdSelectedKeys].filter(k => allKeys.includes(k)).length;
+
+    // Synchronize 3-dot menu select text
+    const toggleSelectText = document.getElementById('vdToggleSelectText');
+    if (toggleSelectText) {
+      toggleSelectText.textContent = _vdSelectMode ? 'Exit Select Mode' : 'Select';
+    }
+
     let tableHtml = '';
     if (filtered.length === 0) {
       tableHtml = `
@@ -2962,13 +3090,22 @@
             </svg>
             <input class="pt-search-inp" id="vdSearch" placeholder="Search voucher #, particulars, amount, date…" style="padding-left: 36px; width: 100%; height: 38px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13.5px; transition: all 0.15s;" value="${_vdSearch.replace(/"/g,'&quot;')}">
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            ${_vdSelectMode ? `
+              <div class="pt-sel-bar" style="margin: 0; padding: 4px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+                <span class="pt-sel-count" style="font-size: 12.5px; font-weight: 600;">${selCount} selected</span>
+                <button id="vdBtnExitSelect" class="btn btn-secondary" style="height: 30px; padding: 0 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--slate-200); background: #fff; cursor: pointer;" type="button">
+                  Exit Select
+                </button>
+              </div>
+            ` : ''}
             <select id="vdTypeFilter" style="height: 38px; padding: 0 12px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13px; font-weight: 600; color: var(--slate-700); background: var(--white);">
               <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
               <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
               <option value="Order" ${_vdTypeFilter === 'Order' ? 'selected' : ''}>Sales Order</option>
               <option value="Reversal" ${_vdTypeFilter === 'Reversal' ? 'selected' : ''}>Sales Reversal</option>
+              <option value="Purchase" ${_vdTypeFilter === 'Purchase' ? 'selected' : ''}>Purchase Voucher</option>
             </select>
           </div>
         </div>
@@ -2992,13 +3129,30 @@
             </svg>
             <input class="pt-search-inp" id="vdSearch" placeholder="Search voucher #, particulars, amount, date…" style="padding-left: 36px; width: 100%; height: 38px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13.5px; transition: all 0.15s;" value="${_vdSearch.replace(/"/g,'&quot;')}">
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            ${_vdSelectMode ? `
+              <div class="pt-sel-bar" style="margin: 0; padding: 4px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+                <span class="pt-sel-count" style="font-size: 12.5px; font-weight: 600;">${selCount} selected</span>
+                ${selCount > 0 ? `
+                  <button class="pt-del-btn" id="vdDelSelected" type="button" style="height: 30px; padding: 0 10px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                    </svg>
+                    Delete Selected
+                  </button>
+                ` : ''}
+                <button id="vdBtnExitSelect" class="btn btn-secondary" style="height: 30px; padding: 0 10px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--slate-200); background: #fff; cursor: pointer;" type="button">
+                  Exit Select
+                </button>
+              </div>
+            ` : ''}
             <select id="vdTypeFilter" style="height: 38px; padding: 0 12px; border-radius: 8px; border: 1.5px solid var(--slate-200); font-size: 13px; font-weight: 600; color: var(--slate-700); background: var(--white);">
               <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
               <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
               <option value="Order" ${_vdTypeFilter === 'Order' ? 'selected' : ''}>Sales Order</option>
               <option value="Reversal" ${_vdTypeFilter === 'Reversal' ? 'selected' : ''}>Sales Reversal</option>
+              <option value="Purchase" ${_vdTypeFilter === 'Purchase' ? 'selected' : ''}>Purchase Voucher</option>
             </select>
           </div>
         </div>
@@ -3007,6 +3161,11 @@
           <table class="pt-table">
             <thead>
               <tr style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500));">
+                ${_vdSelectMode ? `
+                  <th style="width: 40px; text-align: center; padding: 10px 12px;">
+                    <input type="checkbox" class="pt-cb" id="vdSelAll" ${allChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; accent-color: #2563eb;">
+                  </th>
+                ` : ''}
                 <th style="width: 60px; text-align: center;">Sl No</th>
                 <th>Date</th>
                 <th>Voucher No.</th>
@@ -3018,13 +3177,18 @@
             </thead>
             <tbody>
               ${filtered.map((e, index) => {
+                const itemKey = `${e.type}_${e.id}_${e.isDraft}`;
+                const isSelected = _vdSelectedKeys.has(itemKey);
+
                 const typeBadge = e.type === 'Journal'
                    ? `<span class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Journal Entry</span>`
                    : (e.type === 'Reversal'
                       ? `<span class="tb-badge" style="background:#fee2e2; color:#b91c1c; border:1.5px solid #fca5a5; font-size:11px; padding:3px 8px; text-transform:none;">Sales Reversal</span>`
                       : (e.type === 'Order'
                          ? `<span class="tb-badge" style="background:#e0e7ff; color:#4338ca; border:1.5px solid #c7d2fe; font-size:11px; padding:3px 8px; text-transform:none;">Sales Order</span>`
-                         : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`));
+                         : (e.type === 'Purchase'
+                            ? `<span class="tb-badge" style="background:#fef3c7; color:#b45309; border:1.5px solid #fde68a; font-size:11px; padding:3px 8px; text-transform:none;">Purchase Voucher</span>`
+                            : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`)));
 
                 let statusBadge = '';
                 if (e.isDraft) {
@@ -3040,15 +3204,20 @@
                   statusBadge = `<span class="tb-badge" style="background:#ecfdf5; color:#059669; border:1.5px solid #a7f3d0; font-size:11px; padding:3px 8px; text-transform:none;">Posted</span>`;
                 }
 
-                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : (e.type === 'Reversal' ? '#dc2626' : (e.type === 'Order' ? 'var(--emerald-700)' : '#059669'));
+                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : (e.type === 'Reversal' ? '#dc2626' : (e.type === 'Order' ? 'var(--emerald-700)' : (e.type === 'Purchase' ? 'var(--amber-700)' : '#059669')));
 
                 return `
-                  <tr data-id="${e.id}" data-type="${e.type}" data-draft="${e.isDraft}" class="vd-row" style="cursor: pointer;">
+                  <tr data-id="${e.id}" data-type="${e.type}" data-draft="${e.isDraft}" data-key="${itemKey}" class="vd-row ${isSelected ? 'pt-sel-row' : ''}" style="cursor: pointer;">
+                    ${_vdSelectMode ? `
+                      <td style="text-align: center; padding: 10px 12px;" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="pt-cb vd-rcb" data-key="${itemKey}" ${isSelected ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; accent-color: #2563eb;">
+                      </td>
+                    ` : ''}
                     <td style="color:#94a3b8; font-size:12px; font-weight:600; text-align:center;">${index + 1}</td>
                     <td style="white-space:nowrap;">${e.date || '—'}</td>
                     <td><span style="font-family: monospace; font-weight: 700; color: var(--slate-700);">${e.voucherNo || '—'}</span></td>
                     <td>${typeBadge}</td>
-                    <td style="font-weight:500; color:var(--slate-800); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${ohEsc(e.particulars)}</td>
+                    <td style="font-weight:600; color:var(--slate-800); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${ohEsc(e.particulars)}</td>
                     <td style="text-align:right; font-weight:700; color:${amtColor}; white-space:nowrap;">₹&thinsp;${e.amount}</td>
                     <td style="text-align:center;">${statusBadge}</td>
                   </tr>
@@ -3083,8 +3252,124 @@
       });
     }
 
+    const selAll = document.getElementById('vdSelAll');
+    if (selAll) {
+      selAll.addEventListener('change', e => {
+        if (e.target.checked) allKeys.forEach(k => _vdSelectedKeys.add(k));
+        else allKeys.forEach(k => _vdSelectedKeys.delete(k));
+        renderVoucherDeskPanel();
+      });
+    }
+
+    wrap.querySelectorAll('.vd-rcb').forEach(cb => {
+      cb.addEventListener('change', e => {
+        const key = e.target.dataset.key;
+        if (e.target.checked) _vdSelectedKeys.add(key);
+        else _vdSelectedKeys.delete(key);
+        renderVoucherDeskPanel();
+      });
+    });
+
+    const exitSelectBtn = document.getElementById('vdBtnExitSelect');
+    if (exitSelectBtn) {
+      exitSelectBtn.addEventListener('click', () => {
+        _vdSelectMode = false;
+        _vdSelectedKeys.clear();
+        const selectText = document.getElementById('vdToggleSelectText');
+        if (selectText) selectText.textContent = 'Select';
+        renderVoucherDeskPanel();
+      });
+    }
+
+    const delSelBtn = document.getElementById('vdDelSelected');
+    if (delSelBtn) {
+      delSelBtn.addEventListener('click', () => {
+        const n = selCount;
+        showKyaConfirm({
+          title: 'Delete Selected Vouchers?',
+          message: `Permanently delete <strong>${n} selected ${n === 1 ? 'voucher' : 'vouchers'}</strong>?<br>This action cannot be undone.`,
+          confirmLabel: '✕ Delete',
+          iconBg: '#fee2e2', iconColor: '#dc2626',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          okBg: '#dc2626',
+          onConfirm: () => {
+            const selectedItems = filtered.filter(item => _vdSelectedKeys.has(`${item.type}_${item.id}_${item.isDraft}`));
+            selectedItems.forEach(item => {
+              const id = item.id;
+              const type = item.type;
+              const isDraft = item.isDraft;
+
+              if (type === 'Journal') {
+                if (isDraft) {
+                  draftedEntries = draftedEntries.filter(e => String(e.id) !== String(id));
+                } else {
+                  postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
+                }
+              } else if (type === 'Invoice' || type === 'Order' || type === 'Reversal') {
+                if (isDraft) {
+                  if (window.KYA_STORE?.salesVouchersDrafts) {
+                    window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts.filter(d => String(d.id) !== String(id));
+                  }
+                } else {
+                  const sList = window.KYA_STORE?.salesVouchers || [];
+                  const idx = sList.findIndex(v => String(v.id) === String(id) || String(v.journalEntryId) === String(id));
+                  if (idx > -1) {
+                    const inv = sList[idx];
+                    sList.splice(idx, 1);
+                    window.KYA_STORE.salesVouchers = sList;
+                    if (inv.journalEntryId) {
+                      postedEntries = postedEntries.filter(e => String(e.id) !== String(inv.journalEntryId) && String(e.id) !== String(id));
+                    }
+                  } else {
+                    postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
+                  }
+                }
+              } else if (type === 'Purchase') {
+                if (isDraft) {
+                  if (window.KYA_STORE?.purchaseVouchersDrafts) {
+                    window.KYA_STORE.purchaseVouchersDrafts = window.KYA_STORE.purchaseVouchersDrafts.filter(d => String(d.id) !== String(id));
+                  }
+                } else {
+                  const pList = window.KYA_STORE?.purchaseVouchers || [];
+                  const idx = pList.findIndex(v => String(v.id) === String(id));
+                  if (idx > -1) {
+                    pList.splice(idx, 1);
+                    window.KYA_STORE.purchaseVouchers = pList;
+                  }
+                  postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
+                }
+              }
+            });
+
+            _vdSelectedKeys.clear();
+            if (typeof showToast === 'function') {
+              showToast(`${n} ${n === 1 ? 'voucher' : 'vouchers'} deleted successfully.`, 'success');
+            }
+            if (typeof window.refreshAllAppViews === 'function') {
+              window.refreshAllAppViews();
+            } else {
+              refreshAllReports();
+              if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
+              if (typeof renderSalesDraftedPanel === 'function') renderSalesDraftedPanel();
+              if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
+              triggerAutoBackup();
+              renderVoucherDeskPanel();
+            }
+          }
+        });
+      });
+    }
+
     wrap.querySelectorAll('.vd-row').forEach(row => {
       row.addEventListener('click', () => {
+        const key = row.dataset.key;
+        if (_vdSelectMode) {
+          if (_vdSelectedKeys.has(key)) _vdSelectedKeys.delete(key);
+          else _vdSelectedKeys.add(key);
+          renderVoucherDeskPanel();
+          return;
+        }
+
         const id = Number(row.dataset.id);
         const type = row.dataset.type;
         const isDraft = row.dataset.draft === 'true';
@@ -3110,6 +3395,16 @@
               const entry = postedEntries.find(e => e.id === id);
               if (entry) showFullJournalModal(entry, false);
             }
+          }
+        } else if (type === 'Purchase') {
+          if (typeof loadPurchaseVoucher === 'function') {
+            loadPurchaseVoucher(id, isDraft);
+            if (typeof openTab === 'function') openTab('purchase_voucher');
+          } else {
+            const entry = isDraft
+              ? draftedEntries.find(e => e.id === id)
+              : postedEntries.find(e => e.id === id);
+            if (entry) showFullJournalModal(entry, isDraft);
           }
         }
       });
@@ -3160,7 +3455,7 @@
         voucherNo: e.voucherNo,
         type: type,
         rawType: (type === 'Journal Entry' ? 'Journal' : (type === 'Sales Reversal' ? 'Reversal' : (type === 'Sales Order' ? 'Order' : (type === 'Purchase' ? 'Purchase' : 'Invoice')))),
-        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
+        particulars: getVoucherParticularsName(e, type),
         amount: formattedAmount,
         status: 'Posted',
         isDraft: false
@@ -3175,7 +3470,7 @@
         voucherNo: e.voucherNo,
         type: 'Journal Entry',
         rawType: 'Journal',
-        particulars: e.firstParticular || (e.allRows && e.allRows[0] ? e.allRows[0].particular : '') || '—',
+        particulars: getVoucherParticularsName(e, 'Journal'),
         amount: e.amount,
         status: 'Draft',
         isDraft: true
@@ -3185,9 +3480,6 @@
     // 3. Process Sales drafts
     const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
     salesDrafts.forEach(d => {
-      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-      const cust = custs.find(c => String(c.id) === String(d.customerId));
-      const custName = cust ? cust.name : (d.customerName || '');
       const vType = d.isReturn ? 'Sales Reversal' : (d.isOrder ? 'Sales Order' : 'Sales Invoice');
       const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -3197,7 +3489,7 @@
         voucherNo: d.invoiceNo || 'Draft',
         type: vType,
         rawType: d.isReturn ? 'Reversal' : (d.isOrder ? 'Order' : 'Invoice'),
-        particulars: custName || `Draft ${vType}`,
+        particulars: getVoucherParticularsName(d, vType),
         amount: vAmt,
         status: 'Draft',
         isDraft: true
@@ -3217,9 +3509,6 @@
       ));
 
       if (!alreadyInList) {
-        const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-        const cust = custs.find(c => String(c.id) === String(v.customerId));
-        const custName = cust ? cust.name : (v.customerName || '');
         const vType = v.isReturn ? 'Sales Reversal' : (v.isOrder ? 'Sales Order' : 'Sales Invoice');
         const prefix = v.isReturn ? 'SR-' : (v.isOrder ? 'SO-' : 'SV-');
         const vNo = (v.invoiceNo && (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-'))) ? v.invoiceNo : `${prefix}${v.invoiceNo || ''}`;
@@ -3237,9 +3526,55 @@
           voucherNo: vNo,
           type: vType,
           rawType: v.isReturn ? 'Reversal' : (v.isOrder ? 'Order' : 'Invoice'),
-          particulars: custName || vType,
+          particulars: getVoucherParticularsName(v, vType),
           amount: vAmt,
           status: status,
+          isDraft: false
+        });
+      }
+    });
+
+    // 5. Process Purchase drafts
+    const purchDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchersDrafts)) ? window.KYA_STORE.purchaseVouchersDrafts : [];
+    purchDrafts.forEach(d => {
+      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const vNo = d.invoiceNo ? (d.invoiceNo.startsWith('PV-') ? d.invoiceNo : `PV-${d.invoiceNo}`) : 'Draft';
+
+      list.push({
+        id: d.id,
+        date: d.date,
+        voucherNo: vNo,
+        type: 'Purchase Voucher',
+        rawType: 'Purchase',
+        particulars: getVoucherParticularsName(d, 'Purchase'),
+        amount: vAmt,
+        status: 'Draft',
+        isDraft: true
+      });
+    });
+
+    // 6. Process Purchase Posted
+    const purchPosted = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers)) ? window.KYA_STORE.purchaseVouchers : [];
+    purchPosted.forEach(v => {
+      const alreadyInList = list.some(item => !item.isDraft && (
+        item.id === v.id || 
+        item.voucherNo === v.invoiceNo || 
+        item.voucherNo === `PV-${v.invoiceNo}`
+      ));
+
+      if (!alreadyInList) {
+        const vNo = v.invoiceNo ? (v.invoiceNo.startsWith('PV-') ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
+        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        list.push({
+          id: v.id,
+          date: v.date,
+          voucherNo: vNo,
+          type: 'Purchase Voucher',
+          rawType: 'Purchase',
+          particulars: getVoucherParticularsName(v, 'Purchase'),
+          amount: vAmt,
+          status: 'Posted',
           isDraft: false
         });
       }
@@ -3248,7 +3583,9 @@
     list.sort((a, b) => {
       const dComp = (b.date || '').localeCompare(a.date || '');
       if (dComp !== 0) return dComp;
-      return b.id - a.id;
+      const vComp = (a.voucherNo || '').localeCompare(b.voucherNo || '', undefined, { numeric: true, sensitivity: 'base' });
+      if (vComp !== 0) return vComp;
+      return (Number(a.id) || 0) - (Number(b.id) || 0);
     });
 
     // Apply current active filters if any
@@ -3346,6 +3683,23 @@
         if (typeof window.exportVoucherDeskToExcel === 'function') {
           await window.exportVoucherDeskToExcel(getVoucherDeskExportData());
         }
+      });
+    }
+
+    const toggleSelectBtn = document.getElementById('vdToggleSelectMode');
+    if (toggleSelectBtn) {
+      toggleSelectBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllVdMenus();
+        _vdSelectMode = !_vdSelectMode;
+        if (!_vdSelectMode) {
+          _vdSelectedKeys.clear();
+        }
+        const selectText = document.getElementById('vdToggleSelectText');
+        if (selectText) {
+          selectText.textContent = _vdSelectMode ? 'Exit Select Mode' : 'Select';
+        }
+        renderVoucherDeskPanel();
       });
     }
 

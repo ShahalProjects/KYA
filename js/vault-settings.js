@@ -517,6 +517,79 @@
     }
   }
 
+  let _booksAccountsSettingsWired = false;
+
+  function initBooksAccountsSettingsListeners() {
+    if (_booksAccountsSettingsWired) return;
+    _booksAccountsSettingsWired = true;
+
+    const monthEl = document.getElementById('configFyStartMonth');
+    const yearEl = document.getElementById('configFyStartYear');
+    const begDateEl = document.getElementById('configBooksBeginningDate');
+    const saveBtn = document.getElementById('btnBooksAccountsConfigSave') || document.getElementById('btnBooksConfigSave');
+
+    function formatFyStartDate(year, month) {
+      const y = parseInt(year, 10) || new Date().getFullYear();
+      const m = String(month || 4).padStart(2, '0');
+      return `${y}-${m}-01`;
+    }
+
+    if (monthEl && yearEl && begDateEl) {
+      const updateBegDateIfUnset = () => {
+        const currentSaved = localStorage.getItem('kya_books_beginning_date');
+        if (!currentSaved) {
+          begDateEl.value = formatFyStartDate(yearEl.value, monthEl.value);
+        }
+      };
+      monthEl.addEventListener('change', updateBegDateIfUnset);
+      yearEl.addEventListener('input', updateBegDateIfUnset);
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        const startMonth = monthEl ? monthEl.value : '4';
+        const startYear = yearEl ? yearEl.value : '2024';
+        const begDate = begDateEl ? begDateEl.value : formatFyStartDate(startYear, startMonth);
+
+        localStorage.setItem('kya_fy_start_month', startMonth);
+        localStorage.setItem('kya_fy_start_year', startYear);
+        localStorage.setItem('kya_books_beginning_date', begDate);
+
+        window._kyaFyStartMonth = startMonth;
+        window._kyaFyStartYear = startYear;
+        window._kyaBooksBeginningDate = begDate;
+
+        const m = parseInt(startMonth, 10) || 4;
+        const y = parseInt(startYear, 10) || 2024;
+        const startStr = `${y}-${String(m).padStart(2, '0')}-01`;
+        const endD = new Date(y, m - 1 + 12, 0);
+        const endStr = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}`;
+
+        if (typeof syncGlobalDates === 'function') {
+          syncGlobalDates(startStr, endStr);
+        } else if (typeof window.syncGlobalDates === 'function') {
+          window.syncGlobalDates(startStr, endStr);
+        }
+
+        showToast('Books of Accounts configuration saved.', 'success');
+      });
+    }
+  }
+
+  function updateBooksAccountsSettingsUI() {
+    const savedMonth = localStorage.getItem('kya_fy_start_month') || '4';
+    const savedYear = localStorage.getItem('kya_fy_start_year') || '2024';
+    const savedBegDate = localStorage.getItem('kya_books_beginning_date') || `${savedYear}-${String(savedMonth).padStart(2, '0')}-01`;
+
+    const monthEl = document.getElementById('configFyStartMonth');
+    const yearEl = document.getElementById('configFyStartYear');
+    const begDateEl = document.getElementById('configBooksBeginningDate');
+
+    if (monthEl) monthEl.value = savedMonth;
+    if (yearEl) yearEl.value = savedYear;
+    if (begDateEl) begDateEl.value = savedBegDate;
+  }
+
   function switchSettingsTopTab(topTab) {
     _settingsTopTab = topTab;
     window._settingsTopTab = topTab;
@@ -536,8 +609,8 @@
       if (titleEl) titleEl.textContent = 'Configuration';
       if (subtitleEl) subtitleEl.textContent = 'Manage module configurations and posting preferences';
 
-      if (!['sales', 'purchase', 'journal', 'cashline'].includes(_settingsActiveTab)) {
-        _settingsActiveTab = 'cashline';
+      if (!['books', 'sales', 'purchase', 'journal', 'cashline'].includes(_settingsActiveTab)) {
+        _settingsActiveTab = 'books';
       }
     } else {
       if (btnMain) btnMain.className = 'btn btn-primary';
@@ -557,11 +630,10 @@
   window.switchSettingsTopTab = switchSettingsTopTab;
 
   function switchSettingsTab(tab) {
-    if (!tab) tab = _settingsTopTab === 'config' ? 'cashline' : 'vault';
-    if (tab === 'books') tab = 'cashline';
+    if (!tab) tab = _settingsTopTab === 'config' ? 'books' : 'vault';
 
     // Auto-detect and align top tab
-    if (['sales', 'purchase', 'journal', 'cashline'].includes(tab)) {
+    if (['books', 'sales', 'purchase', 'journal', 'cashline'].includes(tab)) {
       _settingsTopTab = 'config';
       window._settingsTopTab = 'config';
       const btnMain = document.getElementById('settingsTopTabMain');
@@ -599,6 +671,7 @@
     const allTabs = [
       ['settingsTabVault', 'vault'],
       ['settingsTabShortcuts', 'shortcuts'],
+      ['configTabBooks', 'books'],
       ['configTabSales', 'sales'],
       ['configTabPurchase', 'purchase'],
       ['configTabJournal', 'journal'],
@@ -607,6 +680,7 @@
     const allViews = [
       ['settings-vault-view', 'vault'],
       ['settings-shortcuts-view', 'shortcuts'],
+      ['config-books-view', 'books'],
       ['config-sales-view', 'sales'],
       ['config-purchase-view', 'purchase'],
       ['config-journal-view', 'journal'],
@@ -626,7 +700,10 @@
       if (view) view.style.display = t === tab ? '' : 'none';
     });
 
-    if (tab === 'cashline') {
+    if (tab === 'books') {
+      initBooksAccountsSettingsListeners();
+      updateBooksAccountsSettingsUI();
+    } else if (tab === 'cashline') {
       initBooksSettingsListeners();
       updateBooksSettingsUI();
     } else if (tab === 'vault') {
@@ -637,7 +714,7 @@
   window.switchSettingsTab = switchSettingsTab;
 
   function renderSettingsPanel() {
-    switchSettingsTab(_settingsActiveTab || (_settingsTopTab === 'config' ? 'cashline' : 'vault'));
+    switchSettingsTab(_settingsActiveTab || (_settingsTopTab === 'config' ? 'books' : 'vault'));
 
     const btnMain = document.getElementById('settingsTopTabMain');
     if (btnMain && !btnMain._wired) {
@@ -654,6 +731,7 @@
     const tabMap = {
       settingsTabVault: 'vault',
       settingsTabShortcuts: 'shortcuts',
+      configTabBooks: 'books',
       configTabSales: 'sales',
       configTabPurchase: 'purchase',
       configTabJournal: 'journal',

@@ -370,7 +370,7 @@
             return;
           }
           if (r.origRate !== undefined && r.rate > r.origRate) {
-            showToast(`Row ${i + 1}: Rate exceeds original invoice rate of ₹${fmtNum(r.origRate)}.`, 'warning');
+            showToast(`Row ${i + 1}: Rate exceeds original invoice rate of â‚¹${fmtNum(r.origRate)}.`, 'warning');
             return;
           }
           if (r.origDiscount !== undefined && r.discount > r.origDiscount) {
@@ -379,7 +379,7 @@
           }
         } else {
           if (r.origBaseAmount !== undefined && r.baseAmount > r.origBaseAmount) {
-            showToast(`Row ${i + 1}: Base Amount exceeds remaining base amount of ₹${fmtNum(r.origBaseAmount)}.`, 'warning');
+            showToast(`Row ${i + 1}: Base Amount exceeds remaining base amount of â‚¹${fmtNum(r.origBaseAmount)}.`, 'warning');
             return;
           }
           if (r.origDiscount !== undefined && r.discount > r.origDiscount) {
@@ -474,7 +474,7 @@
           return;
         }
         if (refundAmt > excessAmount) {
-          showToast(`Refund Amount cannot exceed the excess amount of ₹${fmtNum(excessAmount)}.`, 'warning');
+          showToast(`Refund Amount cannot exceed the excess amount of â‚¹${fmtNum(excessAmount)}.`, 'warning');
           return;
         }
         if (refundAmt === excessAmount) {
@@ -505,10 +505,10 @@
           const maxVal = getSalesPaymentMax(total);
           if (paymentAmount > maxVal) {
             const limitMsg = (currentSalesVoucherSubtype === 'Return')
-              ? `Refund Amount cannot exceed the allowed refund amount of ₹${fmtNum(maxVal)}.`
+              ? `Refund Amount cannot exceed the allowed refund amount of â‚¹${fmtNum(maxVal)}.`
               : ((currentSalesVoucherSubtype === 'Invoice' && orderNo)
-                ? `Payment Amount cannot exceed the balance payment of ₹${fmtNum(maxVal)}.`
-                : `Payment Amount cannot exceed the Grand Total of ₹${fmtNum(maxVal)}.`);
+                ? `Payment Amount cannot exceed the balance payment of â‚¹${fmtNum(maxVal)}.`
+                : `Payment Amount cannot exceed the Grand Total of â‚¹${fmtNum(maxVal)}.`);
             showToast(limitMsg, 'warning');
             return;
           }
@@ -522,7 +522,7 @@
                 origPaidAmt = origInv.paymentAmount || 0;
               }
               if (paymentAmount > origPaidAmt) {
-                showToast(`Refund Amount cannot exceed the original invoice paid amount of ₹${fmtNum(origPaidAmt)}.`, 'warning');
+                showToast(`Refund Amount cannot exceed the original invoice paid amount of â‚¹${fmtNum(origPaidAmt)}.`, 'warning');
                 return;
               }
             }
@@ -564,14 +564,24 @@
       rows: JSON.parse(JSON.stringify(salesRows)),
       partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
-      journalEntryId: existingJournalEntryId || '', 
+      journalEntryId: existingJournalEntryId || '',
+      tdsJournalEntryId: existingPostedInv ? (existingPostedInv.tdsJournalEntryId || '') : '',
+      paymentJournalEntryId: existingPostedInv ? (existingPostedInv.paymentJournalEntryId || '') : '',
       postedAt: isEditPosted ? (existingPostedInv?.postedAt || Date.now()) : Date.now()
     };
 
-    // Post to accounting journal entries (flow to Trial Balance, Ledgers, Voucher Desk)
-    const jEntryId = postSalesVoucherToJournal(invoiceData);
-    if (jEntryId) {
-      invoiceData.journalEntryId = jEntryId;
+    // Post to accounting journal entries (flow to Trial Balance, Ledgers, Voucher Desk).
+    // For Sales Invoices returns { invoiceJEId, tdsJEId, paymentJEId };
+    // for Orders/Returns returns a plain entry ID string.
+    const jeResult = postSalesVoucherToJournal(invoiceData);
+    if (jeResult) {
+      if (typeof jeResult === 'object') {
+        if (jeResult.invoiceJEId) invoiceData.journalEntryId        = jeResult.invoiceJEId;
+        if (jeResult.tdsJEId)     invoiceData.tdsJournalEntryId     = jeResult.tdsJEId;
+        if (jeResult.paymentJEId) invoiceData.paymentJournalEntryId = jeResult.paymentJEId;
+      } else {
+        invoiceData.journalEntryId = jeResult;
+      }
     }
     
     if (window._editingSalesInvoice && window._editingSalesInvoice.isDraft) {
@@ -600,12 +610,14 @@
     }
     
     let successMsg = `Invoice "${invoiceNo}" posted successfully.`;
-    if (currentSalesVoucherSubtype === 'Return') {
+    const _subtypeSnapshot = currentSalesVoucherSubtype;
+    if (_subtypeSnapshot === 'Return') {
       successMsg = `Sales Reversal "${invoiceNo}" posted successfully.`;
-    } else if (currentSalesVoucherSubtype === 'Order') {
+    } else if (_subtypeSnapshot === 'Order') {
       successMsg = `Sales Pre Invoice "${invoiceNo}" saved successfully.`;
     }
     showToast(successMsg, 'success');
+    showInvoicePostedModal(invoiceNo, _subtypeSnapshot);
     window._editingSalesInvoice = null;
     currentSalesVoucherSubtype = 'Invoice';
     initSalesForm();
@@ -616,6 +628,153 @@
     if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
     if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
     triggerAutoBackup();
+  }
+
+  // â”€â”€ Invoice Posted Success Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  function showInvoicePostedModal(invoiceNo, subtype) {
+    // Remove any stale modal
+    const stale = document.getElementById('salePostedOverlay');
+    if (stale) stale.remove();
+
+    // Labels per subtype
+    const isReturn = subtype === 'Return';
+    const isOrder  = subtype === 'Order';
+    const typeLabel = isReturn ? 'Sales Reversal' : isOrder ? 'Pre Invoice' : 'Invoice';
+    const noLabel   = isReturn ? 'Reversal No.'   : isOrder ? 'Pre Invoice No.' : 'Invoice No.';
+    const iconColor = isReturn ? '#ef4444' : isOrder ? '#f59e0b' : '#10b981';
+    const iconSvg   = isReturn
+      ? `<svg viewBox="0 0 20 20" fill="none" style="width:32px;height:32px"><path d="M10 3v7l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 10A6.5 6.5 0 1010 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3.5 6v4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      : isOrder
+      ? `<svg viewBox="0 0 20 20" fill="none" style="width:32px;height:32px"><rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M7 10h6M7 7h6M7 13h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`
+      : `<svg viewBox="0 0 20 20" fill="none" style="width:32px;height:32px"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.7"/><path d="M6.5 10.5l2.5 2.5 4.5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'salePostedOverlay';
+    Object.assign(overlay.style, {
+      position: 'fixed', inset: '0', zIndex: '10100',
+      background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Inter, system-ui, sans-serif'
+    });
+
+    overlay.innerHTML = `
+      <style>
+        @keyframes spModalIn {
+          from { opacity:0; transform:scale(.9) translateY(16px); }
+          to   { opacity:1; transform:none; }
+        }
+        #salePostedCard { animation: spModalIn .22s cubic-bezier(.34,1.3,.64,1); }
+        #spCopyBtn:hover { background: #d1fae5 !important; }
+        #spDoneBtn:hover { filter: brightness(1.08); }
+        #spCopyBtn:active, #spDoneBtn:active { transform: scale(0.97); }
+      </style>
+      <div id="salePostedCard" style="
+        background:#fff; border-radius:20px; padding:40px 36px 32px;
+        box-shadow:0 24px 64px rgba(0,0,0,.22);
+        min-width:340px; max-width:420px; width:90%;
+        display:flex; flex-direction:column; align-items:center; gap:0;
+        text-align:center; position:relative;
+      ">
+        <!-- Close X -->
+        <button id="spCloseX" aria-label="Close" style="
+          position:absolute; top:14px; right:16px; background:none; border:none;
+          font-size:20px; cursor:pointer; color:#94a3b8; line-height:1; padding:4px 8px;
+          border-radius:6px;
+        ">&times;</button>
+
+        <!-- Icon circle -->
+        <div style="
+          width:64px; height:64px; border-radius:50%;
+          background:${iconColor}1a; color:${iconColor};
+          display:flex; align-items:center; justify-content:center;
+          margin-bottom:18px;
+        ">${iconSvg}</div>
+
+        <!-- Heading -->
+        <h2 style="margin:0 0 6px; font-size:20px; font-weight:700; color:#0f172a;">
+          ${typeLabel} Posted!
+        </h2>
+        <p style="margin:0 0 22px; font-size:13.5px; color:#64748b;">
+          Your ${typeLabel.toLowerCase()} has been posted successfully.
+        </p>
+
+        <!-- Invoice No badge -->
+        <div style="
+          background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:12px;
+          padding:16px 24px; width:100%; box-sizing:border-box; margin-bottom:22px;
+        ">
+          <div style="font-size:11px; font-weight:600; color:#6b7280; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px;">
+            ${noLabel}
+          </div>
+          <div id="spInvoiceNoText" style="font-size:26px; font-weight:800; color:#065f46; letter-spacing:.02em; word-break:break-all;">
+            ${invoiceNo}
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex; gap:10px; width:100%;">
+          <button id="spCopyBtn" style="
+            flex:1; padding:10px 0; border-radius:10px;
+            border:1.5px solid #10b981; background:#fff; color:#065f46;
+            font-size:13px; font-weight:600; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; gap:6px;
+            transition: background .15s;
+          ">
+            <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px">
+              <rect x="5" y="5" width="8" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M3 11V3h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Copy No.
+          </button>
+          <button id="spDoneBtn" style="
+            flex:1; padding:10px 0; border-radius:10px;
+            border:none; background:#10b981; color:#fff;
+            font-size:13px; font-weight:600; cursor:pointer;
+            transition: filter .15s;
+          ">Done</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Copy button
+    const copyBtn = document.getElementById('spCopyBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(invoiceNo).then(() => {
+            copyBtn.textContent = 'âœ“ Copied!';
+            setTimeout(() => {
+              copyBtn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><rect x="5" y="5" width="8" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 11V3h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Copy No.`;
+            }, 1800);
+          });
+        } else {
+          // Fallback
+          const tmp = document.createElement('textarea');
+          tmp.value = invoiceNo;
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand('copy');
+          tmp.remove();
+          copyBtn.textContent = 'âœ“ Copied!';
+          setTimeout(() => {
+            copyBtn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><rect x="5" y="5" width="8" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 11V3h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Copy No.`;
+          }, 1800);
+        }
+      });
+    }
+
+    // Close handlers
+    const close = () => { overlay.remove(); };
+    const doneBtn = document.getElementById('spDoneBtn');
+    const closeX  = document.getElementById('spCloseX');
+    if (doneBtn)  doneBtn.addEventListener('click', close);
+    if (closeX)   closeX.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', function escHandler(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+    });
   }
 
   function postSalesVoucherToJournal(invoice) {
@@ -658,31 +817,28 @@
     const cust = custs.find(c => String(c.id) === String(invoice.customerId));
     const customerName = cust ? cust.name : (invoice.customerName || 'Customer');
 
+    // Pre-compute exec text and voucherNo (shared across all branches)
+    let execText = '';
+    if (invoice.salesExecutiveId && typeof ohEmployees !== 'undefined') {
+      const execEmp = ohEmployees.find(e => e.id == invoice.salesExecutiveId);
+      if (execEmp) execText = ` Sales Executive: ${execEmp.name}.`;
+    }
+    const prefix = isRet ? 'SR-' : (isOrd ? 'SO-' : 'SV-');
+    const voucherNo = (invoice.invoiceNo.startsWith(prefix) || invoice.invoiceNo.startsWith('INV-')) ? invoice.invoiceNo : `${prefix}${invoice.invoiceNo}`;
+
     if (isOrd) {
-      // ── SALES ORDER ADVANCE PAYMENT ───────────────────────────────
+      // â”€â”€ SALES ORDER ADVANCE PAYMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const payAccount = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
       const payAccountName = payAccount ? payAccount.name : 'Cash Account';
 
-      journalRows.push({
-        id: 1,
-        type: 'By',
-        particular: payAccountName,
-        debit: paidAmount.toFixed(2),
-        credit: ''
-      });
+      journalRows.push({ id: 1, type: 'By', particular: payAccountName, debit: paidAmount.toFixed(2), credit: '' });
 
       const advanceLedgerId = getOrCreateSystemLedger('Advance from Customers', 'sg-ocl');
       const advanceLedgerName = (coaLedgers.find(l => l.id == advanceLedgerId) || { name: 'Advance from Customers' }).name;
-      journalRows.push({
-        id: 2,
-        type: 'To',
-        particular: advanceLedgerName,
-        debit: '',
-        credit: paidAmount.toFixed(2)
-      });
+      journalRows.push({ id: 2, type: 'To', particular: advanceLedgerName, debit: '', credit: paidAmount.toFixed(2) });
 
     } else if (isRet) {
-      // ── SALES REVERSAL / RETURN ───────────────────────────────────
+      // â”€â”€ SALES REVERSAL / RETURN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (invoice.type === 'Product') {
         let totalRevenue = 0;
         (invoice.rows || []).forEach(r => {
@@ -693,13 +849,7 @@
         if (totalRevenue > 0) {
           const salesReturnLedgerId = getOrCreateSystemLedger('Sales Reversals', 'sg-rfo');
           const salesReturnName = (coaLedgers.find(l => l.id == salesReturnLedgerId) || { name: 'Sales Reversals' }).name;
-          journalRows.push({
-            id: journalRows.length + 1,
-            type: 'By',
-            particular: salesReturnName,
-            debit: totalRevenue.toFixed(2),
-            credit: ''
-          });
+          journalRows.push({ id: journalRows.length + 1, type: 'By', particular: salesReturnName, debit: totalRevenue.toFixed(2), credit: '' });
         }
       } else {
         const revenueByLedger = {};
@@ -713,13 +863,7 @@
           const revAmt = revenueByLedger[ledgId];
           if (revAmt > 0) {
             const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
-            journalRows.push({
-              id: journalRows.length + 1,
-              type: 'By',
-              particular: ledgerName,
-              debit: revAmt.toFixed(2),
-              credit: ''
-            });
+            journalRows.push({ id: journalRows.length + 1, type: 'By', particular: ledgerName, debit: revAmt.toFixed(2), credit: '' });
           }
         }
       }
@@ -775,119 +919,75 @@
       if (paidAmount > 0) {
         const payAccount = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
         const payAccountName = payAccount ? payAccount.name : 'Cash Account';
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: payAccountName,
-          debit: '',
-          credit: paidAmount.toFixed(2)
-        });
+        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: payAccountName, debit: '', credit: paidAmount.toFixed(2) });
       }
 
       const pendingRefund = Math.max(0, origPaidAmt - paidAmount);
       if (pendingRefund > 0) {
         const refundLedgerId = getOrCreateSystemLedger('Refund Payable', 'sg-ocl');
         const refundLedgerName = (coaLedgers.find(l => l.id == refundLedgerId) || { name: 'Refund Payable' }).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: refundLedgerName,
-          debit: '',
-          credit: pendingRefund.toFixed(2)
-        });
+        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: refundLedgerName, debit: '', credit: pendingRefund.toFixed(2) });
       }
 
       const debtReduction = Math.max(0, (parseFloat(invoice.total) || 0) - origPaidAmt);
       if (debtReduction > 0) {
         const trLedgerId = getOrCreateSystemLedger('Trade Receivables', 'sg-tr');
         const trName = (coaLedgers.find(l => l.id == trLedgerId) || { name: 'Trade Receivables' }).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: trName,
-          debit: '',
-          credit: debtReduction.toFixed(2)
-        });
+        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: trName, debit: '', credit: debtReduction.toFixed(2) });
       }
 
       if (invoice.tdsTcsMode === 'TDS' && (parseFloat(invoice.tdsTcsAmount) || 0) > 0) {
         const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
         const tdsName = (coaLedgers.find(l => l.id == tdsLedgerId) || { name: 'TDS Receivable' }).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: tdsName,
-          debit: '',
-          credit: (parseFloat(invoice.tdsTcsAmount) || 0).toFixed(2)
-        });
+        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: tdsName, debit: '', credit: (parseFloat(invoice.tdsTcsAmount) || 0).toFixed(2) });
       }
 
       if ((parseFloat(invoice.adjustments) || 0) < 0) {
         const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
         const adjName = (coaLedgers.find(l => l.id == adjustmentsLedgerId) || { name: 'Adjustments Account' }).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'To',
-          particular: adjName,
-          debit: '',
-          credit: Math.abs(parseFloat(invoice.adjustments) || 0).toFixed(2)
-        });
+        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: adjName, debit: '', credit: Math.abs(parseFloat(invoice.adjustments) || 0).toFixed(2) });
       }
 
     } else {
-      // ── SALES INVOICE POSTING ─────────────────────────────────────
+      // â”€â”€ SALES INVOICE: THREE SEPARATE JOURNAL ENTRIES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      //
+      //  JE-1  Invoice Recognition   (always)
+      //        Dr Trade Receivables = gross invoice (before TDS deduction)
+      //        Cr Sales / Revenue, GST, TCS, Adjustments
+      //
+      //  JE-2  TDS                   (only when TDS is selected)
+      //        Dr TDS Receivable
+      //        Cr Trade Receivables  (reduces the gross receivable by TDS amount)
+      //
+      //  JE-3  Payment Receipt       (only when Full Payment / Partial Payment)
+      //        Dr Cash / Bank
+      //        Cr Trade Receivables  (clears the receivable to the extent paid)
+
+      const tdsAmt   = (invoice.tdsTcsMode === 'TDS') ? (parseFloat(invoice.tdsTcsAmount) || 0) : 0;
+      const tcsAmt   = (invoice.tdsTcsMode === 'TCS') ? (parseFloat(invoice.tdsTcsAmount) || 0) : 0;
+      const adjAmt   = parseFloat(invoice.adjustments) || 0;
       const invTotal = parseFloat(invoice.total) || 0;
-      const unpaidAmount = Math.max(0, invTotal - paidAmount);
 
-      if (unpaidAmount > 0) {
-        const trLedgerId = getOrCreateSystemLedger('Trade Receivables', 'sg-tr');
-        const trName = (coaLedgers.find(l => l.id == trLedgerId) || { name: 'Trade Receivables' }).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'By',
-          particular: trName,
-          debit: unpaidAmount.toFixed(2),
-          credit: ''
-        });
+      // Gross receivable = net total + TDS (since net total already has TDS deducted)
+      const grossReceivable = invTotal + tdsAmt;
+
+      const trLedgerId = getOrCreateSystemLedger('Trade Receivables', 'sg-tr');
+      const trName = (coaLedgers.find(l => l.id == trLedgerId) || { name: 'Trade Receivables' }).name;
+
+      // â”€â”€â”€ JE-1 rows: Invoice Recognition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const invoiceJERows = [];
+
+      // Dr Trade Receivables = gross invoice value (full amount before TDS deduction)
+      invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'By', particular: trName, debit: grossReceivable.toFixed(2), credit: '' });
+
+      // Dr Adjustments Account (if negative adjustment reduces income)
+      if (adjAmt < 0) {
+        const adjLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+        const adjName = (coaLedgers.find(l => l.id == adjLedgerId) || { name: 'Adjustments Account' }).name;
+        invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'By', particular: adjName, debit: Math.abs(adjAmt).toFixed(2), credit: '' });
       }
 
-      if (paidAmount > 0) {
-        const payAccount = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
-        const payAccountName = payAccount ? payAccount.name : 'Cash Account';
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'By',
-          particular: payAccountName,
-          debit: paidAmount.toFixed(2),
-          credit: ''
-        });
-      }
-
-      if (invoice.tdsTcsMode === 'TDS' && (parseFloat(invoice.tdsTcsAmount) || 0) > 0) {
-        const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
-        const tdsName = (coaLedgers.find(l => l.id == tdsLedgerId) || { name: 'TDS Receivable' }).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'By',
-          particular: tdsName,
-          debit: (parseFloat(invoice.tdsTcsAmount) || 0).toFixed(2),
-          credit: ''
-        });
-      }
-
-      if ((parseFloat(invoice.adjustments) || 0) < 0) {
-        const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
-        const adjName = (coaLedgers.find(l => l.id == adjustmentsLedgerId) || { name: 'Adjustments Account' }).name;
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'By',
-          particular: adjName,
-          debit: Math.abs(parseFloat(invoice.adjustments) || 0).toFixed(2),
-          credit: ''
-        });
-      }
-
-      // Revenue Credit
+      // Cr Revenue
       if (invoice.type === 'Product') {
         let totalRevenue = 0;
         (invoice.rows || []).forEach(r => {
@@ -898,13 +998,7 @@
         if (totalRevenue > 0) {
           const salesLedgerId = getOrCreateSystemLedger('Sales Account', 'sg-rfo');
           const salesName = (coaLedgers.find(l => l.id == salesLedgerId) || { name: 'Sales Account' }).name;
-          journalRows.push({
-            id: journalRows.length + 1,
-            type: 'To',
-            particular: salesName,
-            debit: '',
-            credit: totalRevenue.toFixed(2)
-          });
+          invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: salesName, debit: '', credit: totalRevenue.toFixed(2) });
         }
       } else {
         const revenueByLedger = {};
@@ -918,18 +1012,12 @@
           const revAmt = revenueByLedger[ledgId];
           if (revAmt > 0) {
             const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
-            journalRows.push({
-              id: journalRows.length + 1,
-              type: 'To',
-              particular: ledgerName,
-              debit: '',
-              credit: revAmt.toFixed(2)
-            });
+            invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: ledgerName, debit: '', credit: revAmt.toFixed(2) });
           }
         }
       }
 
-      // GST Credit
+      // Cr GST (CGST+SGST, IGST, or GST Payable)
       let totalGst = 0;
       (invoice.rows || []).forEach(r => {
         const base = invoice.type === 'Product' ? ((parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0)) : (parseFloat(r.baseAmount) || 0);
@@ -944,120 +1032,183 @@
           const sgstAmt = totalGst / 2;
           const cgstLedgerId = getOrCreateSystemLedger('Output CGST', 'sg-ocl');
           const cgstName = (coaLedgers.find(l => l.id == cgstLedgerId) || { name: 'Output CGST' }).name;
-          journalRows.push({ id: journalRows.length + 1, type: 'To', particular: cgstName, debit: '', credit: cgstAmt.toFixed(2) });
+          invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: cgstName, debit: '', credit: cgstAmt.toFixed(2) });
           const sgstLedgerId = getOrCreateSystemLedger('Output SGST', 'sg-ocl');
           const sgstName = (coaLedgers.find(l => l.id == sgstLedgerId) || { name: 'Output SGST' }).name;
-          journalRows.push({ id: journalRows.length + 1, type: 'To', particular: sgstName, debit: '', credit: sgstAmt.toFixed(2) });
+          invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: sgstName, debit: '', credit: sgstAmt.toFixed(2) });
         } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
           const igstLedgerId = getOrCreateSystemLedger('Output IGST', 'sg-ocl');
           const igstName = (coaLedgers.find(l => l.id == igstLedgerId) || { name: 'Output IGST' }).name;
-          journalRows.push({ id: journalRows.length + 1, type: 'To', particular: igstName, debit: '', credit: totalGst.toFixed(2) });
+          invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: igstName, debit: '', credit: totalGst.toFixed(2) });
         } else {
           const gstLedgerId = getOrCreateSystemLedger('GST Payable', 'sg-ocl');
           const gstName = (coaLedgers.find(l => l.id == gstLedgerId) || { name: 'GST Payable' }).name;
-          journalRows.push({ id: journalRows.length + 1, type: 'To', particular: gstName, debit: '', credit: totalGst.toFixed(2) });
+          invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: gstName, debit: '', credit: totalGst.toFixed(2) });
         }
       }
 
-      if (invoice.tdsTcsMode === 'TCS' && (parseFloat(invoice.tdsTcsAmount) || 0) > 0) {
+      // Cr TCS Payable (if TCS â€” collected by seller, added to invoice)
+      if (tcsAmt > 0) {
         const tcsLedgerId = getOrCreateSystemLedger('TCS Payable', 'sg-ocl');
         const tcsName = (coaLedgers.find(l => l.id == tcsLedgerId) || { name: 'TCS Payable' }).name;
-        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: tcsName, debit: '', credit: (parseFloat(invoice.tdsTcsAmount) || 0).toFixed(2) });
+        invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: tcsName, debit: '', credit: tcsAmt.toFixed(2) });
       }
 
-      if ((parseFloat(invoice.adjustments) || 0) > 0) {
-        const adjustmentsLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
-        const adjName = (coaLedgers.find(l => l.id == adjustmentsLedgerId) || { name: 'Adjustments Account' }).name;
-        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: adjName, debit: '', credit: (parseFloat(invoice.adjustments) || 0).toFixed(2) });
+      // Cr Adjustments Account (if positive adjustment increases income)
+      if (adjAmt > 0) {
+        const adjLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
+        const adjName = (coaLedgers.find(l => l.id == adjLedgerId) || { name: 'Adjustments Account' }).name;
+        invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: adjName, debit: '', credit: adjAmt.toFixed(2) });
       }
 
-      // Check linked Sales Order advance
-      let orderAdvanceAmount = 0;
+      // Advance settlement from linked Sales Order (if any)
       if (invoice.orderNo) {
         const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === invoice.orderNo.toLowerCase());
         if (linkedOrder) {
+          let orderAdvanceAmount = 0;
           if (linkedOrder.paymentStatus === 'Full Payment') orderAdvanceAmount = parseFloat(linkedOrder.total) || 0;
           else if (linkedOrder.paymentStatus === 'Partial Payment') orderAdvanceAmount = parseFloat(linkedOrder.paymentAmount) || 0;
+          if (orderAdvanceAmount > 0) {
+            const advanceLedgerId = getOrCreateSystemLedger('Advance from Customers', 'sg-ocl');
+            const advanceLedgerName = (coaLedgers.find(l => l.id == advanceLedgerId) || { name: 'Advance from Customers' }).name;
+            invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'By', particular: advanceLedgerName, debit: orderAdvanceAmount.toFixed(2), credit: '' });
+            const settledAmount = Math.min(invTotal, orderAdvanceAmount);
+            const excessAmount  = Math.max(0, orderAdvanceAmount - invTotal);
+            if (settledAmount > 0) {
+              invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: trName, debit: '', credit: settledAmount.toFixed(2) });
+            }
+            if (excessAmount > 0) {
+              const refundLedgerId = getOrCreateSystemLedger('Refund Payable', 'sg-ocl');
+              const refundLedgerName = (coaLedgers.find(l => l.id == refundLedgerId) || { name: 'Refund Payable' }).name;
+              invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: refundLedgerName, debit: '', credit: excessAmount.toFixed(2) });
+            }
+          }
         }
       }
-      if (orderAdvanceAmount > 0) {
-        const advanceLedgerId = getOrCreateSystemLedger('Advance from Customers', 'sg-ocl');
-        const advanceLedgerName = (coaLedgers.find(l => l.id == advanceLedgerId) || { name: 'Advance from Customers' }).name;
-        
-        journalRows.push({
-          id: journalRows.length + 1,
-          type: 'By',
-          particular: advanceLedgerName,
-          debit: orderAdvanceAmount.toFixed(2),
-          credit: ''
-        });
-        
-        const settledAmount = Math.min(invTotal, orderAdvanceAmount);
-        const excessAmount = Math.max(0, orderAdvanceAmount - invTotal);
-        
-        if (settledAmount > 0) {
-          const trLedgerId = getOrCreateSystemLedger('Trade Receivables', 'sg-tr');
-          const trName = (coaLedgers.find(l => l.id == trLedgerId) || { name: 'Trade Receivables' }).name;
-          journalRows.push({
-            id: journalRows.length + 1,
-            type: 'To',
-            particular: trName,
-            debit: '',
-            credit: settledAmount.toFixed(2)
-          });
-        }
-        
-        if (excessAmount > 0) {
-          const refundLedgerId = getOrCreateSystemLedger('Refund Payable', 'sg-ocl');
-          const refundLedgerName = (coaLedgers.find(l => l.id == refundLedgerId) || { name: 'Refund Payable' }).name;
-          journalRows.push({
-            id: journalRows.length + 1,
-            type: 'To',
-            particular: refundLedgerName,
-            debit: '',
-            credit: excessAmount.toFixed(2)
-          });
+
+      // â”€â”€ Create / Update JE-1 (Invoice Recognition) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const invoiceJEId = invoice.journalEntryId || Date.now();
+      const invoiceEntry = {
+        id:              invoiceJEId,
+        date:            invoice.date,
+        voucherNo:       voucherNo,
+        preparedBy:      'Sales Module',
+        departmentId:    '',
+        isBudget:        false,
+        firstParticular: customerName || trName,
+        amount:          fmtNum(invTotal),
+        allRows:         invoiceJERows,
+        narration:       `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`.trim(),
+        jeType:          'invoice',
+      };
+      if (typeof postedEntries !== 'undefined') {
+        if (invoice.journalEntryId) {
+          const idx = postedEntries.findIndex(e => e.id === invoice.journalEntryId);
+          if (idx > -1) { postedEntries[idx] = invoiceEntry; }
+          else { postedEntries.unshift(invoiceEntry); }
+        } else {
+          postedEntries.unshift(invoiceEntry);
         }
       }
-    }
-    
-    let execText = '';
-    if (invoice.salesExecutiveId && typeof ohEmployees !== 'undefined') {
-      const execEmp = ohEmployees.find(e => e.id == invoice.salesExecutiveId);
-      if (execEmp) {
-        execText = ` Sales Executive: ${execEmp.name}.`;
+
+      // â”€â”€ Create / Update JE-2 (TDS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Dr TDS Receivable / Cr Trade Receivables
+      // (reduces the gross receivable â€” customer deducts TDS at source)
+      let tdsJEId = '';
+      if (tdsAmt > 0) {
+        if (invoice.tdsJournalEntryId && typeof postedEntries !== 'undefined') {
+          postedEntries = postedEntries.filter(e => e.id !== invoice.tdsJournalEntryId);
+        }
+        tdsJEId = invoice.tdsJournalEntryId || (Date.now() + 1);
+        const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
+        const tdsLedgerName = (coaLedgers.find(l => l.id == tdsLedgerId) || { name: 'TDS Receivable' }).name;
+        const tdsJERows = [
+          { id: 1, type: 'By', particular: tdsLedgerName, debit: tdsAmt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: customerName,  debit: '',                credit: tdsAmt.toFixed(2) },
+        ];
+        const tdsEntry = {
+          id:              tdsJEId,
+          date:            invoice.date,
+          voucherNo:       `TDS-${invoice.invoiceNo}`,
+          preparedBy:      'Sales Module',
+          departmentId:    '',
+          isBudget:        false,
+          firstParticular: tdsLedgerName,
+          amount:          fmtNum(tdsAmt),
+          allRows:         tdsJERows,
+          narration:       `TDS deducted by customer ${customerName} against Invoice No. ${invoice.invoiceNo} @ ${invoice.tdsTcsRate}%.`.trim(),
+          jeType:          'tds',
+        };
+        if (typeof postedEntries !== 'undefined') {
+          postedEntries.unshift(tdsEntry);
+        }
+      } else if (invoice.tdsJournalEntryId && typeof postedEntries !== 'undefined') {
+        // TDS removed on edit â€” remove the old TDS JE
+        postedEntries = postedEntries.filter(e => e.id !== invoice.tdsJournalEntryId);
       }
+
+      // â”€â”€ Create / Update JE-3 (Payment Receipt) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Dr Cash / Bank / Payment Account / Cr Trade Receivables
+      // (clears receivable to the extent of cash received)
+      let paymentJEId = '';
+      if (paidAmount > 0) {
+        if (invoice.paymentJournalEntryId && typeof postedEntries !== 'undefined') {
+          postedEntries = postedEntries.filter(e => e.id !== invoice.paymentJournalEntryId);
+        }
+        paymentJEId = invoice.paymentJournalEntryId || (Date.now() + 2);
+        const payAcct = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
+        const payAccountName = payAcct ? payAcct.name : 'Cash Account';
+        const payJERows = [
+          { id: 1, type: 'By', particular: payAccountName, debit: paidAmount.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: customerName,   debit: '',                   credit: paidAmount.toFixed(2) },
+        ];
+        const paymentEntry = {
+          id:              paymentJEId,
+          date:            invoice.date,
+          voucherNo:       `PAY-${invoice.invoiceNo}`,
+          preparedBy:      'Sales Module',
+          departmentId:    '',
+          isBudget:        false,
+          firstParticular: payAccountName,
+          amount:          fmtNum(paidAmount),
+          allRows:         payJERows,
+          narration:       `Payment received from customer ${customerName} against Invoice No. ${invoice.invoiceNo}. Status: ${invoice.paymentStatus}.`.trim(),
+          jeType:          'payment',
+        };
+        if (typeof postedEntries !== 'undefined') {
+          postedEntries.unshift(paymentEntry);
+        }
+      } else if (invoice.paymentJournalEntryId && typeof postedEntries !== 'undefined') {
+        // Payment removed on edit â€” remove the old Payment JE
+        postedEntries = postedEntries.filter(e => e.id !== invoice.paymentJournalEntryId);
+      }
+
+      refreshAllReports();
+      return { invoiceJEId, tdsJEId, paymentJEId };
     }
 
+    // â”€â”€ Order / Return: single combined journal entry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const entryId = invoice.journalEntryId || Date.now();
-    const prefix = isRet ? 'SR-' : (isOrd ? 'SO-' : 'SV-');
-    const voucherNo = (invoice.invoiceNo.startsWith(prefix) || invoice.invoiceNo.startsWith('INV-')) ? invoice.invoiceNo : `${prefix}${invoice.invoiceNo}`;
-
     const entry = {
-      id:             entryId,
-      date:           invoice.date,
-      voucherNo:      voucherNo,
-      preparedBy:     'Sales Module',
-      departmentId:   '',
-      isBudget:       false,
-      firstParticular: (paidAmount > 0) ? (coaLedgers.find(l => l.id == invoice.paymentAccountId)?.name || 'Cash Account') : 'Trade Receivables',
-      amount:         isOrd ? fmtNum(paidAmount) : fmtNum(invoice.total),
-      allRows:        journalRows,
-      narration:      isOrd
+      id:              entryId,
+      date:            invoice.date,
+      voucherNo:       voucherNo,
+      preparedBy:      'Sales Module',
+      departmentId:    '',
+      isBudget:        false,
+      firstParticular: customerName || ((paidAmount > 0) ? (coaLedgers.find(l => l.id == invoice.paymentAccountId)?.name || 'Cash Account') : 'Trade Receivables'),
+      amount:          isOrd ? fmtNum(paidAmount) : fmtNum(invoice.total),
+      allRows:         journalRows,
+      narration:       isOrd
         ? `Advance received against Sales Order No. ${invoice.invoiceNo} from customer ${customerName}.${execText} ${invoice.notes || ''}`.trim()
-        : (isRet
-          ? `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`.trim()
-          : `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`.trim()),
+        : `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`.trim(),
     };
-    
+
     if (typeof postedEntries !== 'undefined') {
       if (invoice.journalEntryId) {
         const idx = postedEntries.findIndex(e => e.id === invoice.journalEntryId);
-        if (idx > -1) {
-          postedEntries[idx] = entry;
-        } else {
-          postedEntries.unshift(entry);
-        }
+        if (idx > -1) { postedEntries[idx] = entry; }
+        else { postedEntries.unshift(entry); }
       } else {
         postedEntries.unshift(entry);
       }
@@ -1066,7 +1217,7 @@
     return entryId;
   }
 
-  // ── Global Window Exports ──
+  // â”€â”€ Global Window Exports â”€â”€
   window.postSalesInvoice = postSalesInvoice;
   window.saveSalesDraft = saveSalesDraft;
   window.loadSalesInvoice = loadSalesInvoice;

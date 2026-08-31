@@ -613,7 +613,7 @@
     });
 
     postedEntries.forEach(entry => {
-      if ((entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-')) return;
+      if ((entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-') || (entry.voucherNo || '').startsWith('PAY-')) return;
       (entry.allRows || []).forEach(row => {
         const rowPart = row.particular.trim().toLowerCase();
         const isCustName = (rowPart === customer.name.toLowerCase());
@@ -648,7 +648,19 @@
     const periodNet = periodInvoiced - periodReceived;
     const closingBalance = openingBalance + periodNet;
 
-    transactions.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    // Sort transactions chronologically: Old to New
+    transactions.sort((a, b) => {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      const cmp = dateA.localeCompare(dateB);
+      if (cmp !== 0) return cmp;
+      const idA = Number(a.id) || 0;
+      const idB = Number(b.id) || 0;
+      if (idA !== idB) return idA - idB;
+      if (a.debit && !b.debit) return -1;
+      if (!a.debit && b.debit) return 1;
+      return 0;
+    });
 
     return {
       customer,
@@ -746,7 +758,19 @@
     const periodNet = periodBilled - periodPaid;
     const closingBalance = openingBalance + periodNet;
 
-    transactions.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    // Sort transactions chronologically: Old to New
+    transactions.sort((a, b) => {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      const cmp = dateA.localeCompare(dateB);
+      if (cmp !== 0) return cmp;
+      const idA = Number(a.id) || 0;
+      const idB = Number(b.id) || 0;
+      if (idA !== idB) return idA - idB;
+      if (a.credit && !b.credit) return -1;
+      if (!a.credit && b.credit) return 1;
+      return 0;
+    });
 
     return {
       supplier,
@@ -829,7 +853,16 @@
       });
     });
 
-    ledgerTrans.sort((a, b) => a.date.localeCompare(b.date));
+    // Sort transactions chronologically: Old to New
+    ledgerTrans.sort((a, b) => {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      const cmp = dateA.localeCompare(dateB);
+      if (cmp !== 0) return cmp;
+      const idA = Number(a.id) || 0;
+      const idB = Number(b.id) || 0;
+      return idA - idB;
+    });
 
     let rowsHtml = '';
     const mainGroup = getLedgerMainGroup(ledger);
@@ -1161,7 +1194,16 @@
       });
     });
 
-    ledgerTrans.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    // Sort transactions chronologically: Old to New
+    ledgerTrans.sort((a, b) => {
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      const cmp = dateA.localeCompare(dateB);
+      if (cmp !== 0) return cmp;
+      const idA = Number(a.id) || 0;
+      const idB = Number(b.id) || 0;
+      return idA - idB;
+    });
 
     const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
     const companyName = activeCo.name || 'KYA Accounting';

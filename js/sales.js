@@ -883,8 +883,8 @@ function isSalesReturnInvoiceSelected() {
             <td style="width: 140px;">
               <input type="text" inputmode="decimal" class="sales-row-amount-input je-input" value="${row.amount === 0 ? '' : row.amount.toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; width: 100%;" />
             </td>
-            <td style="width: 50px; text-align: center;">
-              <button type="button" class="sales-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
+            <td class="sales-del-cell" style="width: 50px; text-align: center; border: none !important; background: transparent !important; box-shadow: none !important;">
+              <button type="button" class="sales-del-row" style="background: none; border: none !important; outline: none !important; box-shadow: none !important; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
                 <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
                   <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                 </svg>
@@ -935,8 +935,8 @@ function isSalesReturnInvoiceSelected() {
             <td style="width: 140px;">
               <input type="text" inputmode="decimal" class="sales-row-amount-input je-input" value="${row.amount === 0 ? '' : row.amount.toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; width: 100%;" />
             </td>
-            <td style="width: 50px; text-align: center;">
-              <button type="button" class="sales-del-row" style="background: none; border: none; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
+            <td class="sales-del-cell" style="width: 50px; text-align: center; border: none !important; background: transparent !important; box-shadow: none !important;">
+              <button type="button" class="sales-del-row" style="background: none; border: none !important; outline: none !important; box-shadow: none !important; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
                 <svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;">
                   <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                 </svg>

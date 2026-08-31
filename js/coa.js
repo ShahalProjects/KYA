@@ -1226,12 +1226,14 @@
           cancelHidePartyHoverCard();
         });
         _kyaPartyHoverCardEl.addEventListener('mouseleave', () => {
-          // Never auto-close editable card on mouseleave!
-          if (_kyaPartyCardIsEditable) return;
-          scheduleHidePartyHoverCard(350);
+          scheduleHidePartyHoverCard(_kyaPartyCardIsEditable ? 2000 : 350);
         });
         _kyaPartyHoverCardEl.addEventListener('click', (e) => {
+          cancelHidePartyHoverCard();
           e.stopPropagation();
+        });
+        _kyaPartyHoverCardEl.addEventListener('focusin', () => {
+          cancelHidePartyHoverCard();
         });
       }
     }
@@ -1245,11 +1247,7 @@
     }
   }
 
-  function scheduleHidePartyHoverCard(delay = 300) {
-    if (_kyaPartyCardIsEditable) {
-      // Keep editable card stable!
-      return;
-    }
+  function scheduleHidePartyHoverCard(delay = 2000) {
     cancelHidePartyHoverCard();
     _kyaHoverHideTimeout = setTimeout(() => {
       hidePartyHoverCard();
@@ -1862,21 +1860,44 @@
       }
     };
 
-    // Hover on trigger box when party is selected: show editable details stably
+    let triggerHoverTimer = null;
+    const cancelTriggerHoverTimer = () => {
+      if (triggerHoverTimer) {
+        clearTimeout(triggerHoverTimer);
+        triggerHoverTimer = null;
+      }
+    };
+
+    // Hover on trigger box when party is selected: show editable details stably after 1 second hover
     trigger.addEventListener('mouseenter', () => {
+      cancelTriggerHoverTimer();
+      cancelHidePartyHoverCard();
       if (dropdown.style.display === 'flex') return;
       const partyId = realSelect.value;
       if (!partyId) return;
       const party = findPartyById(partyId, partyType);
       if (party) {
-        cancelHidePartyHoverCard();
-        positionAndShowPartyHoverCard(trigger, party, partyType, true, context);
+        if (_kyaPartyHoverCardEl && _kyaPartyHoverCardEl.style.display === 'block' && _kyaPartyCardIsEditable) {
+          return;
+        }
+        triggerHoverTimer = setTimeout(() => {
+          if (dropdown.style.display === 'flex') return;
+          const currentPartyId = realSelect.value;
+          if (!currentPartyId) return;
+          const currentParty = findPartyById(currentPartyId, partyType);
+          if (currentParty) {
+            cancelHidePartyHoverCard();
+            positionAndShowPartyHoverCard(trigger, currentParty, partyType, true, context);
+          }
+        }, 1000);
       }
     });
 
     trigger.addEventListener('mouseleave', () => {
-      if (_kyaPartyCardIsEditable) return;
-      scheduleHidePartyHoverCard(350);
+      cancelTriggerHoverTimer();
+      if (_kyaPartyHoverCardEl && _kyaPartyHoverCardEl.style.display === 'block') {
+        scheduleHidePartyHoverCard(_kyaPartyCardIsEditable ? 2000 : 350);
+      }
     });
 
     const populateList = (filter = '') => {
@@ -1995,6 +2016,7 @@
     };
 
     trigger.addEventListener('click', (e) => {
+      cancelTriggerHoverTimer();
       e.stopPropagation();
       const isOpen = dropdown.style.display === 'flex';
       hidePartyHoverCard();
@@ -2017,6 +2039,7 @@
     });
 
     dropdown.addEventListener('scroll', () => {
+      cancelTriggerHoverTimer();
       hidePartyHoverCard();
     });
 
@@ -2027,6 +2050,7 @@
     });
 
     realSelect.addEventListener('change', () => {
+      cancelTriggerHoverTimer();
       updateTriggerText();
     });
 
@@ -2039,6 +2063,7 @@
         populateList();
       },
       close: () => {
+        cancelTriggerHoverTimer();
         dropdown.style.display = 'none';
         hidePartyHoverCard();
       }
