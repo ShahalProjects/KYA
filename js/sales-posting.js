@@ -566,19 +566,27 @@
       uploadedDoc: window._salesUploadedDoc || null,
       journalEntryId: existingJournalEntryId || '',
       tdsJournalEntryId: existingPostedInv ? (existingPostedInv.tdsJournalEntryId || '') : '',
+      tdsVoucherNo: existingPostedInv ? (existingPostedInv.tdsVoucherNo || '') : '',
       paymentJournalEntryId: existingPostedInv ? (existingPostedInv.paymentJournalEntryId || '') : '',
+      paymentVoucherNo: existingPostedInv ? (existingPostedInv.paymentVoucherNo || '') : '',
       postedAt: isEditPosted ? (existingPostedInv?.postedAt || Date.now()) : Date.now()
     };
 
     // Post to accounting journal entries (flow to Trial Balance, Ledgers, Voucher Desk).
-    // For Sales Invoices returns { invoiceJEId, tdsJEId, paymentJEId };
+    // For Sales Invoices returns { invoiceJEId, tdsJEId, tdsVoucherNo, paymentJEId, paymentVoucherNo };
     // for Orders/Returns returns a plain entry ID string.
     const jeResult = postSalesVoucherToJournal(invoiceData);
     if (jeResult) {
       if (typeof jeResult === 'object') {
         if (jeResult.invoiceJEId) invoiceData.journalEntryId        = jeResult.invoiceJEId;
-        if (jeResult.tdsJEId)     invoiceData.tdsJournalEntryId     = jeResult.tdsJEId;
-        if (jeResult.paymentJEId) invoiceData.paymentJournalEntryId = jeResult.paymentJEId;
+        if (jeResult.tdsJEId) {
+          invoiceData.tdsJournalEntryId = jeResult.tdsJEId;
+          if (jeResult.tdsVoucherNo) invoiceData.tdsVoucherNo = jeResult.tdsVoucherNo;
+        }
+        if (jeResult.paymentJEId) {
+          invoiceData.paymentJournalEntryId = jeResult.paymentJEId;
+          if (jeResult.paymentVoucherNo) invoiceData.paymentVoucherNo = jeResult.paymentVoucherNo;
+        }
       } else {
         invoiceData.journalEntryId = jeResult;
       }
@@ -1111,15 +1119,30 @@
         }
       }
 
-      // â”€â”€ Create / Update JE-2 (TDS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Create / Update JE-2 (TDS) ──────────────────────────────────
       // Dr TDS Receivable / Cr Trade Receivables
-      // (reduces the gross receivable â€” customer deducts TDS at source)
+      // (reduces the gross receivable — customer deducts TDS at source)
       let tdsJEId = '';
+      let tdsVoucherNo = '';
       if (tdsAmt > 0) {
         if (invoice.tdsJournalEntryId && typeof postedEntries !== 'undefined') {
           postedEntries = postedEntries.filter(e => e.id !== invoice.tdsJournalEntryId);
         }
         tdsJEId = invoice.tdsJournalEntryId || (Date.now() + 1);
+        const existingTdsEntry = (typeof postedEntries !== 'undefined' && invoice.tdsJournalEntryId)
+          ? postedEntries.find(e => String(e.id) === String(invoice.tdsJournalEntryId))
+          : null;
+        if (existingTdsEntry && existingTdsEntry.voucherNo && existingTdsEntry.voucherNo.startsWith('JV-')) {
+          tdsVoucherNo = existingTdsEntry.voucherNo;
+        } else if (invoice.tdsVoucherNo && invoice.tdsVoucherNo.startsWith('JV-')) {
+          tdsVoucherNo = invoice.tdsVoucherNo;
+        } else if (typeof getNextJournalVoucherNo === 'function') {
+          tdsVoucherNo = getNextJournalVoucherNo(invoice.date);
+        } else {
+          const yr = invoice.date ? new Date(invoice.date).getFullYear() : new Date().getFullYear();
+          tdsVoucherNo = `JV-${yr}-001`;
+        }
+
         const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
         const tdsLedgerName = (coaLedgers.find(l => l.id == tdsLedgerId) || { name: 'TDS Receivable' }).name;
         const tdsJERows = [
@@ -1129,7 +1152,7 @@
         const tdsEntry = {
           id:              tdsJEId,
           date:            invoice.date,
-          voucherNo:       `TDS-${invoice.invoiceNo}`,
+          voucherNo:       tdsVoucherNo,
           preparedBy:      'Sales Module',
           departmentId:    '',
           isBudget:        false,
@@ -1143,19 +1166,34 @@
           postedEntries.unshift(tdsEntry);
         }
       } else if (invoice.tdsJournalEntryId && typeof postedEntries !== 'undefined') {
-        // TDS removed on edit â€” remove the old TDS JE
+        // TDS removed on edit — remove the old TDS JE
         postedEntries = postedEntries.filter(e => e.id !== invoice.tdsJournalEntryId);
       }
 
-      // â”€â”€ Create / Update JE-3 (Payment Receipt) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ─── Create / Update JE-3 (Payment Receipt) ──────────────────────
       // Dr Cash / Bank / Payment Account / Cr Trade Receivables
       // (clears receivable to the extent of cash received)
       let paymentJEId = '';
+      let paymentVoucherNo = '';
       if (paidAmount > 0) {
         if (invoice.paymentJournalEntryId && typeof postedEntries !== 'undefined') {
           postedEntries = postedEntries.filter(e => e.id !== invoice.paymentJournalEntryId);
         }
         paymentJEId = invoice.paymentJournalEntryId || (Date.now() + 2);
+        const existingPaymentEntry = (typeof postedEntries !== 'undefined' && invoice.paymentJournalEntryId)
+          ? postedEntries.find(e => String(e.id) === String(invoice.paymentJournalEntryId))
+          : null;
+        if (existingPaymentEntry && existingPaymentEntry.voucherNo && existingPaymentEntry.voucherNo.startsWith('JV-')) {
+          paymentVoucherNo = existingPaymentEntry.voucherNo;
+        } else if (invoice.paymentVoucherNo && invoice.paymentVoucherNo.startsWith('JV-')) {
+          paymentVoucherNo = invoice.paymentVoucherNo;
+        } else if (typeof getNextJournalVoucherNo === 'function') {
+          paymentVoucherNo = getNextJournalVoucherNo(invoice.date);
+        } else {
+          const yr = invoice.date ? new Date(invoice.date).getFullYear() : new Date().getFullYear();
+          paymentVoucherNo = `JV-${yr}-001`;
+        }
+
         const payAcct = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
         const payAccountName = payAcct ? payAcct.name : 'Cash Account';
         const payJERows = [
@@ -1165,7 +1203,7 @@
         const paymentEntry = {
           id:              paymentJEId,
           date:            invoice.date,
-          voucherNo:       `PAY-${invoice.invoiceNo}`,
+          voucherNo:       paymentVoucherNo,
           preparedBy:      'Sales Module',
           departmentId:    '',
           isBudget:        false,
@@ -1184,7 +1222,7 @@
       }
 
       refreshAllReports();
-      return { invoiceJEId, tdsJEId, paymentJEId };
+      return { invoiceJEId, tdsJEId, tdsVoucherNo, paymentJEId, paymentVoucherNo };
     }
 
     // â”€â”€ Order / Return: single combined journal entry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

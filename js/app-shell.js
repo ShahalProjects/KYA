@@ -418,9 +418,10 @@
       if (tooltipEl) tooltipEl.classList.remove('visible');
 
       // Dispatch window resize after transition so active components/tables adjust smoothly
+      // 320ms = sidebar spring duration (310ms) + small buffer
       setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
-      }, 260);
+      }, 320);
     }
 
     function toggleSidebar() {
