@@ -976,60 +976,65 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Central control to manage, view, and organize all voucher transactions</div>
               </div>
             </div>
-            <!-- 3-dot more options dropdown -->
-            <div class="rpt-more-wrap">
-              <button class="rpt-more-btn" id="vdMoreBtn" title="More Options" type="button" aria-label="More Options">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="1.5"></circle>
-                  <circle cx="12" cy="5" r="1.5"></circle>
-                  <circle cx="12" cy="19" r="1.5"></circle>
-                </svg>
-              </button>
-              <div class="rpt-more-dropdown" id="vdMoreDropdown">
-                <!-- Export Submenu -->
-                <div class="rpt-submenu-wrap" id="vdExportSubmenuWrap">
-                  <button class="rpt-menu-item rpt-submenu-btn" id="vdExportMenuBtn" type="button">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                      </svg>
-                      <span>Export</span>
-                    </div>
-                    <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
-                      <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </button>
-                  <div class="rpt-submenu-dropdown" id="vdExportSubmenu">
-                    <button class="rpt-menu-item" id="vdExportPdf" type="button">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                      </svg>
-                      PDF
-                    </button>
-                    <button class="rpt-menu-item" id="vdExportExcel" type="button">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="8" y1="13" x2="16" y2="17"></line>
-                        <line x1="16" y1="13" x2="8" y2="17"></line>
-                      </svg>
-                      Excel
-                    </button>
-                  </div>
-                </div>
-                <div class="rpt-menu-sep"></div>
-                <button class="rpt-menu-item" id="vdToggleSelectMode" type="button" style="width: 100%; text-align: left; display: flex; align-items: center; gap: 10px;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="4"/>
-                    <path d="m9 12 2 2 4-4"/>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="date" id="vdDateFrom" class="cl-glass-control" value="2024-04-01" style="width: 125px;" />
+              <input type="date" id="vdDateTo" class="cl-glass-control" value="2025-03-31" style="width: 125px;" />
+
+              <!-- 3-dot more options dropdown -->
+              <div class="rpt-more-wrap" style="position: relative;">
+                <button class="rpt-more-btn" id="vdMoreBtn" title="More Options" type="button" aria-label="More Options">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="1.5"></circle>
+                    <circle cx="12" cy="5" r="1.5"></circle>
+                    <circle cx="12" cy="19" r="1.5"></circle>
                   </svg>
-                  <span id="vdToggleSelectText">Select</span>
                 </button>
+                <div class="rpt-more-dropdown" id="vdMoreDropdown" style="top: calc(100% + 8px); right: 0; min-width: 170px;">
+                  <!-- Export Submenu -->
+                  <div class="rpt-submenu-wrap" id="vdExportSubmenuWrap">
+                    <button class="rpt-menu-item rpt-submenu-btn" id="vdExportMenuBtn" type="button">
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>Export</span>
+                      </div>
+                      <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
+                        <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                    <div class="rpt-submenu-dropdown" id="vdExportSubmenu">
+                      <button class="rpt-menu-item" id="vdExportPdf" type="button">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="16" y1="13" x2="8" y2="13"></line>
+                          <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                        PDF
+                      </button>
+                      <button class="rpt-menu-item" id="vdExportExcel" type="button">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="8" y1="13" x2="16" y2="17"></line>
+                          <line x1="16" y1="13" x2="8" y2="17"></line>
+                        </svg>
+                        Excel
+                      </button>
+                    </div>
+                  </div>
+                  <div class="rpt-menu-sep"></div>
+                  <button class="rpt-menu-item" id="vdToggleSelectMode" type="button" style="width: 100%; text-align: left; display: flex; align-items: center; gap: 10px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="4"/>
+                      <path d="m9 12 2 2 4-4"/>
+                    </svg>
+                    <span id="vdToggleSelectText">Select</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1730,30 +1735,35 @@
       <!-- Profit & Loss Panel -->
       <div id="panel-pnl" role="region" aria-label="Profit and Loss Statement" style="display:none">
 
-        <!-- Layout Switcher Option (Vertical / Horizontal) -->
+        <!-- Layout Switcher Option (Profit and Loss / Notes to Accounts) -->
         <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 20px;">
-          <button id="pnlLayoutVertical" class="btn btn-primary" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+          <button id="pnlLayoutSchedule" class="btn btn-primary" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
             <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
-              <rect x="2" y="2" width="12" height="5" rx="1" stroke="currentColor" stroke-width="1.8"/>
-              <rect x="2" y="9" width="12" height="5" rx="1" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M2.5 3.5C2.5 2.67157 3.17157 2 4 2H12C12.8284 2 13.5 2.67157 13.5 3.5V12.5C13.5 13.3284 12.8284 14 12 14H4C3.17157 14 2.5 13.3284 2.5 12.5V3.5Z" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M2.5 6H13.5" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M6 6V14" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M10 6V14" stroke="currentColor" stroke-width="1.4"/>
             </svg>
-            Vertical
+            Profit and Loss
           </button>
-          <button id="pnlLayoutHorizontal" class="btn-sales-action" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
+          <button id="pnlLayoutNotes" class="btn-sales-action" type="button" style="height: 38px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;">
             <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
-              <rect x="2" y="2" width="5" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
-              <rect x="9" y="2" width="5" height="12" rx="1" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M3 2.5C3 1.94772 3.44772 1.5 4 1.5H9.5L13 5V13.5C13 14.0523 12.5523 14.5 12 14.5H4C3.44772 14.5 3 14.0523 3 13.5V2.5Z" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M9.5 1.5V5H13" stroke="currentColor" stroke-width="1.4"/>
+              <line x1="5.5" y1="7.5" x2="10.5" y2="7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <line x1="5.5" y1="10" x2="10.5" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <line x1="5.5" y1="12.5" x2="8.5" y2="12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
             </svg>
-            Horizontal
+            Notes to Accounts
           </button>
         </div>
 
         <!-- P&L Card -->
         <div class="table-card" style="padding: 24px 28px;">
-          <!-- Colored header strip -->
+          <!-- Colored header strip (Matching Cashline Books Blue title card) -->
           <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
             <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
-              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: #fff;">
                 <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
                   <path d="M2 14h12M3 11l3-4 3 3 5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                   <path d="M11 4h3v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1764,95 +1774,78 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Statement of Income and Expenses as per Schedule III</div>
               </div>
             </div>
-            <!-- 3-dot more options dropdown -->
-            <div class="rpt-more-wrap">
-              <button class="rpt-more-btn" id="pnlMoreBtn" title="More Options" type="button" aria-label="More Options">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="1.5"></circle>
-                  <circle cx="12" cy="5" r="1.5"></circle>
-                  <circle cx="12" cy="19" r="1.5"></circle>
-                </svg>
-              </button>
-              <div class="rpt-more-dropdown" id="pnlMoreDropdown">
-                <!-- Export Submenu -->
-                <div class="rpt-submenu-wrap" id="pnlExportSubmenuWrap">
-                  <button class="rpt-menu-item rpt-submenu-btn" id="pnlExportMenuBtn" type="button">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
+
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="date" id="pnlDateFrom" class="cl-glass-control" value="2024-04-01" style="width: 125px;" />
+              <input type="date" id="pnlDateTo" class="cl-glass-control" value="2025-03-31" style="width: 125px;" />
+              
+              <!-- Comparison Date Inputs (When Enabled) -->
+              <div class="rpt-compare-date-wrap" id="pnlCompareDateWrap" style="display: none; align-items: center; gap: 8px;">
+                <input type="date" id="pnlCompareDateFrom" class="cl-glass-control" style="width: 125px;" />
+                <input type="date" id="pnlCompareDateTo" class="cl-glass-control" style="width: 125px;" />
+              </div>
+
+              <!-- 3-dot more options dropdown -->
+              <div class="rpt-more-wrap" style="position: relative;">
+                <button class="rpt-more-btn" id="pnlMoreBtn" title="More Options" type="button" aria-label="More Options">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="1.5"></circle>
+                    <circle cx="12" cy="5" r="1.5"></circle>
+                    <circle cx="12" cy="19" r="1.5"></circle>
+                  </svg>
+                </button>
+                <div class="rpt-more-dropdown" id="pnlMoreDropdown" style="top: calc(100% + 8px); right: 0; min-width: 170px;">
+                  <!-- Export Submenu -->
+                  <div class="rpt-submenu-wrap" id="pnlExportSubmenuWrap">
+                    <button class="rpt-menu-item rpt-submenu-btn" id="pnlExportMenuBtn" type="button">
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>Export</span>
+                      </div>
+                      <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
+                        <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>
-                      <span>Export</span>
+                    </button>
+                    <div class="rpt-submenu-dropdown" id="pnlExportSubmenu">
+                      <button class="rpt-menu-item" id="pnlExportPdf" type="button">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="16" y1="13" x2="8" y2="13"></line>
+                          <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                        PDF
+                      </button>
+                      <button class="rpt-menu-item" id="pnlExportExcel" type="button">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="8" y1="13" x2="16" y2="17"></line>
+                          <line x1="16" y1="13" x2="8" y2="17"></line>
+                        </svg>
+                        Excel
+                      </button>
                     </div>
-                    <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
-                      <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </button>
-                  <div class="rpt-submenu-dropdown" id="pnlExportSubmenu">
-                    <button class="rpt-menu-item" id="pnlExportPdf" type="button">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                      </svg>
-                      PDF
-                    </button>
-                    <button class="rpt-menu-item" id="pnlExportExcel" type="button">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="8" y1="13" x2="16" y2="17"></line>
-                        <line x1="16" y1="13" x2="8" y2="17"></line>
-                      </svg>
-                      Excel
-                    </button>
                   </div>
-                </div>
-                <div class="rpt-menu-sep"></div>
-                <button class="rpt-menu-item" id="pnlExpandAll" type="button">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                  Expand All
-                </button>
-                <button class="rpt-menu-item" id="pnlCollapseAll" type="button">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
-                  Collapse All
-                </button>
-                <div class="rpt-menu-sep"></div>
-                <label class="rpt-menu-chk">
-                  <input type="checkbox" id="pnlCompareCheck"> Comparison
-                </label>
-              </div>
-            </div>
-          </div>
-          <!-- P&L Toolbar -->
-          <div class="rpt-toolbar">
-            <div class="rpt-tb-left">
-              <div class="rpt-fg">
-                <label for="pnlDateFrom">Date From</label>
-                <input type="date" id="pnlDateFrom" class="rpt-date-inp">
-              </div>
-              <div class="rpt-fg">
-                <label for="pnlDateTo">Date To</label>
-                <input type="date" id="pnlDateTo" class="rpt-date-inp">
-              </div>
-              <div class="rpt-compare-date-wrap" id="pnlCompareDateWrap" style="display: none;">
-                <div class="rpt-compare-divider"></div>
-                <div class="rpt-fg">
-                  <label for="pnlCompareDateFrom">Compare From</label>
-                  <input type="date" id="pnlCompareDateFrom" class="rpt-date-inp">
-                </div>
-                <div class="rpt-fg">
-                  <label for="pnlCompareDateTo">Compare To</label>
-                  <input type="date" id="pnlCompareDateTo" class="rpt-date-inp">
+                  <div class="rpt-menu-sep"></div>
+                  <button class="rpt-menu-item" id="pnlExpandAll" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                    Expand All
+                  </button>
+                  <button class="rpt-menu-item" id="pnlCollapseAll" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
+                    Collapse All
+                  </button>
+                  <div class="rpt-menu-sep"></div>
+                  <label class="rpt-menu-chk">
+                    <input type="checkbox" id="pnlCompareCheck"> Comparison
+                  </label>
                 </div>
               </div>
-            </div>
-            <div class="rpt-tb-right">
-              <span style="font-size: 13px; font-weight: 600; color: var(--slate-500); white-space: nowrap;">
-                Fiscal Year: <span style="color: var(--blue-600);">2024-25</span>
-              </span>
             </div>
           </div>
 
@@ -2264,7 +2257,7 @@
                   <div class="vault-action-row">
                     <div class="v-action-text">
                       <span class="v-action-lbl">Sales Voucher Preferences</span>
-                      <span class="v-action-desc">Default settings and numbering rules for Sales Invoices, Orders, and Returns</span>
+                      <span class="v-action-desc">Default settings and numbering rules for Sales Invoices and Reversals</span>
                     </div>
                     <span class="badge badge-secondary" style="font-weight: 700;">Standard</span>
                   </div>
@@ -2538,11 +2531,10 @@
               </svg>
               New Invoice
             </button>
-            <button class="btn-sales-action" id="btnSalesOrder" type="button">
+            <button class="btn-sales-action" id="btnSalesPreInvoice" type="button" aria-label="Pre Invoice" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
               <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
-                <rect x="3" y="3" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
-                <line x1="6" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-                <line x1="6" y1="9" x2="10" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M5 5.5h6M5 8h6M5 10.5h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
               </svg>
               Pre Invoice
             </button>
@@ -2556,7 +2548,7 @@
         </div>
 
         <!-- FORM CARD -->
-        <div class="je-form-card">
+        <div class="je-form-card" id="salesVoucherFormCard">
           <!-- Colored header strip -->
           <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); flex-wrap: wrap; gap: 12px; display: flex; align-items: center; justify-content: space-between;">
             <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
@@ -2647,11 +2639,11 @@
               <!-- Searchable Select for returns -->
               <div class="kya-searchable-select-wrap" id="salesInvoiceSelectWrap" style="display: none; position: relative; width: 100%;">
                 <div class="kya-searchable-select-trigger" id="salesInvoiceSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
-                  <span id="salesInvoiceSelectTriggerText">Select Invoice/Pre Invoice</span>
+                  <span id="salesInvoiceSelectTriggerText">Select Invoice</span>
                   <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
                 <div class="kya-searchable-select-dropdown" id="salesInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
-                  <input type="text" id="salesInvoiceSelectSearch" placeholder="Search invoice or pre invoice..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <input type="text" id="salesInvoiceSelectSearch" placeholder="Search invoice..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
                   <div id="salesInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
                 </div>
               </div>
@@ -2682,26 +2674,6 @@
                 <option value="SEZ Without Tax">SEZ Without Tax</option>
                 <option value="Deemed Export">Deemed Export</option>
               </select>
-            </div>
-            <div class="je-field" id="salesOrderNoContainer">
-              <label for="salesOrderNo">Pre Invoice No.</label>
-              <input type="hidden" id="salesOrderNo" value="" />
-              
-              <!-- Searchable Select for orders -->
-              <div class="kya-searchable-select-wrap" id="salesOrderSelectWrap" style="position: relative;">
-                <button type="button" class="kya-searchable-select-trigger" id="salesOrderSelectTrigger" aria-haspopup="listbox" aria-expanded="false" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box; width: 100%;">
-                  <span id="salesOrderSelectTriggerText">None</span>
-                  <svg viewBox="0 0 20 20" fill="none" style="width: 16px; height: 16px; color: var(--slate-400);">
-                    <path d="M5 7.5l5 5 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
-                <div class="kya-searchable-select-dropdown" id="salesOrderSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; width: 100%; max-height: 220px; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); z-index: 100; overflow-y: auto; padding: 6px; flex-direction: column; box-sizing: border-box;">
-                  <input type="text" id="salesOrderSelectSearch" placeholder="Search pre invoices..." style="width: 100%; height: 32px; border: 1.5px solid var(--slate-200); border-radius: 6px; padding: 0 10px; font-size: 12px; margin-bottom: 6px; outline: none; box-sizing: border-box;" />
-                  <div class="kya-searchable-select-options" id="salesOrderSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;">
-                    <!-- options go here -->
-                  </div>
-                </div>
-              </div>
             </div>
             <div class="je-field">
               <label for="salesExecutive">Sales Executive</label>
@@ -2930,6 +2902,1300 @@
           </div>
 
         </div><!-- /.je-form-card -->
+
+        <!-- PRE INVOICE (KeepOne UI) -->
+        <div class="table-card" id="salesPreInvoiceCard" style="display: none; padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" id="salesPreInvoiceHeaderTitle" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Pre Invoice</div>
+                <div class="je-card-subtitle-text" id="salesPreInvoiceHeaderSubtitle" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Pre Invoicing, Quotations, Proforma, Sales Orders &amp; Delivery Challans</div>
+              </div>
+            </div>
+            <div class="panel-actions" id="salesPreInvoiceHeaderActions" style="display: flex; gap: 8px; align-items: center;"></div>
+          </div>
+
+          <div class="oh-layout">
+            <!-- Sub-tabs (5 modules) -->
+            <div class="oh-sub-tabs" role="tablist" aria-label="Pre Invoice sections">
+
+              <!-- 1. Pre Invoice -->
+              <button class="oh-sub-tab active" id="preInvTabOverview" role="tab" aria-selected="true" aria-controls="preInvContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <rect x="3" y="2" width="14" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M7 6h6M7 10h6M7 14h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Pre Invoice</span>
+              </button>
+
+              <!-- 2. Quotation -->
+              <button class="oh-sub-tab" id="preInvTabQuotation" role="tab" aria-selected="false" aria-controls="preInvContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                    <path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Quotation</span>
+              </button>
+
+              <!-- 3. Proforma Invoice -->
+              <button class="oh-sub-tab" id="preInvTabProforma" role="tab" aria-selected="false" aria-controls="preInvContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Proforma Invoice</span>
+              </button>
+
+              <!-- 4. Sales Order -->
+              <button class="oh-sub-tab" id="preInvTabSalesOrder" role="tab" aria-selected="false" aria-controls="preInvContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    <circle cx="14" cy="13" r="1" fill="currentColor"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Sales Order</span>
+              </button>
+
+              <!-- 5. Delivery Challan -->
+              <button class="oh-sub-tab" id="preInvTabDeliveryChallan" role="tab" aria-selected="false" aria-controls="preInvContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                    <circle cx="4.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                    <circle cx="15.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Delivery Challan</span>
+              </button>
+
+            </div>
+
+            <!-- Content views area -->
+            <div class="oh-content-area" id="preInvContentArea">
+              <!-- Dynamically rendered Upcoming Feature card -->
+            </div>
+          </div>
+        </div><!-- /#salesPreInvoiceCard -->
+
+        <!-- QUOTATION FORM CARD (Full Screen with Back Button) -->
+        <div class="je-form-card" id="salesQuotationFormCard" style="display: none;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500));">
+            <div class="je-card-header-left">
+              <div class="je-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text">Quotation / Estimate</div>
+                <div class="je-card-subtitle-text">Create and manage customer quotations and price proposals</div>
+              </div>
+            </div>
+            <div class="je-card-header-right">
+              <div class="je-voucher-chip" id="quoteChipDisplay">QT-2026-001</div>
+            </div>
+          </div>
+
+          <!-- Navigation row between title card and fields -->
+          <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn" id="btnQuotationBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                <span>Back</span>
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn" id="btnQuoteNavProforma" title="Open Proforma Invoice" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Proforma Invoice</span>
+              </button>
+              <button type="button" class="btn" id="btnQuoteNavSalesOrder" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Sales Order</span>
+              </button>
+              <button type="button" class="btn" id="btnQuoteNavDeliveryChallan" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                  <circle cx="4.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+                  <circle cx="15.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+                </svg>
+                <span>Delivery Challan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Header fields -->
+          <div class="je-fields-bar">
+            <div class="je-field">
+              <label for="quoteDate">Date *</label>
+              <input type="date" id="quoteDate" class="je-input" aria-label="Quotation date" />
+            </div>
+            <div class="je-field">
+              <label for="quoteExpiryDate">Expiry Date</label>
+              <input type="date" id="quoteExpiryDate" class="je-input" aria-label="Quotation expiry date" />
+            </div>
+            <div class="je-field">
+              <label for="quoteNo">Quotes No. *</label>
+              <input type="text" id="quoteNo" class="je-input" placeholder="QT-2026-001" aria-label="Quotation number" />
+            </div>
+            <div class="je-field" id="quoteCustomerWrap">
+              <label for="quoteCustomer">Customer *</label>
+              <select id="quoteCustomer" class="je-input" aria-label="Customer Selection" style="display: none;">
+                <option value="">&mdash; Select Customer &mdash;</option>
+              </select>
+              <div class="kya-searchable-select-wrap" id="quoteCustomerSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="quoteCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                  <span id="quoteCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="quoteCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="quoteCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="quoteCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="je-field">
+              <label for="quoteSupplyType">Supply Type *</label>
+              <select id="quoteSupplyType" class="je-input" aria-label="Supply Type Selection">
+                <option value="Intra-State (CGST + SGST)">Intra-State (CGST + SGST)</option>
+                <option value="Inter-State (IGST)">Inter-State (IGST)</option>
+                <option value="Export (Zero-Rated / LUT)">Export (Zero-Rated / LUT)</option>
+                <option value="SEZ With Tax">SEZ With Tax</option>
+                <option value="SEZ Without Tax">SEZ Without Tax</option>
+                <option value="Deemed Export">Deemed Export</option>
+              </select>
+            </div>
+            <div class="je-field">
+              <label for="quoteSalesExecutive">Sales Executive</label>
+              <select id="quoteSalesExecutive" class="je-input" aria-label="Sales Executive Selection">
+                <option value="">&mdash; Select Sales Executive &mdash;</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Line items table section -->
+          <div class="je-table-section">
+            <div class="je-table-label">Line Items</div>
+            <div class="sales-table-wrap">
+              <table class="sales-table" id="quoteItemTable">
+                <thead>
+                  <tr id="quoteTableHeader">
+                    <th class="col-item" style="text-align: left; padding-left: 8px;">Description</th>
+                    <th class="col-hsn" style="width: 90px; text-align: left;">HSN/SAC</th>
+                    <th class="col-qty" style="width: 65px; text-align: right;">Qty</th>
+                    <th class="col-unit" style="width: 65px; text-align: center;">Unit</th>
+                    <th class="col-rate" style="width: 100px; text-align: right;">Rate / Price</th>
+                    <th class="col-disc" style="width: 105px; text-align: right;">Discount</th>
+                    <th class="col-tax" style="width: 75px; text-align: right; padding-right: 6px;">Tax</th>
+                    <th class="col-amt" style="width: 110px; text-align: right; padding-right: 8px;">Amount</th>
+                    <th class="col-del" style="width: 36px; text-align: center;"></th>
+                  </tr>
+                </thead>
+                <tbody id="quoteItemBody">
+                  <!-- rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Add row button -->
+          <div class="je-add-row-wrap" style="padding-top: 6px;">
+            <button class="je-add-row-btn" id="quoteAddRow" type="button" aria-label="Add item line">
+              <svg viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Row
+            </button>
+          </div>
+
+          <!-- Summary & Totals Grid -->
+          <div class="sales-totals-grid">
+            <!-- Left side Notes / Terms -->
+            <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
+              <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <label for="quoteNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <textarea id="quoteNotes" class="je-narration-input" placeholder="Quotation validity terms, payment milestones, delivery terms..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+              </div>
+            </div>
+
+            <!-- Right side Summary Card -->
+            <div class="sales-totals-right" style="display: flex; flex-direction: column; height: 100%;">
+              <div class="sales-summary-card" style="height: 100%; box-sizing: border-box;">
+                <div class="sales-summary-row">
+                  <span>Sub Total</span>
+                  <span id="quoteSubTotal">₹ 0.00</span>
+                </div>
+
+                <!-- TDS/TCS Toggle -->
+                <div class="sales-summary-row" style="align-items: center;">
+                  <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em;">Tax Deduction / Collection</span>
+                  <div class="sales-tdstcs-wrap" style="width: auto; min-width: 154px;">
+                    <div class="sales-tdstcs-bg none-active" id="quoteTdsTcsBg"></div>
+                    <button class="sales-tdstcs-btn active" id="quoteTdsTcsNone" type="button">None</button>
+                    <button class="sales-tdstcs-btn" id="quoteTdsTcsTds" type="button">TDS</button>
+                    <button class="sales-tdstcs-btn" id="quoteTdsTcsTcs" type="button">TCS</button>
+                  </div>
+                </div>
+
+                <!-- TDS/TCS Amount Row -->
+                <div id="quoteTdsTcsAmountRow" style="display: none;">
+                  <div class="sales-roundoff-input-group sales-tdstcs-amount-group">
+                    <select id="quoteTdsTcsRateSelect" class="sales-tdstcs-rate-select" title="Select TDS/TCS rate">
+                      <option value="0.1">0.1%</option>
+                      <option value="1">1%</option>
+                      <option value="2">2%</option>
+                      <option value="5">5%</option>
+                      <option value="10">10%</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    <div id="quoteTdsTcsRateCustomWrap" class="sales-tdstcs-custom-wrap" style="display: none;">
+                      <input type="number" id="quoteTdsTcsRateCustom" class="sales-tdstcs-custom-input" min="0" max="100" step="0.01" placeholder="0" title="Custom percentage" />
+                      <span class="sales-tdstcs-custom-unit">%</span>
+                    </div>
+                    <div class="sales-tdstcs-divider"></div>
+                    <span id="quoteTdsTcsAmountLabel" class="sales-tdstcs-mode-label">TDS</span>
+                    <input type="number" id="quoteTdsTcsAmount" class="sales-roundoff-field" placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div class="sales-roundoff-input-group">
+                  <button type="button" id="btnQuoteAutoRoundOff" class="sales-roundoff-btn-inline" title="Click to auto round off total to nearest rupee">
+                    Round off
+                  </button>
+                  <input type="text" inputmode="decimal" id="quoteAdjustments" class="sales-roundoff-field" placeholder="0.00" />
+                </div>
+
+                <div class="sales-summary-row total-row">
+                  <span>Total</span>
+                  <span id="quoteTotal">₹ 0.00</span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="je-actions-bar">
+            <div class="je-actions-left">
+              <button class="btn btn-danger" id="btnClearQuote" type="button" aria-label="Clear all fields">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+            <div class="je-actions-right">
+              <button class="btn btn-secondary" id="btnSaveQuoteDraft" type="button" aria-label="Save quotation as draft">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M5 2v4h5V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  <path d="M4 8.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Save Draft
+              </button>
+              <button class="btn btn-success" id="btnSaveQuote" type="button" aria-label="Save quotation">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Save Quotation
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /#salesQuotationFormCard -->
+
+        <!-- PROFORMA INVOICE FORM CARD (Full Screen with Back Button) -->
+        <div class="je-form-card" id="salesProformaFormCard" style="display: none;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500));">
+            <div class="je-card-header-left">
+              <div class="je-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text">Proforma Invoice</div>
+                <div class="je-card-subtitle-text">Create provisional commercial invoices and advance billing</div>
+              </div>
+            </div>
+            <div class="je-card-header-right">
+              <div class="je-voucher-chip" id="proformaChipDisplay">PI-2026-001</div>
+            </div>
+          </div>
+
+          <!-- Navigation row between title card and fields -->
+          <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn" id="btnProformaBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                <span>Back</span>
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn" id="btnProformaNavQuotation" title="Open Quotation" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Quotation</span>
+              </button>
+              <button type="button" class="btn" id="btnProformaNavSalesOrder" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Sales Order</span>
+              </button>
+              <button type="button" class="btn" id="btnProformaNavDeliveryChallan" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                  <circle cx="4.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+                  <circle cx="15.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+                </svg>
+                <span>Delivery Challan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Header fields -->
+          <div class="je-fields-bar">
+            <div class="je-field">
+              <label for="proformaDate">Date *</label>
+              <input type="date" id="proformaDate" class="je-input" aria-label="Proforma date" />
+            </div>
+            <div class="je-field">
+              <label for="proformaExpiryDate">Valid Until</label>
+              <input type="date" id="proformaExpiryDate" class="je-input" aria-label="Proforma validity date" />
+            </div>
+            <div class="je-field">
+              <label for="proformaNo">Proforma No. *</label>
+              <input type="text" id="proformaNo" class="je-input" placeholder="PI-2026-001" aria-label="Proforma invoice number" />
+            </div>
+            <div class="je-field" id="proformaCustomerWrap">
+              <label for="proformaCustomer">Customer *</label>
+              <select id="proformaCustomer" class="je-input" aria-label="Customer Selection" style="display: none;">
+                <option value="">&mdash; Select Customer &mdash;</option>
+              </select>
+              <div class="kya-searchable-select-wrap" id="proformaCustomerSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="proformaCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                  <span id="proformaCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="proformaCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="proformaCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="proformaCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="je-field">
+              <label for="proformaSupplyType">Supply Type *</label>
+              <select id="proformaSupplyType" class="je-input" aria-label="Supply Type Selection">
+                <option value="Intra-State (CGST + SGST)">Intra-State (CGST + SGST)</option>
+                <option value="Inter-State (IGST)">Inter-State (IGST)</option>
+                <option value="Export (Zero-Rated / LUT)">Export (Zero-Rated / LUT)</option>
+                <option value="SEZ With Tax">SEZ With Tax</option>
+                <option value="SEZ Without Tax">SEZ Without Tax</option>
+                <option value="Deemed Export">Deemed Export</option>
+              </select>
+            </div>
+            <div class="je-field">
+              <label for="proformaSalesExecutive">Sales Executive</label>
+              <select id="proformaSalesExecutive" class="je-input" aria-label="Sales Executive Selection">
+                <option value="">&mdash; Select Sales Executive &mdash;</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Line items table section -->
+          <div class="je-table-section">
+            <div class="je-table-label">Line Items</div>
+            <div class="sales-table-wrap">
+              <table class="sales-table" id="proformaItemTable">
+                <thead>
+                  <tr id="proformaTableHeader">
+                    <th class="col-item" style="text-align: left; padding-left: 8px;">Description</th>
+                    <th class="col-hsn" style="width: 90px; text-align: left;">HSN/SAC</th>
+                    <th class="col-qty" style="width: 65px; text-align: right;">Qty</th>
+                    <th class="col-unit" style="width: 65px; text-align: center;">Unit</th>
+                    <th class="col-rate" style="width: 100px; text-align: right;">Rate / Price</th>
+                    <th class="col-disc" style="width: 105px; text-align: right;">Discount</th>
+                    <th class="col-tax" style="width: 75px; text-align: right; padding-right: 6px;">Tax</th>
+                    <th class="col-amt" style="width: 110px; text-align: right; padding-right: 8px;">Amount</th>
+                    <th class="col-del" style="width: 36px; text-align: center;"></th>
+                  </tr>
+                </thead>
+                <tbody id="proformaItemBody">
+                  <!-- rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Add row button -->
+          <div class="je-add-row-wrap" style="padding-top: 6px;">
+            <button class="je-add-row-btn" id="proformaAddRow" type="button" aria-label="Add item line">
+              <svg viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Row
+            </button>
+          </div>
+
+          <!-- Summary & Totals Grid -->
+          <div class="sales-totals-grid">
+            <!-- Left side Notes & Payment details -->
+            <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
+              <!-- Payment Status Sliding selector -->
+              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                  <label id="proformaPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment Status</label>
+                  <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
+                    <div class="sales-paystatus-bg notpaid-active" id="proformaPaymentStatusBg"></div>
+                    <button class="sales-paystatus-btn active" id="proformaPaymentStatusNotPaid" type="button">Not Paid</button>
+                    <button class="sales-paystatus-btn" id="proformaPaymentStatusFull" type="button">Full Payment</button>
+                    <button class="sales-paystatus-btn" id="proformaPaymentStatusPartial" type="button">Partial Payment</button>
+                  </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
+                  <div id="proformaDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
+                    <div id="proformaDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                      <input type="date" id="proformaDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                      <span id="proformaDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
+                    </div>
+                  </div>
+                  <div id="proformaPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
+                    <select id="proformaPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
+                  </div>
+                  <div id="proformaPaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
+                    <input type="number" id="proformaPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <label for="proformaNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <textarea id="proformaNotes" class="je-narration-input" placeholder="Payment terms, advance payment details, delivery schedule, bank account info..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+              </div>
+            </div>
+
+            <!-- Right side Summary Card -->
+            <div class="sales-totals-right" style="display: flex; flex-direction: column; height: 100%;">
+              <div class="sales-summary-card" style="height: 100%; box-sizing: border-box;">
+                <div class="sales-summary-row">
+                  <span>Sub Total</span>
+                  <span id="proformaSubTotal">₹ 0.00</span>
+                </div>
+
+                <!-- TDS/TCS Toggle -->
+                <div class="sales-summary-row" style="align-items: center;">
+                  <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em;">Tax Deduction / Collection</span>
+                  <div class="sales-tdstcs-wrap" style="width: auto; min-width: 154px;">
+                    <div class="sales-tdstcs-bg none-active" id="proformaTdsTcsBg"></div>
+                    <button class="sales-tdstcs-btn active" id="proformaTdsTcsNone" type="button">None</button>
+                    <button class="sales-tdstcs-btn" id="proformaTdsTcsTds" type="button">TDS</button>
+                    <button class="sales-tdstcs-btn" id="proformaTdsTcsTcs" type="button">TCS</button>
+                  </div>
+                </div>
+
+                <!-- TDS/TCS Amount Row -->
+                <div id="proformaTdsTcsAmountRow" style="display: none;">
+                  <div class="sales-roundoff-input-group sales-tdstcs-amount-group">
+                    <select id="proformaTdsTcsRateSelect" class="sales-tdstcs-rate-select" title="Select TDS/TCS rate">
+                      <option value="0.1">0.1%</option>
+                      <option value="1">1%</option>
+                      <option value="2">2%</option>
+                      <option value="5">5%</option>
+                      <option value="10">10%</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    <div id="proformaTdsTcsRateCustomWrap" class="sales-tdstcs-custom-wrap" style="display: none;">
+                      <input type="number" id="proformaTdsTcsRateCustom" class="sales-tdstcs-custom-input" min="0" max="100" step="0.01" placeholder="0" title="Custom percentage" />
+                      <span class="sales-tdstcs-custom-unit">%</span>
+                    </div>
+                    <div class="sales-tdstcs-divider"></div>
+                    <span id="proformaTdsTcsAmountLabel" class="sales-tdstcs-mode-label">TDS</span>
+                    <input type="number" id="proformaTdsTcsAmount" class="sales-roundoff-field" placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div class="sales-roundoff-input-group">
+                  <button type="button" id="btnProformaAutoRoundOff" class="sales-roundoff-btn-inline" title="Click to auto round off total to nearest rupee">
+                    Round off
+                  </button>
+                  <input type="text" inputmode="decimal" id="proformaAdjustments" class="sales-roundoff-field" placeholder="0.00" />
+                </div>
+
+                <div class="sales-summary-row total-row">
+                  <span>Total</span>
+                  <span id="proformaTotal">₹ 0.00</span>
+                </div>
+
+                <!-- Document Upload Section under Total -->
+                <div class="sales-doc-upload-wrap" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--slate-200);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <label for="proformaDocFileInput" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      Upload Document / Attachment
+                    </label>
+                    <span id="proformaDocStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+                  </div>
+
+                  <input type="file" id="proformaDocFileInput" style="display: none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+                  <div id="proformaDocDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--slate-50); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--blue-400)'; this.style.background='var(--blue-50)'" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='var(--slate-50)'">
+                    <div id="proformaDocEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; border-radius: 50%; background: #ffffff; border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: var(--blue-600); flex-shrink: 0;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">Click to Choose File</span>
+                        <span style="font-size: 10px; color: var(--slate-400);">PDF, Image, Excel, Word (Max 10MB)</span>
+                      </div>
+                    </div>
+
+                    <div id="proformaDocSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                        <div id="proformaDocFileIcon" style="width: 26px; height: 26px; border-radius: 6px; background: #dbeafe; color: #1e40af; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase;">PDF</div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                          <span id="proformaDocFileName" style="font-size: 12px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">doc.pdf</span>
+                          <span id="proformaDocFileSize" style="font-size: 10px; color: var(--slate-500); font-weight: 500;">0 KB</span>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <a id="proformaDocPreviewBtn" target="_blank" style="padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; border-radius: 5px; text-decoration: none;" title="Download / View document">View</a>
+                        <button id="proformaDocRemoveBtn" type="button" style="background: none; border: none; color: var(--red-600); cursor: pointer; padding: 3px; border-radius: 4px; display: flex; align-items: center;" title="Remove document">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="je-actions-bar">
+            <div class="je-actions-left">
+              <button class="btn btn-danger" id="btnClearProforma" type="button" aria-label="Clear all fields">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+            <div class="je-actions-right">
+              <button class="btn btn-secondary" id="btnSaveProformaDraft" type="button" aria-label="Save proforma as draft">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M5 2v4h5V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  <path d="M4 8.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Save Draft
+              </button>
+              <button class="btn btn-success" id="btnSaveProforma" type="button" aria-label="Save proforma invoice">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Save Proforma Invoice
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /#salesProformaFormCard -->
+
+        <!-- SALES ORDER FORM CARD (Full Screen with Back Button) -->
+        <div class="je-form-card" id="salesOrderFormCard" style="display: none;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500));">
+            <div class="je-card-header-left">
+              <div class="je-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  <circle cx="14" cy="13" r="1" fill="currentColor"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text">Sales Order</div>
+                <div class="je-card-subtitle-text">Record confirmed customer purchase orders and delivery schedules</div>
+              </div>
+            </div>
+            <div class="je-card-header-right">
+              <div class="je-voucher-chip" id="orderChipDisplay">SO-2026-001</div>
+            </div>
+          </div>
+
+          <!-- Navigation row between title card and fields -->
+          <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn" id="btnOrderBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                <span>Back</span>
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn" id="btnOrderNavQuotation" title="Open Quotation" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Quotation</span>
+              </button>
+              <button type="button" class="btn" id="btnOrderNavProforma" title="Open Proforma Invoice" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Proforma Invoice</span>
+              </button>
+              <button type="button" class="btn" id="btnOrderNavDeliveryChallan" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                  <circle cx="4.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+                  <circle cx="15.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.4"/>
+                </svg>
+                <span>Delivery Challan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Header fields -->
+          <div class="je-fields-bar">
+            <div class="je-field">
+              <label for="orderDate">Date *</label>
+              <input type="date" id="orderDate" class="je-input" aria-label="Order date" />
+            </div>
+            <div class="je-field">
+              <label for="orderDeliveryDate">Delivery Date</label>
+              <input type="date" id="orderDeliveryDate" class="je-input" aria-label="Order delivery date" />
+            </div>
+            <div class="je-field">
+              <label for="orderNo">Order No. *</label>
+              <input type="text" id="orderNo" class="je-input" placeholder="SO-2026-001" aria-label="Sales order number" />
+            </div>
+            <div class="je-field" id="orderCustomerWrap">
+              <label for="orderCustomer">Customer *</label>
+              <select id="orderCustomer" class="je-input" aria-label="Customer Selection" style="display: none;">
+                <option value="">&mdash; Select Customer &mdash;</option>
+              </select>
+              <div class="kya-searchable-select-wrap" id="orderCustomerSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="orderCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                  <span id="orderCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="orderCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="orderCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="orderCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="je-field">
+              <label for="orderSupplyType">Supply Type *</label>
+              <select id="orderSupplyType" class="je-input" aria-label="Supply Type Selection">
+                <option value="Intra-State (CGST + SGST)">Intra-State (CGST + SGST)</option>
+                <option value="Inter-State (IGST)">Inter-State (IGST)</option>
+                <option value="Export (Zero-Rated / LUT)">Export (Zero-Rated / LUT)</option>
+                <option value="SEZ With Tax">SEZ With Tax</option>
+                <option value="SEZ Without Tax">SEZ Without Tax</option>
+                <option value="Deemed Export">Deemed Export</option>
+              </select>
+            </div>
+            <div class="je-field">
+              <label for="orderSalesExecutive">Sales Executive</label>
+              <select id="orderSalesExecutive" class="je-input" aria-label="Sales Executive Selection">
+                <option value="">&mdash; Select Sales Executive &mdash;</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Line items table section -->
+          <div class="je-table-section">
+            <div class="je-table-label">Line Items</div>
+            <div class="sales-table-wrap">
+              <table class="sales-table" id="orderItemTable">
+                <thead>
+                  <tr id="orderTableHeader">
+                    <th class="col-item" style="text-align: left; padding-left: 8px;">Description</th>
+                    <th class="col-hsn" style="width: 90px; text-align: left;">HSN/SAC</th>
+                    <th class="col-qty" style="width: 65px; text-align: right;">Qty</th>
+                    <th class="col-unit" style="width: 65px; text-align: center;">Unit</th>
+                    <th class="col-rate" style="width: 100px; text-align: right;">Rate / Price</th>
+                    <th class="col-disc" style="width: 105px; text-align: right;">Discount</th>
+                    <th class="col-tax" style="width: 75px; text-align: right; padding-right: 6px;">Tax</th>
+                    <th class="col-amt" style="width: 110px; text-align: right; padding-right: 8px;">Amount</th>
+                    <th class="col-del" style="width: 36px; text-align: center;"></th>
+                  </tr>
+                </thead>
+                <tbody id="orderItemBody">
+                  <!-- rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Add row button -->
+          <div class="je-add-row-wrap" style="padding-top: 6px;">
+            <button class="je-add-row-btn" id="orderAddRow" type="button" aria-label="Add item line">
+              <svg viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Row
+            </button>
+          </div>
+
+          <!-- Summary & Totals Grid -->
+          <div class="sales-totals-grid">
+            <!-- Left side Notes & Payment details -->
+            <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
+              <!-- Payment Status Sliding selector -->
+              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                  <label id="orderPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment / Advance Status</label>
+                  <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
+                    <div class="sales-paystatus-bg notpaid-active" id="orderPaymentStatusBg"></div>
+                    <button class="sales-paystatus-btn active" id="orderPaymentStatusNotPaid" type="button">Not Paid</button>
+                    <button class="sales-paystatus-btn" id="orderPaymentStatusFull" type="button">Full Payment</button>
+                    <button class="sales-paystatus-btn" id="orderPaymentStatusPartial" type="button">Partial Payment</button>
+                  </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
+                  <div id="orderDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
+                    <div id="orderDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                      <input type="date" id="orderDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                      <span id="orderDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
+                    </div>
+                  </div>
+                  <div id="orderPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
+                    <select id="orderPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
+                  </div>
+                  <div id="orderPaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
+                    <input type="number" id="orderPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <label for="orderNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <textarea id="orderNotes" class="je-narration-input" placeholder="Order fulfillment terms, delivery schedule, shipping instructions, customer PO reference..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+              </div>
+            </div>
+
+            <!-- Right side Summary Card -->
+            <div class="sales-totals-right" style="display: flex; flex-direction: column; height: 100%;">
+              <div class="sales-summary-card" style="height: 100%; box-sizing: border-box;">
+                <div class="sales-summary-row">
+                  <span>Sub Total</span>
+                  <span id="orderSubTotal">₹ 0.00</span>
+                </div>
+
+                <!-- TDS/TCS Toggle -->
+                <div class="sales-summary-row" style="align-items: center;">
+                  <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em;">Tax Deduction / Collection</span>
+                  <div class="sales-tdstcs-wrap" style="width: auto; min-width: 154px;">
+                    <div class="sales-tdstcs-bg none-active" id="orderTdsTcsBg"></div>
+                    <button class="sales-tdstcs-btn active" id="orderTdsTcsNone" type="button">None</button>
+                    <button class="sales-tdstcs-btn" id="orderTdsTcsTds" type="button">TDS</button>
+                    <button class="sales-tdstcs-btn" id="orderTdsTcsTcs" type="button">TCS</button>
+                  </div>
+                </div>
+
+                <!-- TDS/TCS Amount Row -->
+                <div id="orderTdsTcsAmountRow" style="display: none;">
+                  <div class="sales-roundoff-input-group sales-tdstcs-amount-group">
+                    <select id="orderTdsTcsRateSelect" class="sales-tdstcs-rate-select" title="Select TDS/TCS rate">
+                      <option value="0.1">0.1%</option>
+                      <option value="1">1%</option>
+                      <option value="2">2%</option>
+                      <option value="5">5%</option>
+                      <option value="10">10%</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    <div id="orderTdsTcsRateCustomWrap" class="sales-tdstcs-custom-wrap" style="display: none;">
+                      <input type="number" id="orderTdsTcsRateCustom" class="sales-tdstcs-custom-input" min="0" max="100" step="0.01" placeholder="0" title="Custom percentage" />
+                      <span class="sales-tdstcs-custom-unit">%</span>
+                    </div>
+                    <div class="sales-tdstcs-divider"></div>
+                    <span id="orderTdsTcsAmountLabel" class="sales-tdstcs-mode-label">TDS</span>
+                    <input type="number" id="orderTdsTcsAmount" class="sales-roundoff-field" placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div class="sales-roundoff-input-group">
+                  <button type="button" id="btnOrderAutoRoundOff" class="sales-roundoff-btn-inline" title="Click to auto round off total to nearest rupee">
+                    Round off
+                  </button>
+                  <input type="text" inputmode="decimal" id="orderAdjustments" class="sales-roundoff-field" placeholder="0.00" />
+                </div>
+
+                <div class="sales-summary-row total-row">
+                  <span>Total</span>
+                  <span id="orderTotal">₹ 0.00</span>
+                </div>
+
+                <!-- Document Upload Section under Total -->
+                <div class="sales-doc-upload-wrap" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--slate-200);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <label for="orderDocFileInput" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      Upload Document / Attachment
+                    </label>
+                    <span id="orderDocStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+                  </div>
+
+                  <input type="file" id="orderDocFileInput" style="display: none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+                  <div id="orderDocDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--slate-50); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--blue-400)'; this.style.background='var(--blue-50)'" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='var(--slate-50)'">
+                    <div id="orderDocEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; border-radius: 50%; background: #ffffff; border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: var(--blue-600); flex-shrink: 0;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">Click to Choose File</span>
+                        <span style="font-size: 10px; color: var(--slate-400);">PDF, Image, Excel, Word (Max 10MB)</span>
+                      </div>
+                    </div>
+
+                    <div id="orderDocSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                        <div id="orderDocFileIcon" style="width: 26px; height: 26px; border-radius: 6px; background: #dbeafe; color: #1e40af; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase;">PDF</div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                          <span id="orderDocFileName" style="font-size: 12px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">doc.pdf</span>
+                          <span id="orderDocFileSize" style="font-size: 10px; color: var(--slate-500); font-weight: 500;">0 KB</span>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <a id="orderDocPreviewBtn" target="_blank" style="padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; border-radius: 5px; text-decoration: none;" title="Download / View document">View</a>
+                        <button id="orderDocRemoveBtn" type="button" style="background: none; border: none; color: var(--red-600); cursor: pointer; padding: 3px; border-radius: 4px; display: flex; align-items: center;" title="Remove document">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="je-actions-bar">
+            <div class="je-actions-left">
+              <button class="btn btn-danger" id="btnClearOrder" type="button" aria-label="Clear all fields">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+            <div class="je-actions-right">
+              <button class="btn btn-secondary" id="btnSaveOrderDraft" type="button" aria-label="Save sales order as draft">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M5 2v4h5V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  <path d="M4 8.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Save Draft
+              </button>
+              <button class="btn btn-success" id="btnSaveOrder" type="button" aria-label="Save sales order">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Save Sales Order
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /#salesOrderFormCard -->
+
+        <!-- DELIVERY CHALLAN FORM CARD (Full Screen with Back Button) -->
+        <div class="je-form-card" id="salesDeliveryChallanFormCard" style="display: none;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500));">
+            <div class="je-card-header-left">
+              <div class="je-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none">
+                  <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <circle cx="4.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                  <circle cx="15.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text">Delivery Challan</div>
+                <div class="je-card-subtitle-text">Generate dispatch documents for goods transportation and delivery transit</div>
+              </div>
+            </div>
+            <div class="je-card-header-right">
+              <div class="je-voucher-chip" id="challanChipDisplay">DC-2026-001</div>
+            </div>
+          </div>
+
+          <!-- Navigation row between title card and fields -->
+          <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn" id="btnChallanBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                <span>Back</span>
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn" id="btnChallanNavQuotation" title="Open Quotation" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Quotation</span>
+              </button>
+              <button type="button" class="btn" id="btnChallanNavProforma" title="Open Proforma Invoice" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Proforma Invoice</span>
+              </button>
+              <button type="button" class="btn" id="btnChallanNavSalesOrder" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Sales Order</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Header fields -->
+          <div class="je-fields-bar">
+            <div class="je-field">
+              <label for="challanDate">Date *</label>
+              <input type="date" id="challanDate" class="je-input" aria-label="Challan date" />
+            </div>
+            <div class="je-field">
+              <label for="challanDispatchDate">Dispatch Date</label>
+              <input type="date" id="challanDispatchDate" class="je-input" aria-label="Dispatch date" />
+            </div>
+            <div class="je-field">
+              <label for="challanNo">Challan No. *</label>
+              <input type="text" id="challanNo" class="je-input" placeholder="DC-2026-001" aria-label="Delivery challan number" />
+            </div>
+            <div class="je-field" id="challanCustomerWrap">
+              <label for="challanCustomer">Customer / Consignee *</label>
+              <select id="challanCustomer" class="je-input" aria-label="Customer Selection" style="display: none;">
+                <option value="">&mdash; Select Customer / Consignee &mdash;</option>
+              </select>
+              <div class="kya-searchable-select-wrap" id="challanCustomerSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="challanCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                  <span id="challanCustomerSelectTriggerText">&mdash; Select Customer / Consignee &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="challanCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="challanCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="challanCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="je-field">
+              <label for="challanSupplyType">Challan Purpose / Supply Type *</label>
+              <select id="challanSupplyType" class="je-input" aria-label="Supply Type Selection">
+                <option value="Transportation of Goods">Transportation of Goods</option>
+                <option value="Supply on Approval">Supply on Approval</option>
+                <option value="Job Work / Processing">Job Work / Processing</option>
+                <option value="Stock / Location Transfer">Stock / Location Transfer</option>
+                <option value="Supply for Exhibition / Demo">Supply for Exhibition / Demo</option>
+                <option value="Line Sale / Mobile Van">Line Sale / Mobile Van</option>
+                <option value="Others">Others</option>
+              </select>
+            </div>
+            <div class="je-field">
+              <label for="challanSalesExecutive">Dispatched By / Executive</label>
+              <select id="challanSalesExecutive" class="je-input" aria-label="Sales Executive Selection">
+                <option value="">&mdash; Select Dispatched By &mdash;</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Line items table section -->
+          <div class="je-table-section">
+            <div class="je-table-label">Line Items</div>
+            <div class="sales-table-wrap">
+              <table class="sales-table" id="challanItemTable">
+                <thead>
+                  <tr id="challanTableHeader">
+                    <th class="col-item" style="text-align: left; padding-left: 8px;">Description</th>
+                    <th class="col-hsn" style="width: 90px; text-align: left;">HSN/SAC</th>
+                    <th class="col-qty" style="width: 65px; text-align: right;">Qty</th>
+                    <th class="col-unit" style="width: 65px; text-align: center;">Unit</th>
+                    <th class="col-rate" style="width: 100px; text-align: right;">Rate / Price</th>
+                    <th class="col-disc" style="width: 105px; text-align: right;">Discount</th>
+                    <th class="col-tax" style="width: 75px; text-align: right; padding-right: 6px;">Tax</th>
+                    <th class="col-amt" style="width: 110px; text-align: right; padding-right: 8px;">Amount</th>
+                    <th class="col-del" style="width: 36px; text-align: center;"></th>
+                  </tr>
+                </thead>
+                <tbody id="challanItemBody">
+                  <!-- rows injected by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Add row button -->
+          <div class="je-add-row-wrap" style="padding-top: 6px;">
+            <button class="je-add-row-btn" id="challanAddRow" type="button" aria-label="Add item line">
+              <svg viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              Add Row
+            </button>
+          </div>
+
+          <!-- Summary & Totals Grid -->
+          <div class="sales-totals-grid">
+            <!-- Left side Notes & Payment details -->
+            <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
+              <!-- Payment / Dispatch Status Sliding selector -->
+              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                  <label id="challanPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment / Dispatch Status</label>
+                  <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
+                    <div class="sales-paystatus-bg notpaid-active" id="challanPaymentStatusBg"></div>
+                    <button class="sales-paystatus-btn active" id="challanPaymentStatusNotPaid" type="button">Not Paid</button>
+                    <button class="sales-paystatus-btn" id="challanPaymentStatusFull" type="button">Full Payment</button>
+                    <button class="sales-paystatus-btn" id="challanPaymentStatusPartial" type="button">Partial Payment</button>
+                  </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
+                  <div id="challanDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
+                    <div id="challanDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                      <input type="date" id="challanDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                      <span id="challanDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
+                    </div>
+                  </div>
+                  <div id="challanPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
+                    <select id="challanPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
+                  </div>
+                  <div id="challanPaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
+                    <input type="number" id="challanPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <label for="challanNotes" class="je-narration-label" style="flex-shrink: 0;">Transport Notes / Terms</label>
+                <textarea id="challanNotes" class="je-narration-input" placeholder="Vehicle number, transporter name, LR / E-Way bill number, dispatch terms, delivery instructions..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+              </div>
+            </div>
+
+            <!-- Right side Summary Card -->
+            <div class="sales-totals-right" style="display: flex; flex-direction: column; height: 100%;">
+              <div class="sales-summary-card" style="height: 100%; box-sizing: border-box;">
+                <div class="sales-summary-row">
+                  <span>Sub Total</span>
+                  <span id="challanSubTotal">₹ 0.00</span>
+                </div>
+
+                <!-- TDS/TCS Toggle -->
+                <div class="sales-summary-row" style="align-items: center;">
+                  <span style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em;">Tax Deduction / Collection</span>
+                  <div class="sales-tdstcs-wrap" style="width: auto; min-width: 154px;">
+                    <div class="sales-tdstcs-bg none-active" id="challanTdsTcsBg"></div>
+                    <button class="sales-tdstcs-btn active" id="challanTdsTcsNone" type="button">None</button>
+                    <button class="sales-tdstcs-btn" id="challanTdsTcsTds" type="button">TDS</button>
+                    <button class="sales-tdstcs-btn" id="challanTdsTcsTcs" type="button">TCS</button>
+                  </div>
+                </div>
+
+                <!-- TDS/TCS Amount Row -->
+                <div id="challanTdsTcsAmountRow" style="display: none;">
+                  <div class="sales-roundoff-input-group sales-tdstcs-amount-group">
+                    <select id="challanTdsTcsRateSelect" class="sales-tdstcs-rate-select" title="Select TDS/TCS rate">
+                      <option value="0.1">0.1%</option>
+                      <option value="1">1%</option>
+                      <option value="2">2%</option>
+                      <option value="5">5%</option>
+                      <option value="10">10%</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                    <div id="challanTdsTcsRateCustomWrap" class="sales-tdstcs-custom-wrap" style="display: none;">
+                      <input type="number" id="challanTdsTcsRateCustom" class="sales-tdstcs-custom-input" min="0" max="100" step="0.01" placeholder="0" title="Custom percentage" />
+                      <span class="sales-tdstcs-custom-unit">%</span>
+                    </div>
+                    <div class="sales-tdstcs-divider"></div>
+                    <span id="challanTdsTcsAmountLabel" class="sales-tdstcs-mode-label">TDS</span>
+                    <input type="number" id="challanTdsTcsAmount" class="sales-roundoff-field" placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div class="sales-roundoff-input-group">
+                  <button type="button" id="btnChallanAutoRoundOff" class="sales-roundoff-btn-inline" title="Click to auto round off total to nearest rupee">
+                    Round off
+                  </button>
+                  <input type="text" inputmode="decimal" id="challanAdjustments" class="sales-roundoff-field" placeholder="0.00" />
+                </div>
+
+                <div class="sales-summary-row total-row">
+                  <span>Total</span>
+                  <span id="challanTotal">₹ 0.00</span>
+                </div>
+
+                <!-- Document Upload Section under Total -->
+                <div class="sales-doc-upload-wrap" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--slate-200);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <label for="challanDocFileInput" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      Upload Document / Attachment
+                    </label>
+                    <span id="challanDocStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+                  </div>
+
+                  <input type="file" id="challanDocFileInput" style="display: none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.zip" />
+
+                  <div id="challanDocDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 10px 12px; text-align: center; background: var(--slate-50); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--blue-400)'; this.style.background='var(--blue-50)'" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='var(--slate-50)'">
+                    <div id="challanDocEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; border-radius: 50%; background: #ffffff; border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: var(--blue-600); flex-shrink: 0;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="17 8 12 3 7 8"/>
+                          <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                        <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">Click to Choose File</span>
+                        <span style="font-size: 10px; color: var(--slate-400);">PDF, Image, Excel, Word (Max 10MB)</span>
+                      </div>
+                    </div>
+
+                    <div id="challanDocSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                        <div id="challanDocFileIcon" style="width: 26px; height: 26px; border-radius: 6px; background: #dbeafe; color: #1e40af; font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase;">PDF</div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                          <span id="challanDocFileName" style="font-size: 12px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">doc.pdf</span>
+                          <span id="challanDocFileSize" style="font-size: 10px; color: var(--slate-500); font-weight: 500;">0 KB</span>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <a id="challanDocPreviewBtn" target="_blank" style="padding: 3px 7px; font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; border-radius: 5px; text-decoration: none;" title="Download / View document">View</a>
+                        <button id="challanDocRemoveBtn" type="button" style="background: none; border: none; color: var(--red-600); cursor: pointer; padding: 3px; border-radius: 4px; display: flex; align-items: center;" title="Remove document">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="je-actions-bar">
+            <div class="je-actions-left">
+              <button class="btn btn-danger" id="btnClearChallan" type="button" aria-label="Clear all fields">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+            <div class="je-actions-right">
+              <button class="btn btn-secondary" id="btnSaveChallanDraft" type="button" aria-label="Save delivery challan as draft">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M5 2v4h5V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  <path d="M4 8.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Save Draft
+              </button>
+              <button class="btn btn-success" id="btnSaveChallan" type="button" aria-label="Save delivery challan">
+                <svg viewBox="0 0 15 15" fill="none">
+                  <path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Save Delivery Challan
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /#salesDeliveryChallanFormCard -->
       </div><!-- /#panel-sales-voucher -->
 
       <!-- Purchase Voucher Panel -->
@@ -3274,11 +4540,15 @@
 <script src="js/vault-core.js"></script>
 <script src="js/ledgers.js"></script>
 <script src="js/vault-settings.js?v=20260825_7"></script>
-<script src="js/sales-form.js?v=20260830_2"></script>
+<script src="js/sales-form.js?v=20260902_4"></script>
 <script src="js/sales-posting.js?v=20260830_2"></script>
-<script src="js/sales-helpers.js?v=20260830_2"></script>
+<script src="js/sales-helpers.js?v=20260902_4"></script>
 <script src="js/sales-records.js?v=20260830_2"></script>
-<script src="js/sales-print-events.js?v=20260830_2"></script>
+<script src="js/sales-print-events.js?v=20260902_4"></script>
+<script src="js/quotation.js?v=20260902_1"></script>
+<script src="js/proforma.js?v=20260902_1"></script>
+<script src="js/sales-order.js?v=20260902_1"></script>
+<script src="js/delivery-challan.js?v=20260902_1"></script>
 <script src="js/purchase-form.js?v=20260830_2"></script>
 <script src="js/company-profile.js"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>

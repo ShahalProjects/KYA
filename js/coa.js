@@ -2,11 +2,11 @@
     _globalDateFrom = fromVal;
     _globalDateTo   = toVal;
 
-    ['pnlDateFrom', 'trialDateFrom', 'bsDateFrom'].forEach(id => {
+    ['pnlDateFrom', 'trialDateFrom', 'bsDateFrom', 'vdDateFrom'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = fromVal;
     });
-    ['pnlDateTo', 'trialDateTo', 'bsDateTo'].forEach(id => {
+    ['pnlDateTo', 'trialDateTo', 'bsDateTo', 'vdDateTo'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = toVal;
     });

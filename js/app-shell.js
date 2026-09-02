@@ -12,7 +12,7 @@
   if (!window.coaLedgers) window.coaLedgers = [];
   if (!window.KYA_STORE)  window.KYA_STORE  = {
     salesVouchers: [], salesVouchersDrafts: [],
-    salesInvoiceCtr: 1, salesReturnCtr: 1, salesOrderCtr: 1,
+    salesInvoiceCtr: 1, salesReturnCtr: 1,
     purchaseVouchers: [], purchaseVouchersDrafts: [],
     purchaseInvoiceCtr: 1,
     customers: [],

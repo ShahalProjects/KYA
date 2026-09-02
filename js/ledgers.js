@@ -627,25 +627,6 @@
             });
           }
         }
-      } else if (v.isOrder) {
-        // Sales Order (only advance received affects customer ledger)
-        const advancePaid = (v.paymentStatus === 'Full Payment') ? total : (parseFloat(v.paymentAmount) || 0);
-        if (advancePaid > 0) {
-          if (dateFrom && vDate < dateFrom) {
-            preReceived += advancePaid;
-          } else if ((!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo)) {
-            periodReceived += advancePaid;
-            transactions.push({
-              id: v.journalEntryId || v.id,
-              date: vDate,
-              voucherNo: v.invoiceNo || 'SO-' + v.id,
-              particulars: 'Advance Received (Order)',
-              debit: 0,
-              credit: advancePaid,
-              isSales: true
-            });
-          }
-        }
       } else {
         // Regular Sales Invoice
         const tdsAmt = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0)

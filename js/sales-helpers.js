@@ -6,7 +6,7 @@
   function isSalesReturnInvoiceSelected() {
     if (currentSalesVoucherSubtype !== 'Return') return false;
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
-    return triggerText && triggerText.textContent !== 'Select Invoice/Order';
+    return triggerText && triggerText.textContent !== 'Select Invoice';
   }
 
   function getInvoiceRemainingRows(origInv, excludeReturnId = null) {
@@ -46,7 +46,7 @@
   function getOriginalInvoiceForReturn() {
     if (currentSalesVoucherSubtype !== 'Return') return null;
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
-    if (!triggerText || triggerText.textContent === 'Select Invoice/Order') return null;
+    if (!triggerText || triggerText.textContent === 'Select Invoice') return null;
     const invNo = triggerText.textContent.trim();
     return (window.KYA_STORE.salesVouchers || []).find(v => v.invoiceNo.toLowerCase() === invNo.toLowerCase() && !v.isReturn);
   }
@@ -73,13 +73,6 @@
       supplyTypeEl.disabled = isLocked;
       supplyTypeEl.style.backgroundColor = isLocked ? 'var(--slate-50)' : '';
       supplyTypeEl.style.cursor = isLocked ? 'not-allowed' : '';
-    }
-    
-    const orderEl = document.getElementById('salesOrderNo');
-    if (orderEl) {
-      orderEl.disabled = isLocked;
-      orderEl.style.backgroundColor = 'var(--slate-50)';
-      orderEl.style.color = isLocked ? 'var(--slate-400)' : 'var(--slate-700)';
     }
     
     const execEl = document.getElementById('salesExecutive');
@@ -134,7 +127,7 @@
     
     if (tdsTcsNoneBtn) { tdsTcsNoneBtn.disabled = false; tdsTcsNoneBtn.style.cursor = ''; tdsTcsNoneBtn.style.opacity = ''; }
     if (tdsTcsTdsBtn) { tdsTcsTdsBtn.disabled = false; tdsTcsTdsBtn.style.cursor = ''; tdsTcsTdsBtn.style.opacity = ''; }
-    if (tdsTcsTcsBtn) { tdsTcsTdsBtn.disabled = false; tdsTcsTcsBtn.style.cursor = ''; tdsTcsTcsBtn.style.opacity = ''; }
+    if (tdsTcsTcsBtn) { tdsTcsTcsBtn.disabled = false; tdsTcsTcsBtn.style.cursor = ''; tdsTcsTcsBtn.style.opacity = ''; }
 
     const payAmtEl = document.getElementById('salesPaymentAmount');
     if (payAmtEl) {
@@ -270,21 +263,7 @@
 
   function getSalesPaymentMax(total) {
     let maxVal = total;
-    if (currentSalesVoucherSubtype === 'Invoice') {
-      const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
-      if (orderNo) {
-        const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
-        if (linkedOrder) {
-          let orderAdvanceAmount = 0;
-          if (linkedOrder.paymentStatus === 'Full Payment') {
-            orderAdvanceAmount = linkedOrder.total;
-          } else if (linkedOrder.paymentStatus === 'Partial Payment') {
-            orderAdvanceAmount = linkedOrder.paymentAmount || 0;
-          }
-          maxVal = Math.max(0, total - orderAdvanceAmount);
-        }
-      }
-    } else if (currentSalesVoucherSubtype === 'Return') {
+    if (currentSalesVoucherSubtype === 'Return') {
       const payAmtEl = document.getElementById('salesPaymentAmount');
       if (payAmtEl && payAmtEl.max) {
         const maxPaid = parseFloat(payAmtEl.max);
@@ -348,23 +327,6 @@
     total += adjustments;
 
     const maxVal = getSalesPaymentMax(total);
-    
-    const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
-    let orderAdvanceAmount = 0;
-    let isOrderLinked = false;
-    if (currentSalesVoucherSubtype === 'Invoice' && orderNo) {
-      const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
-      if (linkedOrder) {
-        isOrderLinked = true;
-        if (linkedOrder.paymentStatus === 'Full Payment') {
-          orderAdvanceAmount = linkedOrder.total;
-        } else if (linkedOrder.paymentStatus === 'Partial Payment') {
-          orderAdvanceAmount = linkedOrder.paymentAmount || 0;
-        }
-      }
-    }
-
-    const excessAmount = isOrderLinked ? Math.max(0, orderAdvanceAmount - total) : 0;
 
     if (currentSalesVoucherSubtype === 'Return') {
       payNotPaidBtn.textContent = 'No Refund';
@@ -375,23 +337,10 @@
       if (payAmtEl) {
         payAmtEl.max = maxVal;
       }
-    } else if (excessAmount > 0) {
-      payNotPaidBtn.textContent = 'Not Refunded';
-      payFullBtn.textContent = `Full Refund (₹${fmtNum(excessAmount)})`;
-      payPartialBtn.textContent = 'Partial Refund';
-      
-      const payAmtEl = document.getElementById('salesPaymentAmount');
-      if (payAmtEl) {
-        payAmtEl.max = excessAmount;
-      }
     } else {
       payNotPaidBtn.textContent = 'Not Paid';
       payPartialBtn.textContent = 'Partial Payment';
-      if (isOrderLinked && orderAdvanceAmount > 0) {
-        payFullBtn.textContent = `Full Payment (₹${fmtNum(maxVal)})`;
-      } else {
-        payFullBtn.textContent = 'Full Payment';
-      }
+      payFullBtn.textContent = 'Full Payment';
     }
   }
 
@@ -424,6 +373,38 @@
     return isNaN(v) ? 0 : v;
   }
 
+  function getSalesTdsTcsMode() {
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (tdsBtn && tdsBtn.classList.contains('active')) return 'TDS';
+    if (tcsBtn && tcsBtn.classList.contains('active')) return 'TCS';
+    return 'None';
+  }
+
+  function getSalesTdsTcsRate() {
+    const mode = getSalesTdsTcsMode();
+    if (mode === 'None') return 0;
+    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
+    if (!rateSelect) return 0;
+    if (rateSelect.value === 'custom') {
+      const customInput = document.getElementById('salesTdsTcsRateCustom');
+      return customInput ? (parseFloat(customInput.value) || 0) : 0;
+    }
+    return parseFloat(rateSelect.value) || 0;
+  }
+
+  function getSalesTdsTcsAmount(subTotal) {
+    const mode = getSalesTdsTcsMode();
+    if (mode === 'None') return 0;
+    const amtInput = document.getElementById('salesTdsTcsAmount');
+    if (amtInput && amtInput.value.trim() !== '') {
+      return parseFloat(amtInput.value) || 0;
+    }
+    const rate = getSalesTdsTcsRate();
+    const st = (typeof subTotal === 'number') ? subTotal : (typeof calculateSubtotal === 'function' ? calculateSubtotal() : 0);
+    return Math.round(st * (rate / 100) * 100) / 100;
+  }
+
   // Initialize store for future features
   if (!window.KYA_STORE) {
     window.KYA_STORE = {};
@@ -432,4 +413,7 @@
   window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
   window.KYA_STORE.salesInvoiceCtr = window.KYA_STORE.salesInvoiceCtr || 1;
   window.KYA_STORE.salesReturnCtr = window.KYA_STORE.salesReturnCtr || 1;
-  window.KYA_STORE.salesOrderCtr = window.KYA_STORE.salesOrderCtr || 1;
+
+  window.getSalesTdsTcsMode = getSalesTdsTcsMode;
+  window.getSalesTdsTcsRate = getSalesTdsTcsRate;
+  window.getSalesTdsTcsAmount = getSalesTdsTcsAmount;

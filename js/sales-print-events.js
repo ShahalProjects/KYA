@@ -8,18 +8,6 @@
     const inv = list.find(v => v.id === id);
     if (!inv) return;
     
-    let orderAdvanceAmount = 0;
-    if (inv.orderNo && !inv.isOrder && !inv.isReturn) {
-      const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === inv.orderNo.toLowerCase());
-      if (linkedOrder) {
-        if (linkedOrder.paymentStatus === 'Full Payment') {
-          orderAdvanceAmount = linkedOrder.total;
-        } else if (linkedOrder.paymentStatus === 'Partial Payment') {
-          orderAdvanceAmount = linkedOrder.paymentAmount || 0;
-        }
-      }
-    }
-    
     const customer = (typeof findPartyById === 'function' ? findPartyById(inv.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == inv.customerId) : null) || { name: 'Unknown Customer' };
     const partyName = (inv.partyOverride && inv.partyOverride.name) || customer.name || 'Unknown Customer';
     const partyContact = (inv.partyOverride && inv.partyOverride.contactName) || customer.contactName || '';
@@ -139,7 +127,7 @@
     overlay.innerHTML = `
       <div class="inv-modal-card" style="padding: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1.5px solid var(--slate-100); background: var(--slate-50); border-radius: 20px 20px 0 0;">
-          <div style="font-weight: 700; color: var(--slate-800);">${inv.isReturn ? 'Sales Reversal Preview' : (inv.isOrder ? 'Sales Pre Invoice Preview' : 'Invoice Preview')}</div>
+          <div style="font-weight: 700; color: var(--slate-800);">${inv.isReturn ? 'Sales Reversal Preview' : 'Invoice Preview'}</div>
           <div style="display: flex; gap: 8px; align-items: center;">
             <!-- Export Dropdown -->
             <div class="rpt-more-wrap" style="position: relative;">
@@ -217,7 +205,7 @@
               </div>
             </div>
             <div style="text-align: right;">
-              <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: var(--slate-800); margin: 0; letter-spacing: -0.5px;">${inv.isReturn ? 'Credit Note / Sales Reversal' : (inv.isOrder ? 'Sales Pre Invoice' : 'Tax Invoice')}</h1>
+              <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: var(--slate-800); margin: 0; letter-spacing: -0.5px;">${inv.isReturn ? 'Credit Note / Sales Reversal' : 'Tax Invoice'}</h1>
               <div style="font-size: 14px; font-weight: 700; color: var(--blue-700); margin-top: 4px;"># ${ohEsc(inv.invoiceNo)}</div>
             </div>
           </div>
@@ -235,19 +223,13 @@
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13.5px;">
               <div>
-                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">${inv.isReturn ? 'Reversal Date:' : (inv.isOrder ? 'Order Date:' : 'Invoice Date:')}</div>
+                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">${inv.isReturn ? 'Reversal Date:' : 'Invoice Date:'}</div>
                 <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${inv.date}</div>
               </div>
               <div>
                 <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Due Date:</div>
                 <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${inv.dueDate || inv.date}</div>
               </div>
-              ${!inv.isOrder ? `
-              <div>
-                <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Order Number:</div>
-                <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${ohEsc(inv.orderNo) || '&mdash;'}</div>
-              </div>
-              ` : ''}
               <div>
                 <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Payment Terms:</div>
                 <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">Due on Receipt</div>
@@ -285,7 +267,7 @@
           <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; margin-top: 30px;">
             <div>
               <h4 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 700;">Terms & Notes:</h4>
-              <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${ohEsc(inv.notes) || (inv.isReturn ? 'Sales Reversal / Credit Note processed.' : (inv.isOrder ? 'Sales Pre Invoice saved.' : 'Thank you for your business! Please settle this invoice by the due date.'))}</div>
+              <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap; font-weight: 500;">${ohEsc(inv.notes) || (inv.isReturn ? 'Sales Reversal / Credit Note processed.' : 'Thank you for your business! Please settle this invoice by the due date.')}</div>
               ${inv.uploadedDoc && inv.uploadedDoc.fileData ? `
                 <div style="margin-top: 14px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
                   <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
@@ -328,47 +310,16 @@
                   <span>₹ ${fmtNum(inv.total)}</span>
                 </div>
                 
-                ${inv.excessAmount > 0 ? `
-                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
-                    <span>Order Advance Applied</span>
-                    <span style="color: var(--emerald-700); font-weight: 700;">₹ ${fmtNum(orderAdvanceAmount)}</span>
-                  </div>
+                ${inv.paymentStatus && inv.paymentStatus !== 'Not Paid' && inv.paymentStatus !== 'No Refund' ? `
                   <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 6px; font-weight: 500;">
-                    <span>Refund Status</span>
-                    <span style="font-weight: 700; color: var(--slate-700);">${inv.paymentStatus}</span>
+                    <span>Paid Amount (${inv.paymentStatus})</span>
+                    <span style="color: #10b981; font-weight: 700;">₹ ${fmtNum(inv.paymentAmount)}</span>
                   </div>
-                  ${inv.refundedAmount > 0 ? `
-                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 6px; font-weight: 500;">
-                      <span>Amount Refunded</span>
-                      <span style="color: #10b981; font-weight: 700;">₹ ${fmtNum(inv.refundedAmount)}</span>
-                    </div>
-                  ` : ''}
-                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 6px; font-weight: 700;">
-                    <span>Refund Payable</span>
-                    <span style="color: ${inv.excessAmount - (inv.refundedAmount || 0) > 0 ? '#ef4444' : 'var(--slate-600)'};">₹ ${fmtNum(inv.excessAmount - (inv.refundedAmount || 0))}</span>
-                  </div>
-                ` : `
-                  ${orderAdvanceAmount > 0 ? `
-                    <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-600); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 500;">
-                      <span>Advance Paid</span>
-                      <span style="color: var(--emerald-700); font-weight: 700;">₹ ${fmtNum(orderAdvanceAmount)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 6px; font-weight: 700;">
-                      <span>Balance Due</span>
-                      <span style="color: var(--blue-700);">₹ ${fmtNum(Math.max(0, inv.total - orderAdvanceAmount))}</span>
-                    </div>
-                  ` : ''}
-                  ${inv.paymentStatus && inv.paymentStatus !== 'Not Paid' && inv.paymentStatus !== 'No Refund' ? `
-                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-top: 6px; font-weight: 500;">
-                      <span>Paid Amount (${inv.paymentStatus})</span>
-                      <span style="color: #10b981; font-weight: 700;">₹ ${fmtNum(inv.paymentAmount)}</span>
-                    </div>
-                  ` : ''}
-                  <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 700;">
-                    <span>Balance Due</span>
-                    <span style="color: ${inv.total - orderAdvanceAmount - (inv.paymentAmount || 0) > 0 ? '#ef4444' : 'var(--slate-600)'};">₹ ${fmtNum(Math.max(0, inv.total - orderAdvanceAmount - (inv.paymentAmount || 0)))}</span>
-                  </div>
-                `}
+                ` : ''}
+                <div style="display: flex; justify-content: space-between; font-size: 13.5px; color: var(--slate-900); margin-top: 8px; border-top: 1px dashed var(--slate-200); padding-top: 8px; font-weight: 700;">
+                  <span>Balance Due</span>
+                  <span style="color: ${inv.total - (inv.paymentAmount || 0) > 0 ? '#ef4444' : 'var(--slate-600)'};">₹ ${fmtNum(Math.max(0, inv.total - (inv.paymentAmount || 0)))}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -480,10 +431,6 @@
         if (isOpen) {
           selectDropdown.style.display = 'none';
         } else {
-          // Close other select dropdowns if open
-          const orderDropdown = document.getElementById('salesOrderSelectDropdown');
-          if (orderDropdown) orderDropdown.style.display = 'none';
-
           selectDropdown.style.display = 'flex';
           selectSearch.value = '';
           refreshSalesInvoiceDropdownOptions();
@@ -506,51 +453,11 @@
       });
     }
 
-    // Searchable dropdown for sales orders
-    const orderSelectTrigger = document.getElementById('salesOrderSelectTrigger');
-    const orderSelectDropdown = document.getElementById('salesOrderSelectDropdown');
-    const orderSelectSearch = document.getElementById('salesOrderSelectSearch');
-    
-    if (orderSelectTrigger && orderSelectDropdown && orderSelectSearch) {
-      orderSelectTrigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = orderSelectDropdown.style.display === 'flex';
-        if (isOpen) {
-          orderSelectDropdown.style.display = 'none';
-        } else {
-          // Close other select dropdowns if open
-          const invoiceDropdown = document.getElementById('salesInvoiceSelectDropdown');
-          if (invoiceDropdown) invoiceDropdown.style.display = 'none';
-
-          orderSelectDropdown.style.display = 'flex';
-          orderSelectSearch.value = '';
-          refreshSalesOrderDropdownOptions();
-          setTimeout(() => orderSelectSearch.focus(), 50);
-        }
-      });
-      
-      orderSelectSearch.addEventListener('input', () => {
-        refreshSalesOrderDropdownOptions(orderSelectSearch.value);
-      });
-      
-      orderSelectSearch.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-      
-      document.addEventListener('click', (e) => {
-        if (!orderSelectTrigger.contains(e.target) && !orderSelectDropdown.contains(e.target)) {
-          orderSelectDropdown.style.display = 'none';
-        }
-      });
-    }
-
     const invNoEl = document.getElementById('salesInvoiceNo');
     const chipEl = document.getElementById('salesVoucherChipDisplay');
     if (invNoEl && chipEl) {
       invNoEl.addEventListener('input', () => {
-        let fallback = 'INV-XXXX';
-        if (currentSalesVoucherSubtype === 'Return') fallback = 'REV-XXXX';
-        else if (currentSalesVoucherSubtype === 'Order') fallback = 'SO-XXXX';
+        const fallback = currentSalesVoucherSubtype === 'Return' ? 'REV-XXXX' : 'INV-XXXX';
         chipEl.textContent = invNoEl.value.trim() || fallback;
       });
     }
@@ -558,14 +465,6 @@
     const prodTypeBtn = document.getElementById('salesTypeProduct');
     if (prodTypeBtn) {
       prodTypeBtn.addEventListener('click', () => {
-        const bg = document.getElementById('salesTypeBg');
-        if (bg) {
-          bg.classList.add('prod-active');
-          bg.classList.remove('serv-active');
-        }
-        prodTypeBtn.classList.add('active');
-        const servTypeBtn = document.getElementById('salesTypeService');
-        if (servTypeBtn) servTypeBtn.classList.remove('active');
         switchSalesType('Product');
       });
     }
@@ -573,148 +472,34 @@
     const servTypeBtn = document.getElementById('salesTypeService');
     if (servTypeBtn) {
       servTypeBtn.addEventListener('click', () => {
-        const bg = document.getElementById('salesTypeBg');
-        if (bg) {
-          bg.classList.add('serv-active');
-          bg.classList.remove('prod-active');
-        }
-        servTypeBtn.classList.add('active');
-        const prodTypeBtn = document.getElementById('salesTypeProduct');
-        if (prodTypeBtn) prodTypeBtn.classList.remove('active');
         switchSalesType('Service');
       });
     }
     
-    const noneBtn = document.getElementById('salesTdsTcsNone');
-    const tdsBtn = document.getElementById('salesTdsTcsTds');
-    const tcsBtn = document.getElementById('salesTdsTcsTcs');
-    const tBg = document.getElementById('salesTdsTcsBg');
-    const amtRow = document.getElementById('salesTdsTcsAmountRow');
-    const amtLabel = document.getElementById('salesTdsTcsAmountLabel');
+    const autoNoBtn = document.getElementById('salesInvoiceNoAuto');
+    if (autoNoBtn) {
+      autoNoBtn.addEventListener('click', () => {
+        setInvoiceNoMode('Auto');
+      });
+    }
     
-    if (noneBtn && tdsBtn && tcsBtn && tBg && amtRow && amtLabel) {
-      noneBtn.addEventListener('click', () => {
-        noneBtn.classList.add('active');
-        tdsBtn.classList.remove('active');
-        tcsBtn.classList.remove('active');
-        tBg.className = 'sales-tdstcs-bg none-active';
-        amtRow.style.display = 'none';
-        recalculateSalesTotals();
-      });
-      
-      tdsBtn.addEventListener('click', () => {
-        tdsBtn.classList.add('active');
-        noneBtn.classList.remove('active');
-        tcsBtn.classList.remove('active');
-        tBg.className = 'sales-tdstcs-bg tds-active';
-        amtRow.style.display = 'block';
-        amtLabel.textContent = 'TDS';
-        recalculateSalesTotals();
-      });
-      
-      tcsBtn.addEventListener('click', () => {
-        tcsBtn.classList.add('active');
-        noneBtn.classList.remove('active');
-        tdsBtn.classList.remove('active');
-        tBg.className = 'sales-tdstcs-bg tcs-active';
-        amtRow.style.display = 'block';
-        amtLabel.textContent = 'TCS';
-        recalculateSalesTotals();
+    const manualNoBtn = document.getElementById('salesInvoiceNoManual');
+    if (manualNoBtn) {
+      manualNoBtn.addEventListener('click', () => {
+        setInvoiceNoMode('Manual');
       });
     }
     
     const addRowBtn = document.getElementById('salesAddRow');
     if (addRowBtn) {
-      addRowBtn.addEventListener('click', (e) => {
-        e.preventDefault();
+      addRowBtn.addEventListener('click', () => {
         addSalesRow();
       });
     }
-    
-    const clearBtn = document.getElementById('btnClearSales');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        window._editingSalesInvoice = null;
-        initSalesForm();
-      });
-    }
-    
-    const newSalesBtn = document.getElementById('btnNewSales');
-    if (newSalesBtn) {
-      newSalesBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        currentSalesVoucherSubtype = 'Invoice';
-        window._editingSalesInvoice = null;
-        initSalesForm();
-      });
-    }
-    
-    const saveDraftBtn = document.getElementById('btnSaveSalesDraft');
-    if (saveDraftBtn) {
-      saveDraftBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        saveSalesDraft();
-      });
-    }
-    
-    const postInvoiceBtn = document.getElementById('btnPostSales');
-    if (postInvoiceBtn) {
-      postInvoiceBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        postSalesInvoice();
-      });
-    }
-    
-    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
-    if (rateSelect) {
-      rateSelect.addEventListener('change', () => {
-        const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
-        if (rateSelect.value === 'custom') {
-          if (customWrap) customWrap.style.display = 'flex';
-        } else {
-          if (customWrap) customWrap.style.display = 'none';
-        }
-        recalculateSalesTotals();
-      });
-    }
-    const customInput = document.getElementById('salesTdsTcsRateCustom');
-    if (customInput) {
-      customInput.addEventListener('input', recalculateSalesTotals);
-    }
-    
-    const btnAutoRound = document.getElementById('btnSalesAutoRoundOff');
-    if (btnAutoRound) {
-      btnAutoRound.addEventListener('click', autoCalculateSalesRoundOff);
-    }
 
-    const adjustmentsInput = document.getElementById('salesAdjustments');
-    if (adjustmentsInput) {
-      adjustmentsInput.addEventListener('input', recalculateSalesTotals);
-      adjustmentsInput.addEventListener('blur', () => {
-        const val = parseSalesAmt(adjustmentsInput.value);
-        if (!isNaN(val)) {
-          const clamped = Math.round(val * 100) / 100;
-          adjustmentsInput.value = clamped === 0 ? '' : clamped.toFixed(2);
-          recalculateSalesTotals();
-        }
-      });
-      adjustmentsInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          const val = parseSalesAmt(adjustmentsInput.value);
-          if (!isNaN(val)) {
-            const clamped = Math.round(val * 100) / 100;
-            adjustmentsInput.value = clamped === 0 ? '' : clamped.toFixed(2);
-            recalculateSalesTotals();
-          }
-        }
-      });
-    }
-    
-    const body = document.getElementById('salesItemBody');
-    if (body) {
-      body.addEventListener('input', (e) => {
+    const salesItemBodyEl = document.getElementById('salesItemBody');
+    if (salesItemBodyEl) {
+      salesItemBodyEl.addEventListener('input', (e) => {
         const tr = e.target.closest('tr');
         if (!tr) return;
         const isRate = e.target.classList.contains('sales-row-rate');
@@ -732,48 +517,70 @@
         }
         const index = parseInt(tr.dataset.rowIndex);
         const triggeredBy = isAmt ? 'amount' : 'rate';
-        updateRowFromDOM(index, tr, triggeredBy);
+        if (typeof updateRowFromDOM === 'function') {
+          updateRowFromDOM(index, tr, triggeredBy);
+        }
       });
-      
-      body.addEventListener('change', (e) => {
+
+      salesItemBodyEl.addEventListener('change', (e) => {
         const tr = e.target.closest('tr');
         if (!tr) return;
         const index = parseInt(tr.dataset.rowIndex);
-        const triggeredBy = e.target.classList.contains('sales-row-amount-input') ? 'amount' : 'rate';
-        updateRowFromDOM(index, tr, triggeredBy);
+        if (typeof updateRowFromDOM === 'function') {
+          updateRowFromDOM(index, tr, 'rate');
+        }
       });
-      
-      body.addEventListener('click', (e) => {
-        const btn = e.target.closest('.sales-del-row');
-        if (btn) {
-          const tr = btn.closest('tr');
-          const index = parseInt(tr.dataset.rowIndex);
-          salesRows.splice(index, 1);
-          if (salesRows.length === 0) {
-            addSalesRow();
-          } else {
-            renderSalesRows();
-            recalculateSalesTotals();
+
+      salesItemBodyEl.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.sales-del-row');
+        if (delBtn) {
+          const tr = delBtn.closest('tr');
+          if (tr) {
+            const index = parseInt(tr.dataset.rowIndex);
+            if (!isNaN(index)) {
+              if (salesRows.length > 1) {
+                salesRows.splice(index, 1);
+              } else {
+                salesRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+              }
+              renderSalesRows();
+              recalculateSalesTotals();
+            }
           }
         }
       });
+    }
+    
+    const postSalesBtn = document.getElementById('btnPostSales');
+    if (postSalesBtn) {
+      postSalesBtn.addEventListener('click', () => {
+        postSalesInvoice();
+      });
+    }
 
-      // Evaluate math expression and format on blur
-      body.addEventListener('blur', (e) => {
-        const isRate = e.target.classList.contains('sales-row-rate');
-        const isAmt = e.target.classList.contains('sales-row-amount-input');
-        const isBase = e.target.classList.contains('sales-row-base');
-        const isDisc = e.target.classList.contains('sales-row-discount');
-        if (!isRate && !isAmt && !isBase && !isDisc) return;
+    const saveDraftBtn = document.getElementById('btnSaveSalesDraft');
+    if (saveDraftBtn) {
+      saveDraftBtn.addEventListener('click', () => {
+        saveSalesDraft();
+      });
+    }
 
-        const val = parseSalesAmt(e.target.value);
-        if (!isNaN(val)) {
-          const clamped = Math.round(val * 100) / 100;
-          e.target.value = clamped === 0 ? '' : clamped.toFixed(2);
-          const tr = e.target.closest('tr');
-          if (tr) updateRowFromDOM(parseInt(tr.dataset.rowIndex), tr, isAmt ? 'amount' : 'rate');
-        }
-      }, true); // capture phase so blur bubbles correctly
+    const discardBtn = document.getElementById('btnDiscardSales');
+    if (discardBtn) {
+      discardBtn.addEventListener('click', () => {
+        showKyaConfirm({
+          title: 'Discard Voucher?',
+          message: 'Are you sure you want to discard this sales voucher? Any unsaved changes will be lost.',
+          confirmLabel: 'Discard',
+          okBg: 'var(--red-600)',
+          onConfirm: () => {
+            window._editingSalesInvoice = null;
+            currentSalesVoucherSubtype = 'Invoice';
+            initSalesForm();
+            showToast('Sales voucher discarded.', 'info');
+          }
+        });
+      });
     }
     
     const dateEl = document.getElementById('salesDate');
@@ -792,19 +599,6 @@
     if (custEl) {
       custEl.addEventListener('focus', () => {
         populateSalesCustomers(custEl.value);
-      });
-      custEl.addEventListener('change', () => {
-        const customerId = custEl.value;
-        const orderEl = document.getElementById('salesOrderNo');
-        if (orderEl) {
-          if (customerId) {
-            const postedInvoices = window.KYA_STORE.salesVouchers || [];
-            const count = postedInvoices.filter(v => v.customerId == customerId).length;
-            orderEl.value = count + 1;
-          } else {
-            orderEl.value = '';
-          }
-        }
       });
     }
     
@@ -927,37 +721,106 @@
         total += adjustments;
         
         const maxVal = getSalesPaymentMax(total);
-        const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
-        const isOrderLinked = (currentSalesVoucherSubtype === 'Invoice' && orderNo);
         
-        let orderAdvanceAmount = 0;
-        if (isOrderLinked) {
-          const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
-          if (linkedOrder) {
-            if (linkedOrder.paymentStatus === 'Full Payment') {
-              orderAdvanceAmount = linkedOrder.total;
-            } else if (linkedOrder.paymentStatus === 'Partial Payment') {
-              orderAdvanceAmount = linkedOrder.paymentAmount || 0;
-            }
-          }
+        if (total > 0 && parseFloat(payAmtEl.value) > maxVal) {
+          payAmtEl.value = maxVal.toFixed(2);
+          showToast(`Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the Grand Total.`, 'warning');
         }
-        const excessAmount = Math.max(0, orderAdvanceAmount - total);
-        const allowedMax = (isOrderLinked && excessAmount > 0) ? excessAmount : maxVal;
-        
-        if (total > 0 && parseFloat(payAmtEl.value) > allowedMax) {
-          payAmtEl.value = allowedMax.toFixed(2);
-          const limitMsg = (isOrderLinked && excessAmount > 0)
-            ? `Refund Amount cannot exceed the excess refund amount of ₹${fmtNum(allowedMax)}.`
-            : (isOrderLinked 
-               ? `Payment Amount cannot exceed the balance payment of ₹${fmtNum(allowedMax)}.`
-               : `Payment Amount cannot exceed the Grand Total of ₹${fmtNum(allowedMax)}.`);
-          showToast(limitMsg, 'warning');
+      });
+    }
+
+    // TDS / TCS Toggle Buttons & Row
+    const tdsTcsNoneBtn = document.getElementById('salesTdsTcsNone');
+    const tdsTcsTdsBtn = document.getElementById('salesTdsTcsTds');
+    const tdsTcsTcsBtn = document.getElementById('salesTdsTcsTcs');
+    const tdsTcsBg = document.getElementById('salesTdsTcsBg');
+    const tdsTcsAmountRow = document.getElementById('salesTdsTcsAmountRow');
+    const tdsTcsAmountLabel = document.getElementById('salesTdsTcsAmountLabel');
+    const tdsTcsRateSelect = document.getElementById('salesTdsTcsRateSelect');
+    const tdsTcsRateCustom = document.getElementById('salesTdsTcsRateCustom');
+    const tdsTcsRateCustomWrap = document.getElementById('salesTdsTcsRateCustomWrap');
+    const tdsTcsAmountInput = document.getElementById('salesTdsTcsAmount');
+    const salesAdjustmentsInput = document.getElementById('salesAdjustments');
+    const btnAutoRoundOff = document.getElementById('btnSalesAutoRoundOff');
+
+    if (tdsTcsNoneBtn) {
+      tdsTcsNoneBtn.addEventListener('click', () => {
+        tdsTcsNoneBtn.classList.add('active');
+        if (tdsTcsTdsBtn) tdsTcsTdsBtn.classList.remove('active');
+        if (tdsTcsTcsBtn) tdsTcsTcsBtn.classList.remove('active');
+        if (tdsTcsBg) tdsTcsBg.className = 'sales-tdstcs-bg none-active';
+        if (tdsTcsAmountRow) tdsTcsAmountRow.style.display = 'none';
+        if (tdsTcsAmountInput) tdsTcsAmountInput.value = '';
+        recalculateSalesTotals();
+      });
+    }
+
+    if (tdsTcsTdsBtn) {
+      tdsTcsTdsBtn.addEventListener('click', () => {
+        tdsTcsTdsBtn.classList.add('active');
+        if (tdsTcsNoneBtn) tdsTcsNoneBtn.classList.remove('active');
+        if (tdsTcsTcsBtn) tdsTcsTcsBtn.classList.remove('active');
+        if (tdsTcsBg) tdsTcsBg.className = 'sales-tdstcs-bg tds-active';
+        if (tdsTcsAmountRow) tdsTcsAmountRow.style.display = 'block';
+        if (tdsTcsAmountLabel) tdsTcsAmountLabel.textContent = 'TDS';
+        recalculateSalesTotals();
+      });
+    }
+
+    if (tdsTcsTcsBtn) {
+      tdsTcsTcsBtn.addEventListener('click', () => {
+        tdsTcsTcsBtn.classList.add('active');
+        if (tdsTcsNoneBtn) tdsTcsNoneBtn.classList.remove('active');
+        if (tdsTcsTdsBtn) tdsTcsTdsBtn.classList.remove('active');
+        if (tdsTcsBg) tdsTcsBg.className = 'sales-tdstcs-bg tcs-active';
+        if (tdsTcsAmountRow) tdsTcsAmountRow.style.display = 'block';
+        if (tdsTcsAmountLabel) tdsTcsAmountLabel.textContent = 'TCS';
+        recalculateSalesTotals();
+      });
+    }
+
+    if (tdsTcsRateSelect) {
+      tdsTcsRateSelect.addEventListener('change', () => {
+        if (tdsTcsRateSelect.value === 'custom') {
+          if (tdsTcsRateCustomWrap) tdsTcsRateCustomWrap.style.display = 'flex';
+          if (tdsTcsRateCustom) tdsTcsRateCustom.focus();
+        } else {
+          if (tdsTcsRateCustomWrap) tdsTcsRateCustomWrap.style.display = 'none';
+        }
+        recalculateSalesTotals();
+      });
+    }
+
+    if (tdsTcsRateCustom) {
+      tdsTcsRateCustom.addEventListener('input', () => {
+        recalculateSalesTotals();
+      });
+    }
+
+    if (tdsTcsAmountInput) {
+      tdsTcsAmountInput.addEventListener('input', () => {
+        recalculateSalesTotals();
+      });
+    }
+
+    if (salesAdjustmentsInput) {
+      salesAdjustmentsInput.addEventListener('input', () => {
+        recalculateSalesTotals();
+      });
+    }
+
+    if (btnAutoRoundOff) {
+      btnAutoRoundOff.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (typeof autoCalculateSalesRoundOff === 'function') {
+          autoCalculateSalesRoundOff();
         }
       });
     }
 
     const returnBtn = document.getElementById('btnSalesReturn');
-    const orderBtn = document.getElementById('btnSalesOrder');
+    const newSalesBtn = document.getElementById('btnNewSales');
+    const preInvoiceBtn = document.getElementById('btnSalesPreInvoice');
     
     if (returnBtn) {
       returnBtn.addEventListener('click', (e) => {
@@ -967,14 +830,334 @@
         initSalesForm();
       });
     }
-    if (orderBtn) {
-      orderBtn.addEventListener('click', (e) => {
+
+    if (newSalesBtn) {
+      newSalesBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        currentSalesVoucherSubtype = 'Order';
+        currentSalesVoucherSubtype = 'Invoice';
         window._editingSalesInvoice = null;
         initSalesForm();
       });
     }
+
+    if (preInvoiceBtn) {
+      preInvoiceBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentSalesVoucherSubtype = 'PreInvoice';
+        window._editingSalesInvoice = null;
+        updateVoucherSubtypeUI();
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  PRE INVOICE — KeepOne-Style Upcoming Modules
+  // ══════════════════════════════════════════════════════════════════
+  const SALES_PRE_INV_UPCOMING = {
+    preinvoice: {
+      label: 'Pre Invoice',
+      icon: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>`,
+      desc: 'Centralized pre-billing pipeline to prepare, verify, and convert preliminary sales documents prior to final invoice posting.',
+      features: ['Draft Billing', 'Pre-Tax Validations', 'Document Conversion', 'Multi-Stage Approvals'],
+    },
+    quotation: {
+      label: 'Quotation',
+      icon: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        <line x1="8" y1="9" x2="16" y2="9"></line>
+        <line x1="8" y1="13" x2="14" y2="13"></line>
+      </svg>`,
+      desc: 'Create official price estimates and formal sales quotes for clients with itemized rates, discounts, and terms.',
+      features: ['Price Quotations', 'Client Estimations', 'Convert to Sales Order', 'Discount Tiers'],
+    },
+    proforma: {
+      label: 'Proforma Invoice',
+      icon: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"></path>
+        <line x1="8" y1="8" x2="16" y2="8"></line>
+        <line x1="8" y1="12" x2="16" y2="12"></line>
+        <line x1="8" y1="16" x2="12" y2="16"></line>
+      </svg>`,
+      desc: 'Issue provisional bills of sale in advance of goods shipment or service delivery to request advance payments.',
+      features: ['Advance Invoicing', 'Customs Clearance Proforma', 'Payment Milestones', '1-Click Invoice Generation'],
+    },
+    salesorder: {
+      label: 'Sales Order',
+      icon: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+        <line x1="8" y1="21" x2="16" y2="21"></line>
+        <line x1="12" y1="17" x2="12" y2="21"></line>
+        <path d="M7 8h10M7 12h6"></path>
+      </svg>`,
+      desc: 'Record confirmed customer purchase orders, track order fulfillment, inventory commitments, and delivery schedules.',
+      features: ['Order Confirmation', 'Inventory Reservation', 'Fulfillment Tracking', 'Backorder Management'],
+    },
+    deliverychallan: {
+      label: 'Delivery Challan',
+      icon: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="3" width="15" height="13"></rect>
+        <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+      </svg>`,
+      desc: 'Generate dispatch documents for transportation of goods for job work, supply on approval, or multi-location transfers.',
+      features: ['Goods Dispatch', 'Vehicle & E-Way Link', 'Approval Supply', 'Goods Return Tracking'],
+    },
+  };
+
+  let _salesPreInvActiveTab = 'preinvoice';
+
+  function renderSalesPreInvoicePanel() {
+    switchSalesPreInvTab(_salesPreInvActiveTab || 'preinvoice');
+
+    const tabMap = {
+      preInvTabOverview: 'preinvoice',
+      preInvTabQuotation: 'quotation',
+      preInvTabProforma: 'proforma',
+      preInvTabSalesOrder: 'salesorder',
+      preInvTabDeliveryChallan: 'deliverychallan',
+    };
+
+    Object.entries(tabMap).forEach(([btnId, tabKey]) => {
+      const btn = document.getElementById(btnId);
+      if (btn && !btn._preInvWired) {
+        btn._preInvWired = true;
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          switchSalesPreInvTab(tabKey);
+        });
+      }
+    });
+  }
+
+  function switchSalesPreInvTab(tabKey) {
+    if (tabKey === 'quotation' && typeof openQuotationForm === 'function') {
+      openQuotationForm();
+      return;
+    }
+    if (tabKey === 'proforma' && typeof openProformaForm === 'function') {
+      openProformaForm();
+      return;
+    }
+    if (tabKey === 'salesorder' && typeof openSalesOrderForm === 'function') {
+      openSalesOrderForm();
+      return;
+    }
+    if (tabKey === 'deliverychallan' && typeof openDeliveryChallanForm === 'function') {
+      openDeliveryChallanForm();
+      return;
+    }
+
+    _salesPreInvActiveTab = tabKey;
+
+    const tabButtons = {
+      preinvoice: document.getElementById('preInvTabOverview'),
+      quotation: document.getElementById('preInvTabQuotation'),
+      proforma: document.getElementById('preInvTabProforma'),
+      salesorder: document.getElementById('preInvTabSalesOrder'),
+      deliverychallan: document.getElementById('preInvTabDeliveryChallan'),
+    };
+
+    Object.entries(tabButtons).forEach(([k, btn]) => {
+      if (!btn) return;
+      const isActive = k === tabKey;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    const contentArea = document.getElementById('preInvContentArea');
+    if (!contentArea) return;
+
+    if (tabKey === 'preinvoice') {
+      contentArea.innerHTML = renderPreInvoiceOverviewTable();
+      return;
+    }
+
+    const cfg = SALES_PRE_INV_UPCOMING[tabKey] || SALES_PRE_INV_UPCOMING['preinvoice'];
+    if (!cfg) return;
+
+    const featureTags = cfg.features
+      .map(f => `<span class="oh-upcoming-feat-tag">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M2 6l3 3 5-5" stroke="#10b981" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        ${f}
+      </span>`)
+      .join('');
+
+    contentArea.innerHTML = `
+      <div class="oh-upcoming-wrap">
+        <div class="oh-upcoming-icon-ring" style="color:#b45309;">
+          ${cfg.icon}
+        </div>
+        <div class="oh-upcoming-title">${cfg.label}</div>
+        <div class="oh-upcoming-subtitle">${cfg.desc}</div>
+        <div class="oh-upcoming-pill">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Upcoming Feature
+        </div>
+        <div class="oh-upcoming-features">${featureTags}</div>
+      </div>
+    `;
+  }
+
+  function renderPreInvoiceOverviewTable() {
+    window.KYA_STORE = window.KYA_STORE || {};
+    const quotes = window.KYA_STORE.quotations || [];
+    const quoteActive = quotes.filter(q => q.status === 'Active' || !q.status || q.status === 'Draft').length;
+    const quoteCompleted = quotes.filter(q => q.status === 'Completed').length;
+    const quoteCancelled = quotes.filter(q => q.status === 'Cancelled').length;
+
+    const proformas = window.KYA_STORE.proformaInvoices || [];
+    const proformaActive = proformas.filter(p => p.status === 'Active' || !p.status || p.status === 'Draft').length;
+    const proformaCompleted = proformas.filter(p => p.status === 'Completed').length;
+    const proformaCancelled = proformas.filter(p => p.status === 'Cancelled').length;
+
+    const orders = window.KYA_STORE.salesOrders || [];
+    const orderActive = orders.filter(o => o.status === 'Active' || !o.status || o.status === 'Draft').length;
+    const orderCompleted = orders.filter(o => o.status === 'Completed').length;
+    const orderCancelled = orders.filter(o => o.status === 'Cancelled').length;
+
+    const challans = window.KYA_STORE.deliveryChallans || [];
+    const challanActive = challans.filter(c => c.status === 'Active' || !c.status || c.status === 'Draft').length;
+    const challanCompleted = challans.filter(c => c.status === 'Completed').length;
+    const challanCancelled = challans.filter(c => c.status === 'Cancelled').length;
+
+    return `
+      <div class="table-card" style="border: 1.5px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: var(--shadow-sm); width: 100%; box-sizing: border-box;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+          <thead>
+            <tr style="background: var(--slate-50); border-bottom: 1.5px solid var(--slate-200);">
+              <th style="padding: 14px 24px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--slate-600);">Pre Invoice</th>
+              <th style="padding: 14px 20px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--emerald-700); text-align: center; width: 140px;">Active</th>
+              <th style="padding: 14px 20px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--blue-700); text-align: center; width: 140px;">Completed</th>
+              <th style="padding: 14px 20px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--slate-500); text-align: center; width: 140px;">Cancelled</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- 1. Quotation -->
+            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openQuotationForm()">
+              <td style="padding: 16px 24px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; background: #eff6ff; color: var(--blue-600); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      <path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                      <path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--slate-800);">Quotation</div>
+                    <div style="font-size: 12px; color: var(--slate-500);">Price proposals, estimates and customer quotes</div>
+                  </div>
+                </div>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${quoteActive}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${quoteCompleted}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${quoteCancelled}</span>
+              </td>
+            </tr>
+
+            <!-- 2. Proforma Invoice -->
+            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openProformaForm()">
+              <td style="padding: 16px 24px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--slate-800);">Proforma Invoice</div>
+                    <div style="font-size: 12px; color: var(--slate-500);">Preliminary commercial invoices and advance billing</div>
+                  </div>
+                </div>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${proformaActive}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${proformaCompleted}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${proformaCancelled}</span>
+              </td>
+            </tr>
+
+            <!-- 3. Sales Order -->
+            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openSalesOrderForm()">
+              <td style="padding: 16px 24px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                      <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                      <circle cx="14" cy="13" r="1" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--slate-800);">Sales Order</div>
+                    <div style="font-size: 12px; color: var(--slate-500);">Confirmed customer purchase orders for fulfillment</div>
+                  </div>
+                </div>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${orderActive}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${orderCompleted}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${orderCancelled}</span>
+              </td>
+            </tr>
+
+            <!-- 4. Delivery Challan -->
+            <tr style="transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openDeliveryChallanForm()">
+              <td style="padding: 16px 24px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 36px; height: 36px; border-radius: 8px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                      <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.6"/>
+                      <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                      <circle cx="4.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                      <circle cx="15.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--slate-800);">Delivery Challan</div>
+                    <div style="font-size: 12px; color: var(--slate-500);">Dispatch challans and goods transit documentation</div>
+                  </div>
+                </div>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${challanActive}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${challanCompleted}</span>
+              </td>
+              <td style="padding: 16px 20px; text-align: center;">
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${challanCancelled}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   function setupVoucherDeskEventListeners() {
@@ -1000,6 +1183,8 @@
   // ── Global Window Exports ──
   window.setupSalesVoucherEventListeners = setupSalesVoucherEventListeners;
   window.setupVoucherDeskEventListeners = setupVoucherDeskEventListeners;
+  window.renderSalesPreInvoicePanel = renderSalesPreInvoicePanel;
+  window.switchSalesPreInvTab = switchSalesPreInvTab;
   if (typeof viewPrintInvoice === 'function') window.viewPrintInvoice = viewPrintInvoice;
   if (typeof editSalesDraft === 'function') window.editSalesDraft = editSalesDraft;
   if (typeof printSalesVoucher === 'function') window.printSalesVoucher = printSalesVoucher;

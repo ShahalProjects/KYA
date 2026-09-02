@@ -5337,7 +5337,8 @@
       flex-direction: column;
       min-height: 0;
     }
-    #salesNotes {
+    #salesNotes,
+    #quoteNotes {
       flex: 1;
       width: 100%;
       min-height: 90px;
@@ -6056,3 +6057,165 @@ tr.cl-confirm-row:hover {
   border-color: #fecaca !important;
   color: #dc2626 !important;
 }
+
+/* ==========================================================
+   CASHLINE & REPORT GLASS CONTROLS (Blue Card Header Controls)
+   ========================================================== */
+.cl-glass-control {
+  height: 34px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 8px !important;
+  color: #ffffff !important;
+  font-family: var(--font-main), Inter, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  padding: 0 10px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  cursor: pointer;
+}
+.cl-glass-control:hover {
+  background: rgba(255, 255, 255, 0.26) !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+}
+.cl-glass-control:focus {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.75) !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+}
+.cl-glass-control option {
+  background: #ffffff !important;
+  color: #1e293b !important;
+  font-weight: 500 !important;
+}
+.cl-glass-control[type="date"] {
+  color-scheme: dark !important;
+}
+
+/* 3-Dot More Options Dropdown & Submenus */
+.rpt-more-wrap {
+  position: relative;
+  display: inline-block;
+}
+.rpt-more-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  padding: 0;
+  box-sizing: border-box;
+}
+.rpt-more-btn:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.rpt-more-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  min-width: 170px;
+  z-index: 1000;
+  display: none;
+  font-family: var(--font-main), Inter, sans-serif;
+  animation: jePopIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rpt-more-dropdown.open {
+  display: block;
+}
+.rpt-menu-item {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.12s ease;
+  text-align: left;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.rpt-menu-item:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+.rpt-menu-item svg {
+  flex-shrink: 0;
+}
+.rpt-submenu-wrap {
+  position: relative;
+  width: 100%;
+}
+.rpt-submenu-btn {
+  justify-content: space-between;
+}
+.rpt-submenu-caret {
+  transition: transform 0.15s ease;
+}
+.rpt-submenu-dropdown {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 6px);
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  min-width: 130px;
+  z-index: 1001;
+  display: none;
+}
+.rpt-submenu-dropdown.open {
+  display: block;
+}
+.rpt-menu-sep {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 4px 0;
+}
+.rpt-menu-chk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+.rpt-menu-chk:hover {
+  background: #f1f5f9;
+}
+.rpt-menu-chk input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--blue-600);
+}
+

@@ -111,7 +111,6 @@
       window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
       window.KYA_STORE.salesInvoiceCtr = window.KYA_STORE.salesInvoiceCtr || 1;
       window.KYA_STORE.salesReturnCtr = window.KYA_STORE.salesReturnCtr || 1;
-      window.KYA_STORE.salesOrderCtr = window.KYA_STORE.salesOrderCtr || 1;
       window.KYA_STORE.purchaseVouchers = window.KYA_STORE.purchaseVouchers || [];
       window.KYA_STORE.purchaseVouchersDrafts = window.KYA_STORE.purchaseVouchersDrafts || [];
       window.KYA_STORE.purchaseInvoiceCtr = window.KYA_STORE.purchaseInvoiceCtr || 1;

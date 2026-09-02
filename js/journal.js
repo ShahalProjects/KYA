@@ -117,10 +117,38 @@
     if (inp) inp.focus();
   }
 
-  // ── Date → Enter → first particulars ─────────────────────────────
-  document.getElementById('jeDate').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); focusFirstParticulars(); }
-  });
+  let _jeLastSelectedDate = '';
+  try {
+    _jeLastSelectedDate = localStorage.getItem('kya_je_last_date') || '';
+  } catch (e) {}
+
+  // ── Date listeners ───────────────────────────────────────────────
+  const jeDateEl = document.getElementById('jeDate');
+  if (jeDateEl) {
+    jeDateEl.addEventListener('change', function() {
+      if (this.value) {
+        _jeLastSelectedDate = this.value;
+        try { localStorage.setItem('kya_je_last_date', this.value); } catch(e) {}
+        if (!window._editingJournalEntry) {
+          const curVn = (document.getElementById('jeVoucherNo')?.value || '').trim();
+          if (!curVn || /^JV-\d{4}-\d+$/i.test(curVn)) {
+            const newVn = genVoucherNo(this.value);
+            document.getElementById('jeVoucherNo').value = newVn;
+            document.getElementById('jeVoucherChipDisplay').textContent = newVn;
+          }
+        }
+      }
+    });
+    jeDateEl.addEventListener('input', function() {
+      if (this.value) {
+        _jeLastSelectedDate = this.value;
+        try { localStorage.setItem('kya_je_last_date', this.value); } catch(e) {}
+      }
+    });
+    jeDateEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); focusFirstParticulars(); }
+    });
+  }
 
   // ── Voucher No → Enter → first particulars ────────────────────────
   document.getElementById('jeVoucherNo').addEventListener('keydown', function(e) {
@@ -307,8 +335,10 @@
   function initFormDefaults() {
     const d = new Date();
     const iso = d.toISOString().split('T')[0];
-    document.getElementById('jeDate').value = iso;
-    const vn = genVoucherNo();
+    const targetDate = _jeLastSelectedDate || iso;
+    const dateInput = document.getElementById('jeDate');
+    if (dateInput) dateInput.value = targetDate;
+    const vn = genVoucherNo(targetDate);
     document.getElementById('jeVoucherNo').value = vn;
     document.getElementById('jeVoucherChipDisplay').textContent = vn;
     document.getElementById('jeNarration').value = '';
@@ -502,8 +532,31 @@
           if (e.key === 'Enter' || (e.key === ' ' && !/[\+\-\*\/\(]\s*$/.test(inpAmt.value))) {
             e.preventDefault();
 
-            // Commit current amount first
-            const v = parseAmt(inpAmt.value);
+            let v = parseAmt(inpAmt.value);
+
+            // Auto amount (tally amount) only if current row type can actually balance Total Dr and Cr
+            if ((!v || v <= 0) && inpAmt.value.trim() === '') {
+              let otherDr = 0;
+              let otherCr = 0;
+              jeRows.forEach(r => {
+                if (r.id !== row.id) {
+                  otherDr += parseAmt(r.debit);
+                  otherCr += parseAmt(r.credit);
+                }
+              });
+
+              let tallyAmt = 0;
+              if (row.type === 'To' && otherDr > otherCr) {
+                tallyAmt = otherDr - otherCr;
+              } else if (row.type === 'By' && otherCr > otherDr) {
+                tallyAmt = otherCr - otherDr;
+              }
+
+              if (tallyAmt > 0) {
+                v = tallyAmt;
+              }
+            }
+
             if (!v || v <= 0) {
               showToast('Please enter an amount greater than zero.', 'warning');
               return;
@@ -511,7 +564,9 @@
 
             const fmt = v.toFixed(2);
             inpAmt.value = fmt;
-            if (isBy) row.debit = fmt; else row.credit = fmt;
+            if (row.type === 'By') { row.debit = fmt; row.credit = ''; }
+            else                   { row.credit = fmt; row.debit = ''; }
+
             refreshTotals();
 
             // After committing, re-check balance
@@ -524,12 +579,36 @@
               document.getElementById('jeNarration').focus();
             } else {
               // Not balanced → create next row
-              if (e.key === 'Enter') addRow('To');
+              const nextType = totalDr > totalCr ? 'To' : 'By';
+              if (e.key === 'Enter') addRow(nextType);
               else                   addRow('By');
             }
 
           } else if (e.key === 'Tab') {
-            const v = parseAmt(inpAmt.value);
+            let v = parseAmt(inpAmt.value);
+            if ((!v || v <= 0) && inpAmt.value.trim() === '') {
+              let otherDr = 0, otherCr = 0;
+              jeRows.forEach(r => {
+                if (r.id !== row.id) {
+                  otherDr += parseAmt(r.debit);
+                  otherCr += parseAmt(r.credit);
+                }
+              });
+              let tallyAmt = 0;
+              if (row.type === 'To' && otherDr > otherCr) {
+                tallyAmt = otherDr - otherCr;
+              } else if (row.type === 'By' && otherCr > otherDr) {
+                tallyAmt = otherCr - otherDr;
+              }
+              if (tallyAmt > 0) {
+                v = tallyAmt;
+                const fmt = v.toFixed(2);
+                inpAmt.value = fmt;
+                if (row.type === 'By') { row.debit = fmt; row.credit = ''; }
+                else                   { row.credit = fmt; row.debit = ''; }
+                refreshTotals();
+              }
+            }
             if (!v || v <= 0) {
               e.preventDefault();
               showToast('Please enter an amount greater than zero.', 'warning');
@@ -1366,6 +1445,11 @@
     showToast(isEditDraft ? 'Draft updated successfully.' : 'Draft saved successfully.', 'info');
     if (!isEditDraft) {
       jvCounter++;
+    }
+
+    if (dateVal) {
+      _jeLastSelectedDate = dateVal;
+      try { localStorage.setItem('kya_je_last_date', dateVal); } catch(e) {}
     }
 
     const returnContext = editingCtx?.returnContext || window._pendingJournalReturnContext || null;
@@ -2640,6 +2724,11 @@
       jvCounter++;
     }
 
+    if (postData.date) {
+      _jeLastSelectedDate = postData.date;
+      try { localStorage.setItem('kya_je_last_date', postData.date); } catch(e) {}
+    }
+
     window._editingJournalEntry = null;
     window._pendingJournalReturnContext = null;
 
@@ -2935,7 +3024,7 @@
     // 3. Process Sales drafts from KYA_STORE
     const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
     salesDrafts.forEach(d => {
-      const vType = d.isReturn ? 'Reversal' : (d.isOrder ? 'Order' : 'Invoice');
+      const vType = d.isReturn ? 'Reversal' : 'Invoice';
       const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
       list.push({
@@ -2950,7 +3039,7 @@
       });
     });
 
-    // 4. Process any Sales Vouchers not captured in postedEntries (e.g. non-financial orders)
+    // 4. Process any Sales Vouchers not captured in postedEntries
     const salesPosted = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [];
     salesPosted.forEach(v => {
       const alreadyInList = list.some(item => !item.isDraft && (
@@ -2958,13 +3047,12 @@
         item.id === v.id || 
         item.voucherNo === v.invoiceNo || 
         item.voucherNo === `SV-${v.invoiceNo}` || 
-        item.voucherNo === `SR-${v.invoiceNo}` || 
-        item.voucherNo === `SO-${v.invoiceNo}`
+        item.voucherNo === `SR-${v.invoiceNo}`
       ));
 
       if (!alreadyInList) {
-        const vType = v.isReturn ? 'Reversal' : (v.isOrder ? 'Order' : 'Invoice');
-        const prefix = v.isReturn ? 'SR-' : (v.isOrder ? 'SO-' : 'SV-');
+        const vType = v.isReturn ? 'Reversal' : 'Invoice';
+        const prefix = v.isReturn ? 'SR-' : 'SV-';
         const vNo = (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-')) ? v.invoiceNo : `${prefix}${v.invoiceNo}`;
         const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -3025,11 +3113,26 @@
       }
     });
 
-    // 7. Update Stat counters
-    const totalJournal = list.filter(e => e.type === 'Journal' && !e.isDraft).length;
-    const totalSales = list.filter(e => (e.type === 'Invoice' || e.type === 'Order' || e.type === 'Reversal') && !e.isDraft).length;
-    const totalDrafts = list.filter(e => e.isDraft).length;
-    const totalVouchers = list.length;
+    // 7. Date inputs & filtering
+    const fromInp = document.getElementById('vdDateFrom');
+    const toInp   = document.getElementById('vdDateTo');
+    if (fromInp && !fromInp.value) fromInp.value = _globalDateFrom || '2024-04-01';
+    if (toInp   && !toInp.value)   toInp.value   = _globalDateTo || '2025-03-31';
+
+    const dateFrom = fromInp ? fromInp.value : '';
+    const dateTo   = toInp ? toInp.value : '';
+
+    const dateFilteredList = list.filter(e => {
+      if (dateFrom && e.date && e.date < dateFrom) return false;
+      if (dateTo && e.date && e.date > dateTo) return false;
+      return true;
+    });
+
+    // Update Stat counters based on date range
+    const totalJournal = dateFilteredList.filter(e => e.type === 'Journal' && !e.isDraft).length;
+    const totalSales = dateFilteredList.filter(e => (e.type === 'Invoice' || e.type === 'Order' || e.type === 'Reversal') && !e.isDraft).length;
+    const totalDrafts = dateFilteredList.filter(e => e.isDraft).length;
+    const totalVouchers = dateFilteredList.length;
 
     const elTotal = document.getElementById('vdStatTotal');
     const elJE = document.getElementById('vdStatJE');
@@ -3041,7 +3144,7 @@
     if (elInv) elInv.textContent = totalSales;
     if (elDrafts) elDrafts.textContent = totalDrafts;
 
-    list.sort((a, b) => {
+    dateFilteredList.sort((a, b) => {
       const dComp = (b.date || '').localeCompare(a.date || '');
       if (dComp !== 0) return dComp;
       const vComp = (a.voucherNo || '').localeCompare(b.voucherNo || '', undefined, { numeric: true, sensitivity: 'base' });
@@ -3049,7 +3152,7 @@
       return (Number(a.id) || 0) - (Number(b.id) || 0);
     });
 
-    let filtered = list.filter(e => {
+    let filtered = dateFilteredList.filter(e => {
       if (_vdTypeFilter !== 'All' && e.type !== _vdTypeFilter) return false;
       
       if (_vdStatusFilter !== 'All') {
@@ -3103,7 +3206,6 @@
               <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
               <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
-              <option value="Order" ${_vdTypeFilter === 'Order' ? 'selected' : ''}>Sales Order</option>
               <option value="Reversal" ${_vdTypeFilter === 'Reversal' ? 'selected' : ''}>Sales Reversal</option>
               <option value="Purchase" ${_vdTypeFilter === 'Purchase' ? 'selected' : ''}>Purchase Voucher</option>
             </select>
@@ -3150,7 +3252,6 @@
               <option value="All" ${_vdTypeFilter === 'All' ? 'selected' : ''}>All Types</option>
               <option value="Journal" ${_vdTypeFilter === 'Journal' ? 'selected' : ''}>Journal Entry</option>
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
-              <option value="Order" ${_vdTypeFilter === 'Order' ? 'selected' : ''}>Sales Order</option>
               <option value="Reversal" ${_vdTypeFilter === 'Reversal' ? 'selected' : ''}>Sales Reversal</option>
               <option value="Purchase" ${_vdTypeFilter === 'Purchase' ? 'selected' : ''}>Purchase Voucher</option>
             </select>
@@ -3184,27 +3285,18 @@
                    ? `<span class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Journal Entry</span>`
                    : (e.type === 'Reversal'
                       ? `<span class="tb-badge" style="background:#fee2e2; color:#b91c1c; border:1.5px solid #fca5a5; font-size:11px; padding:3px 8px; text-transform:none;">Sales Reversal</span>`
-                      : (e.type === 'Order'
-                         ? `<span class="tb-badge" style="background:#e0e7ff; color:#4338ca; border:1.5px solid #c7d2fe; font-size:11px; padding:3px 8px; text-transform:none;">Sales Order</span>`
-                         : (e.type === 'Purchase'
-                            ? `<span class="tb-badge" style="background:#fef3c7; color:#b45309; border:1.5px solid #fde68a; font-size:11px; padding:3px 8px; text-transform:none;">Purchase Voucher</span>`
-                            : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`)));
+                      : (e.type === 'Purchase'
+                         ? `<span class="tb-badge" style="background:#fef3c7; color:#b45309; border:1.5px solid #fde68a; font-size:11px; padding:3px 8px; text-transform:none;">Purchase Voucher</span>`
+                         : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`));
 
                 let statusBadge = '';
                 if (e.isDraft) {
                   statusBadge = `<span class="tb-badge" style="background:#fffbeb; color:#d97706; border:1.5px solid #fde68a; font-size:11px; padding:3px 8px; text-transform:none;">Draft</span>`;
-                } else if (e.type === 'Order') {
-                  const isCompleted = (window.KYA_STORE.salesVouchers || []).some(v => !v.isOrder && !v.isReturn && v.orderNo === e.voucherNo);
-                  if (isCompleted) {
-                    statusBadge = `<span class="tb-badge" style="background:#ecfdf5; color:#059669; border:1.5px solid #a7f3d0; font-size:11px; padding:3px 8px; text-transform:none;">Completed</span>`;
-                  } else {
-                    statusBadge = `<span class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Placed</span>`;
-                  }
                 } else {
                   statusBadge = `<span class="tb-badge" style="background:#ecfdf5; color:#059669; border:1.5px solid #a7f3d0; font-size:11px; padding:3px 8px; text-transform:none;">Posted</span>`;
                 }
 
-                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : (e.type === 'Reversal' ? '#dc2626' : (e.type === 'Order' ? 'var(--emerald-700)' : (e.type === 'Purchase' ? 'var(--amber-700)' : '#059669')));
+                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : (e.type === 'Reversal' ? '#dc2626' : (e.type === 'Purchase' ? 'var(--amber-700)' : '#059669'));
 
                 return `
                   <tr data-id="${e.id}" data-type="${e.type}" data-draft="${e.isDraft}" data-key="${itemKey}" class="vd-row ${isSelected ? 'pt-sel-row' : ''}" style="cursor: pointer;">
@@ -3235,6 +3327,22 @@
     document.querySelectorAll('.vd-status-tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.status === _vdStatusFilter);
     });
+
+    const vdDateFromEl = document.getElementById('vdDateFrom');
+    if (vdDateFromEl && !vdDateFromEl._isWired) {
+      vdDateFromEl._isWired = true;
+      vdDateFromEl.addEventListener('change', () => {
+        renderVoucherDeskPanel();
+      });
+    }
+
+    const vdDateToEl = document.getElementById('vdDateTo');
+    if (vdDateToEl && !vdDateToEl._isWired) {
+      vdDateToEl._isWired = true;
+      vdDateToEl.addEventListener('change', () => {
+        renderVoucherDeskPanel();
+      });
+    }
 
     const searchEl = document.getElementById('vdSearch');
     if (searchEl) {
@@ -3423,6 +3531,10 @@
 
   function getVoucherDeskExportData() {
     let list = [];
+    const fromInp = document.getElementById('vdDateFrom');
+    const toInp   = document.getElementById('vdDateTo');
+    const dateFrom = fromInp ? fromInp.value : '';
+    const dateTo   = toInp ? toInp.value : '';
 
     // 1. Process Journal & Sales entries posted in postedEntries
     postedEntries.forEach(e => {
@@ -3480,7 +3592,7 @@
     // 3. Process Sales drafts
     const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
     salesDrafts.forEach(d => {
-      const vType = d.isReturn ? 'Sales Reversal' : (d.isOrder ? 'Sales Order' : 'Sales Invoice');
+      const vType = d.isReturn ? 'Sales Reversal' : 'Sales Invoice';
       const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
       list.push({
@@ -3488,7 +3600,7 @@
         date: d.date,
         voucherNo: d.invoiceNo || 'Draft',
         type: vType,
-        rawType: d.isReturn ? 'Reversal' : (d.isOrder ? 'Order' : 'Invoice'),
+        rawType: d.isReturn ? 'Reversal' : 'Invoice',
         particulars: getVoucherParticularsName(d, vType),
         amount: vAmt,
         status: 'Draft',
@@ -3504,28 +3616,23 @@
         item.id === v.id || 
         item.voucherNo === v.invoiceNo || 
         item.voucherNo === `SV-${v.invoiceNo}` || 
-        item.voucherNo === `SR-${v.invoiceNo}` || 
-        item.voucherNo === `SO-${v.invoiceNo}`
+        item.voucherNo === `SR-${v.invoiceNo}`
       ));
 
       if (!alreadyInList) {
-        const vType = v.isReturn ? 'Sales Reversal' : (v.isOrder ? 'Sales Order' : 'Sales Invoice');
-        const prefix = v.isReturn ? 'SR-' : (v.isOrder ? 'SO-' : 'SV-');
+        const vType = v.isReturn ? 'Sales Reversal' : 'Sales Invoice';
+        const prefix = v.isReturn ? 'SR-' : 'SV-';
         const vNo = (v.invoiceNo && (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-'))) ? v.invoiceNo : `${prefix}${v.invoiceNo || ''}`;
         const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         
-        let status = 'Posted';
-        if (v.isOrder) {
-          const isCompleted = (window.KYA_STORE.salesVouchers || []).some(so => !so.isOrder && !so.isReturn && so.orderNo === vNo);
-          status = isCompleted ? 'Completed' : 'Placed';
-        }
+        const status = 'Posted';
 
         list.push({
           id: v.id,
           date: v.date,
           voucherNo: vNo,
           type: vType,
-          rawType: v.isReturn ? 'Reversal' : (v.isOrder ? 'Order' : 'Invoice'),
+          rawType: v.isReturn ? 'Reversal' : 'Invoice',
           particulars: getVoucherParticularsName(v, vType),
           amount: vAmt,
           status: status,
@@ -3590,6 +3697,8 @@
 
     // Apply current active filters if any
     let filtered = list.filter(e => {
+      if (dateFrom && e.date && e.date < dateFrom) return false;
+      if (dateTo && e.date && e.date > dateTo) return false;
       if (_vdTypeFilter && _vdTypeFilter !== 'All' && e.rawType !== _vdTypeFilter) return false;
       if (_vdStatusFilter && _vdStatusFilter !== 'All') {
         const isDraft = _vdStatusFilter === 'Draft';
@@ -3611,6 +3720,8 @@
       companyName: activeCo.name || 'KYA Accounting',
       filterStatus: _vdStatusFilter || 'All',
       filterType: _vdTypeFilter || 'All',
+      dateFrom,
+      dateTo,
       items: filtered
     };
   }

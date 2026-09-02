@@ -1007,7 +1007,7 @@
   // ══════════════════════════════════════════════════════════════════
   let _pnlStyleDone = false;
   let _pnlExpanded = new Set();
-  let _pnlLayoutMode = 'Vertical';
+  let _pnlLayoutMode = 'Schedule';
 
   function injectPnlStyles() {
     if (_pnlStyleDone) return;
@@ -1066,6 +1066,462 @@
       .pnl-caret-empty { width: 12px; flex-shrink: 0; }
       
       .pnl-code { font-size: 11px; color: var(--slate-400); font-weight: 700; font-family: monospace; margin-left: 8px; }
+
+      /* ══════════════════════════════════════════════════════════════════
+         SCHEDULE III STATEMENT OF PROFIT AND LOSS STYLES
+         ══════════════════════════════════════════════════════════════════ */
+      .pnl-sch-card {
+        border: 1.5px solid var(--slate-200);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--white);
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 24px;
+      }
+      .pnl-sch-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+      }
+      .pnl-sch-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--font-main);
+        min-width: 680px;
+      }
+      .pnl-sch-table thead th {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        padding: 13px 18px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--slate-700);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-bottom: 2px solid var(--slate-200);
+        vertical-align: middle;
+      }
+      .pnl-sch-th-part { text-align: left; }
+      .pnl-sch-th-note { text-align: center; width: 100px; }
+      .pnl-sch-th-amt { text-align: right; width: 180px; }
+      .pnl-sch-th-title { font-size: 13px; font-weight: 700; color: var(--slate-800); }
+      .pnl-sch-th-sub { font-size: 11px; font-weight: 500; color: var(--slate-500); text-transform: none; margin-top: 2px; }
+
+      .pnl-sch-table td {
+        padding: 11px 18px;
+        border-bottom: 1px solid var(--slate-100);
+        font-size: 13.5px;
+        vertical-align: middle;
+      }
+      .pnl-sch-table tbody tr:last-child td { border-bottom: none; }
+      
+      .pnl-sch-row-main {
+        font-weight: 700;
+        color: var(--slate-900);
+        transition: background var(--duration);
+      }
+      .pnl-sch-row-main:hover { background: var(--slate-50); }
+      
+      .pnl-sch-sec-hdr td {
+        background: var(--blue-50);
+        font-weight: 800;
+        font-size: 13.5px;
+        color: var(--blue-900);
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        border-top: 1.5px solid var(--blue-100);
+        border-bottom: 1.5px solid var(--blue-100);
+        cursor: default;
+      }
+      .pnl-sch-sec-hdr:hover td { background: var(--blue-50); }
+
+      .pnl-sch-row-sub {
+        font-weight: 600;
+        font-size: 13.5px;
+        color: var(--slate-800);
+        transition: background var(--duration);
+      }
+      .pnl-sch-row-sub:hover { background: var(--slate-50); }
+      .pnl-sch-row-sub .pnl-sch-name { padding-left: 20px; }
+
+      .pnl-sch-subtotal td {
+        background: #f8fafc;
+        font-weight: 800;
+        font-size: 13.5px;
+        color: var(--slate-900);
+        border-top: 1.5px solid var(--slate-300);
+        border-bottom: 1.5px solid var(--slate-300);
+      }
+
+      .pnl-sch-row-highlight td {
+        background: #fffdf5;
+        font-weight: 800;
+        font-size: 14px;
+        color: #92400e;
+        border-top: 1px solid #fef3c7;
+        border-bottom: 1px solid #fef3c7;
+      }
+
+      .pnl-sch-grandtotal td {
+        background: var(--blue-100) !important;
+        font-weight: 900;
+        font-size: 15px;
+        color: var(--blue-950);
+        border-top: 2px solid var(--blue-400);
+        border-bottom: 4px double var(--blue-800) !important;
+      }
+
+      .pnl-sch-amt {
+        text-align: right;
+        font-weight: 700;
+        white-space: nowrap;
+        font-family: var(--font-main);
+      }
+      .pnl-sch-note-cell {
+        text-align: center;
+      }
+      .pnl-note-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 22px;
+        padding: 0 6px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 700;
+        font-family: monospace;
+        transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+      }
+      .pnl-note-link {
+        cursor: pointer;
+      }
+      .pnl-note-link:hover {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+        transform: scale(1.1);
+        box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+      }
+      .pnl-note-empty {
+        display: inline-block;
+        color: var(--slate-300);
+        font-weight: 400;
+      }
+      .pnl-sch-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         NOTES TO ACCOUNTS STYLES
+         ══════════════════════════════════════════════════════════════════ */
+      .pnl-notes-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        font-family: var(--font-main);
+      }
+      .pnl-notes-hero {
+        background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+        border: 1.5px solid #dbeafe;
+        border-radius: 14px;
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .pnl-notes-hero-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .pnl-notes-hero-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--blue-950);
+      }
+      .pnl-notes-hero-sub {
+        font-size: 12px;
+        color: var(--slate-500);
+        margin-top: 2px;
+      }
+      .pnl-notes-pills-wrap {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-top: 6px;
+        border-top: 1px solid #e2e8f0;
+      }
+      .pnl-note-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: #ffffff;
+        border: 1px solid #bfdbfe;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #1d4ed8;
+        cursor: pointer;
+        transition: all .15s ease;
+        text-decoration: none;
+        user-select: none;
+      }
+      .pnl-note-pill:hover {
+        background: #1d4ed8;
+        color: #ffffff;
+        border-color: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(29, 78, 216, 0.2);
+      }
+      .pnl-note-card {
+        border: 1.5px solid var(--slate-200);
+        border-radius: 14px;
+        overflow: hidden;
+        background: var(--white);
+        box-shadow: var(--shadow-sm);
+        scroll-margin-top: 20px;
+        transition: all .25s ease;
+      }
+      .pnl-note-target-highlight {
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22), var(--shadow-md) !important;
+        animation: pnlNotePulse 2.5s ease forwards;
+      }
+      @keyframes pnlNotePulse {
+        0% { transform: scale(1.01); background: #eff6ff; }
+        40% { transform: scale(1.005); background: #f8faff; }
+        100% { transform: scale(1); background: #ffffff; }
+      }
+      .pnl-note-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 13px 20px;
+        background: #f8fafc;
+        border-bottom: 1.5px solid var(--slate-200);
+      }
+      .pnl-note-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .pnl-note-badge-lg {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3px 10px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1.5px solid #bfdbfe;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 800;
+        font-family: monospace;
+      }
+      .pnl-note-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--slate-900);
+      }
+      .pnl-note-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .pnl-note-table th {
+        padding: 9px 18px;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--slate-600);
+        background: #fafafa;
+        border-bottom: 1px solid var(--slate-200);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .pnl-note-table td {
+        padding: 8px 18px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--slate-100);
+        vertical-align: middle;
+      }
+      .pnl-note-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .pnl-note-total-row td {
+        background: #f8fafc;
+        font-weight: 800;
+        font-size: 13px;
+        color: var(--slate-900);
+        border-top: 1.5px solid var(--slate-300);
+        border-bottom: 2px solid var(--slate-300) !important;
+      }
+
+      /* Glass Controls for Header Area */
+      .cl-glass-control {
+        height: 34px !important;
+        background: rgba(255, 255, 255, 0.18) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.35) !important;
+        border-radius: 8px !important;
+        color: #ffffff !important;
+        font-family: var(--font-main), Inter, sans-serif !important;
+        font-size: 12.5px !important;
+        font-weight: 600 !important;
+        padding: 0 10px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+        transition: all 0.15s ease !important;
+        outline: none !important;
+        box-sizing: border-box !important;
+        cursor: pointer;
+      }
+      .cl-glass-control:hover {
+        background: rgba(255, 255, 255, 0.26) !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
+      }
+      .cl-glass-control:focus {
+        background: rgba(255, 255, 255, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.75) !important;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+      }
+      .cl-glass-control option {
+        background: #ffffff !important;
+        color: #1e293b !important;
+        font-weight: 500 !important;
+      }
+      .cl-glass-control[type="date"] {
+        color-scheme: dark !important;
+      }
+
+      /* 3-Dot More Options Dropdown */
+      .rpt-more-wrap {
+        position: relative;
+        display: inline-block;
+      }
+      .rpt-more-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        padding: 0;
+        box-sizing: border-box;
+      }
+      .rpt-more-btn:hover {
+        background: rgba(255, 255, 255, 0.26);
+        border-color: rgba(255, 255, 255, 0.55);
+      }
+      .rpt-more-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        padding: 6px;
+        min-width: 170px;
+        z-index: 1000;
+        display: none;
+        font-family: var(--font-main), Inter, sans-serif;
+        animation: jePopIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .rpt-more-dropdown.open {
+        display: block;
+      }
+      .rpt-menu-item {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #334155;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.12s ease;
+        text-align: left;
+        box-sizing: border-box;
+        font-family: inherit;
+      }
+      .rpt-menu-item:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+      }
+      .rpt-menu-item svg {
+        flex-shrink: 0;
+      }
+      .rpt-submenu-wrap {
+        position: relative;
+        width: 100%;
+      }
+      .rpt-submenu-btn {
+        justify-content: space-between;
+      }
+      .rpt-submenu-caret {
+        transition: transform 0.15s ease;
+      }
+      .rpt-submenu-dropdown {
+        position: absolute;
+        top: 0;
+        right: calc(100% + 6px);
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+        padding: 6px;
+        min-width: 130px;
+        z-index: 1001;
+        display: none;
+      }
+      .rpt-submenu-dropdown.open {
+        display: block;
+      }
+      .rpt-menu-sep {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 4px 0;
+      }
+      .rpt-menu-chk {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #334155;
+        cursor: pointer;
+        user-select: none;
+        border-radius: 6px;
+        transition: background 0.12s ease;
+      }
+      .rpt-menu-chk:hover {
+        background: #f1f5f9;
+      }
+      .rpt-menu-chk input[type="checkbox"] {
+        cursor: pointer;
+        accent-color: var(--blue-600);
+      }
     `;
     document.head.appendChild(s);
   }
@@ -1106,6 +1562,860 @@
     }
 
     return 0;
+  }
+
+  function getPnlShareCapitalBalance(dateTo) {
+    let totalCap = 0;
+    coaLedgers.forEach(l => {
+      if (l.type !== 'ledger') return;
+      const isSg = l.sgId === 'sg-sc' || l.sgId === 'sg-cap';
+      const nameLower = (l.name || '').trim().toLowerCase();
+      const isName = nameLower.includes('share capital') || nameLower.includes('equity capital') || nameLower === 'capital' || nameLower === 'capital account';
+      if (isSg || isName) {
+        let bal = parseAmt(l.openingBalance);
+        postedEntries.forEach(entry => {
+          if (dateTo && entry.date > dateTo) return;
+          (entry.allRows || []).forEach(row => {
+            const part = (row.particular || '').trim().toLowerCase();
+            if (part === nameLower) {
+              const dr = parseAmt(row.debit);
+              const cr = parseAmt(row.credit);
+              bal += (cr - dr);
+            }
+          });
+        });
+        if (bal > 0) totalCap += bal;
+      }
+    });
+    return totalCap;
+  }
+
+  function getPreviousPeriodDates(dateFrom, dateTo) {
+    if (!dateFrom && !dateTo) return { prevFrom: '', prevTo: '' };
+    try {
+      if (dateFrom && dateTo) {
+        const d1 = new Date(dateFrom);
+        const d2 = new Date(dateTo);
+        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+          const prevD1 = new Date(d1.getFullYear() - 1, d1.getMonth(), d1.getDate());
+          const prevD2 = new Date(d2.getFullYear() - 1, d2.getMonth(), d2.getDate());
+          const formatYMD = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          return { prevFrom: formatYMD(prevD1), prevTo: formatYMD(prevD2) };
+        }
+      } else if (dateTo) {
+        const d2 = new Date(dateTo);
+        if (!isNaN(d2.getTime())) {
+          const prevD2 = new Date(d2.getFullYear() - 1, d2.getMonth(), d2.getDate());
+          const formatYMD = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          };
+          return { prevFrom: '', prevTo: formatYMD(prevD2) };
+        }
+      }
+    } catch(e) {}
+    return { prevFrom: '', prevTo: '' };
+  }
+
+  function renderPnlScheduleMode(ledgerBalances1, dateFrom, dateTo, isCompare, compareDateFrom, compareDateTo) {
+    let ledgerBalances2 = {};
+    let prevPeriodFrom = compareDateFrom;
+    let prevPeriodTo = compareDateTo;
+
+    if (isCompare) {
+      ledgerBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
+    } else {
+      const prevDates = getPreviousPeriodDates(dateFrom, dateTo);
+      prevPeriodFrom = prevDates.prevFrom;
+      prevPeriodTo = prevDates.prevTo;
+      if (prevPeriodFrom || prevPeriodTo) {
+        ledgerBalances2 = computeTrialBalanceBalances(prevPeriodFrom, prevPeriodTo);
+      }
+    }
+
+    const col1Title = formatRptDateRange(dateFrom, dateTo, 'Current Period');
+    const col2Title = formatRptDateRange(prevPeriodFrom, prevPeriodTo, 'Previous Period');
+
+    function fmtSchAmt(val) {
+      if (typeof val !== 'number' || isNaN(val)) return '₹ 0.00';
+      if (val < 0) {
+        return `<span style="color: #dc2626;">(₹ ${fmtNum(Math.abs(val))})</span>`;
+      }
+      return `₹ ${fmtNum(val)}`;
+    }
+
+    function fmtNoteBadge(num) {
+      if (!num) return `<span class="pnl-note-empty">-</span>`;
+      return `<span class="pnl-note-badge pnl-note-link" data-pnl-goto-note="${num}" title="Click to view Note ${num} details in Notes to Accounts">${num}</span>`;
+    }
+
+    // Calculations
+    const rfoBal1 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances1);
+    const rfoBal2 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances2);
+
+    const oiBal1 = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances1);
+    const oiBal2 = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances2);
+
+    const totalRevenue1 = rfoBal1 + oiBal1;
+    const totalRevenue2 = rfoBal2 + oiBal2;
+
+    // Standard Expense Subgroups
+    const cmcBal1 = getPnlNodeBalance('sg-cmc', 'sg', ledgerBalances1);
+    const cmcBal2 = getPnlNodeBalance('sg-cmc', 'sg', ledgerBalances2);
+
+    const pstBal1 = getPnlNodeBalance('sg-pst', 'sg', ledgerBalances1);
+    const pstBal2 = getPnlNodeBalance('sg-pst', 'sg', ledgerBalances2);
+
+    const cinvBal1 = getPnlNodeBalance('sg-cinv', 'sg', ledgerBalances1);
+    const cinvBal2 = getPnlNodeBalance('sg-cinv', 'sg', ledgerBalances2);
+
+    const ebeBal1 = getPnlNodeBalance('sg-ebe', 'sg', ledgerBalances1);
+    const ebeBal2 = getPnlNodeBalance('sg-ebe', 'sg', ledgerBalances2);
+
+    const fcBal1 = getPnlNodeBalance('sg-fc', 'sg', ledgerBalances1);
+    const fcBal2 = getPnlNodeBalance('sg-fc', 'sg', ledgerBalances2);
+
+    const daBal1 = getPnlNodeBalance('sg-da', 'sg', ledgerBalances1);
+    const daBal2 = getPnlNodeBalance('sg-da', 'sg', ledgerBalances2);
+
+    const oeBal1 = getPnlNodeBalance('sg-oe', 'sg', ledgerBalances1);
+    const oeBal2 = getPnlNodeBalance('sg-oe', 'sg', ledgerBalances2);
+
+    // Any other custom expense subgroups (excluding sg-tax and the 7 system ones)
+    const stdExpSgIds = new Set(['sg-cmc', 'sg-pst', 'sg-cinv', 'sg-ebe', 'sg-fc', 'sg-da', 'sg-oe', 'sg-tax']);
+    const customExpSgs = COA_SYS_SGS.filter(sg => sg.main === 'expense' && !stdExpSgIds.has(sg.id));
+
+    let customExpTotal1 = 0;
+    let customExpTotal2 = 0;
+    customExpSgs.forEach(sg => {
+      customExpTotal1 += getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+      customExpTotal2 += getPnlNodeBalance(sg.id, 'sg', ledgerBalances2);
+    });
+
+    const totalExpenses1 = cmcBal1 + pstBal1 + cinvBal1 + ebeBal1 + fcBal1 + daBal1 + oeBal1 + customExpTotal1;
+    const totalExpenses2 = cmcBal2 + pstBal2 + cinvBal2 + ebeBal2 + fcBal2 + daBal2 + oeBal2 + customExpTotal2;
+
+    const pbeita1 = totalRevenue1 - totalExpenses1;
+    const pbeita2 = totalRevenue2 - totalExpenses2;
+
+    // Exceptional items & Discontinued ops
+    let exceptional1 = 0, exceptional2 = 0;
+    let discont1 = 0, discont2 = 0;
+    let discontTax1 = 0, discontTax2 = 0;
+
+    coaLedgers.forEach(l => {
+      const lName = (l.name || '').toLowerCase();
+      if (lName.includes('exceptional')) {
+        exceptional1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        exceptional2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      } else if (lName.includes('discontinued') && lName.includes('tax')) {
+        discontTax1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        discontTax2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      } else if (lName.includes('discontinued')) {
+        discont1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        discont2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      }
+    });
+
+    const pbt1 = pbeita1 - exceptional1;
+    const pbt2 = pbeita2 - exceptional2;
+
+    // Tax Expense Breakdown
+    const taxLedgers = coaLedgers.filter(l => l.sgId === 'sg-tax');
+    let currTaxBal1 = 0, currTaxBal2 = 0;
+    let defTaxBal1 = 0, defTaxBal2 = 0;
+
+    taxLedgers.forEach(l => {
+      const lName = (l.name || '').toLowerCase();
+      const b1 = getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+      const b2 = getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      if (lName.includes('deferred')) {
+        defTaxBal1 += b1;
+        defTaxBal2 += b2;
+      } else {
+        currTaxBal1 += b1;
+        currTaxBal2 += b2;
+      }
+    });
+    // Fallback if no specific current/def tax ledgers but sg-tax has balance
+    const totalTaxBal1 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances1);
+    const totalTaxBal2 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances2);
+    if (currTaxBal1 === 0 && defTaxBal1 === 0 && totalTaxBal1 !== 0) {
+      currTaxBal1 = totalTaxBal1;
+    }
+    if (currTaxBal2 === 0 && defTaxBal2 === 0 && totalTaxBal2 !== 0) {
+      currTaxBal2 = totalTaxBal2;
+    }
+
+    const pcont1 = pbt1 - (currTaxBal1 + defTaxBal1);
+    const pcont2 = pbt2 - (currTaxBal2 + defTaxBal2);
+
+    const discontAfter1 = discont1 - discontTax1;
+    const discontAfter2 = discont2 - discontTax2;
+
+    const pat1 = pcont1 + discontAfter1;
+    const pat2 = pcont2 + discontAfter2;
+
+    // EPS
+    const shareCapBal1 = getPnlShareCapitalBalance(dateTo);
+    const shareCapBal2 = getPnlShareCapitalBalance(prevPeriodTo);
+    const numShares1 = shareCapBal1 > 0 ? Math.round(shareCapBal1 / 10) : 0;
+    const numShares2 = shareCapBal2 > 0 ? Math.round(shareCapBal2 / 10) : 0;
+
+    const basicEps1 = numShares1 > 0 ? (pat1 / numShares1).toFixed(2) : '0.00';
+    const basicEps2 = numShares2 > 0 ? (pat2 / numShares2).toFixed(2) : '0.00';
+    const dilutedEps1 = basicEps1;
+    const dilutedEps2 = basicEps2;
+
+    function renderSgRow(title, noteNo, bal1, bal2, isMain = true, isSub = false) {
+      const rowClass = isMain ? 'pnl-sch-row-main' : (isSub ? 'pnl-sch-row-sub' : 'pnl-sch-row-main');
+      return `
+        <tr class="${rowClass}" data-pnl-goto-note="${noteNo}" style="cursor: pointer;" title="Click to view Note ${noteNo} in Notes to Accounts">
+          <td>
+            <div class="pnl-sch-name">
+              <span>${title}</span>
+            </div>
+          </td>
+          <td class="pnl-sch-note-cell">${fmtNoteBadge(noteNo)}</td>
+          <td class="pnl-sch-amt">${fmtSchAmt(bal1)}</td>
+          <td class="pnl-sch-amt">${fmtSchAmt(bal2)}</td>
+        </tr>
+      `;
+    }
+
+    let tableHtml = `
+      <div class="pnl-sch-card">
+        <div class="pnl-sch-table-wrap">
+          <table class="pnl-sch-table">
+            <thead>
+              <tr>
+                <th class="pnl-sch-th-part">Particulars</th>
+                <th class="pnl-sch-th-note">Note No.</th>
+                <th class="pnl-sch-th-amt">
+                  <div class="pnl-sch-th-title">Current Period</div>
+                  <div class="pnl-sch-th-sub">${col1Title}</div>
+                </th>
+                <th class="pnl-sch-th-amt">
+                  <div class="pnl-sch-th-title">Previous Period</div>
+                  <div class="pnl-sch-th-sub">${col2Title}</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- I. Revenue from operations -->
+              ${renderSgRow('I. Revenue from operations', '1', rfoBal1, rfoBal2, true, false)}
+
+              <!-- II. Other income -->
+              ${renderSgRow('II. Other income', '2', oiBal1, oiBal2, true, false)}
+
+              <!-- III. Total Revenue (I + II) -->
+              <tr class="pnl-sch-subtotal">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>III. Total Revenue (I + II)</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell"><span class="pnl-note-empty">-</span></td>
+                <td class="pnl-sch-amt">${fmtSchAmt(totalRevenue1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(totalRevenue2)}</td>
+              </tr>
+
+              <!-- IV. Expenses : -->
+              <tr class="pnl-sch-sec-hdr">
+                <td colspan="4">IV. Expenses :</td>
+              </tr>
+
+              <!-- Expense items -->
+              ${renderSgRow('Cost of materials consumed', '3', cmcBal1, cmcBal2, false, true)}
+              ${renderSgRow('Purchases of Stock-in-Trade', '4', pstBal1, pstBal2, false, true)}
+              ${renderSgRow('Changes in inventories of finished goods / Work-in-progress and Stock-In-Trade', '5', cinvBal1, cinvBal2, false, true)}
+              ${renderSgRow('Employee Benefits Expenses', '6', ebeBal1, ebeBal2, false, true)}
+              ${renderSgRow('Finance Costs', '7', fcBal1, fcBal2, false, true)}
+              ${renderSgRow('Depreciation and amortization expense', '8', daBal1, daBal2, false, true)}
+              ${renderSgRow('Other expenses', '9', oeBal1, oeBal2, false, true)}
+    `;
+
+    // Custom Expense subgroups if any
+    let customNoteCtr = 10;
+    customExpSgs.forEach(sg => {
+      const b1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+      const b2 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances2);
+      tableHtml += renderSgRow(sg.name, String(customNoteCtr++), b1, b2, false, true);
+    });
+
+    tableHtml += `
+              <!-- Total expenses (IV) -->
+              <tr class="pnl-sch-subtotal">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>Total expenses (IV)</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell"><span class="pnl-note-empty">-</span></td>
+                <td class="pnl-sch-amt">${fmtSchAmt(totalExpenses1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(totalExpenses2)}</td>
+              </tr>
+
+              <!-- V. Profit/(loss) before exceptional items and tax (I- IV) -->
+              <tr class="pnl-sch-row-highlight">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>V. Profit/(loss) before exceptional items and tax (I- IV)</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell"><span class="pnl-note-empty">-</span></td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pbeita1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pbeita2)}</td>
+              </tr>
+
+              <!-- VI. Exceptional Items -->
+              ${renderSgRow('VI. Exceptional Items', '10', exceptional1, exceptional2, true, false)}
+
+              <!-- VII. Profit/(loss) before tax (V-VI) -->
+              <tr class="pnl-sch-row-highlight">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>VII. Profit/(loss) before tax (V-VI)</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell"><span class="pnl-note-empty">-</span></td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pbt1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pbt2)}</td>
+              </tr>
+
+              <!-- VIII. Tax expense: -->
+              <tr class="pnl-sch-sec-hdr">
+                <td colspan="4">VIII. Tax expense:</td>
+              </tr>
+
+              <!-- (1) Current tax -->
+              ${renderSgRow('(1) Current tax', '11', currTaxBal1, currTaxBal2, false, true)}
+
+              <!-- (2) Deferred tax -->
+              ${renderSgRow('(2) Deferred tax', '12', defTaxBal1, defTaxBal2, false, true)}
+
+              <!-- IX. Profit (Loss) for the period from continuing operations (VII-VIII) -->
+              <tr class="pnl-sch-row-highlight">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>IX. Profit (Loss) for the period from continuing operations (VII-VIII)</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell"><span class="pnl-note-empty">-</span></td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pcont1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pcont2)}</td>
+              </tr>
+
+              <!-- X. Profit/(loss) from discontinued operations -->
+              ${renderSgRow('X. Profit/(loss) from discontinued operations', '13', discont1, discont2, true, false)}
+
+              <!-- XI. Tax expense of discontinued operations -->
+              ${renderSgRow('XI. Tax expense of discontinued operations', '14', discontTax1, discontTax2, true, false)}
+
+              <!-- XII. Profit/(loss) from Discontinued operations (after tax) (X-XI) -->
+              <tr class="pnl-sch-row-highlight">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>XII. Profit/(loss) from Discontinued operations (after tax) (X-XI)</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell"><span class="pnl-note-empty">-</span></td>
+                <td class="pnl-sch-amt">${fmtSchAmt(discontAfter1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(discontAfter2)}</td>
+              </tr>
+
+              <!-- XIII. Profit/(loss) for the period (IX+XII) -->
+              <tr class="pnl-sch-grandtotal">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>XIII. Profit/(loss) for the period (IX+XII)</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell"><span class="pnl-note-empty">-</span></td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pat1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pat2)}</td>
+              </tr>
+
+              <!-- XV. Earnings per equity share: -->
+              <tr class="pnl-sch-sec-hdr">
+                <td colspan="4">XV. Earnings per equity share:</td>
+              </tr>
+
+              <tr class="pnl-sch-row-sub" data-pnl-goto-note="15" style="cursor: pointer;" title="Click to view Note 15 details in Notes to Accounts">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>Basic</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell">${fmtNoteBadge('15')}</td>
+                <td class="pnl-sch-amt">₹ ${basicEps1}</td>
+                <td class="pnl-sch-amt">₹ ${basicEps2}</td>
+              </tr>
+
+              <tr class="pnl-sch-row-sub" data-pnl-goto-note="15" style="cursor: pointer;" title="Click to view Note 15 details in Notes to Accounts">
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>Diluted</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell">${fmtNoteBadge('15')}</td>
+                <td class="pnl-sch-amt">₹ ${dilutedEps1}</td>
+                <td class="pnl-sch-amt">₹ ${dilutedEps2}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    return tableHtml;
+  }
+
+  function renderPnlNotesMode(ledgerBalances1, dateFrom, dateTo, isCompare, compareDateFrom, compareDateTo) {
+    let ledgerBalances2 = {};
+    let prevPeriodFrom = compareDateFrom;
+    let prevPeriodTo = compareDateTo;
+
+    if (isCompare) {
+      ledgerBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
+    } else {
+      const prevDates = getPreviousPeriodDates(dateFrom, dateTo);
+      prevPeriodFrom = prevDates.prevFrom;
+      prevPeriodTo = prevDates.prevTo;
+      if (prevPeriodFrom || prevPeriodTo) {
+        ledgerBalances2 = computeTrialBalanceBalances(prevPeriodFrom, prevPeriodTo);
+      }
+    }
+
+    const col1Title = formatRptDateRange(dateFrom, dateTo, 'Current Period');
+    const col2Title = formatRptDateRange(prevPeriodFrom, prevPeriodTo, 'Previous Period');
+
+    function fmtSchAmt(val) {
+      if (typeof val !== 'number' || isNaN(val)) return '₹ 0.00';
+      if (val < 0) {
+        return `<span style="color: #dc2626;">(₹ ${fmtNum(Math.abs(val))})</span>`;
+      }
+      return `₹ ${fmtNum(val)}`;
+    }
+
+    // Calculations
+    const rfoBal1 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances1);
+    const rfoBal2 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances2);
+    const oiBal1 = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances1);
+    const oiBal2 = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances2);
+    const totalRevenue1 = rfoBal1 + oiBal1;
+    const totalRevenue2 = rfoBal2 + oiBal2;
+
+    const cmcBal1 = getPnlNodeBalance('sg-cmc', 'sg', ledgerBalances1);
+    const cmcBal2 = getPnlNodeBalance('sg-cmc', 'sg', ledgerBalances2);
+    const pstBal1 = getPnlNodeBalance('sg-pst', 'sg', ledgerBalances1);
+    const pstBal2 = getPnlNodeBalance('sg-pst', 'sg', ledgerBalances2);
+    const cinvBal1 = getPnlNodeBalance('sg-cinv', 'sg', ledgerBalances1);
+    const cinvBal2 = getPnlNodeBalance('sg-cinv', 'sg', ledgerBalances2);
+    const ebeBal1 = getPnlNodeBalance('sg-ebe', 'sg', ledgerBalances1);
+    const ebeBal2 = getPnlNodeBalance('sg-ebe', 'sg', ledgerBalances2);
+    const fcBal1 = getPnlNodeBalance('sg-fc', 'sg', ledgerBalances1);
+    const fcBal2 = getPnlNodeBalance('sg-fc', 'sg', ledgerBalances2);
+    const daBal1 = getPnlNodeBalance('sg-da', 'sg', ledgerBalances1);
+    const daBal2 = getPnlNodeBalance('sg-da', 'sg', ledgerBalances2);
+    const oeBal1 = getPnlNodeBalance('sg-oe', 'sg', ledgerBalances1);
+    const oeBal2 = getPnlNodeBalance('sg-oe', 'sg', ledgerBalances2);
+
+    const stdExpSgIds = new Set(['sg-cmc', 'sg-pst', 'sg-cinv', 'sg-ebe', 'sg-fc', 'sg-da', 'sg-oe', 'sg-tax']);
+    const customExpSgs = COA_SYS_SGS.filter(sg => sg.main === 'expense' && !stdExpSgIds.has(sg.id));
+
+    let customExpTotal1 = 0, customExpTotal2 = 0;
+    customExpSgs.forEach(sg => {
+      customExpTotal1 += getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+      customExpTotal2 += getPnlNodeBalance(sg.id, 'sg', ledgerBalances2);
+    });
+
+    const totalExpenses1 = cmcBal1 + pstBal1 + cinvBal1 + ebeBal1 + fcBal1 + daBal1 + oeBal1 + customExpTotal1;
+    const totalExpenses2 = cmcBal2 + pstBal2 + cinvBal2 + ebeBal2 + fcBal2 + daBal2 + oeBal2 + customExpTotal2;
+
+    const pbeita1 = totalRevenue1 - totalExpenses1;
+    const pbeita2 = totalRevenue2 - totalExpenses2;
+
+    let exceptional1 = 0, exceptional2 = 0;
+    let discont1 = 0, discont2 = 0;
+    let discontTax1 = 0, discontTax2 = 0;
+
+    coaLedgers.forEach(l => {
+      const lName = (l.name || '').toLowerCase();
+      if (lName.includes('exceptional')) {
+        exceptional1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        exceptional2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      } else if (lName.includes('discontinued') && lName.includes('tax')) {
+        discontTax1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        discontTax2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      } else if (lName.includes('discontinued')) {
+        discont1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        discont2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      }
+    });
+
+    const pbt1 = pbeita1 - exceptional1;
+    const pbt2 = pbeita2 - exceptional2;
+
+    const taxLedgers = coaLedgers.filter(l => l.sgId === 'sg-tax');
+    let currTaxBal1 = 0, currTaxBal2 = 0;
+    let defTaxBal1 = 0, defTaxBal2 = 0;
+
+    taxLedgers.forEach(l => {
+      const lName = (l.name || '').toLowerCase();
+      const b1 = getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+      const b2 = getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      if (lName.includes('deferred')) {
+        defTaxBal1 += b1;
+        defTaxBal2 += b2;
+      } else {
+        currTaxBal1 += b1;
+        currTaxBal2 += b2;
+      }
+    });
+
+    const totalTaxBal1 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances1);
+    const totalTaxBal2 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances2);
+    if (currTaxBal1 === 0 && defTaxBal1 === 0 && totalTaxBal1 !== 0) currTaxBal1 = totalTaxBal1;
+    if (currTaxBal2 === 0 && defTaxBal2 === 0 && totalTaxBal2 !== 0) currTaxBal2 = totalTaxBal2;
+
+    const pcont1 = pbt1 - (currTaxBal1 + defTaxBal1);
+    const pcont2 = pbt2 - (currTaxBal2 + defTaxBal2);
+    const discontAfter1 = discont1 - discontTax1;
+    const discontAfter2 = discont2 - discontTax2;
+    const pat1 = pcont1 + discontAfter1;
+    const pat2 = pcont2 + discontAfter2;
+
+    const shareCapBal1 = getPnlShareCapitalBalance(dateTo);
+    const shareCapBal2 = getPnlShareCapitalBalance(prevPeriodTo);
+    const numShares1 = shareCapBal1 > 0 ? Math.round(shareCapBal1 / 10) : 0;
+    const numShares2 = shareCapBal2 > 0 ? Math.round(shareCapBal2 / 10) : 0;
+
+    const basicEps1 = numShares1 > 0 ? (pat1 / numShares1).toFixed(2) : '0.00';
+    const basicEps2 = numShares2 > 0 ? (pat2 / numShares2).toFixed(2) : '0.00';
+    const dilutedEps1 = basicEps1;
+    const dilutedEps2 = basicEps2;
+
+    function renderNoteCardForSubgroup(noteNo, title, sgId) {
+      const sgBal1 = getPnlNodeBalance(sgId, 'sg', ledgerBalances1);
+      const sgBal2 = getPnlNodeBalance(sgId, 'sg', ledgerBalances2);
+
+      let rowsHtml = '';
+      let rowCount = 0;
+
+      const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
+      groupLdgs.forEach(gl => {
+        const glBal1 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances1);
+        const glBal2 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances2);
+
+        rowsHtml += `
+          <tr style="background: #fdfefe; font-weight: 600;">
+            <td style="padding-left: 20px; color: #b45309;">📁 ${gl.name} ${gl.code ? `<span class="pnl-code">${gl.code}</span>` : ''}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(glBal1)}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(glBal2)}</td>
+          </tr>
+        `;
+        rowCount++;
+
+        const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
+        childLdgs.forEach(l => {
+          const b1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+          const b2 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances2);
+          rowsHtml += `
+            <tr>
+              <td style="padding-left: 38px; color: var(--slate-600);">• ${l.name} ${l.code ? `<span class="pnl-code">${l.code}</span>` : ''}</td>
+              <td class="pnl-sch-amt">${fmtSchAmt(b1)}</td>
+              <td class="pnl-sch-amt">${fmtSchAmt(b2)}</td>
+            </tr>
+          `;
+          rowCount++;
+        });
+      });
+
+      const directLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'ledger' && !l.glId);
+      directLdgs.forEach(l => {
+        const b1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
+        const b2 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances2);
+        rowsHtml += `
+          <tr>
+            <td style="padding-left: 20px; color: var(--slate-700);">• ${l.name} ${l.code ? `<span class="pnl-code">${l.code}</span>` : ''}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(b1)}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(b2)}</td>
+          </tr>
+        `;
+        rowCount++;
+      });
+
+      if (rowCount === 0) {
+        rowsHtml = `
+          <tr>
+            <td style="padding-left: 20px; color: var(--slate-400); font-style: italic;">No specific accounts recorded under this note</td>
+            <td class="pnl-sch-amt">₹ 0.00</td>
+            <td class="pnl-sch-amt">₹ 0.00</td>
+          </tr>
+        `;
+      }
+
+      return `
+        <div class="pnl-note-card" id="pnl-note-${noteNo}">
+          <div class="pnl-note-header">
+            <div class="pnl-note-header-left">
+              <span class="pnl-note-badge-lg">Note ${noteNo}</span>
+              <span class="pnl-note-title">${title}</span>
+            </div>
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--blue-900);">
+              Total: ${fmtSchAmt(sgBal1)}
+            </div>
+          </div>
+          <table class="pnl-note-table">
+            <thead>
+              <tr>
+                <th style="text-align: left;">Particulars</th>
+                <th style="text-align: right; width: 170px;">Current Period (₹)</th>
+                <th style="text-align: right; width: 170px;">Previous Period (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="pnl-note-total-row">
+                <td>Total ${title}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(sgBal1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(sgBal2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderTaxNoteCard(noteNo, title, isDeferred = false) {
+      const taxLdgs = coaLedgers.filter(l => {
+        if (l.sgId !== 'sg-tax') return false;
+        const lName = (l.name || '').toLowerCase();
+        return isDeferred ? lName.includes('deferred') : !lName.includes('deferred');
+      });
+
+      let rowsHtml = '';
+      let tot1 = 0, tot2 = 0;
+
+      taxLdgs.forEach(l => {
+        const b1 = getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        const b2 = getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+        tot1 += b1;
+        tot2 += b2;
+        rowsHtml += `
+          <tr>
+            <td style="padding-left: 20px; color: var(--slate-700);">• ${l.name}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(b1)}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(b2)}</td>
+          </tr>
+        `;
+      });
+
+      if (taxLdgs.length === 0) {
+        const fallbackTot1 = isDeferred ? defTaxBal1 : currTaxBal1;
+        const fallbackTot2 = isDeferred ? defTaxBal2 : currTaxBal2;
+        tot1 = fallbackTot1;
+        tot2 = fallbackTot2;
+        rowsHtml = `
+          <tr>
+            <td style="padding-left: 20px; color: var(--slate-700);">• ${title} Provision</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(tot1)}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(tot2)}</td>
+          </tr>
+        `;
+      }
+
+      return `
+        <div class="pnl-note-card" id="pnl-note-${noteNo}">
+          <div class="pnl-note-header">
+            <div class="pnl-note-header-left">
+              <span class="pnl-note-badge-lg">Note ${noteNo}</span>
+              <span class="pnl-note-title">${title}</span>
+            </div>
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--blue-900);">
+              Total: ${fmtSchAmt(tot1)}
+            </div>
+          </div>
+          <table class="pnl-note-table">
+            <thead>
+              <tr>
+                <th style="text-align: left;">Particulars</th>
+                <th style="text-align: right; width: 170px;">Current Period (₹)</th>
+                <th style="text-align: right; width: 170px;">Previous Period (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="pnl-note-total-row">
+                <td>Total ${title}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(tot1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(tot2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderCustomNoteCard(noteNo, title, val1, val2, subtitle = '') {
+      return `
+        <div class="pnl-note-card" id="pnl-note-${noteNo}">
+          <div class="pnl-note-header">
+            <div class="pnl-note-header-left">
+              <span class="pnl-note-badge-lg">Note ${noteNo}</span>
+              <span class="pnl-note-title">${title}</span>
+            </div>
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--blue-900);">
+              Total: ${fmtSchAmt(val1)}
+            </div>
+          </div>
+          <table class="pnl-note-table">
+            <thead>
+              <tr>
+                <th style="text-align: left;">Particulars</th>
+                <th style="text-align: right; width: 170px;">Current Period (₹)</th>
+                <th style="text-align: right; width: 170px;">Previous Period (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding-left: 20px; color: var(--slate-700);">${subtitle || title}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(val1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(val2)}</td>
+              </tr>
+              <tr class="pnl-note-total-row">
+                <td>Total ${title}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(val1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(val2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderEpsNoteCard(noteNo) {
+      return `
+        <div class="pnl-note-card" id="pnl-note-${noteNo}">
+          <div class="pnl-note-header">
+            <div class="pnl-note-header-left">
+              <span class="pnl-note-badge-lg">Note ${noteNo}</span>
+              <span class="pnl-note-title">Earnings Per Equity Share (EPS)</span>
+            </div>
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--blue-900);">
+              Basic EPS: ₹ ${basicEps1}
+            </div>
+          </div>
+          <table class="pnl-note-table">
+            <thead>
+              <tr>
+                <th style="text-align: left;">Particulars</th>
+                <th style="text-align: right; width: 170px;">Current Period</th>
+                <th style="text-align: right; width: 170px;">Previous Period</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding-left: 20px; color: var(--slate-700);">Profit/(loss) for the period after tax (₹)</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pat1)}</td>
+                <td class="pnl-sch-amt">${fmtSchAmt(pat2)}</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 20px; color: var(--slate-700);">Weighted average number of equity shares</td>
+                <td class="pnl-sch-amt">${numShares1 > 0 ? numShares1.toLocaleString('en-IN') : '0'}</td>
+                <td class="pnl-sch-amt">${numShares2 > 0 ? numShares2.toLocaleString('en-IN') : '0'}</td>
+              </tr>
+              <tr>
+                <td style="padding-left: 20px; color: var(--slate-700);">Nominal value per equity share (₹)</td>
+                <td class="pnl-sch-amt">${numShares1 > 0 ? '₹ 10.00' : '₹ 0.00'}</td>
+                <td class="pnl-sch-amt">${numShares2 > 0 ? '₹ 10.00' : '₹ 0.00'}</td>
+              </tr>
+              <tr class="pnl-note-total-row">
+                <td>Basic Earnings Per Share (₹)</td>
+                <td class="pnl-sch-amt">₹ ${basicEps1}</td>
+                <td class="pnl-sch-amt">₹ ${basicEps2}</td>
+              </tr>
+              <tr class="pnl-note-total-row">
+                <td>Diluted Earnings Per Share (₹)</td>
+                <td class="pnl-sch-amt">₹ ${dilutedEps1}</td>
+                <td class="pnl-sch-amt">₹ ${dilutedEps2}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    let notesHtml = `
+      <div class="pnl-notes-container">
+        <!-- Notes Hero Banner -->
+        <div class="pnl-notes-hero">
+          <div class="pnl-notes-hero-top">
+            <div>
+              <div class="pnl-notes-hero-title">Notes to Financial Statements (Profit &amp; Loss)</div>
+              <div class="pnl-notes-hero-sub">Schedule III Disclosures &middot; ${col1Title} vs ${col2Title}</div>
+            </div>
+            <button class="btn btn-sales-action" id="pnlNotesBackToSchBtn" type="button" style="height: 34px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Back to Profit &amp; Loss Statement
+            </button>
+          </div>
+          <div class="pnl-notes-pills-wrap">
+            <a class="pnl-note-pill" href="#pnl-note-1">Note 1: Revenue</a>
+            <a class="pnl-note-pill" href="#pnl-note-2">Note 2: Other Income</a>
+            <a class="pnl-note-pill" href="#pnl-note-3">Note 3: Material Consumed</a>
+            <a class="pnl-note-pill" href="#pnl-note-4">Note 4: Purchases</a>
+            <a class="pnl-note-pill" href="#pnl-note-5">Note 5: Inventories</a>
+            <a class="pnl-note-pill" href="#pnl-note-6">Note 6: Employee Benefits</a>
+            <a class="pnl-note-pill" href="#pnl-note-7">Note 7: Finance Costs</a>
+            <a class="pnl-note-pill" href="#pnl-note-8">Note 8: Depreciation</a>
+            <a class="pnl-note-pill" href="#pnl-note-9">Note 9: Other Expenses</a>
+            <a class="pnl-note-pill" href="#pnl-note-10">Note 10: Exceptional</a>
+            <a class="pnl-note-pill" href="#pnl-note-11">Note 11: Current Tax</a>
+            <a class="pnl-note-pill" href="#pnl-note-12">Note 12: Deferred Tax</a>
+            <a class="pnl-note-pill" href="#pnl-note-15">Note 15: EPS</a>
+          </div>
+        </div>
+
+        <!-- Note Cards -->
+        ${renderNoteCardForSubgroup('1', 'Revenue from Operations', 'sg-rfo')}
+        ${renderNoteCardForSubgroup('2', 'Other Income', 'sg-oi')}
+        ${renderNoteCardForSubgroup('3', 'Cost of Materials Consumed', 'sg-cmc')}
+        ${renderNoteCardForSubgroup('4', 'Purchases of Stock-in-Trade', 'sg-pst')}
+        ${renderNoteCardForSubgroup('5', 'Changes in Inventories of Finished Goods, Work-in-Progress and Stock-in-Trade', 'sg-cinv')}
+        ${renderNoteCardForSubgroup('6', 'Employee Benefits Expense', 'sg-ebe')}
+        ${renderNoteCardForSubgroup('7', 'Finance Costs', 'sg-fc')}
+        ${renderNoteCardForSubgroup('8', 'Depreciation and Amortization Expense', 'sg-da')}
+        ${renderNoteCardForSubgroup('9', 'Other Expenses', 'sg-oe')}
+    `;
+
+    // Custom Expense subgroups Notes
+    let noteCtr = 10;
+    customExpSgs.forEach(sg => {
+      notesHtml += renderNoteCardForSubgroup(String(noteCtr++), sg.name, sg.id);
+    });
+
+    notesHtml += `
+        ${renderCustomNoteCard('10', 'Exceptional Items', exceptional1, exceptional2, 'Exceptional gains / (losses) during the period')}
+        ${renderTaxNoteCard('11', 'Current Tax', false)}
+        ${renderTaxNoteCard('12', 'Deferred Tax', true)}
+        ${renderCustomNoteCard('13', 'Discontinued Operations', discont1, discont2, 'Profit / (loss) from discontinued operations')}
+        ${renderCustomNoteCard('14', 'Tax Expense of Discontinued Operations', discontTax1, discontTax2, 'Tax on discontinued operations')}
+        ${renderEpsNoteCard('15')}
+      </div>
+    `;
+
+    return notesHtml;
   }
 
   function renderPnlPanel() {
@@ -1182,34 +2492,33 @@
       return `<div class="pnl-amt-col">₹ ${fmtNum(bal1)}</div>`;
     }
 
-    const btnVert = document.getElementById('pnlLayoutVertical');
-    const btnHoriz = document.getElementById('pnlLayoutHorizontal');
-    if (btnVert && btnHoriz) {
-      if (_pnlLayoutMode === 'Vertical') {
-        btnVert.className = 'btn btn-primary';
-        btnVert.style.background = 'var(--blue-700)';
-        btnVert.style.color = '#fff';
-        btnVert.style.borderColor = 'var(--blue-700)';
-        
-        btnHoriz.className = 'btn-sales-action';
-        btnHoriz.style.background = 'var(--white)';
-        btnHoriz.style.color = 'var(--slate-600)';
-        btnHoriz.style.borderColor = 'var(--slate-200)';
+    const btnSch = document.getElementById('pnlLayoutSchedule');
+    const btnNotes = document.getElementById('pnlLayoutNotes');
+
+    function setBtnStyle(btn, isActive) {
+      if (!btn) return;
+      if (isActive) {
+        btn.className = 'btn btn-primary';
+        btn.style.background = 'var(--blue-700)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--blue-700)';
       } else {
-        btnHoriz.className = 'btn btn-primary';
-        btnHoriz.style.background = 'var(--blue-700)';
-        btnHoriz.style.color = '#fff';
-        btnHoriz.style.borderColor = 'var(--blue-700)';
-        
-        btnVert.className = 'btn-sales-action';
-        btnVert.style.background = 'var(--white)';
-        btnVert.style.color = 'var(--slate-600)';
-        btnVert.style.borderColor = 'var(--slate-200)';
+        btn.className = 'btn-sales-action';
+        btn.style.background = 'var(--white)';
+        btn.style.color = 'var(--slate-600)';
+        btn.style.borderColor = 'var(--slate-200)';
       }
     }
 
+    setBtnStyle(btnSch, _pnlLayoutMode === 'Schedule');
+    setBtnStyle(btnNotes, _pnlLayoutMode === 'Notes');
+
     let treeHtml = '';
-    if (_pnlLayoutMode === 'Horizontal') {
+    if (_pnlLayoutMode === 'Schedule') {
+      treeHtml = renderPnlScheduleMode(ledgerBalances1, dateFrom, dateTo, isCompare, compareDateFrom, compareDateTo);
+    } else if (_pnlLayoutMode === 'Notes') {
+      treeHtml = renderPnlNotesMode(ledgerBalances1, dateFrom, dateTo, isCompare, compareDateFrom, compareDateTo);
+    } else if (_pnlLayoutMode === 'Horizontal') {
       treeHtml = '<div class="pnl-tree horizontal-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; align-items: stretch;">';
 
       // 1. Left Card: Expenses & Tax
@@ -1493,6 +2802,49 @@
         renderPnlPanel();
       });
     });
+
+    wrap.querySelectorAll('[data-pnl-goto-note]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const noteNo = el.dataset.pnlGotoNote;
+        if (!noteNo) return;
+        _pnlLayoutMode = 'Notes';
+        renderPnlPanel();
+        setTimeout(() => {
+          const targetEl = document.getElementById(`pnl-note-${noteNo}`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            targetEl.classList.add('pnl-note-target-highlight');
+            setTimeout(() => {
+              targetEl.classList.remove('pnl-note-target-highlight');
+            }, 2500);
+          }
+        }, 60);
+      });
+    });
+
+    document.getElementById('pnlNotesBackToSchBtn')?.addEventListener('click', () => {
+      _pnlLayoutMode = 'Schedule';
+      renderPnlPanel();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    wrap.querySelectorAll('.pnl-note-pill').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        const targetId = el.getAttribute('href')?.replace('#', '');
+        if (targetId) {
+          const targetEl = document.getElementById(targetId);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            targetEl.classList.add('pnl-note-target-highlight');
+            setTimeout(() => {
+              targetEl.classList.remove('pnl-note-target-highlight');
+            }, 2500);
+          }
+        }
+      });
+    });
   }
 
   function renderPnlSubgroupLeafs(sgId, ledgerBalances1, indentClassL2, indentClassL3, dateFrom = '', dateTo = '', isCompare = false, ledgerBalances2 = {}, compareDateFrom = '', compareDateTo = '') {
@@ -1581,6 +2933,7 @@
   }
 
   // Helper to compile structured P&L Report Data for Export
+  // Helper to compile structured P&L Report Data for Export
   function getPnLReportData() {
     const fromInp = document.getElementById('pnlDateFrom');
     const toInp   = document.getElementById('pnlDateTo');
@@ -1594,129 +2947,288 @@
     const compareDateTo   = (isCompare && compToInp) ? compToInp.value : '';
 
     const ledgerBalances1 = computeTrialBalanceBalances(dateFrom, dateTo);
-    const ledgerBalances2 = isCompare ? computeTrialBalanceBalances(compareDateFrom, compareDateTo) : {};
+    let ledgerBalances2 = {};
+    let prevPeriodFrom = compareDateFrom;
+    let prevPeriodTo = compareDateTo;
+
+    if (isCompare) {
+      ledgerBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
+    } else {
+      const prevDates = getPreviousPeriodDates(dateFrom, dateTo);
+      prevPeriodFrom = prevDates.prevFrom;
+      prevPeriodTo = prevDates.prevTo;
+      if (prevPeriodFrom || prevPeriodTo) {
+        ledgerBalances2 = computeTrialBalanceBalances(prevPeriodFrom, prevPeriodTo);
+      }
+    }
 
     const co = (typeof getCompanyDetails === 'function') ? getCompanyDetails() : {};
     const companyName = co.name || 'KYA Accounting';
 
-    // 1. Income Data
-    const incSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'income');
-    const incomeData = [];
-    let totalRevenue1 = 0;
-    let totalRevenue2 = 0;
+    const col1Title = formatRptDateRange(dateFrom, dateTo, 'Current Period');
+    const col2Title = formatRptDateRange(prevPeriodFrom, prevPeriodTo, isCompare ? 'Comparison Period' : 'Previous Period');
 
-    incSubgroups.forEach(sg => {
-      const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
-      const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
-      if (!hasTx1 && !hasTx2) return;
+    // ── Primary Calculations ──
+    const rfoBal1 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances1);
+    const rfoBal2 = getPnlNodeBalance('sg-rfo', 'sg', ledgerBalances2);
+    const oiBal1  = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances1);
+    const oiBal2  = getPnlNodeBalance('sg-oi', 'sg', ledgerBalances2);
+    const totalRevenue1 = rfoBal1 + oiBal1;
+    const totalRevenue2 = rfoBal2 + oiBal2;
 
-      const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
-      const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
-      totalRevenue1 += sgBal1;
-      totalRevenue2 += sgBal2;
+    const cmcBal1 = getPnlNodeBalance('sg-cmc', 'sg', ledgerBalances1);
+    const cmcBal2 = getPnlNodeBalance('sg-cmc', 'sg', ledgerBalances2);
+    const pstBal1 = getPnlNodeBalance('sg-pst', 'sg', ledgerBalances1);
+    const pstBal2 = getPnlNodeBalance('sg-pst', 'sg', ledgerBalances2);
+    const cinvBal1 = getPnlNodeBalance('sg-cinv', 'sg', ledgerBalances1);
+    const cinvBal2 = getPnlNodeBalance('sg-cinv', 'sg', ledgerBalances2);
+    const ebeBal1 = getPnlNodeBalance('sg-ebe', 'sg', ledgerBalances1);
+    const ebeBal2 = getPnlNodeBalance('sg-ebe', 'sg', ledgerBalances2);
+    const fcBal1 = getPnlNodeBalance('sg-fc', 'sg', ledgerBalances1);
+    const fcBal2 = getPnlNodeBalance('sg-fc', 'sg', ledgerBalances2);
+    const daBal1 = getPnlNodeBalance('sg-da', 'sg', ledgerBalances1);
+    const daBal2 = getPnlNodeBalance('sg-da', 'sg', ledgerBalances2);
+    const oeBal1 = getPnlNodeBalance('sg-oe', 'sg', ledgerBalances1);
+    const oeBal2 = getPnlNodeBalance('sg-oe', 'sg', ledgerBalances2);
 
+    const stdExpSgIds = new Set(['sg-cmc', 'sg-pst', 'sg-cinv', 'sg-ebe', 'sg-fc', 'sg-da', 'sg-oe', 'sg-tax']);
+    const customExpSgs = COA_SYS_SGS.filter(sg => sg.main === 'expense' && !stdExpSgIds.has(sg.id));
+
+    let customExpTotal1 = 0;
+    let customExpTotal2 = 0;
+    const customExpRows = [];
+    let customNoteCtr = 10;
+    customExpSgs.forEach(sg => {
+      const b1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
+      const b2 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances2);
+      customExpTotal1 += b1;
+      customExpTotal2 += b2;
+      customExpRows.push({
+        id: sg.id,
+        name: sg.name,
+        noteNo: String(customNoteCtr++),
+        amount1: b1,
+        amount2: b2
+      });
+    });
+
+    const totalExpenses1 = cmcBal1 + pstBal1 + cinvBal1 + ebeBal1 + fcBal1 + daBal1 + oeBal1 + customExpTotal1;
+    const totalExpenses2 = cmcBal2 + pstBal2 + cinvBal2 + ebeBal2 + fcBal2 + daBal2 + oeBal2 + customExpTotal2;
+
+    const pbeita1 = totalRevenue1 - totalExpenses1;
+    const pbeita2 = totalRevenue2 - totalExpenses2;
+
+    let exceptional1 = 0, exceptional2 = 0;
+    let discont1 = 0, discont2 = 0;
+    let discontTax1 = 0, discontTax2 = 0;
+
+    coaLedgers.forEach(l => {
+      const lName = (l.name || '').toLowerCase();
+      if (lName.includes('exceptional')) {
+        exceptional1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        exceptional2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      } else if (lName.includes('discontinued') && lName.includes('tax')) {
+        discontTax1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        discontTax2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      } else if (lName.includes('discontinued')) {
+        discont1 += getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+        discont2 += getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      }
+    });
+
+    const pbt1 = pbeita1 - exceptional1;
+    const pbt2 = pbeita2 - exceptional2;
+
+    const taxLedgers = coaLedgers.filter(l => l.sgId === 'sg-tax');
+    let currTaxBal1 = 0, currTaxBal2 = 0;
+    let defTaxBal1 = 0, defTaxBal2 = 0;
+
+    taxLedgers.forEach(l => {
+      const lName = (l.name || '').toLowerCase();
+      const b1 = getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+      const b2 = getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+      if (lName.includes('deferred')) {
+        defTaxBal1 += b1;
+        defTaxBal2 += b2;
+      } else {
+        currTaxBal1 += b1;
+        currTaxBal2 += b2;
+      }
+    });
+    const totalTaxBal1 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances1);
+    const totalTaxBal2 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances2);
+    if (currTaxBal1 === 0 && defTaxBal1 === 0 && totalTaxBal1 !== 0) currTaxBal1 = totalTaxBal1;
+    if (currTaxBal2 === 0 && defTaxBal2 === 0 && totalTaxBal2 !== 0) currTaxBal2 = totalTaxBal2;
+
+    const pcont1 = pbt1 - (currTaxBal1 + defTaxBal1);
+    const pcont2 = pbt2 - (currTaxBal2 + defTaxBal2);
+
+    const discontAfter1 = discont1 - discontTax1;
+    const discontAfter2 = discont2 - discontTax2;
+
+    const pat1 = pcont1 + discontAfter1;
+    const pat2 = pcont2 + discontAfter2;
+
+    const shareCapBal1 = getPnlShareCapitalBalance(dateTo);
+    const shareCapBal2 = getPnlShareCapitalBalance(prevPeriodTo);
+    const numShares1 = shareCapBal1 > 0 ? Math.round(shareCapBal1 / 10) : 0;
+    const numShares2 = shareCapBal2 > 0 ? Math.round(shareCapBal2 / 10) : 0;
+
+    const basicEps1 = numShares1 > 0 ? (pat1 / numShares1).toFixed(2) : '0.00';
+    const basicEps2 = numShares2 > 0 ? (pat2 / numShares2).toFixed(2) : '0.00';
+    const dilutedEps1 = basicEps1;
+    const dilutedEps2 = basicEps2;
+
+    // ── Build Schedule Rows ──
+    const scheduleRows = [
+      { particular: 'I. Revenue from operations', noteNo: '1', amount1: rfoBal1, amount2: rfoBal2, type: 'main' },
+      { particular: 'II. Other income', noteNo: '2', amount1: oiBal1, amount2: oiBal2, type: 'main' },
+      { particular: 'III. Total Revenue (I + II)', noteNo: '', amount1: totalRevenue1, amount2: totalRevenue2, type: 'subtotal-revenue' },
+      { particular: 'IV. Expenses :', noteNo: '', amount1: null, amount2: null, type: 'sec-hdr' },
+      { particular: 'Cost of materials consumed', noteNo: '3', amount1: cmcBal1, amount2: cmcBal2, type: 'sub' },
+      { particular: 'Purchases of Stock-in-Trade', noteNo: '4', amount1: pstBal1, amount2: pstBal2, type: 'sub' },
+      { particular: 'Changes in inventories of finished goods / Work-in-progress and Stock-In-Trade', noteNo: '5', amount1: cinvBal1, amount2: cinvBal2, type: 'sub' },
+      { particular: 'Employee Benefits Expenses', noteNo: '6', amount1: ebeBal1, amount2: ebeBal2, type: 'sub' },
+      { particular: 'Finance Costs', noteNo: '7', amount1: fcBal1, amount2: fcBal2, type: 'sub' },
+      { particular: 'Depreciation and amortization expense', noteNo: '8', amount1: daBal1, amount2: daBal2, type: 'sub' },
+      { particular: 'Other expenses', noteNo: '9', amount1: oeBal1, amount2: oeBal2, type: 'sub' }
+    ];
+
+    customExpRows.forEach(cer => {
+      scheduleRows.push({ particular: cer.name, noteNo: cer.noteNo, amount1: cer.amount1, amount2: cer.amount2, type: 'sub' });
+    });
+
+    scheduleRows.push(
+      { particular: 'Total expenses (IV)', noteNo: '', amount1: totalExpenses1, amount2: totalExpenses2, type: 'subtotal-expense' },
+      { particular: 'V. Profit/(loss) before exceptional items and tax (I- IV)', noteNo: '', amount1: pbeita1, amount2: pbeita2, type: 'highlight' },
+      { particular: 'VI. Exceptional Items', noteNo: '10', amount1: exceptional1, amount2: exceptional2, type: 'main' },
+      { particular: 'VII. Profit/(loss) before tax (V-VI)', noteNo: '', amount1: pbt1, amount2: pbt2, type: 'highlight' },
+      { particular: 'VIII. Tax expense:', noteNo: '', amount1: null, amount2: null, type: 'sec-hdr' },
+      { particular: '(1) Current tax', noteNo: '11', amount1: currTaxBal1, amount2: currTaxBal2, type: 'sub' },
+      { particular: '(2) Deferred tax', noteNo: '12', amount1: defTaxBal1, amount2: defTaxBal2, type: 'sub' },
+      { particular: 'IX. Profit (Loss) for the period from continuing operations (VII-VIII)', noteNo: '', amount1: pcont1, amount2: pcont2, type: 'highlight' },
+      { particular: 'X. Profit/(loss) from discontinued operations', noteNo: '13', amount1: discont1, amount2: discont2, type: 'main' },
+      { particular: 'XI. Tax expense of discontinued operations', noteNo: '14', amount1: discontTax1, amount2: discontTax2, type: 'main' },
+      { particular: 'XII. Profit/(loss) from Discontinued operations (after tax) (X-XI)', noteNo: '', amount1: discontAfter1, amount2: discontAfter2, type: 'highlight' },
+      { particular: 'XIII. Profit/(loss) for the period (IX+XII)', noteNo: '', amount1: pat1, amount2: pat2, type: 'grandtotal' },
+      { particular: 'XV. Earnings per equity share:', noteNo: '', amount1: null, amount2: null, type: 'sec-hdr' },
+      { particular: 'Basic', noteNo: '15', amount1: basicEps1, amount2: basicEps2, type: 'eps', isEps: true },
+      { particular: 'Diluted', noteNo: '15', amount1: dilutedEps1, amount2: dilutedEps2, type: 'eps', isEps: true }
+    );
+
+    // ── Build Notes Data ──
+    function buildNoteForSubgroup(noteNo, title, sgId) {
+      const sgBal1 = getPnlNodeBalance(sgId, 'sg', ledgerBalances1);
+      const sgBal2 = getPnlNodeBalance(sgId, 'sg', ledgerBalances2);
       const items = [];
-      const groupLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger');
-      groupLdgs.forEach(gl => {
-        const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, false);
-        const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, false);
-        if (!hasGlTx1 && !hasGlTx2) return;
 
+      const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
+      groupLdgs.forEach(gl => {
         const glBal1 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances1);
-        const glBal2 = isCompare ? getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances2) : 0;
+        const glBal2 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances2);
 
         const children = [];
         const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
         childLdgs.forEach(l => {
-          const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
-          const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
-          if (!hasLTx1 && !hasLTx2) return;
-
           const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
-          const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
+          const bal2 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances2);
           children.push({ name: l.name, code: l.code || '', amount1: bal1, amount2: bal2 });
         });
 
         items.push({ name: gl.name, code: gl.code || '', isGroup: true, amount1: glBal1, amount2: glBal2, children });
       });
 
-      const directLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'ledger' && !l.glId);
+      const directLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'ledger' && !l.glId);
       directLdgs.forEach(l => {
-        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
-        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
-        if (!hasLTx1 && !hasLTx2) return;
-
         const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
-        const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
+        const bal2 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances2);
         items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
       });
 
-      incomeData.push({ id: sg.id, name: sg.name, amount1: sgBal1, amount2: sgBal2, items });
-    });
+      return { noteNo, title, total1: sgBal1, total2: sgBal2, items };
+    }
 
-    // 2. Expense Data
-    const expSubgroups = COA_SYS_SGS.filter(sg => sg.main === 'expense' && sg.id !== 'sg-tax');
-    const expenseData = [];
-    let totalExpenses1 = 0;
-    let totalExpenses2 = 0;
-
-    expSubgroups.forEach(sg => {
-      const hasTx1 = subgroupHasTransactions(sg.id, dateFrom, dateTo, false);
-      const hasTx2 = isCompare && subgroupHasTransactions(sg.id, compareDateFrom, compareDateTo, false);
-      if (!hasTx1 && !hasTx2) return;
-
-      const sgBal1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
-      const sgBal2 = isCompare ? getPnlNodeBalance(sg.id, 'sg', ledgerBalances2) : 0;
-      totalExpenses1 += sgBal1;
-      totalExpenses2 += sgBal2;
-
+    function buildTaxNote(noteNo, title, isDeferred) {
       const items = [];
-      const groupLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'group-ledger');
-      groupLdgs.forEach(gl => {
-        const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, false);
-        const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, false);
-        if (!hasGlTx1 && !hasGlTx2) return;
-
-        const glBal1 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances1);
-        const glBal2 = isCompare ? getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances2) : 0;
-
-        const children = [];
-        const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
-        childLdgs.forEach(l => {
-          const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
-          const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
-          if (!hasLTx1 && !hasLTx2) return;
-
-          const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
-          const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
-          children.push({ name: l.name, code: l.code || '', amount1: bal1, amount2: bal2 });
-        });
-
-        items.push({ name: gl.name, code: gl.code || '', isGroup: true, amount1: glBal1, amount2: glBal2, children });
+      let total1 = 0, total2 = 0;
+      taxLedgers.forEach(l => {
+        const lName = (l.name || '').toLowerCase();
+        const matches = isDeferred ? lName.includes('deferred') : !lName.includes('deferred');
+        if (matches) {
+          const bal1 = getPnlNodeBalance(l.id, l.type, ledgerBalances1);
+          const bal2 = getPnlNodeBalance(l.id, l.type, ledgerBalances2);
+          total1 += bal1;
+          total2 += bal2;
+          items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
+        }
       });
+      if (items.length === 0) {
+        const fallback1 = isDeferred ? defTaxBal1 : currTaxBal1;
+        const fallback2 = isDeferred ? defTaxBal2 : currTaxBal2;
+        if (fallback1 !== 0 || fallback2 !== 0) {
+          total1 = fallback1;
+          total2 = fallback2;
+          items.push({ name: title, code: '', isGroup: false, amount1: fallback1, amount2: fallback2 });
+        }
+      }
+      return { noteNo, title, total1, total2, items };
+    }
 
-      const directLdgs = coaLedgers.filter(l => l.sgId === sg.id && l.type === 'ledger' && !l.glId);
-      directLdgs.forEach(l => {
-        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, false);
-        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, false);
-        if (!hasLTx1 && !hasLTx2) return;
+    function buildCustomNote(noteNo, title, amt1, amt2, desc) {
+      return {
+        noteNo,
+        title,
+        total1: amt1,
+        total2: amt2,
+        items: [{ name: desc || title, code: '', isGroup: false, amount1: amt1, amount2: amt2 }]
+      };
+    }
 
-        const bal1 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances1);
-        const bal2 = isCompare ? getPnlNodeBalance(l.id, 'ledger', ledgerBalances2) : 0;
-        items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
-      });
+    const notesData = [
+      buildNoteForSubgroup('1', 'Revenue from Operations', 'sg-rfo'),
+      buildNoteForSubgroup('2', 'Other Income', 'sg-oi'),
+      buildNoteForSubgroup('3', 'Cost of Materials Consumed', 'sg-cmc'),
+      buildNoteForSubgroup('4', 'Purchases of Stock-in-Trade', 'sg-pst'),
+      buildNoteForSubgroup('5', 'Changes in Inventories of Finished Goods, Work-in-Progress and Stock-in-Trade', 'sg-cinv'),
+      buildNoteForSubgroup('6', 'Employee Benefits Expense', 'sg-ebe'),
+      buildNoteForSubgroup('7', 'Finance Costs', 'sg-fc'),
+      buildNoteForSubgroup('8', 'Depreciation and Amortization Expense', 'sg-da'),
+      buildNoteForSubgroup('9', 'Other Expenses', 'sg-oe')
+    ];
 
-      expenseData.push({ id: sg.id, name: sg.name, amount1: sgBal1, amount2: sgBal2, items });
+    customExpRows.forEach(cer => {
+      notesData.push(buildNoteForSubgroup(cer.noteNo, cer.name, cer.id));
     });
 
-    const pbt1 = totalRevenue1 - totalExpenses1;
-    const pbt2 = totalRevenue2 - totalExpenses2;
-
-    const taxBal1 = getPnlNodeBalance('sg-tax', 'sg', ledgerBalances1);
-    const taxBal2 = isCompare ? getPnlNodeBalance('sg-tax', 'sg', ledgerBalances2) : 0;
-
-    const pat1 = pbt1 - taxBal1;
-    const pat2 = pbt2 - taxBal2;
+    notesData.push(
+      buildCustomNote('10', 'Exceptional Items', exceptional1, exceptional2, 'Exceptional gains / (losses) during the period'),
+      buildTaxNote('11', 'Current Tax', false),
+      buildTaxNote('12', 'Deferred Tax', true),
+      buildCustomNote('13', 'Discontinued Operations', discont1, discont2, 'Profit / (loss) from discontinued operations'),
+      buildCustomNote('14', 'Tax Expense of Discontinued Operations', discontTax1, discontTax2, 'Tax on discontinued operations'),
+      {
+        noteNo: '15',
+        title: 'Earnings Per Equity Share (EPS)',
+        isEps: true,
+        pat1,
+        pat2,
+        numShares1,
+        numShares2,
+        basicEps1,
+        basicEps2,
+        dilutedEps1,
+        dilutedEps2,
+        total1: basicEps1,
+        total2: basicEps2,
+        items: [
+          { name: 'Profit/(loss) for the period after tax (₹)', code: '', isGroup: false, amount1: pat1, amount2: pat2, isCurrency: true },
+          { name: 'Weighted average number of equity shares', code: '', isGroup: false, amount1: numShares1, amount2: numShares2, isCount: true },
+          { name: 'Nominal value per equity share (₹)', code: '', isGroup: false, amount1: numShares1 > 0 ? 10.00 : 0.00, amount2: numShares2 > 0 ? 10.00 : 0.00, isNominalVal: true, isCurrency: true },
+          { name: 'Basic Earnings Per Share (₹)', code: '', isGroup: false, amount1: Number(basicEps1), amount2: Number(basicEps2), isEpsVal: true, isHighlight: true },
+          { name: 'Diluted Earnings Per Share (₹)', code: '', isGroup: false, amount1: Number(dilutedEps1), amount2: Number(dilutedEps2), isEpsVal: true, isHighlight: true }
+        ]
+      }
+    );
 
     return {
       companyName,
@@ -1725,16 +3237,20 @@
       isCompare,
       compareDateFrom,
       compareDateTo,
-      incomeData,
+      prevPeriodFrom,
+      prevPeriodTo,
+      col1Title,
+      col2Title,
+      scheduleRows,
+      notesData,
       totalRevenue1,
       totalRevenue2,
-      expenseData,
       totalExpenses1,
       totalExpenses2,
       pbt1,
       pbt2,
-      taxBal1,
-      taxBal2,
+      taxBal1: currTaxBal1 + defTaxBal1,
+      taxBal2: currTaxBal2 + defTaxBal2,
       pat1,
       pat2
     };
@@ -1817,6 +3333,28 @@
 
   document.getElementById('pnlLayoutHorizontal')?.addEventListener('click', () => {
     _pnlLayoutMode = 'Horizontal';
+    renderPnlPanel();
+  });
+
+  document.getElementById('pnlLayoutSchedule')?.addEventListener('click', () => {
+    _pnlLayoutMode = 'Schedule';
+    renderPnlPanel();
+  });
+
+  document.getElementById('pnlLayoutNotes')?.addEventListener('click', () => {
+    _pnlLayoutMode = 'Notes';
+    renderPnlPanel();
+  });
+
+  ['pnlDateFrom', 'pnlDateTo', 'pnlCompareDateFrom', 'pnlCompareDateTo'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      renderPnlPanel();
+    });
+  });
+
+  document.getElementById('pnlCompareCheck')?.addEventListener('change', (e) => {
+    const wrap = document.getElementById('pnlCompareDateWrap');
+    if (wrap) wrap.style.display = e.target.checked ? 'flex' : 'none';
     renderPnlPanel();
   });
 

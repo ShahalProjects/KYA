@@ -405,9 +405,6 @@
     if (currentSalesVoucherSubtype === 'Return') {
       const ctr = window.KYA_STORE.salesReturnCtr || 1;
       return `REV-${year}-${String(ctr).padStart(3, '0')}`;
-    } else if (currentSalesVoucherSubtype === 'Order') {
-      const ctr = window.KYA_STORE.salesOrderCtr || 1;
-      return `SO-${year}-${String(ctr).padStart(3, '0')}`;
     } else {
       const ctr = window.KYA_STORE.salesInvoiceCtr || 1;
       return `INV-${year}-${String(ctr).padStart(3, '0')}`;
@@ -429,7 +426,6 @@
     if (invNoEl) {
       let ph = 'INV-2026-001';
       if (currentSalesVoucherSubtype === 'Return') ph = 'REV-2026-001';
-      else if (currentSalesVoucherSubtype === 'Order') ph = 'SO-2026-001';
       invNoEl.placeholder = ph;
     }
     
@@ -591,57 +587,9 @@
       return 'No Refund';
     }
     
-    const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
-    let orderAdvanceAmount = 0;
-    let total = calculateSubtotal();
-    let tdsTcsMode = 'None';
-    const tdsBtn = document.getElementById('salesTdsTcsTds');
-    const tcsBtn = document.getElementById('salesTdsTcsTcs');
-    if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
-    if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
-    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
-    let rate = 0;
-    if (tdsTcsMode !== 'None' && rateSelect) {
-      if (rateSelect.value === 'custom') {
-        const customInput = document.getElementById('salesTdsTcsRateCustom');
-        rate = customInput ? (parseFloat(customInput.value) || 0) : 0;
-      } else {
-        rate = parseFloat(rateSelect.value) || 0;
-      }
-    }
-    const amountInput = document.getElementById('salesTdsTcsAmount');
-    const tdsTcsAmount = amountInput ? (parseFloat(amountInput.value) || 0) : 0;
-    const adjustmentsInput = document.getElementById('salesAdjustments');
-    const adjustments = adjustmentsInput ? (parseFloat(adjustmentsInput.value) || 0) : 0;
-    
-    let grandTotal = total;
-    if (tdsTcsMode === 'TDS') grandTotal = total - tdsTcsAmount;
-    else if (tdsTcsMode === 'TCS') grandTotal = total + tdsTcsAmount;
-    grandTotal += adjustments;
-
-    let isOrderLinked = false;
-    if (currentSalesVoucherSubtype === 'Invoice' && orderNo) {
-      const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
-      if (linkedOrder) {
-        isOrderLinked = true;
-        if (linkedOrder.paymentStatus === 'Full Payment') {
-          orderAdvanceAmount = linkedOrder.total;
-        } else if (linkedOrder.paymentStatus === 'Partial Payment') {
-          orderAdvanceAmount = linkedOrder.paymentAmount || 0;
-        }
-      }
-    }
-    const excessAmount = isOrderLinked ? Math.max(0, orderAdvanceAmount - grandTotal) : 0;
-
-    if (excessAmount > 0) {
-      if (fullBtn && fullBtn.classList.contains('active')) return 'Full Refund';
-      if (partBtn && partBtn.classList.contains('active')) return 'Partial Refund';
-      return 'Not Refunded';
-    } else {
-      if (fullBtn && fullBtn.classList.contains('active')) return 'Full Payment';
-      if (partBtn && partBtn.classList.contains('active')) return 'Partial Payment';
-      return 'Not Paid';
-    }
+    if (fullBtn && fullBtn.classList.contains('active')) return 'Full Payment';
+    if (partBtn && partBtn.classList.contains('active')) return 'Partial Payment';
+    return 'Not Paid';
   }
 
   function getOrCreateSystemLedger(name, sgId) {
@@ -817,17 +765,25 @@
     const amtInput  = tr.querySelector('.sales-row-amount-input');
     const amountEdited = (triggeredBy === 'amount');
 
-    const itemEl = tr.querySelector('.sales-row-item');
-    if (itemEl) row.item = itemEl.value;
+    const isService = (typeof currentSalesType !== 'undefined' && currentSalesType === 'Service');
 
-    const hsnEl = tr.querySelector('.sales-row-hsn');
-    if (hsnEl) row.hsn = hsnEl.value;
+    if (isService) {
+      const revSelect = tr.querySelector('.sales-row-rev');
+      if (revSelect && revSelect.value) row.revenueLedgerId = revSelect.value;
+    } else {
+      const itemEl = tr.querySelector('.sales-row-item');
+      if (itemEl) row.item = itemEl.value;
 
-    const unitEl = tr.querySelector('.sales-row-unit');
-    if (unitEl) row.unit = unitEl.value;
+      const hsnEl = tr.querySelector('.sales-row-hsn');
+      if (hsnEl) row.hsn = hsnEl.value;
+
+      const unitEl = tr.querySelector('.sales-row-unit');
+      if (unitEl) row.unit = unitEl.value;
+    }
 
     let qty      = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
     let rate     = Math.round(parseSalesAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
+    let baseAmt  = Math.round(parseSalesAmt(tr.querySelector('.sales-row-base')?.value || '0') * 100) / 100;
     let discount = parseSalesAmt(tr.querySelector('.sales-row-discount')?.value || '0');
     row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
     row.tax = parseFloat(tr.querySelector('.sales-row-tax')?.value) || 0;
@@ -847,57 +803,82 @@
       } else {
         base = afterDiscount + discount;
       }
-      rate = Math.round((qty > 0 ? base / qty : 0) * 100) / 100;
 
-      if (currentSalesVoucherSubtype === 'Return' && row.origRate !== undefined) {
-        if (rate > row.origRate) {
-          rate = row.origRate;
-          showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
+      if (isService) {
+        row.baseAmount = Math.round(base * 100) / 100;
+        row.discount = discount;
+        row.amount   = enteredAmount;
+        const baseInput = tr.querySelector('.sales-row-base');
+        if (baseInput && document.activeElement !== baseInput) {
+          baseInput.value = row.baseAmount === 0 ? '' : row.baseAmount.toFixed(2);
         }
-      }
+      } else {
+        rate = Math.round((qty > 0 ? base / qty : 0) * 100) / 100;
 
-      row.qty      = qty;
-      row.rate     = rate;
-      row.discount = discount;
-      row.amount   = enteredAmount;
+        if (currentSalesVoucherSubtype === 'Return' && row.origRate !== undefined) {
+          if (rate > row.origRate) {
+            rate = row.origRate;
+            showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
+          }
+        }
 
-      const rateInput = tr.querySelector('.sales-row-rate');
-      if (rateInput && document.activeElement !== rateInput) {
-        rateInput.value = rate === 0 ? '' : rate.toFixed(2);
+        row.qty      = qty;
+        row.rate     = rate;
+        row.discount = discount;
+        row.amount   = enteredAmount;
+
+        const rateInput = tr.querySelector('.sales-row-rate');
+        if (rateInput && document.activeElement !== rateInput) {
+          rateInput.value = rate === 0 ? '' : rate.toFixed(2);
+        }
       }
     } else {
-      if (currentSalesVoucherSubtype === 'Return' && row.origQty !== undefined) {
-        if (qty > row.origQty) {
-          qty = row.origQty;
-          if (tr.querySelector('.sales-row-qty')) tr.querySelector('.sales-row-qty').value = qty;
-          showToast(`Quantity cannot exceed remaining quantity of ${row.origQty}.`, 'warning');
+      if (isService) {
+        row.baseAmount = baseAmt;
+        row.discount   = discount;
+
+        const discAmt       = row.discountType === 'pct' ? (baseAmt * (row.discount / 100)) : row.discount;
+        const afterDiscount = Math.max(0, baseAmt - discAmt);
+        const taxAmt        = afterDiscount * (row.tax / 100);
+        row.amount          = Math.round((afterDiscount + taxAmt) * 100) / 100;
+
+        if (amtInput && document.activeElement !== amtInput) {
+          amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
         }
-        if (rate > row.origRate) {
-          rate = row.origRate;
-          const rateInput = tr.querySelector('.sales-row-rate');
-          if (rateInput && document.activeElement !== rateInput) {
-            rateInput.value = rate === 0 ? '' : rate.toFixed(2);
+      } else {
+        if (currentSalesVoucherSubtype === 'Return' && row.origQty !== undefined) {
+          if (qty > row.origQty) {
+            qty = row.origQty;
+            if (tr.querySelector('.sales-row-qty')) tr.querySelector('.sales-row-qty').value = qty;
+            showToast(`Quantity cannot exceed remaining quantity of ${row.origQty}.`, 'warning');
           }
-          showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
+          if (rate > row.origRate) {
+            rate = row.origRate;
+            const rateInput = tr.querySelector('.sales-row-rate');
+            if (rateInput && document.activeElement !== rateInput) {
+              rateInput.value = rate === 0 ? '' : rate.toFixed(2);
+            }
+            showToast(`Rate cannot exceed original invoice rate of ₹${fmtNum(row.origRate)}.`, 'warning');
+          }
+          if (discount > row.origDiscount) {
+            discount = row.origDiscount;
+            if (tr.querySelector('.sales-row-discount')) tr.querySelector('.sales-row-discount').value = discount === 0 ? '' : discount;
+          }
         }
-        if (discount > row.origDiscount) {
-          discount = row.origDiscount;
-          if (tr.querySelector('.sales-row-discount')) tr.querySelector('.sales-row-discount').value = discount === 0 ? '' : discount;
+
+        row.qty      = qty;
+        row.rate     = rate;
+        row.discount = discount;
+
+        const base          = row.qty * row.rate;
+        const discAmt       = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+        const afterDiscount = Math.max(0, base - discAmt);
+        const taxAmt        = afterDiscount * (row.tax / 100);
+        row.amount          = Math.round((afterDiscount + taxAmt) * 100) / 100;
+
+        if (amtInput && document.activeElement !== amtInput) {
+          amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
         }
-      }
-
-      row.qty      = qty;
-      row.rate     = rate;
-      row.discount = discount;
-
-      const base          = row.qty * row.rate;
-      const discAmt       = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
-      const afterDiscount = Math.max(0, base - discAmt);
-      const taxAmt        = afterDiscount * (row.tax / 100);
-      row.amount          = Math.round((afterDiscount + taxAmt) * 100) / 100;
-
-      if (amtInput && document.activeElement !== amtInput) {
-        amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
       }
     }
 
@@ -1012,7 +993,6 @@
     });
     return Math.round(sub * 100) / 100;
   }
-
   function recalculateSalesTotals() {
     const subTotal = calculateSubtotal();
     const subTotalEl = document.getElementById('salesSubTotal');
@@ -1081,45 +1061,19 @@
     const totalEl = document.getElementById('salesTotal');
     if (totalEl) totalEl.textContent = '₹ ' + fmtNum(total);
 
-    // Adjust Payment Amount in real-time if it exceeds the new Grand Total or Balance Payment
+    // Adjust Payment Amount in real-time if it exceeds the new Grand Total
     const payAmtEl = document.getElementById('salesPaymentAmount');
     if (payAmtEl) {
       const maxVal = getSalesPaymentMax(total);
-      const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
-      const isOrderLinked = (currentSalesVoucherSubtype === 'Invoice' && orderNo);
-      
-      let orderAdvanceAmount = 0;
-      if (isOrderLinked) {
-        const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
-        if (linkedOrder) {
-          if (linkedOrder.paymentStatus === 'Full Payment') {
-            orderAdvanceAmount = linkedOrder.total;
-          } else if (linkedOrder.paymentStatus === 'Partial Payment') {
-            orderAdvanceAmount = linkedOrder.paymentAmount || 0;
-          }
-        }
-      }
-      const excessAmount = Math.max(0, orderAdvanceAmount - total);
-
-      if (isOrderLinked) {
-        payAmtEl.max = excessAmount > 0 ? excessAmount : maxVal;
-      } else if (currentSalesVoucherSubtype === 'Return' && payAmtEl.max) {
-        // Keep return logic max as set in updateSalesReturnLockState
-      } else {
+      if (currentSalesVoucherSubtype !== 'Return') {
         payAmtEl.removeAttribute('max');
       }
       
       if (payAmtEl.value && total > 0) {
         const currentVal = parseFloat(payAmtEl.value) || 0;
-        const allowedMax = (isOrderLinked && excessAmount > 0) ? excessAmount : maxVal;
-        if (currentVal > allowedMax) {
-          payAmtEl.value = allowedMax.toFixed(2);
-          const limitMsg = (isOrderLinked && excessAmount > 0)
-            ? `Refund Amount adjusted to ₹${fmtNum(allowedMax)} to not exceed the excess refund amount.`
-            : (isOrderLinked 
-               ? `Payment Amount adjusted to ₹${fmtNum(allowedMax)} to not exceed the balance payment.`
-               : `Payment Amount adjusted to ₹${fmtNum(allowedMax)} to not exceed the Grand Total.`);
-          showToast(limitMsg, 'warning');
+        if (currentVal > maxVal) {
+          payAmtEl.value = maxVal.toFixed(2);
+          showToast(`Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the Grand Total.`, 'warning');
         }
       }
     }
@@ -1128,41 +1082,9 @@
     const refundInfoEl = document.getElementById('salesRefundInfoMessage');
     const payStatusWrapEl = document.querySelector('.sales-paystatus-wrap');
     if (refundInfoEl && payStatusWrapEl) {
-      let orderAdvanceAmount = 0;
-      const orderNo = document.getElementById('salesOrderNo')?.value?.trim();
-      const isOrderLinked = (currentSalesVoucherSubtype === 'Invoice' && orderNo);
-      
-      if (isOrderLinked) {
-        const linkedOrder = (window.KYA_STORE.salesVouchers || []).find(v => v.isOrder && v.invoiceNo.toLowerCase() === orderNo.toLowerCase());
-        if (linkedOrder) {
-          if (linkedOrder.paymentStatus === 'Full Payment') {
-            orderAdvanceAmount = linkedOrder.total;
-          } else if (linkedOrder.paymentStatus === 'Partial Payment') {
-            orderAdvanceAmount = linkedOrder.paymentAmount || 0;
-          }
-        }
-      }
-      
-      const excessAmount = Math.max(0, orderAdvanceAmount - total);
-      if (isOrderLinked && excessAmount > 0) {
-        payStatusWrapEl.style.display = 'flex';
-        refundInfoEl.style.display = 'block';
-        
-        const payStatus = getSalesPaymentStatus();
-        if (payStatus === 'Full Refund') {
-          refundInfoEl.textContent = `Refund due: ₹${fmtNum(excessAmount)} (Fully Refunded now). This will be paid from the selected Payment Account.`;
-        } else if (payStatus === 'Partial Refund') {
-          const refundAmt = parseFloat(document.getElementById('salesPaymentAmount')?.value) || 0;
-          const remaining = Math.max(0, excessAmount - refundAmt);
-          refundInfoEl.textContent = `Refund due: ₹${fmtNum(excessAmount)} (₹${fmtNum(refundAmt)} refunded now, ₹${fmtNum(remaining)} Refund Payable).`;
-        } else {
-          refundInfoEl.textContent = `Refund due: ₹${fmtNum(excessAmount)} (Refund later). This will be recorded under Refund Payable and will set status to Not Refunded.`;
-        }
-      } else {
-        payStatusWrapEl.style.display = 'flex';
-        refundInfoEl.style.display = 'none';
-        refundInfoEl.textContent = '';
-      }
+      payStatusWrapEl.style.display = 'flex';
+      refundInfoEl.style.display = 'none';
+      refundInfoEl.textContent = '';
     }
     
     updateSalesPaymentUI();
@@ -1170,15 +1092,16 @@
 
   function updateVoucherSubtypeUI() {
     const newSalesBtn = document.getElementById('btnNewSales');
+    const preInvoiceBtn = document.getElementById('btnSalesPreInvoice');
     const returnBtn = document.getElementById('btnSalesReturn');
-    const orderBtn = document.getElementById('btnSalesOrder');
-    const cardTitle = document.querySelector('#panel-sales-voucher .je-card-title-text');
-    const cardSubtitle = document.querySelector('#panel-sales-voucher .je-card-subtitle-text');
+    const formCard = document.getElementById('salesVoucherFormCard') || document.querySelector('#panel-sales-voucher .je-form-card');
+    const preInvCard = document.getElementById('salesPreInvoiceCard');
+    const cardTitle = document.querySelector('#salesVoucherFormCard .je-card-title-text') || document.querySelector('#panel-sales-voucher .je-card-title-text');
+    const cardSubtitle = document.querySelector('#salesVoucherFormCard .je-card-subtitle-text') || document.querySelector('#panel-sales-voucher .je-card-subtitle-text');
     const invoiceNoLabel = document.getElementById('lblSalesInvoiceNo');
     const invoiceNoInput = document.getElementById('salesInvoiceNo');
     const selectWrap = document.getElementById('salesInvoiceSelectWrap');
     const invoiceNoContainer = document.getElementById('salesInvoiceNoContainer');
-    const orderNoContainer = document.getElementById('salesOrderNoContainer');
     const postSalesBtn = document.getElementById('btnPostSales');
 
     if (invoiceNoLabel) invoiceNoLabel.textContent = 'Invoice No.';
@@ -1200,53 +1123,60 @@
       }
     };
 
-    deactiveBtn(newSalesBtn);
-    deactiveBtn(returnBtn);
-    deactiveBtn(orderBtn);
+    const quoteCard = document.getElementById('salesQuotationFormCard');
+    const proformaCard = document.getElementById('salesProformaFormCard');
+    const orderCard = document.getElementById('salesOrderFormCard');
+    const challanCard = document.getElementById('salesDeliveryChallanFormCard');
 
-    if (currentSalesVoucherSubtype === 'Return') {
-      activeBtn(returnBtn);
-      if (cardTitle) cardTitle.textContent = 'Sales Reversal';
-      if (cardSubtitle) cardSubtitle.textContent = 'Record sales reversals and customer credits';
-      if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
-      if (invoiceNoLabel) invoiceNoLabel.textContent = 'Original Doc';
-      if (invoiceNoInput) invoiceNoInput.style.display = 'none';
-      if (selectWrap) {
-        selectWrap.style.display = 'block';
-        refreshSalesInvoiceDropdownOptions();
-      }
-      if (orderNoContainer) orderNoContainer.style.display = 'block';
-      if (postSalesBtn) {
-        postSalesBtn.innerHTML = `<svg viewBox="0 0 15 15" fill="none" style="width:14px; height:14px; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Post Reversal`;
-      }
-    } else if (currentSalesVoucherSubtype === 'Order') {
-      activeBtn(orderBtn);
-      if (cardTitle) cardTitle.textContent = 'Sales Pre Invoice';
-      if (cardSubtitle) cardSubtitle.textContent = 'Record pre-invoices without impact on books';
-      if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
-      if (invoiceNoLabel) invoiceNoLabel.textContent = 'Pre Invoice No.';
-      if (invoiceNoInput) {
-        invoiceNoInput.style.display = 'block';
-        invoiceNoInput.placeholder = 'SO-2026-001';
-      }
-      if (selectWrap) selectWrap.style.display = 'none';
-      if (orderNoContainer) orderNoContainer.style.display = 'none';
-      if (postSalesBtn) {
-        postSalesBtn.innerHTML = `<svg viewBox="0 0 15 15" fill="none" style="width:14px; height:14px; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Place Order`;
+    deactiveBtn(newSalesBtn);
+    deactiveBtn(preInvoiceBtn);
+    deactiveBtn(returnBtn);
+
+    if (quoteCard) quoteCard.style.display = 'none';
+    if (proformaCard) proformaCard.style.display = 'none';
+    if (orderCard) orderCard.style.display = 'none';
+    if (challanCard) challanCard.style.display = 'none';
+
+    if (currentSalesVoucherSubtype === 'PreInvoice') {
+      activeBtn(preInvoiceBtn);
+      if (formCard) formCard.style.display = 'none';
+      if (preInvCard) {
+        preInvCard.style.display = 'block';
+        if (typeof renderSalesPreInvoicePanel === 'function') {
+          renderSalesPreInvoicePanel();
+        }
       }
     } else {
-      activeBtn(newSalesBtn);
-      if (cardTitle) cardTitle.textContent = 'Sales Invoice';
-      if (cardSubtitle) cardSubtitle.textContent = 'Record sales transactions and customer receivables';
-      if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
-      if (invoiceNoInput) {
-        invoiceNoInput.style.display = 'block';
-        invoiceNoInput.placeholder = 'INV-2026-001';
-      }
-      if (selectWrap) selectWrap.style.display = 'none';
-      if (orderNoContainer) orderNoContainer.style.display = 'block';
-      if (postSalesBtn) {
-        postSalesBtn.innerHTML = `<svg viewBox="0 0 15 15" fill="none" style="width:14px; height:14px; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Post Invoice`;
+      if (formCard) formCard.style.display = '';
+      if (preInvCard) preInvCard.style.display = 'none';
+
+      if (currentSalesVoucherSubtype === 'Return') {
+        activeBtn(returnBtn);
+        if (cardTitle) cardTitle.textContent = 'Sales Reversal';
+        if (cardSubtitle) cardSubtitle.textContent = 'Record sales reversals and customer credits';
+        if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
+        if (invoiceNoLabel) invoiceNoLabel.textContent = 'Original Doc';
+        if (invoiceNoInput) invoiceNoInput.style.display = 'none';
+        if (selectWrap) {
+          selectWrap.style.display = 'block';
+          refreshSalesInvoiceDropdownOptions();
+        }
+        if (postSalesBtn) {
+          postSalesBtn.innerHTML = `<svg viewBox="0 0 15 15" fill="none" style="width:14px; height:14px; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Post Reversal`;
+        }
+      } else {
+        activeBtn(newSalesBtn);
+        if (cardTitle) cardTitle.textContent = 'Sales Invoice';
+        if (cardSubtitle) cardSubtitle.textContent = 'Record sales transactions and customer receivables';
+        if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
+        if (invoiceNoInput) {
+          invoiceNoInput.style.display = 'block';
+          invoiceNoInput.placeholder = 'INV-2026-001';
+        }
+        if (selectWrap) selectWrap.style.display = 'none';
+        if (postSalesBtn) {
+          postSalesBtn.innerHTML = `<svg viewBox="0 0 15 15" fill="none" style="width:14px; height:14px; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Post Invoice`;
+        }
       }
     }
   }
@@ -1258,14 +1188,9 @@
 
     optionsList.innerHTML = '';
     
-    // Get all posted invoices/orders that are NOT returns and NOT completely returned
+    // Get all posted invoices that are NOT returns and NOT completely returned
     const invoices = (window.KYA_STORE.salesVouchers || []).filter(v => {
       if (v.isReturn) return false;
-      if (v.isOrder) {
-        // Only show orders that have NOT been converted to a sale (Invoice)
-        const isConverted = (window.KYA_STORE.salesVouchers || []).some(inv => !inv.isOrder && !inv.isReturn && inv.orderNo && inv.orderNo.toLowerCase() === v.invoiceNo.toLowerCase());
-        if (isConverted) return false;
-      }
       const remainingRows = getInvoiceRemainingRows(v);
       if (v.type === 'Product') {
         return remainingRows.some(row => row.qty > 0);
@@ -1279,8 +1204,7 @@
     
     invoices.forEach(inv => {
       const custName = inv.customerId ? ((coaLedgers.find(l => l.id == inv.customerId) || { name: 'Customer' }).name) : 'No Customer';
-      const docType = inv.isOrder ? 'Pre-Inv' : 'Inv';
-      const text = `${docType}: ${inv.invoiceNo} - ${custName} (${inv.date}) - ₹${fmtNum(inv.total)}`;
+      const text = `${inv.invoiceNo} - ${custName} (${inv.date}) - ₹${fmtNum(inv.total)}`;
       if (query && !text.toLowerCase().includes(query)) {
         return;
       }
@@ -1324,7 +1248,7 @@
       noResult.style.fontSize = '12px';
       noResult.style.color = 'var(--slate-400)';
       noResult.style.textAlign = 'center';
-      noResult.textContent = 'No matching documents';
+      noResult.textContent = 'No matching invoices';
       optionsList.appendChild(noResult);
     }
   }
@@ -1349,8 +1273,7 @@
     
     const notesEl = document.getElementById('salesNotes');
     if (notesEl) {
-      const docLabel = inv.isOrder ? 'pre-invoice' : 'invoice';
-      notesEl.value = `Return against ${docLabel} ${inv.invoiceNo}. ${inv.notes || ''}`;
+      notesEl.value = `Return against invoice ${inv.invoiceNo}. ${inv.notes || ''}`;
     }
     
     const adjEl = document.getElementById('salesAdjustments');
@@ -1420,177 +1343,6 @@
     recalculateSalesTotals();
   }
 
-  function refreshSalesOrderDropdownOptions(filter = '') {
-    const optionsList = document.getElementById('salesOrderSelectOptionsList');
-    const triggerText = document.getElementById('salesOrderSelectTriggerText');
-    const orderEl = document.getElementById('salesOrderNo');
-    if (!optionsList || !triggerText || !orderEl) return;
-
-    optionsList.innerHTML = '';
-    
-    // Default "None" option
-    const noneItem = document.createElement('div');
-    noneItem.style.padding = '8px 12px';
-    noneItem.style.fontSize = '13px';
-    noneItem.style.borderRadius = '6px';
-    noneItem.style.cursor = 'pointer';
-    noneItem.style.fontWeight = '600';
-    noneItem.style.color = 'var(--slate-500)';
-    noneItem.textContent = 'None';
-    
-    noneItem.addEventListener('mouseover', () => {
-      noneItem.style.background = 'var(--slate-50)';
-    });
-    noneItem.addEventListener('mouseout', () => {
-      noneItem.style.background = 'transparent';
-    });
-    noneItem.addEventListener('click', () => {
-      triggerText.textContent = 'None';
-      orderEl.value = '';
-      
-      const dropdown = document.getElementById('salesOrderSelectDropdown');
-      if (dropdown) dropdown.style.display = 'none';
-      recalculateSalesTotals();
-    });
-    optionsList.appendChild(noneItem);
-
-    // Get all posted sales orders (excluding those already converted to a posted sales invoice)
-    const postedInvoices = (window.KYA_STORE.salesVouchers || []).filter(v => !v.isOrder && !v.isReturn);
-    const convertedOrderNos = new Set(postedInvoices.map(inv => inv.orderNo).filter(no => !!no));
-    const orders = (window.KYA_STORE.salesVouchers || []).filter(v => v.isOrder && !convertedOrderNos.has(v.invoiceNo));
-    
-    const query = filter.toLowerCase().trim();
-    let matchCount = 0;
-    
-    orders.forEach(order => {
-      const custName = order.customerId ? ((coaLedgers.find(l => l.id == order.customerId) || { name: 'Customer' }).name) : 'No Customer';
-      const text = `${order.invoiceNo} - ${custName} (${order.date}) - ₹${fmtNum(order.total)}`;
-      if (query && !text.toLowerCase().includes(query)) {
-        return;
-      }
-      matchCount++;
-      
-      const item = document.createElement('div');
-      item.style.padding = '8px 12px';
-      item.style.fontSize = '13px';
-      item.style.borderRadius = '6px';
-      item.style.cursor = 'pointer';
-      item.style.fontWeight = '500';
-      item.style.color = 'var(--slate-700)';
-      item.style.whiteSpace = 'nowrap';
-      item.style.overflow = 'hidden';
-      item.style.textOverflow = 'ellipsis';
-      
-      item.textContent = text;
-      
-      item.addEventListener('mouseover', () => {
-        item.style.background = 'var(--slate-50)';
-      });
-      item.addEventListener('mouseout', () => {
-        item.style.background = 'transparent';
-      });
-      
-      item.addEventListener('click', () => {
-        triggerText.textContent = order.invoiceNo;
-        orderEl.value = order.invoiceNo;
-        
-        autoFillFormFromOrder(order);
-        
-        const dropdown = document.getElementById('salesOrderSelectDropdown');
-        if (dropdown) dropdown.style.display = 'none';
-      });
-      
-      optionsList.appendChild(item);
-    });
-    
-    if (query && matchCount === 0) {
-      const noResult = document.createElement('div');
-      noResult.style.padding = '8px 12px';
-      noResult.style.fontSize = '12px';
-      noResult.style.color = 'var(--slate-400)';
-      noResult.style.textAlign = 'center';
-      noResult.textContent = 'No matching orders';
-      optionsList.appendChild(noResult);
-    }
-  }
-
-  function autoFillFormFromOrder(order) {
-    const custEl = document.getElementById('salesCustomer');
-    if (custEl) {
-      custEl.value = order.customerId || '';
-      populateSalesCustomers(order.customerId);
-    }
-    
-    const execEl = document.getElementById('salesExecutive');
-    if (execEl) {
-      execEl.value = order.salesExecutiveId || '';
-      populateSalesExecutives(order.salesExecutiveId);
-    }
-    
-    const supplyTypeEl = document.getElementById('salesSupplyType');
-    if (supplyTypeEl) {
-      supplyTypeEl.value = order.salesSupplyType || 'Intra-State (CGST + SGST)';
-    }
-    
-    const notesEl = document.getElementById('salesNotes');
-    if (notesEl) {
-      notesEl.value = order.notes || '';
-    }
-    
-    const adjEl = document.getElementById('salesAdjustments');
-    if (adjEl) {
-      adjEl.value = order.adjustments || '';
-    }
-    
-    const noneBtn = document.getElementById('salesTdsTcsNone');
-    const tdsBtn = document.getElementById('salesTdsTcsTds');
-    const tcsBtn = document.getElementById('salesTdsTcsTcs');
-    if (order.tdsTcsMode === 'TDS' && tdsBtn) tdsBtn.click();
-    else if (order.tdsTcsMode === 'TCS' && tcsBtn) tcsBtn.click();
-    else if (noneBtn) noneBtn.click();
-    
-    const rateSelect = document.getElementById('salesTdsTcsRateSelect');
-    const customInput = document.getElementById('salesTdsTcsRateCustom');
-    const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
-    const rateVal = order.tdsTcsRate || 0;
-    if (rateSelect) {
-      if (rateSelect.querySelector(`option[value="${rateVal}"]`)) {
-        rateSelect.value = String(rateVal);
-        if (customWrap) customWrap.style.display = 'none';
-      } else {
-        rateSelect.value = 'custom';
-        if (customInput) customInput.value = rateVal;
-        if (customWrap) customWrap.style.display = 'flex';
-      }
-    }
-    
-    currentSalesType = order.type;
-    const prodBtn = document.getElementById('salesTypeProduct');
-    const servBtn = document.getElementById('salesTypeService');
-    const typeBg = document.getElementById('salesTypeBg');
-    if (order.type === 'Product') {
-      if (prodBtn) prodBtn.classList.add('active');
-      if (servBtn) servBtn.classList.remove('active');
-      if (typeBg) {
-        typeBg.classList.add('prod-active');
-        typeBg.classList.remove('serv-active');
-      }
-    } else {
-      if (servBtn) servBtn.classList.add('active');
-      if (prodBtn) prodBtn.classList.remove('active');
-      if (typeBg) {
-        typeBg.classList.add('serv-active');
-        typeBg.classList.remove('prod-active');
-      }
-    }
-    
-    // Copy rows
-    salesRows = JSON.parse(JSON.stringify(order.rows));
-    
-    renderSalesRows();
-    recalculateSalesTotals();
-  }
-
   function initSalesForm() {
     updateVoucherSubtypeUI();
     const today = new Date().toISOString().split('T')[0];
@@ -1599,12 +1351,8 @@
     if (dateEl) dateEl.value = today;
     if (dueEl) dueEl.value = today;
     
-    const orderEl = document.getElementById('salesOrderNo');
     const notesEl = document.getElementById('salesNotes');
     const adjEl = document.getElementById('salesAdjustments');
-    if (orderEl) orderEl.value = '';
-    const orderTriggerText = document.getElementById('salesOrderSelectTriggerText');
-    if (orderTriggerText) orderTriggerText.textContent = 'None';
     if (notesEl) notesEl.value = '';
     if (adjEl) adjEl.value = '';
     
@@ -1647,7 +1395,7 @@
     }
     
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
-    if (triggerText) triggerText.textContent = 'Select Invoice/Order';
+    if (triggerText) triggerText.textContent = 'Select Invoice';
 
     salesRows = [];
     addSalesRow();
@@ -1727,7 +1475,6 @@
       const salesExecutiveId = document.getElementById('salesExecutive')?.value || '';
       const salesSupplyType = document.getElementById('salesSupplyType')?.value || 'Intra-State (CGST + SGST)';
       const dueDate = document.getElementById('salesDueDate')?.value || '';
-      const orderNo = document.getElementById('salesOrderNo')?.value || '';
       const notes = document.getElementById('salesNotes')?.value || '';
       const adjustments = parseFloat(document.getElementById('salesAdjustments')?.value) || 0;
       const subTotal = typeof calculateSubtotal === 'function' ? calculateSubtotal() : 0;
@@ -1747,14 +1494,12 @@
         mode: typeof currentSalesInvoiceMode !== 'undefined' ? currentSalesInvoiceMode : 'Auto',
         invoiceNo: invoiceNo || 'INV-2026-001',
         isReturn: typeof currentSalesVoucherSubtype !== 'undefined' && currentSalesVoucherSubtype === 'Return',
-        isOrder: typeof currentSalesVoucherSubtype !== 'undefined' && currentSalesVoucherSubtype === 'Order',
         returnAgainstInvoice: (typeof currentSalesVoucherSubtype !== 'undefined' && currentSalesVoucherSubtype === 'Return') ? (document.getElementById('salesInvoiceSelectTriggerText')?.textContent.trim() || '') : '',
         customerId,
         salesExecutiveId,
         salesSupplyType,
         date,
         dueDate,
-        orderNo,
         notes,
         tdsTcsMode,
         tdsTcsRate,
@@ -1836,5 +1581,7 @@
   window.syncSalesRowsFromDOM = syncSalesRowsFromDOM;
   window.calculateSubtotal = calculateSubtotal;
   window.recalculateSalesTotals = recalculateSalesTotals;
+  window.updateRowFromDOM = updateRowFromDOM;
+  window.autoCalculateSalesRoundOff = autoCalculateSalesRoundOff;
   window.getSalesPaymentStatus = getSalesPaymentStatus;
   window.setInvoiceNoMode = setInvoiceNoMode;
