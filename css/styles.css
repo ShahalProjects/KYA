@@ -5456,7 +5456,7 @@
       .inv-paper { position: absolute; left: 0; top: 0; width: 100%; }
       .inv-modal-overlay { background: none; position: relative; inset: auto; }
       .inv-modal-card { width: 100%; max-height: none; overflow: visible; box-shadow: none; }
-      .inv-modal-hdr { display: none; }
+      .inv-modal-hdr, .quote-preview-action-bar, .no-print { display: none !important; }
       .inv-modal-body { padding: 0; }
     }
     /* Payment Status Slider Segmented Control */
@@ -6163,6 +6163,10 @@ tr.cl-confirm-row:hover {
 .rpt-menu-item:hover {
   background: #f1f5f9;
   color: #1e293b;
+}
+#vdPostAllOption:hover {
+  background: #f0fdf4 !important;
+  color: #15803d !important;
 }
 .rpt-menu-item svg {
   flex-shrink: 0;

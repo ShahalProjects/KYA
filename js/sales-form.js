@@ -1123,6 +1123,7 @@
       }
     };
 
+    const quoteListCard = document.getElementById('salesQuotationListCard');
     const quoteCard = document.getElementById('salesQuotationFormCard');
     const proformaCard = document.getElementById('salesProformaFormCard');
     const orderCard = document.getElementById('salesOrderFormCard');
@@ -1132,6 +1133,7 @@
     deactiveBtn(preInvoiceBtn);
     deactiveBtn(returnBtn);
 
+    if (quoteListCard) quoteListCard.style.display = 'none';
     if (quoteCard) quoteCard.style.display = 'none';
     if (proformaCard) proformaCard.style.display = 'none';
     if (orderCard) orderCard.style.display = 'none';

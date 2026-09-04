@@ -2145,43 +2145,101 @@
 
   // ── Post one or more draft entries → move to Posted ──────────────
   function postDraftEntries(ids) {
-    const idsSet = new Set(ids);
-    const toPost = draftedEntries.filter(e => idsSet.has(e.id));
+    const idsSet = new Set(ids.map(x => String(x)));
+    const toPost = (typeof draftedEntries !== 'undefined' ? draftedEntries : []).filter(e => idsSet.has(String(e.id)));
+    if (!toPost.length) {
+      // If already moved to postedEntries, silently succeed without showing an error
+      const alreadyPosted = (typeof postedEntries !== 'undefined' ? postedEntries : []).some(e => idsSet.has(String(e.id)));
+      if (alreadyPosted) {
+        return true;
+      }
+      return false;
+    }
 
-    // Validate all rows in all to-be-posted drafts
-    for (const entry of toPost) {
-      const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-      const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
-      const invalidRow = (entry.allRows || []).find(r => {
-        const val = (r.particular || '').trim().toLowerCase();
-        if (!val) return true;
-        const isCoa = coaLedgers.some(l => l.type === 'ledger' && (l.name || '').toLowerCase() === val);
-        const isCust = custs.some(c => (c.name || '').toLowerCase() === val);
-        const isSupp = supps.some(s => (s.name || '').toLowerCase() === val);
-        return !isCoa && !isCust && !isSupp;
-      });
-      if (invalidRow) {
-        showToast(`Cannot post draft "${entry.voucherNo || '—'}": it references an invalid or deleted account: "${invalidRow.particular || 'Empty'}".`, 'error');
-        return;
+    // Filter out completely empty trailing rows from each entry
+    toPost.forEach(entry => {
+      if (Array.isArray(entry.allRows)) {
+        const meaningful = entry.allRows.filter(r => (r.particular || '').trim() || parseAmt(r.debit) || parseAmt(r.credit));
+        if (meaningful.length > 0) {
+          entry.allRows = meaningful;
+        }
+      }
+    });
+
+    // Move matched drafts into postedEntries (preserve newest-first order)
+    toPost.forEach(e => {
+      if (!e.firstParticular && Array.isArray(e.allRows) && e.allRows.length > 0) {
+        e.firstParticular = e.allRows[0].particular || '—';
+      }
+      if (!e.amount && Array.isArray(e.allRows) && e.allRows.length > 0) {
+        const firstRow = e.allRows[0];
+        const amt = parseAmt(firstRow.debit) || parseAmt(firstRow.credit);
+        e.amount = fmtNum(amt);
+      }
+      postedEntries.unshift(e);
+    });
+
+    // Remove from drafts & selection
+    draftedEntries = draftedEntries.filter(e => !idsSet.has(String(e.id)));
+    ids.forEach(id => {
+      if (typeof _dtSelected !== 'undefined') {
+        _dtSelected.delete(Number(id));
+        _dtSelected.delete(String(id));
+      }
+    });
+
+    const n = toPost.length;
+    if (typeof showToast === 'function') {
+      showToast(
+        n === 1
+          ? `Draft "${toPost[0].voucherNo || '—'}" posted successfully!`
+          : `${n} drafts posted successfully!`,
+        'success'
+      );
+    }
+
+    if (typeof window.refreshAllAppViews === 'function') {
+      window.refreshAllAppViews();
+    } else {
+      if (typeof renderDraftedPanel === 'function') renderDraftedPanel();
+      if (typeof renderPostedPanel === 'function') renderPostedPanel();
+      if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+      if (typeof refreshAllReports === 'function') refreshAllReports();
+    }
+    if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    return true;
+  }
+  window.postDraftEntries = postDraftEntries;
+
+  let _postingVoucherLock = false;
+  function postVoucherFromDetails(id) {
+    if (_postingVoucherLock) return;
+    _postingVoucherLock = true;
+    setTimeout(() => { _postingVoucherLock = false; }, 800);
+
+    let entry = (typeof draftedEntries !== 'undefined' ? draftedEntries : []).find(e => String(e.id) === String(id) || e.id == id);
+    if (!entry && typeof window !== 'undefined' && window._currentViewingJournalEntry) {
+      if (String(window._currentViewingJournalEntry.id) === String(id)) {
+        entry = window._currentViewingJournalEntry;
       }
     }
 
-    // Move matched drafts into postedEntries (preserve newest-first order)
-    toPost.forEach(e => postedEntries.unshift(e));
-    // Remove from drafts & selection
-    draftedEntries = draftedEntries.filter(e => !idsSet.has(e.id));
-    ids.forEach(id => _dtSelected.delete(id));
-    const n = toPost.length;
-    showToast(
-      n === 1
-        ? `Draft "${toPost[0].voucherNo || '—'}" posted successfully!`
-        : `${n} drafts posted successfully!`,
-      'success'
-    );
-    renderDraftedPanel();
-    refreshAllReports();
-    triggerAutoBackup();
+    // Close modal instantly
+    document.getElementById('fjOverlay')?.remove();
+    window._currentViewingJournalEntry = null;
+
+    if (!entry) {
+      const alreadyPosted = (typeof postedEntries !== 'undefined' ? postedEntries : []).some(e => String(e.id) === String(id) || e.id == id);
+      if (alreadyPosted) return;
+      if (typeof showToast === 'function') showToast('Draft entry not found.', 'error');
+      return;
+    }
+
+    // Post entry instantly
+    postDraftEntries([entry.id]);
   }
+  window.postVoucherFromDetails = postVoucherFromDetails;
+
 
   function renderDraftedPanel() {
     injectPostedStyles();   // reuse Posted CSS for table, toolbar, buttons
@@ -2444,6 +2502,7 @@
 
   // ── Full Journal View modal ────────────────────────────────────────
   function showFullJournalModal(entry, isDraft) {
+    window._currentViewingJournalEntry = entry;
     document.getElementById('fjOverlay')?.remove();
 
     const rows = entry.allRows || [];
@@ -2459,7 +2518,17 @@
     const statusText = isDraft ? 'Full entry details · Draft' : 'Full entry details · Posted';
     const amtColour  = isDraft ? '#d97706' : '#2563eb';
     const draftBanner = isDraft
-      ? `<div class="fj-draft-banner">✏️ &nbsp;This is a <strong>Draft</strong> entry — it has not been posted yet.</div>`
+      ? `<div class="fj-draft-banner" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>This is a <strong>Draft</strong> entry — it has not been posted yet.</span>
+          </div>
+          <button id="fjBannerPostBtn" type="button" style="background: #16a34a; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; color: #fff; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; transition: background 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.1);" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Post Entry</span>
+          </button>
+        </div>`
       : '';
 
     const deptObj = (entry.departmentId && entry.departmentId !== 'all')
@@ -2591,6 +2660,23 @@
 
     document.body.appendChild(overlay);
     overlay.focus();
+
+    // Wire Post Entry Button (Drafts)
+    const bannerPostBtn = overlay.querySelector('#fjBannerPostBtn');
+    if (bannerPostBtn) {
+      bannerPostBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        bannerPostBtn.disabled = true;
+        bannerPostBtn.style.pointerEvents = 'none';
+        bannerPostBtn.style.opacity = '0.5';
+        if (typeof postVoucherFromDetails === 'function') {
+          postVoucherFromDetails(entry.id);
+        } else if (typeof window.postVoucherFromDetails === 'function') {
+          window.postVoucherFromDetails(entry.id);
+        }
+      });
+    }
 
     // Wire Export Dropdown
     const expBtn = overlay.querySelector('#fjExportBtn');
@@ -2956,6 +3042,65 @@
     return '—';
   }
 
+  function updateVdPostAllOptionVisibility() {
+    const postAllOption = document.getElementById('vdPostAllOption');
+    const postAllSep = document.getElementById('vdPostAllSep');
+    const postAllText = document.getElementById('vdPostAllText');
+    if (!postAllOption) return;
+
+    const selectedDraftKeys = [..._vdSelectedKeys].filter(k => k.endsWith('_true'));
+    const count = selectedDraftKeys.length;
+
+    if (count > 0) {
+      postAllOption.style.display = 'flex';
+      if (postAllSep) postAllSep.style.display = 'block';
+      if (postAllText) {
+        postAllText.textContent = count > 1 ? `Post All (${count})` : 'Post All';
+      }
+    } else {
+      postAllOption.style.display = 'none';
+      if (postAllSep) postAllSep.style.display = 'none';
+    }
+  }
+
+  let _vdPostAllLock = false;
+  function executeVoucherDeskPostAll() {
+    if (_vdPostAllLock) return;
+    _vdPostAllLock = true;
+    setTimeout(() => { _vdPostAllLock = false; }, 800);
+
+    const journalDraftIds = [];
+    _vdSelectedKeys.forEach(key => {
+      if (!key.endsWith('_true')) return;
+      const parts = key.split('_');
+      const type = parts[0];
+      const id = parts.slice(1, parts.length - 1).join('_');
+      if (type === 'Journal') {
+        journalDraftIds.push(id);
+      }
+    });
+
+    if (journalDraftIds.length === 0) {
+      if (typeof showToast === 'function') {
+        showToast('No drafted journal entries selected to post.', 'info');
+      }
+      return;
+    }
+
+    // Clean posted keys from selection
+    journalDraftIds.forEach(id => {
+      _vdSelectedKeys.delete(`Journal_${id}_true`);
+    });
+
+    // Close any open menus
+    const moreDropdown = document.getElementById('vdMoreDropdown');
+    if (moreDropdown) moreDropdown.classList.remove('active');
+
+    // Post all drafts instantly (one click all post)
+    postDraftEntries(journalDraftIds);
+  }
+  window.executeVoucherDeskPostAll = executeVoucherDeskPostAll;
+
   function renderVoucherDeskPanel() {
     const wrap = document.getElementById('voucherDeskWrap');
     if (!wrap) return;
@@ -3175,12 +3320,14 @@
     const allKeys = filtered.map(e => `${e.type}_${e.id}_${e.isDraft}`);
     const allChecked = allKeys.length > 0 && allKeys.every(k => _vdSelectedKeys.has(k));
     const selCount = [..._vdSelectedKeys].filter(k => allKeys.includes(k)).length;
+    const selectedDraftCount = filtered.filter(item => item.isDraft && _vdSelectedKeys.has(`${item.type}_${item.id}_${item.isDraft}`)).length;
 
     // Synchronize 3-dot menu select text
     const toggleSelectText = document.getElementById('vdToggleSelectText');
     if (toggleSelectText) {
       toggleSelectText.textContent = _vdSelectMode ? 'Exit Select Mode' : 'Select';
     }
+    updateVdPostAllOptionVisibility();
 
     let tableHtml = '';
     if (filtered.length === 0) {
@@ -3235,6 +3382,14 @@
             ${_vdSelectMode ? `
               <div class="pt-sel-bar" style="margin: 0; padding: 4px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
                 <span class="pt-sel-count" style="font-size: 12.5px; font-weight: 600;">${selCount} selected</span>
+                ${selectedDraftCount > 0 ? `
+                  <button class="dt-post-sel-btn" id="vdPostSel" type="button" style="height: 30px; padding: 0 10px; font-size: 12px; display: flex; align-items: center; gap: 5px; border-radius: 6px; border: none; background: #dcfce7; color: #15803d; font-weight: 700; cursor: pointer; transition: background 0.15s;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Post Selected
+                  </button>
+                ` : ''}
                 ${selCount > 0 ? `
                   <button class="pt-del-btn" id="vdDelSelected" type="button" style="height: 30px; padding: 0 10px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3389,6 +3544,13 @@
       });
     }
 
+    const postSelBtn = document.getElementById('vdPostSel');
+    if (postSelBtn) {
+      postSelBtn.addEventListener('click', () => {
+        executeVoucherDeskPostAll();
+      });
+    }
+
     const delSelBtn = document.getElementById('vdDelSelected');
     if (delSelBtn) {
       delSelBtn.addEventListener('click', () => {
@@ -3484,8 +3646,8 @@
 
         if (type === 'Journal') {
           const entry = isDraft
-            ? draftedEntries.find(e => e.id === id)
-            : postedEntries.find(e => e.id === id);
+            ? draftedEntries.find(e => String(e.id) === String(id) || e.id == id)
+            : postedEntries.find(e => String(e.id) === String(id) || e.id == id);
           if (entry) showFullJournalModal(entry, isDraft);
         } else if (type === 'Invoice' || type === 'Reversal' || type === 'Order') {
           if (isDraft) {
@@ -3748,6 +3910,7 @@
         const isOpen = moreDropdown.classList.contains('active');
         closeAllVdMenus();
         if (!isOpen) {
+          updateVdPostAllOptionVisibility();
           moreDropdown.classList.add('active');
         }
       });
@@ -3811,6 +3974,15 @@
           selectText.textContent = _vdSelectMode ? 'Exit Select Mode' : 'Select';
         }
         renderVoucherDeskPanel();
+      });
+    }
+
+    const postAllOption = document.getElementById('vdPostAllOption');
+    if (postAllOption) {
+      postAllOption.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllVdMenus();
+        executeVoucherDeskPostAll();
       });
     }
 

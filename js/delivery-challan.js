@@ -35,6 +35,7 @@
   function openDeliveryChallanForm(challanData) {
     const preInvCard = document.getElementById('salesPreInvoiceCard');
     const salesFormCard = document.getElementById('salesVoucherFormCard');
+    const quoteListCard = document.getElementById('salesQuotationListCard');
     const quoteFormCard = document.getElementById('salesQuotationFormCard');
     const proformaFormCard = document.getElementById('salesProformaFormCard');
     const orderFormCard = document.getElementById('salesOrderFormCard');
@@ -42,6 +43,7 @@
 
     if (preInvCard) preInvCard.style.display = 'none';
     if (salesFormCard) salesFormCard.style.display = 'none';
+    if (quoteListCard) quoteListCard.style.display = 'none';
     if (quoteFormCard) quoteFormCard.style.display = 'none';
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (orderFormCard) orderFormCard.style.display = 'none';
@@ -908,7 +910,11 @@
       quoteNavBtn.addEventListener('click', (e) => {
         e.preventDefault();
         closeDeliveryChallanForm();
-        if (typeof openQuotationForm === 'function') {
+        if (typeof window.openQuotationList === 'function') {
+          window.openQuotationList('all');
+        } else if (typeof window.switchSalesPreInvTab === 'function') {
+          window.switchSalesPreInvTab('quotation');
+        } else if (typeof openQuotationForm === 'function') {
           openQuotationForm();
         }
       });

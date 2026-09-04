@@ -2035,6 +2035,245 @@
   }
 
   // ════════════════════════════════════════════════════════════════════
+  // 11. INDIVIDUAL QUOTATION PDF EXPORT
+  // ════════════════════════════════════════════════════════════════════
+  async function exportQuotationToPDF(quote) {
+    try {
+      await ensureJsPDFLoaded();
+      const { jsPDF } = global.jspdf || global;
+      if (!jsPDF) throw new Error('jsPDF library could not be loaded.');
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
+      const compName = (activeCo.name || 'KYA Accounting').toUpperCase();
+      const title = 'QUOTATION / ESTIMATE';
+
+      // Top Blue Bar
+      doc.setFillColor(29, 78, 216);
+      doc.rect(0, 0, pageWidth, 5, 'F');
+
+      // Company Name
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(29, 78, 216);
+      doc.text(compName, 14, 16);
+
+      // Title
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42);
+      doc.text(title, 14, 23);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(37, 99, 235);
+      const quoteNoText = `# ${quote.quoteNo || '—'}`;
+      doc.text(quoteNoText, pageWidth - 14, 16, { align: 'right' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      const genDateStr = `Generated on: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+      doc.text(genDateStr, pageWidth - 14, 23, { align: 'right' });
+
+      // Divider line
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(14, 26.5, pageWidth - 14, 26.5);
+
+      // Metadata Info Box
+      const customer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == quote.customerId) : null) || { name: quote.customerName || 'Unknown Customer' };
+      const partyName = customer.name || quote.customerName || 'Unknown Customer';
+      const partyAddr = customer.address || '';
+      const partyGstin = customer.gstin || '';
+
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(14, 29, pageWidth - 28, 26, 2, 2, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(14, 29, pageWidth - 28, 26, 2, 2, 'D');
+
+      // Left: Quotation For
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('QUOTATION FOR:', 18, 35);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(partyName, 18, 41);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      if (partyGstin) {
+        doc.text(`GSTIN: ${partyGstin}`, 18, 47);
+      } else if (partyAddr) {
+        doc.text(partyAddr.length > 35 ? partyAddr.substring(0, 32) + '...' : partyAddr, 18, 47);
+      } else {
+        doc.text('Client Estimate', 18, 47);
+      }
+
+      // Right: Dates and Supply
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Quotation Date:', 110, 35);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(formatRptDate(quote.date) || '—', 135, 35);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text('Valid Until:', 110, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(formatRptDate(quote.expiryDate || quote.date) || '—', 135, 42);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text('Supply Type:', 110, 49);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(quote.supplyType || 'Intra-State'), 135, 49);
+
+      // Table of Items
+      const tableHeaders = [['#', 'Description', 'HSN/SAC', 'Qty', 'Rate', 'Discount', 'Tax', 'Amount']];
+      const tableBody = [];
+
+      (quote.rows || []).forEach((r, idx) => {
+        const desc = r.item || 'Item';
+        const hsn = r.hsn || '—';
+        const qty = parseFloat(r.qty) || 1;
+        const rate = parseFloat(r.rate) || 0;
+        const base = qty * rate;
+        const disc = parseFloat(r.discount) || 0;
+        const discAmt = r.discountType === 'pct' ? (base * (disc / 100)) : disc;
+        const itemTotal = base - discAmt;
+        const taxRate = parseFloat(r.tax) || 0;
+        const taxAmt = itemTotal * (taxRate / 100);
+        const finalAmt = itemTotal + taxAmt;
+        const discStr = disc > 0 ? (r.discountType === 'pct' ? `${disc}%` : `₹${fmtNum(discAmt)}`) : '—';
+        const qtyStr = `${qty}${r.unit ? ' ' + r.unit : ''}`;
+
+        tableBody.push([
+          idx + 1,
+          desc,
+          hsn,
+          qtyStr,
+          fmtNum(rate),
+          discStr,
+          taxRate ? `${taxRate}%` : '0%',
+          fmtNum(finalAmt)
+        ]);
+      });
+
+      // Sub Total & Taxes rows in table footer
+      tableBody.push([
+        { content: 'Sub Total', colSpan: 7, styles: { halign: 'right', fontStyle: 'bold', fillColor: [248, 250, 252] } },
+        { content: fmtNum(quote.subTotal || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: [248, 250, 252] } }
+      ]);
+      if (quote.tdsTcsMode && quote.tdsTcsMode !== 'None') {
+        tableBody.push([
+          { content: `${quote.tdsTcsMode} (${quote.tdsTcsRate}%)`, colSpan: 7, styles: { halign: 'right', fontStyle: 'normal', fillColor: [248, 250, 252] } },
+          { content: `${quote.tdsTcsMode === 'TDS' ? '-' : '+'} ${fmtNum(quote.tdsTcsAmount)}`, styles: { halign: 'right', fontStyle: 'normal', fillColor: [248, 250, 252] } }
+        ]);
+      }
+      if (quote.adjustments) {
+        tableBody.push([
+          { content: 'Round off / Adjustments', colSpan: 7, styles: { halign: 'right', fontStyle: 'normal', fillColor: [248, 250, 252] } },
+          { content: fmtNum(quote.adjustments), styles: { halign: 'right', fontStyle: 'normal', fillColor: [248, 250, 252] } }
+        ]);
+      }
+      tableBody.push([
+        { content: 'TOTAL AMOUNT', colSpan: 7, styles: { halign: 'right', fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [22, 101, 52] } },
+        { content: `INR ${fmtNum(quote.total || 0)}`, styles: { halign: 'right', fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [22, 101, 52] } }
+      ]);
+
+      const autoTableConfig = {
+        startY: 59,
+        head: tableHeaders,
+        body: tableBody,
+        theme: 'plain',
+        styles: { font: 'helvetica', fontSize: 9, cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }, textColor: [51, 65, 85], lineColor: [226, 232, 240], lineWidth: 0.3 },
+        headStyles: { fillColor: [29, 78, 216], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 'auto', halign: 'left' },
+          2: { cellWidth: 20, halign: 'left' },
+          3: { cellWidth: 16, halign: 'right' },
+          4: { cellWidth: 24, halign: 'right' },
+          5: { cellWidth: 20, halign: 'right' },
+          6: { cellWidth: 16, halign: 'right' },
+          7: { cellWidth: 28, halign: 'right' }
+        },
+        margin: { left: 14, right: 14, bottom: 20 }
+      };
+
+      if (typeof doc.autoTable === 'function') doc.autoTable(autoTableConfig);
+      else if (global.jspdf && typeof global.jspdf.autoTable === 'function') global.jspdf.autoTable(doc, autoTableConfig);
+      else if (typeof global.autoTable === 'function') global.autoTable(doc, autoTableConfig);
+
+      let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 140;
+
+      // Terms & Notes
+      if (quote.notes) {
+        if (finalY > doc.internal.pageSize.getHeight() - 40) {
+          doc.addPage();
+          finalY = 20;
+        }
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(14, finalY, pageWidth - 28, 16, 2, 2, 'F');
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(14, finalY, pageWidth - 28, 16, 2, 2, 'D');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text('Terms & Notes:', 18, finalY + 5.5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        doc.text(String(quote.notes), 18, finalY + 11.5);
+        finalY += 24;
+      }
+
+      // Signatures
+      if (finalY > doc.internal.pageSize.getHeight() - 35) {
+        doc.addPage();
+        finalY = 20;
+      }
+      finalY += 6;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.4);
+      doc.line(20, finalY + 15, 70, finalY + 15);
+      doc.line(pageWidth - 70, finalY + 15, pageWidth - 20, finalY + 15);
+
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Customer Acceptance', 45, finalY + 20, { align: 'center' });
+      doc.text('Authorized Signatory', pageWidth - 45, finalY + 20, { align: 'center' });
+
+      // Footer
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
+        doc.text('KYA Accounting • Official Quotation', 14, doc.internal.pageSize.getHeight() - 8);
+      }
+
+      const qNum = (quote.quoteNo || 'Quotation').replace(/[^a-zA-Z0-9_-]/g, '_');
+      doc.save(`Quotation_${qNum}.pdf`);
+      return true;
+    } catch (err) {
+      console.error('Failed to export Quotation to PDF:', err);
+      // Fallback to window.print() if jsPDF fails
+      window.print();
+      return false;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
   // 12. VOUCHER DESK REGISTER PDF EXPORT
   // ════════════════════════════════════════════════════════════════════
   async function exportVoucherDeskToPDF(data) {
@@ -2164,6 +2403,7 @@
   global.exportCashbookToPDF = exportStatementToPDF;
   global.exportVoucherToPDF = exportVoucherToPDF;
   global.exportInvoiceToPDF = exportInvoiceToPDF;
+  global.exportQuotationToPDF = exportQuotationToPDF;
   global.exportVoucherDeskToPDF = exportVoucherDeskToPDF;
 
 })(typeof window !== 'undefined' ? window : this);

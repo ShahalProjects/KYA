@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=20260830_3" />
+  <link rel="stylesheet" href="css/styles.css?v=20260904_1" />
 </head>
 <body>
 
@@ -1033,6 +1033,13 @@
                       <path d="m9 12 2 2 4-4"/>
                     </svg>
                     <span id="vdToggleSelectText">Select</span>
+                  </button>
+                  <div class="rpt-menu-sep" id="vdPostAllSep" style="display: none;"></div>
+                  <button class="rpt-menu-item" id="vdPostAllOption" type="button" style="width: 100%; text-align: left; display: none; align-items: center; gap: 10px; color: #16a34a; font-weight: 600;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span id="vdPostAllText">Post All</span>
                   </button>
                 </div>
               </div>
@@ -2996,6 +3003,70 @@
           </div>
         </div><!-- /#salesPreInvoiceCard -->
 
+        <!-- QUOTATION LIST CARD (Full Screen with Back Button) -->
+        <div class="table-card" id="salesQuotationListCard" style="display: none; padding: 24px 28px;">
+          <!-- Colored header strip -->
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 20 20" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Quotation / Estimate</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage customer quotations and price proposals</div>
+              </div>
+            </div>
+            <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
+              <button type="button" class="btn" id="btnQuoteListNewQuoteTop" onclick="openQuotationForm(null, 'quotelist')" style="background: #fff; color: var(--blue-700); font-weight: 700; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); transition: transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                New Quotation
+              </button>
+            </div>
+          </div>
+
+          <!-- Navigation row between header and content -->
+          <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn" id="btnQuoteListBack" onclick="closeQuotationList()" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                <span>Back to Pre Invoice</span>
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn" onclick="openProformaForm()" title="Open Proforma Invoice" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Proforma Invoice</span>
+              </button>
+              <button type="button" class="btn" onclick="openSalesOrderForm()" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>Sales Order</span>
+              </button>
+              <button type="button" class="btn" onclick="openDeliveryChallanForm()" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                </svg>
+                <span>Delivery Challan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Quotation List Area (Pills + Search + Active/Completed/Cancelled tables) -->
+          <div id="quotationListFullContentArea"></div>
+        </div><!-- /#salesQuotationListCard -->
+
         <!-- QUOTATION FORM CARD (Full Screen with Back Button) -->
         <div class="je-form-card" id="salesQuotationFormCard" style="display: none;">
           <!-- Colored header strip -->
@@ -3020,11 +3091,22 @@
           <!-- Navigation row between title card and fields -->
           <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" id="btnQuotationBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+              <button type="button" class="btn" id="btnQuotationBack" title="Back" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M19 12H5M12 19l-7-7 7-7"/>
                 </svg>
                 <span>Back</span>
+              </button>
+              <button type="button" class="btn" id="btnQuotationViewList" onclick="openQuotationList('all')" title="View Quotation List" style="background: var(--slate-100); color: var(--blue-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-50)'; this.style.borderColor='var(--blue-300)'" onmouseout="this.style.background='var(--slate-100)'; this.style.borderColor='var(--slate-200)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+                <span>Quotation List</span>
               </button>
             </div>
 
@@ -4523,8 +4605,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 
-<script src="js/exportPdf.js"></script>
-<script src="js/exportExcel.js"></script>
+<script src="js/exportPdf.js?v=20260904_1"></script>
+<script src="js/exportExcel.js?v=20260904_1"></script>
 <script src="js/app-shell.js?v=20260825_1"></script>
 <script src="js/master-desk.js"></script>
 <script src="js/journal.js"></script>
@@ -4544,11 +4626,11 @@
 <script src="js/sales-posting.js?v=20260830_2"></script>
 <script src="js/sales-helpers.js?v=20260902_4"></script>
 <script src="js/sales-records.js?v=20260830_2"></script>
-<script src="js/sales-print-events.js?v=20260902_4"></script>
-<script src="js/quotation.js?v=20260902_1"></script>
-<script src="js/proforma.js?v=20260902_1"></script>
-<script src="js/sales-order.js?v=20260902_1"></script>
-<script src="js/delivery-challan.js?v=20260902_1"></script>
+<script src="js/sales-print-events.js?v=20260904_3"></script>
+<script src="js/quotation.js?v=20260904_6"></script>
+<script src="js/proforma.js?v=20260904_1"></script>
+<script src="js/sales-order.js?v=20260904_1"></script>
+<script src="js/delivery-challan.js?v=20260904_1"></script>
 <script src="js/purchase-form.js?v=20260830_2"></script>
 <script src="js/company-profile.js"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>

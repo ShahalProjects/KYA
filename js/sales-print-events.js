@@ -936,9 +936,9 @@
     });
   }
 
-  function switchSalesPreInvTab(tabKey) {
+  function switchSalesPreInvTab(tabKey, filterStatus = 'all') {
     if (tabKey === 'quotation' && typeof openQuotationForm === 'function') {
-      openQuotationForm();
+      openQuotationForm(null, 'preinvoice');
       return;
     }
     if (tabKey === 'proforma' && typeof openProformaForm === 'function') {
@@ -955,6 +955,11 @@
     }
 
     _salesPreInvActiveTab = tabKey;
+
+    const preInvCard = document.getElementById('salesPreInvoiceCard');
+    const quoteFormCard = document.getElementById('salesQuotationFormCard');
+    if (quoteFormCard) quoteFormCard.style.display = 'none';
+    if (preInvCard) preInvCard.style.display = 'block';
 
     const tabButtons = {
       preinvoice: document.getElementById('preInvTabOverview'),
@@ -976,6 +981,15 @@
 
     if (tabKey === 'preinvoice') {
       contentArea.innerHTML = renderPreInvoiceOverviewTable();
+      return;
+    }
+
+    if (tabKey === 'quotation') {
+      if (typeof window.openQuotationList === 'function') {
+        window.openQuotationList(filterStatus);
+      } else if (typeof openQuotationForm === 'function') {
+        openQuotationForm();
+      }
       return;
     }
 
@@ -1012,7 +1026,7 @@
 
   function renderPreInvoiceOverviewTable() {
     window.KYA_STORE = window.KYA_STORE || {};
-    const quotes = window.KYA_STORE.quotations || [];
+    const quotes = (window.KYA_STORE.quotations || []).concat(window.KYA_STORE.quotationsDrafts || []);
     const quoteActive = quotes.filter(q => q.status === 'Active' || !q.status || q.status === 'Draft').length;
     const quoteCompleted = quotes.filter(q => q.status === 'Completed').length;
     const quoteCancelled = quotes.filter(q => q.status === 'Cancelled').length;
@@ -1045,7 +1059,7 @@
           </thead>
           <tbody>
             <!-- 1. Quotation -->
-            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openQuotationForm()">
+            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openQuotationList('all')">
               <td style="padding: 16px 24px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <div style="width: 36px; height: 36px; border-radius: 8px; background: #eff6ff; color: var(--blue-600); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -1061,13 +1075,13 @@
                 </div>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${quoteActive}</span>
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openQuotationList('active')">${quoteActive}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${quoteCompleted}</span>
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openQuotationList('completed')">${quoteCompleted}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${quoteCancelled}</span>
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-500); padding: 4px 10px; cursor: pointer; border-radius: 6px; display: inline-block;" onmouseover="this.style.background='var(--slate-100)'" onmouseout="this.style.background='transparent'" onclick="event.stopPropagation(); openQuotationList('cancelled')">${quoteCancelled}</span>
               </td>
             </tr>
 
