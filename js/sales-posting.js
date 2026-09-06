@@ -9,9 +9,18 @@
     
     setInvoiceNoMode(inv.mode || 'Manual');
     const invNoEl = document.getElementById('salesInvoiceNo');
-    if (invNoEl) invNoEl.value = inv.invoiceNo;
+    if (invNoEl) {
+      if (inv.invoiceNo && inv.invoiceNo.trim()) {
+        invNoEl.value = inv.invoiceNo;
+      } else if (inv.mode === 'Auto' || inv._isFromQuotation || inv.convertedFromQuotationId || inv._isFromProforma || inv.convertedFromProformaId) {
+        invNoEl.value = typeof getNextAutoInvoiceNumber === 'function' ? getNextAutoInvoiceNumber() :
+                        (typeof window.getNextAutoInvoiceNumber === 'function' ? window.getNextAutoInvoiceNumber() : '');
+      } else {
+        invNoEl.value = '';
+      }
+    }
     const chipEl = document.getElementById('salesVoucherChipDisplay');
-    if (chipEl) chipEl.textContent = inv.invoiceNo || 'INV-XXXX';
+    if (chipEl) chipEl.textContent = (invNoEl && invNoEl.value) || inv.invoiceNo || 'INV-XXXX';
     
     const returnTriggerText = document.getElementById('salesInvoiceSelectTriggerText');
     if (returnTriggerText) {
@@ -130,7 +139,20 @@
     updateSalesReturnLockState();
     recalculateSalesTotals();
     
-    window._editingSalesInvoice = { id: inv.id, isDraft: isDraft };
+    if (inv && (inv._isFromQuotation || inv.convertedFromQuotationId)) {
+      window._pendingConvertQuotationId = inv.convertedFromQuotationId;
+      window._editingSalesInvoice = null;
+    } else if (inv && (inv._isFromProforma || inv.convertedFromProformaId)) {
+      window._pendingConvertProformaId = inv.convertedFromProformaId;
+      window._pendingConvertProformaAdvance = {
+        amount: inv.advancePaidAmount || 0,
+        journalEntryId: inv.advanceJournalEntryId || null,
+        voucherNo: inv.advanceVoucherNo || null
+      };
+      window._editingSalesInvoice = null;
+    } else {
+      window._editingSalesInvoice = { id: inv.id, isDraft: isDraft };
+    }
     updateSalesDocUI(inv.uploadedDoc || null);
     
     openTab('sales_voucher');
@@ -226,6 +248,11 @@
       rows: JSON.parse(JSON.stringify(salesRows)),
       partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
+      convertedFromQuotationId: window._pendingConvertQuotationId || null,
+      convertedFromProformaId: window._pendingConvertProformaId || null,
+      advancePaidAmount: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.amount) || 0,
+      advanceJournalEntryId: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.journalEntryId) || null,
+      advanceVoucherNo: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.voucherNo) || null,
       updatedAt: Date.now()
     };
     window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
@@ -467,6 +494,14 @@
       paymentStatus,
       paymentAccountId,
       paymentAmount,
+      convertedFromQuotationId: window._pendingConvertQuotationId || (window._editingSalesInvoice && window._editingSalesInvoice.convertedFromQuotationId) || null,
+      convertedFromProformaId: window._pendingConvertProformaId || (window._editingSalesInvoice && window._editingSalesInvoice.convertedFromProformaId) || null,
+      advancePaidAmount: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.amount) ||
+                         (window._editingSalesInvoice && window._editingSalesInvoice.advancePaidAmount) || 0,
+      advanceJournalEntryId: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.journalEntryId) ||
+                             (window._editingSalesInvoice && window._editingSalesInvoice.advanceJournalEntryId) || null,
+      advanceVoucherNo: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.voucherNo) ||
+                        (window._editingSalesInvoice && window._editingSalesInvoice.advanceVoucherNo) || null,
       rows: JSON.parse(JSON.stringify(salesRows)),
       partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
@@ -526,6 +561,54 @@
     }
     showToast(successMsg, 'success');
     showInvoicePostedModal(invoiceNo, _subtypeSnapshot);
+
+    // If this invoice was converted from a Quotation, mark that quotation as Completed now
+    const convertedQuoteId = window._pendingConvertQuotationId || (invoiceData && invoiceData.convertedFromQuotationId);
+    if (convertedQuoteId) {
+      window._pendingConvertQuotationId = null;
+      if (typeof markQuotationCompletedOnInvoicePost === 'function') {
+        markQuotationCompletedOnInvoicePost(convertedQuoteId);
+      } else if (typeof window.markQuotationCompletedOnInvoicePost === 'function') {
+        window.markQuotationCompletedOnInvoicePost(convertedQuoteId);
+      } else {
+        window.KYA_STORE = window.KYA_STORE || {};
+        window.KYA_STORE.quotations = window.KYA_STORE.quotations || [];
+        const q = (window.KYA_STORE.quotations || []).find(item => String(item.id) === String(convertedQuoteId)) ||
+                  (window.KYA_STORE.quotationsDrafts || []).find(item => String(item.id) === String(convertedQuoteId));
+        if (q) {
+          q.status = 'Completed';
+          q.updatedAt = Date.now();
+        }
+      }
+      if (typeof window.renderSalesPreInvoicePanel === 'function') {
+        window.renderSalesPreInvoicePanel();
+      }
+    }
+
+    // If this invoice was converted from a Proforma, mark that proforma as Completed now
+    const convertedProformaId = window._pendingConvertProformaId || (invoiceData && invoiceData.convertedFromProformaId);
+    if (convertedProformaId) {
+      window._pendingConvertProformaId = null;
+      window._pendingConvertProformaAdvance = null;
+      if (typeof markProformaCompletedOnInvoicePost === 'function') {
+        markProformaCompletedOnInvoicePost(convertedProformaId);
+      } else if (typeof window.markProformaCompletedOnInvoicePost === 'function') {
+        window.markProformaCompletedOnInvoicePost(convertedProformaId);
+      } else {
+        window.KYA_STORE = window.KYA_STORE || {};
+        window.KYA_STORE.proformaInvoices = window.KYA_STORE.proformaInvoices || [];
+        const p = (window.KYA_STORE.proformaInvoices || []).find(item => String(item.id) === String(convertedProformaId)) ||
+                  (window.KYA_STORE.proformaInvoicesDrafts || []).find(item => String(item.id) === String(convertedProformaId));
+        if (p) {
+          p.status = 'Completed';
+          p.updatedAt = Date.now();
+        }
+      }
+      if (typeof window.renderSalesPreInvoicePanel === 'function') {
+        window.renderSalesPreInvoicePanel();
+      }
+    }
+
     window._editingSalesInvoice = null;
     currentSalesVoucherSubtype = 'Invoice';
     initSalesForm();
@@ -991,10 +1074,64 @@
 
         const payAcct = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
         const payAccountName = payAcct ? payAcct.name : 'Cash Account';
-        const payJERows = [
-          { id: 1, type: 'By', particular: payAccountName, debit: paidAmount.toFixed(2), credit: '' },
-          { id: 2, type: 'To', particular: customerName,   debit: '',                   credit: paidAmount.toFixed(2) },
-        ];
+
+        // Check if this invoice was converted from a Proforma with advance payment
+        const convertedProformaId = invoice.convertedFromProformaId || window._pendingConvertProformaId;
+        let prof = null;
+        if (convertedProformaId && typeof window.KYA_STORE !== 'undefined' && Array.isArray(window.KYA_STORE.proformaInvoices)) {
+          prof = window.KYA_STORE.proformaInvoices.find(p => String(p.id) === String(convertedProformaId));
+        }
+        const profAdvanceAmt = prof ? (parseFloat(prof.advancePaidAmount) || 0) : (parseFloat(invoice.advancePaidAmount) || 0);
+        const advPortion = (profAdvanceAmt > 0) ? Math.min(profAdvanceAmt, paidAmount) : 0;
+        const cashPortion = Math.max(0, paidAmount - advPortion);
+
+        const payJERows = [];
+        let rId = 1;
+        let primaryParticular = payAccountName;
+
+        if (advPortion > 0) {
+          const advLedgerId = (typeof getOrCreateSystemLedger === 'function')
+            ? getOrCreateSystemLedger('Advance from Customers', 'sg-ocl')
+            : (typeof window.getOrCreateSystemLedger === 'function' ? window.getOrCreateSystemLedger('Advance from Customers', 'sg-ocl') : null);
+          const advLedger = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id === advLedgerId || l.name === 'Advance from Customers');
+          const advLedgerName = advLedger ? advLedger.name : 'Advance from Customers';
+
+          payJERows.push({
+            id: rId++,
+            type: 'By',
+            particular: advLedgerName,
+            debit: advPortion.toFixed(2),
+            credit: ''
+          });
+          primaryParticular = advLedgerName;
+        }
+
+        if (cashPortion > 0) {
+          payJERows.push({
+            id: rId++,
+            type: 'By',
+            particular: payAccountName,
+            debit: cashPortion.toFixed(2),
+            credit: ''
+          });
+          if (advPortion === 0) primaryParticular = payAccountName;
+        }
+
+        payJERows.push({
+          id: rId++,
+          type: 'To',
+          particular: customerName,
+          debit: '',
+          credit: paidAmount.toFixed(2)
+        });
+
+        let payNarration = `Payment received from customer ${customerName} against Invoice No. ${invoice.invoiceNo}. Status: ${invoice.paymentStatus}.`.trim();
+        if (advPortion > 0 && cashPortion > 0) {
+          payNarration = `Advance payment ₹${fmtNum(advPortion)} adjusted from Proforma ${prof?.proformaNo || ''} and balance payment ₹${fmtNum(cashPortion)} received from customer ${customerName} against Invoice No. ${invoice.invoiceNo}.`.trim();
+        } else if (advPortion > 0) {
+          payNarration = `Advance payment ₹${fmtNum(advPortion)} adjusted from Proforma ${prof?.proformaNo || ''} against Invoice No. ${invoice.invoiceNo}.`.trim();
+        }
+
         const paymentEntry = {
           id:              paymentJEId,
           date:            invoice.date,
@@ -1002,17 +1139,19 @@
           preparedBy:      'Sales Module',
           departmentId:    '',
           isBudget:        false,
-          firstParticular: payAccountName,
+          firstParticular: primaryParticular,
           amount:          fmtNum(paidAmount),
           allRows:         payJERows,
-          narration:       `Payment received from customer ${customerName} against Invoice No. ${invoice.invoiceNo}. Status: ${invoice.paymentStatus}.`.trim(),
+          narration:       payNarration,
           jeType:          'payment',
         };
         if (typeof postedEntries !== 'undefined') {
           postedEntries.unshift(paymentEntry);
+          if (typeof window !== 'undefined') window.postedEntries = postedEntries;
         }
       } else if (invoice.paymentJournalEntryId && typeof postedEntries !== 'undefined') {
         postedEntries = postedEntries.filter(e => e.id !== invoice.paymentJournalEntryId);
+        if (typeof window !== 'undefined') window.postedEntries = postedEntries;
       }
 
       refreshAllReports();

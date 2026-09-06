@@ -130,9 +130,16 @@
           } else {
             postedEntries = postedEntries.filter(e => e.id !== invoice.id);
           }
+          if (invoice.tdsJournalEntryId) {
+            postedEntries = postedEntries.filter(e => e.id !== invoice.tdsJournalEntryId);
+          }
+          if (invoice.paymentJournalEntryId) {
+            postedEntries = postedEntries.filter(e => e.id !== invoice.paymentJournalEntryId);
+          }
           if (invoice.refundJournalEntryIds && Array.isArray(invoice.refundJournalEntryIds)) {
             postedEntries = postedEntries.filter(e => !invoice.refundJournalEntryIds.includes(e.id));
           }
+          if (typeof window !== 'undefined') window.postedEntries = postedEntries;
         }
 
         const successMsg = isRet ? `Sales Reversal "${invoice.invoiceNo}" deleted.` : `Invoice "${invoice.invoiceNo}" deleted.`;

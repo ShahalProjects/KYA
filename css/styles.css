@@ -1280,6 +1280,7 @@
       align-items: center;
       gap: 8px;
       flex: 1;
+      min-width: 0;
     }
 
     .breadcrumb-home {
@@ -1296,7 +1297,7 @@
       font-size: 13px;
     }
 
-    /* Tabs System */
+    /* Tabs System & Ceiling Slider */
     .topbar-home-btn {
       width: 34px;
       height: 34px;
@@ -1326,13 +1327,94 @@
       outline-offset: 1px;
     }
 
+    .ceiling-slider-wrap {
+      display: flex;
+      align-items: center;
+      position: relative;
+      flex: 1;
+      min-width: 0;
+      gap: 6px;
+    }
+
+    .ceiling-slider-wrap::before,
+    .ceiling-slider-wrap::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 20px;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .ceiling-slider-wrap::before {
+      left: 32px;
+      background: linear-gradient(to right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+    }
+    .ceiling-slider-wrap::after {
+      right: 32px;
+      background: linear-gradient(to left, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+    }
+    .ceiling-slider-wrap.can-scroll-left::before {
+      opacity: 1;
+    }
+    .ceiling-slider-wrap.can-scroll-right::after {
+      opacity: 1;
+    }
+
+    .ceiling-slider-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: var(--white);
+      border: 1px solid var(--slate-200);
+      color: var(--slate-500);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      z-index: 3;
+      padding: 0;
+    }
+    .ceiling-slider-btn.visible {
+      display: flex;
+    }
+    .ceiling-slider-btn:hover:not(:disabled) {
+      background: var(--blue-50);
+      color: var(--blue-600);
+      border-color: var(--blue-200);
+      box-shadow: 0 2px 5px rgba(37, 99, 235, 0.12);
+      transform: translateY(-0.5px);
+    }
+    .ceiling-slider-btn:active:not(:disabled) {
+      transform: translateY(0.5px);
+    }
+    .ceiling-slider-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      box-shadow: none;
+      pointer-events: none;
+    }
+    .ceiling-slider-btn:focus-visible {
+      outline: 2px solid var(--blue-300);
+      outline-offset: 1px;
+    }
+
     .topbar-tabs {
       display: flex;
       align-items: center;
       gap: 6px;
       flex: 1;
       overflow-x: auto;
+      scroll-behavior: smooth;
       scrollbar-width: none;
+      -ms-overflow-style: none;
+      min-width: 0;
+      padding: 2px 0;
     }
     .topbar-tabs::-webkit-scrollbar {
       display: none;

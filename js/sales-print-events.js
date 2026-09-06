@@ -937,12 +937,20 @@
   }
 
   function switchSalesPreInvTab(tabKey, filterStatus = 'all') {
-    if (tabKey === 'quotation' && typeof openQuotationForm === 'function') {
-      openQuotationForm(null, 'preinvoice');
+    if (tabKey === 'quotation') {
+      if (typeof openQuotationForm === 'function') {
+        openQuotationForm(null, 'preinvoice');
+      } else if (typeof window.openQuotationList === 'function') {
+        window.openQuotationList(filterStatus);
+      }
       return;
     }
-    if (tabKey === 'proforma' && typeof openProformaForm === 'function') {
-      openProformaForm();
+    if (tabKey === 'proforma') {
+      if (typeof openProformaForm === 'function') {
+        openProformaForm(null, 'preinvoice');
+      } else if (typeof window.openProformaList === 'function') {
+        window.openProformaList(filterStatus);
+      }
       return;
     }
     if (tabKey === 'salesorder' && typeof openSalesOrderForm === 'function') {
@@ -984,15 +992,6 @@
       return;
     }
 
-    if (tabKey === 'quotation') {
-      if (typeof window.openQuotationList === 'function') {
-        window.openQuotationList(filterStatus);
-      } else if (typeof openQuotationForm === 'function') {
-        openQuotationForm();
-      }
-      return;
-    }
-
     const cfg = SALES_PRE_INV_UPCOMING[tabKey] || SALES_PRE_INV_UPCOMING['preinvoice'];
     if (!cfg) return;
 
@@ -1031,7 +1030,7 @@
     const quoteCompleted = quotes.filter(q => q.status === 'Completed').length;
     const quoteCancelled = quotes.filter(q => q.status === 'Cancelled').length;
 
-    const proformas = window.KYA_STORE.proformaInvoices || [];
+    const proformas = (window.KYA_STORE.proformaInvoices || []).concat(window.KYA_STORE.proformaInvoicesDrafts || []);
     const proformaActive = proformas.filter(p => p.status === 'Active' || !p.status || p.status === 'Draft').length;
     const proformaCompleted = proformas.filter(p => p.status === 'Completed').length;
     const proformaCancelled = proformas.filter(p => p.status === 'Cancelled').length;
@@ -1086,7 +1085,7 @@
             </tr>
 
             <!-- 2. Proforma Invoice -->
-            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openProformaForm()">
+            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openProformaList('all')">
               <td style="padding: 16px 24px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <div style="width: 36px; height: 36px; border-radius: 8px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -1102,13 +1101,13 @@
                 </div>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${proformaActive}</span>
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openProformaList('active')">${proformaActive}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${proformaCompleted}</span>
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openProformaList('completed')">${proformaCompleted}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${proformaCancelled}</span>
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-500); padding: 4px 10px; cursor: pointer; border-radius: 6px; display: inline-block;" onmouseover="this.style.background='var(--slate-100)'" onmouseout="this.style.background='transparent'" onclick="event.stopPropagation(); openProformaList('cancelled')">${proformaCancelled}</span>
               </td>
             </tr>
 

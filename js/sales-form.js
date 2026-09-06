@@ -402,11 +402,22 @@
 
   function getNextAutoInvoiceNumber() {
     const year = new Date().getFullYear();
+    window.KYA_STORE = window.KYA_STORE || {};
     if (currentSalesVoucherSubtype === 'Return') {
-      const ctr = window.KYA_STORE.salesReturnCtr || 1;
+      let ctr = window.KYA_STORE.salesReturnCtr || 1;
+      const existing = (window.KYA_STORE.salesVouchers || []).filter(v => v.isReturn).map(v => (v.invoiceNo || '').toLowerCase());
+      while (existing.includes(`rev-${year}-${String(ctr).padStart(3, '0')}`.toLowerCase())) {
+        ctr++;
+      }
+      window.KYA_STORE.salesReturnCtr = ctr;
       return `REV-${year}-${String(ctr).padStart(3, '0')}`;
     } else {
-      const ctr = window.KYA_STORE.salesInvoiceCtr || 1;
+      let ctr = window.KYA_STORE.salesInvoiceCtr || 1;
+      const existing = (window.KYA_STORE.salesVouchers || []).filter(v => !v.isReturn).map(v => (v.invoiceNo || '').toLowerCase());
+      while (existing.includes(`inv-${year}-${String(ctr).padStart(3, '0')}`.toLowerCase())) {
+        ctr++;
+      }
+      window.KYA_STORE.salesInvoiceCtr = ctr;
       return `INV-${year}-${String(ctr).padStart(3, '0')}`;
     }
   }
@@ -620,6 +631,7 @@
     }
     return ldg.id;
   }
+  window.getOrCreateSystemLedger = getOrCreateSystemLedger;
 
   function getIncomeLedgers() {
     let list = coaLedgers.filter(l => l.type === 'ledger' && (l.sgId === 'sg-rfo' || l.sgId === 'sg-oi'));
@@ -1125,6 +1137,7 @@
 
     const quoteListCard = document.getElementById('salesQuotationListCard');
     const quoteCard = document.getElementById('salesQuotationFormCard');
+    const proformaListCard = document.getElementById('salesProformaListCard');
     const proformaCard = document.getElementById('salesProformaFormCard');
     const orderCard = document.getElementById('salesOrderFormCard');
     const challanCard = document.getElementById('salesDeliveryChallanFormCard');
@@ -1135,6 +1148,7 @@
 
     if (quoteListCard) quoteListCard.style.display = 'none';
     if (quoteCard) quoteCard.style.display = 'none';
+    if (proformaListCard) proformaListCard.style.display = 'none';
     if (proformaCard) proformaCard.style.display = 'none';
     if (orderCard) orderCard.style.display = 'none';
     if (challanCard) challanCard.style.display = 'none';
@@ -1346,6 +1360,8 @@
   }
 
   function initSalesForm() {
+    window._pendingConvertQuotationId = null;
+    window._pendingConvertProformaId = null;
     updateVoucherSubtypeUI();
     const today = new Date().toISOString().split('T')[0];
     const dateEl = document.getElementById('salesDate');
@@ -1587,3 +1603,4 @@
   window.autoCalculateSalesRoundOff = autoCalculateSalesRoundOff;
   window.getSalesPaymentStatus = getSalesPaymentStatus;
   window.setInvoiceNoMode = setInvoiceNoMode;
+  window.getNextAutoInvoiceNumber = getNextAutoInvoiceNumber;

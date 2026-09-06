@@ -43,6 +43,7 @@
     const quoteListCard = document.getElementById('salesQuotationListCard');
     const salesFormCard = document.getElementById('salesVoucherFormCard');
     const quoteFormCard = document.getElementById('salesQuotationFormCard');
+    const proformaListCard = document.getElementById('salesProformaListCard');
     const proformaFormCard = document.getElementById('salesProformaFormCard');
     const orderFormCard = document.getElementById('salesOrderFormCard');
     const challanFormCard = document.getElementById('salesDeliveryChallanFormCard');
@@ -50,6 +51,7 @@
     if (preInvCard) preInvCard.style.display = 'none';
     if (quoteListCard) quoteListCard.style.display = 'none';
     if (salesFormCard) salesFormCard.style.display = 'none';
+    if (proformaListCard) proformaListCard.style.display = 'none';
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (orderFormCard) orderFormCard.style.display = 'none';
     if (challanFormCard) challanFormCard.style.display = 'none';
@@ -76,6 +78,7 @@
     const salesFormCard = document.getElementById('salesVoucherFormCard');
     const quoteListCard = document.getElementById('salesQuotationListCard');
     const quoteFormCard = document.getElementById('salesQuotationFormCard');
+    const proformaListCard = document.getElementById('salesProformaListCard');
     const proformaFormCard = document.getElementById('salesProformaFormCard');
     const orderFormCard = document.getElementById('salesOrderFormCard');
     const challanFormCard = document.getElementById('salesDeliveryChallanFormCard');
@@ -83,6 +86,7 @@
     if (preInvCard) preInvCard.style.display = 'none';
     if (salesFormCard) salesFormCard.style.display = 'none';
     if (quoteFormCard) quoteFormCard.style.display = 'none';
+    if (proformaListCard) proformaListCard.style.display = 'none';
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (orderFormCard) orderFormCard.style.display = 'none';
     if (challanFormCard) challanFormCard.style.display = 'none';
@@ -101,9 +105,13 @@
     const preInvCard = document.getElementById('salesPreInvoiceCard');
     const quoteListCard = document.getElementById('salesQuotationListCard');
     const quoteFormCard = document.getElementById('salesQuotationFormCard');
+    const proformaListCard = document.getElementById('salesProformaListCard');
+    const proformaFormCard = document.getElementById('salesProformaFormCard');
 
     if (quoteListCard) quoteListCard.style.display = 'none';
     if (quoteFormCard) quoteFormCard.style.display = 'none';
+    if (proformaListCard) proformaListCard.style.display = 'none';
+    if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (preInvCard) preInvCard.style.display = 'block';
 
     if (typeof window.switchSalesPreInvTab === 'function') {
@@ -1236,13 +1244,16 @@
       return;
     }
 
+    const nextInvNo = typeof getNextAutoInvoiceNumber === 'function' ? getNextAutoInvoiceNumber() :
+                      (typeof window.getNextAutoInvoiceNumber === 'function' ? window.getNextAutoInvoiceNumber() : '');
+
     const inv = {
       id: Date.now(),
       customerId: quote.customerId,
       customerName: quote.customerName,
       date: new Date().toISOString().split('T')[0],
       dueDate: quote.expiryDate || new Date().toISOString().split('T')[0],
-      invoiceNo: '',
+      invoiceNo: nextInvNo,
       salesSupplyType: quote.supplyType || 'Intra-State (CGST + SGST)',
       salesExecutiveId: quote.salesExecutiveId || '',
       type: 'Product',
@@ -1261,34 +1272,66 @@
         fileName: quote.document.name,
         fileSize: quote.document.size ? `${(quote.document.size / 1024).toFixed(1)} KB` : '',
         fileData: quote.document.data
-      } : null
+      } : null,
+      mode: 'Auto',
+      _isFromQuotation: true,
+      convertedFromQuotationId: quote.id
     };
 
-    quote.status = 'Completed';
-    window.KYA_STORE.quotations = window.KYA_STORE.quotations || [];
-    const idx = window.KYA_STORE.quotations.findIndex(q => String(q.id) === String(id));
-    if (idx >= 0) {
-      window.KYA_STORE.quotations[idx].status = 'Completed';
-    } else {
-      window.KYA_STORE.quotations.unshift(quote);
-      window.KYA_STORE.quotationsDrafts = (window.KYA_STORE.quotationsDrafts || []).filter(d => String(d.id) !== String(id));
-    }
-
-    if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    window._pendingConvertQuotationId = quote.id;
 
     if (typeof loadSalesInvoice === 'function') {
       const quoteListCard = document.getElementById('salesQuotationListCard');
       if (quoteListCard) quoteListCard.style.display = 'none';
+      const quoteFormCard = document.getElementById('salesQuotationFormCard');
+      if (quoteFormCard) quoteFormCard.style.display = 'none';
+      const proformaListCard = document.getElementById('salesProformaListCard');
+      if (proformaListCard) proformaListCard.style.display = 'none';
+      const proformaFormCard = document.getElementById('salesProformaFormCard');
+      if (proformaFormCard) proformaFormCard.style.display = 'none';
+      const preInvCard = document.getElementById('salesPreInvoiceCard');
+      if (preInvCard) preInvCard.style.display = 'none';
+
       currentSalesVoucherSubtype = 'Invoice';
       if (typeof updateVoucherSubtypeUI === 'function') updateVoucherSubtypeUI();
       loadSalesInvoice(inv, false);
-      showToast(`Quotation ${quote.quoteNo} converted to Sales Invoice!`, 'success');
-    } else {
-      showToast(`Quotation ${quote.quoteNo} marked as Completed.`, 'success');
-      if (typeof window.openQuotationList === 'function') {
-        window.openQuotationList(_quoteFilterStatus || 'all');
+      window._editingSalesInvoice = null;
+      if (typeof setInvoiceNoMode === 'function') setInvoiceNoMode('Auto');
+      const invNoEl = document.getElementById('salesInvoiceNo');
+      const chipEl = document.getElementById('salesVoucherChipDisplay');
+      if (invNoEl && (!invNoEl.value || !invNoEl.value.trim())) {
+        const genNo = typeof getNextAutoInvoiceNumber === 'function' ? getNextAutoInvoiceNumber() :
+                      (typeof window.getNextAutoInvoiceNumber === 'function' ? window.getNextAutoInvoiceNumber() : '');
+        invNoEl.value = genNo;
+        if (chipEl) chipEl.textContent = genNo || 'INV-XXXX';
+      }
+      showToast(`Quotation ${quote.quoteNo} converted! Post the invoice to mark it as completed.`, 'info');
+    }
+  }
+
+  function markQuotationCompletedOnInvoicePost(id) {
+    window.KYA_STORE = window.KYA_STORE || {};
+    window.KYA_STORE.quotations = window.KYA_STORE.quotations || [];
+    window.KYA_STORE.quotationsDrafts = window.KYA_STORE.quotationsDrafts || [];
+
+    let quote = window.KYA_STORE.quotations.find(q => String(q.id) === String(id));
+    let isDraft = false;
+    if (!quote) {
+      quote = window.KYA_STORE.quotationsDrafts.find(d => String(d.id) === String(id));
+      isDraft = true;
+    }
+    if (!quote) return;
+
+    quote.status = 'Completed';
+    quote.updatedAt = Date.now();
+
+    if (isDraft) {
+      window.KYA_STORE.quotationsDrafts = window.KYA_STORE.quotationsDrafts.filter(d => String(d.id) !== String(id));
+      if (!window.KYA_STORE.quotations.some(q => String(q.id) === String(id))) {
+        window.KYA_STORE.quotations.unshift(quote);
       }
     }
+    if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
   }
 
   function viewPrintQuotation(id) {
@@ -1359,22 +1402,26 @@
     let statusActionsHtml = '';
     if (isAct || isDrf) {
       statusActionsHtml = `
-        <button type="button" id="btnPreviewToInvoice" class="btn btn-sm" style="background: #10b981; color: #fff; border: 1.5px solid #059669; padding: 7px 15px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: all 0.15s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span>Convert to Invoice</span>
+        <button type="button" id="btnPreviewToInvoice" class="btn btn-sm" title="Convert to Invoice" aria-label="Convert to Invoice" style="background: #10b981; color: #fff; border: 1.5px solid #059669; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: all 0.15s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </button>
-        <button type="button" id="btnPreviewComplete" class="btn btn-sm" style="background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
-          <span>✓ Mark Completed</span>
+        <button type="button" id="btnPreviewEditQuote" class="btn btn-sm" title="Edit Quotation" aria-label="Edit Quotation" style="background: #fff; color: var(--blue-700); border: 1.5px solid var(--slate-300); width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='var(--slate-100)'; this.style.borderColor='var(--blue-400)'" onmouseout="this.style.background='#fff'; this.style.borderColor='var(--slate-300)'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button type="button" id="btnPreviewCancel" class="btn btn-sm" style="background: #fff1f2; color: #be123c; border: 1.5px solid #fecdd3; padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;" onmouseover="this.style.background='#ffe4e6'" onmouseout="this.style.background='#fff1f2'">
-          <span>✕ Mark Cancelled</span>
+        <button type="button" id="btnPreviewComplete" class="btn btn-sm" title="Mark Completed" aria-label="Mark Completed" style="background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#dbeafe'; this.style.borderColor='#93c5fd'" onmouseout="this.style.background='#eff6ff'; this.style.borderColor='#bfdbfe'">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" id="btnPreviewCancel" class="btn btn-sm" title="Mark Cancelled" aria-label="Mark Cancelled" style="background: #fff1f2; color: #be123c; border: 1.5px solid #fecdd3; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#ffe4e6'; this.style.borderColor='#fda4af'" onmouseout="this.style.background='#fff1f2'; this.style.borderColor='#fecdd3'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       `;
     } else {
       statusActionsHtml = `
-        <button type="button" id="btnPreviewReopen" class="btn btn-sm" style="background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0; padding: 7px 15px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s;" onmouseover="this.style.background='#d1fae5'" onmouseout="this.style.background='#ecfdf5'">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          <span>↺ Reopen as Active</span>
+        <button type="button" id="btnPreviewReopen" class="btn btn-sm" title="Reopen as Active" aria-label="Reopen as Active" style="background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#d1fae5'; this.style.borderColor='#6ee7b7'" onmouseout="this.style.background='#ecfdf5'; this.style.borderColor='#a7f3d0'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+        <button type="button" id="btnPreviewEditQuote" class="btn btn-sm" title="Edit Quotation" aria-label="Edit Quotation" style="background: #fff; color: var(--blue-700); border: 1.5px solid var(--slate-300); width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='var(--slate-100)'; this.style.borderColor='var(--blue-400)'" onmouseout="this.style.background='#fff'; this.style.borderColor='var(--slate-300)'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
       `;
     }
@@ -1436,21 +1483,12 @@
           </div>
         </div>
 
-        <!-- Action Bar: Inside the quote preview with all actions -->
-        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <button type="button" id="btnPreviewEditQuote" class="btn btn-sm" style="background: #fff; color: var(--blue-700); border: 1.5px solid var(--slate-300); padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='#fff'">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              <span>Edit Quotation</span>
-            </button>
-            ${statusActionsHtml}
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <button type="button" id="btnPreviewDeleteQuote" class="btn btn-sm" style="background: #fee2e2; color: #dc2626; border: 1.5px solid #fca5a5; padding: 7px 13px; font-size: 12.5px; font-weight: 700; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;" onmouseover="this.style.background='#fecdd3'" onmouseout="this.style.background='#fee2e2'">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-              <span>Delete</span>
-            </button>
-          </div>
+        <!-- Action Bar: Inside the quote preview with all actions aligned to the right side -->
+        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+          ${statusActionsHtml}
+          <button type="button" id="btnPreviewDeleteQuote" class="btn btn-sm" title="Delete Quotation" aria-label="Delete Quotation" style="background: #fee2e2; color: #dc2626; border: 1.5px solid #fca5a5; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#fecdd3'; this.style.borderColor='#f87171'" onmouseout="this.style.background='#fee2e2'; this.style.borderColor='#fca5a5'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+          </button>
         </div>
 
         <div class="inv-modal-body">
@@ -1900,6 +1938,7 @@
   window.setQuotationStatus = setQuotationStatus;
   window.deleteQuotationItem = deleteQuotationItem;
   window.convertQuotationToInvoice = convertQuotationToInvoice;
+  window.markQuotationCompletedOnInvoicePost = markQuotationCompletedOnInvoicePost;
   window.editQuotationItem = editQuotationItem;
   window.viewPrintQuotation = viewPrintQuotation;
 

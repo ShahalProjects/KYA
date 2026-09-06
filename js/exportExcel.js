@@ -2055,6 +2055,259 @@
   }
 
   /**
+   * Export Proforma Invoice to Excel (.xlsx) using ExcelJS
+   */
+  async function exportProformaToExcel(proforma) {
+    try {
+      await ensureExcelJSLoaded();
+      if (!global.ExcelJS) throw new Error('ExcelJS library could not be loaded.');
+
+      const workbook = new global.ExcelJS.Workbook();
+      workbook.creator = 'KYA Accounting';
+      workbook.created = new Date();
+
+      const sheet = workbook.addWorksheet('Proforma_Invoice', {
+        views: [{ state: 'frozen', ySplit: 6, showGridLines: true }]
+      });
+
+      const maxCols = 8;
+      const lastColLetter = 'H';
+
+      sheet.getColumn(1).width = 6;  // #
+      sheet.getColumn(2).width = 34; // Description
+      sheet.getColumn(3).width = 14; // HSN/SAC
+      sheet.getColumn(4).width = 12; // Qty
+      sheet.getColumn(5).width = 16; // Rate
+      sheet.getColumn(6).width = 14; // Discount
+      sheet.getColumn(7).width = 12; // Tax %
+      sheet.getColumn(8).width = 18; // Amount
+
+      const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
+      const compName = (activeCo.name || 'KYA Accounting').toUpperCase();
+
+      // Row 1: Company Name
+      const r1 = sheet.addRow([compName]);
+      r1.height = 24;
+      sheet.mergeCells(`A1:${lastColLetter}1`);
+      const cA1 = sheet.getCell('A1');
+      cA1.font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF1D4ED8' } };
+      cA1.alignment = { vertical: 'middle', horizontal: 'left' };
+
+      // Row 2: Title & Proforma #
+      const r2 = sheet.addRow(['PROFORMA INVOICE', '', '', '', '', '', `Proforma #: ${proforma.proformaNo || '—'}`]);
+      r2.height = 20;
+      sheet.mergeCells('A2:E2');
+      sheet.mergeCells(`F2:${lastColLetter}2`);
+      r2.getCell(1).font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF0F172A' } };
+      r2.getCell(6).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF2563EB' } };
+      r2.getCell(6).alignment = { vertical: 'middle', horizontal: 'right' };
+
+      // Row 3: Customer & Date
+      const customer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, 'Customer') : null) ||
+                       (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) ||
+                       { name: proforma.customerName || 'Customer' };
+      const partyName = customer.name || proforma.customerName || 'Customer';
+      const r3 = sheet.addRow([`Proforma For: ${partyName}`, '', '', '', `Date: ${formatRptDate(proforma.date) || '—'}`]);
+      r3.height = 18;
+      sheet.mergeCells('A3:D3');
+      sheet.mergeCells(`E3:${lastColLetter}3`);
+      r3.getCell(1).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF334155' } };
+      r3.getCell(5).font = { name: 'Calibri', size: 10, color: { argb: 'FF64748B' } };
+
+      // Row 4: Supply & Due Date / Status
+      const dueText = proforma.dueDate ? `Due Date: ${formatRptDate(proforma.dueDate)}` : (proforma.expiryDate ? `Valid Until: ${formatRptDate(proforma.expiryDate)}` : '');
+      const r4 = sheet.addRow([`Supply: ${proforma.supplyType || 'Intra-State'}`, '', '', '', dueText || `Status: ${proforma.status || 'Active'}`]);
+      r4.height = 18;
+      sheet.mergeCells('A4:D4');
+      sheet.mergeCells(`E4:${lastColLetter}4`);
+      r4.getCell(1).font = { name: 'Calibri', size: 10, color: { argb: 'FF64748B' } };
+      r4.getCell(5).font = { name: 'Calibri', size: 10, color: { argb: 'FF64748B' } };
+
+      // Row 5: Spacer
+      const r5 = sheet.addRow([]);
+      r5.height = 8;
+
+      // Row 6: Column Headers
+      const r6 = sheet.addRow(['#', 'Description', 'HSN/SAC', 'Qty', 'Rate (INR)', 'Discount', 'Tax %', 'Amount (INR)']);
+      r6.height = 24;
+      for (let c = 1; c <= maxCols; c++) {
+        const cell = r6.getCell(c);
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+        cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: (c === 1 ? 'center' : (c === 2 || c === 3 ? 'left' : 'right')),
+          indent: c === 2 ? 1 : 0
+        };
+      }
+
+      // Data Rows
+      (proforma.rows || []).forEach((r, idx) => {
+        const desc = r.item || 'Item';
+        const hsn = r.hsn || '—';
+        const qty = parseFloat(r.qty) || 1;
+        const rate = parseFloat(r.rate) || 0;
+        const base = qty * rate;
+        const disc = parseFloat(r.discount) || 0;
+        const discAmt = r.discountType === 'pct' ? (base * (disc / 100)) : disc;
+        const itemTotal = base - discAmt;
+        const taxRate = parseFloat(r.tax) || 0;
+        const taxAmt = itemTotal * (taxRate / 100);
+        const finalAmt = itemTotal + taxAmt;
+        const discStr = disc > 0 ? (r.discountType === 'pct' ? `${disc}%` : discAmt) : '';
+        const qtyDisplay = r.unit ? `${qty} ${r.unit}` : qty;
+
+        const row = sheet.addRow([
+          idx + 1,
+          desc,
+          hsn,
+          qtyDisplay,
+          rate,
+          discStr,
+          taxRate ? `${taxRate}%` : '0%',
+          finalAmt
+        ]);
+        row.height = 20;
+
+        for (let c = 1; c <= maxCols; c++) {
+          const cell = row.getCell(c);
+          cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF334155' } };
+          cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+
+          if (c === 5 || c === 8) {
+            cell.numFmt = numFormat;
+            cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          } else if (c === 4 || c === 6 || c === 7) {
+            cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          } else if (c === 1) {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          } else {
+            cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+          }
+        }
+      });
+
+      // Sub Total & Taxes
+      const addSummaryRow = (label, val, isBold = false, isFinal = false) => {
+        const row = sheet.addRow(['', '', '', '', '', '', label, val]);
+        row.height = isFinal ? 22 : 20;
+        sheet.mergeCells(`A${row.number}:F${row.number}`);
+        for (let c = 1; c <= maxCols; c++) {
+          const cell = row.getCell(c);
+          cell.font = { name: 'Calibri', size: isFinal ? 11 : 10, bold: isBold, color: isFinal ? { argb: 'FF166534' } : { argb: 'FF334155' } };
+          if (isFinal) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+            cell.border = { top: mediumBorder, bottom: doubleBorder, left: thinBorder, right: thinBorder };
+          } else {
+            cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+          }
+          if (c === 8) {
+            if (typeof cell.value === 'number') cell.numFmt = numFormat;
+            cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          } else if (c === 7) {
+            cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          }
+        }
+      };
+
+      addSummaryRow('Sub Total', proforma.subTotal || 0, true);
+      if (proforma.tdsTcsMode && proforma.tdsTcsMode !== 'None') {
+        addSummaryRow(`${proforma.tdsTcsMode} (${proforma.tdsTcsRate}%)`, proforma.tdsTcsAmount);
+      }
+      if (proforma.adjustments) addSummaryRow('Round off / Adjustments', proforma.adjustments);
+      addSummaryRow('TOTAL AMOUNT', proforma.total || 0, true, true);
+
+      // Notes
+      if (proforma.notes) {
+        const rNarrSpacer = sheet.addRow([]);
+        rNarrSpacer.height = 8;
+        const rNarr = sheet.addRow([`Terms & Notes: ${proforma.notes}`]);
+        rNarr.height = 20;
+        sheet.mergeCells(`A${rNarr.number}:${lastColLetter}${rNarr.number}`);
+        const cNarr = rNarr.getCell(1);
+        cNarr.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF475569' } };
+        cNarr.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      const pNum = (proforma.proformaNo || 'Proforma').replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `Proforma_${pNum}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      return true;
+    } catch (err) {
+      console.error('Failed to export Proforma to Excel:', err);
+      exportProformaToCsvFallback(proforma);
+      return false;
+    }
+  }
+
+  /**
+   * CSV fallback for Proforma export
+   */
+  function exportProformaToCsvFallback(proforma) {
+    try {
+      const rows = [
+        ['Proforma #', proforma.proformaNo || ''],
+        ['Date', proforma.date || ''],
+        ['Due Date', proforma.dueDate || proforma.expiryDate || ''],
+        ['Customer', proforma.customerName || ''],
+        ['Supply Type', proforma.supplyType || ''],
+        ['Payment Terms', proforma.paymentStatus || ''],
+        [],
+        ['#', 'Description', 'HSN/SAC', 'Qty', 'Unit', 'Rate', 'Discount', 'Tax %', 'Amount']
+      ];
+      (proforma.rows || []).forEach((r, idx) => {
+        const qty = parseFloat(r.qty) || 1;
+        const rate = parseFloat(r.rate) || 0;
+        const base = qty * rate;
+        const disc = parseFloat(r.discount) || 0;
+        const discAmt = r.discountType === 'pct' ? (base * (disc / 100)) : disc;
+        const itemTotal = base - discAmt;
+        const taxRate = parseFloat(r.tax) || 0;
+        const taxAmt = itemTotal * (taxRate / 100);
+        const finalAmt = itemTotal + taxAmt;
+        rows.push([
+          idx + 1,
+          r.item || '',
+          r.hsn || '',
+          qty,
+          r.unit || '',
+          rate,
+          disc,
+          `${taxRate}%`,
+          finalAmt
+        ]);
+      });
+      rows.push([]);
+      rows.push(['', '', '', '', '', '', '', 'Sub Total', proforma.subTotal || 0]);
+      if (proforma.adjustments) rows.push(['', '', '', '', '', '', '', 'Adjustments', proforma.adjustments]);
+      rows.push(['', '', '', '', '', '', '', 'Total', proforma.total || 0]);
+
+      const csvContent = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      const pNum = (proforma.proformaNo || 'Proforma').replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `Proforma_${pNum}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      return true;
+    } catch (e) {
+      console.error('Failed CSV fallback for proforma:', e);
+      return false;
+    }
+  }
+
+  /**
    * Export Voucher Desk Register to Excel (.xlsx)
    */
   async function exportVoucherDeskToExcel(data) {
@@ -2224,6 +2477,8 @@
   global.exportInvoiceToExcel = exportInvoiceToExcel;
   global.exportQuotationToExcel = exportQuotationToExcel;
   global.exportQuotationToCsvFallback = exportQuotationToCsvFallback;
+  global.exportProformaToExcel = exportProformaToExcel;
+  global.exportProformaToCsvFallback = exportProformaToCsvFallback;
   global.exportVoucherDeskToExcel = exportVoucherDeskToExcel;
 
 })(typeof window !== 'undefined' ? window : this);

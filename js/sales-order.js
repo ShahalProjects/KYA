@@ -925,12 +925,10 @@
       quoteNavBtn.addEventListener('click', (e) => {
         e.preventDefault();
         closeSalesOrderForm();
-        if (typeof window.openQuotationList === 'function') {
-          window.openQuotationList('all');
-        } else if (typeof window.switchSalesPreInvTab === 'function') {
-          window.switchSalesPreInvTab('quotation');
-        } else if (typeof openQuotationForm === 'function') {
+        if (typeof openQuotationForm === 'function') {
           openQuotationForm();
+        } else if (typeof window.openQuotationList === 'function') {
+          window.openQuotationList('all');
         }
       });
     }

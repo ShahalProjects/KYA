@@ -1719,6 +1719,7 @@
 
   // ── Posted entries store & panel state ───────────────────────────
   let postedEntries       = [];
+  window.postedEntries    = postedEntries;
   let _ptStyleDone        = false;
   let _ptSelected         = new Set();
   let _ptSearch           = '';

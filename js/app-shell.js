@@ -1049,7 +1049,102 @@
     }
   }
 
+  /* ======================
+     CEILING TAB SLIDER
+  ====================== */
+  function updateCeilingSliderControls() {
+    const tabsContainer = document.getElementById('topbarTabs');
+    const prevBtn = document.getElementById('ceilingSliderPrev');
+    const nextBtn = document.getElementById('ceilingSliderNext');
+    const sliderWrap = document.getElementById('ceilingSliderWrap');
+    if (!tabsContainer || !prevBtn || !nextBtn) return;
+
+    const scrollLeft = Math.round(tabsContainer.scrollLeft);
+    const scrollWidth = tabsContainer.scrollWidth;
+    const clientWidth = tabsContainer.clientWidth;
+    const hasOverflow = scrollWidth > clientWidth + 3;
+
+    if (hasOverflow) {
+      prevBtn.classList.add('visible');
+      nextBtn.classList.add('visible');
+
+      const canScrollLeft = scrollLeft > 2;
+      const canScrollRight = scrollLeft + clientWidth < scrollWidth - 3;
+
+      prevBtn.disabled = !canScrollLeft;
+      nextBtn.disabled = !canScrollRight;
+
+      if (sliderWrap) {
+        sliderWrap.classList.toggle('can-scroll-left', canScrollLeft);
+        sliderWrap.classList.toggle('can-scroll-right', canScrollRight);
+      }
+    } else {
+      prevBtn.classList.remove('visible');
+      nextBtn.classList.remove('visible');
+      prevBtn.disabled = true;
+      nextBtn.disabled = true;
+      if (sliderWrap) {
+        sliderWrap.classList.remove('can-scroll-left', 'can-scroll-right');
+      }
+    }
+  }
+
+  let _ceilingSliderInitialized = false;
+  function initCeilingSlider() {
+    if (_ceilingSliderInitialized) return;
+    const tabsContainer = document.getElementById('topbarTabs');
+    const prevBtn = document.getElementById('ceilingSliderPrev');
+    const nextBtn = document.getElementById('ceilingSliderNext');
+    if (!tabsContainer || !prevBtn || !nextBtn) return;
+    _ceilingSliderInitialized = true;
+
+    prevBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      tabsContainer.scrollBy({ left: -220, behavior: 'smooth' });
+      setTimeout(updateCeilingSliderControls, 320);
+    });
+
+    nextBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      tabsContainer.scrollBy({ left: 220, behavior: 'smooth' });
+      setTimeout(updateCeilingSliderControls, 320);
+    });
+
+    tabsContainer.addEventListener('scroll', () => {
+      updateCeilingSliderControls();
+    }, { passive: true });
+
+    // Translate vertical mouse wheel over tabs into smooth horizontal sliding
+    tabsContainer.addEventListener('wheel', (e) => {
+      if (tabsContainer.scrollWidth > tabsContainer.clientWidth) {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          e.preventDefault();
+          tabsContainer.scrollLeft += e.deltaY;
+          updateCeilingSliderControls();
+        }
+      }
+    }, { passive: false });
+
+    // Window resize listener
+    window.addEventListener('resize', () => {
+      updateCeilingSliderControls();
+    });
+
+    // Alert icon click handler: opens Reminders/Notifications
+    const alertBtn = document.getElementById('topbarAlertBtn');
+    if (alertBtn) {
+      alertBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateTo('onehub');
+        if (typeof switchOhTab === 'function') {
+          switchOhTab('reminders');
+        }
+      });
+    }
+  }
+
   function renderTabs() {
+    initCeilingSlider();
     const tabsContainer = document.getElementById('topbarTabs');
     if (!tabsContainer) return;
     
@@ -1065,6 +1160,7 @@
 
     if (openTabs.length === 0) {
       tabsContainer.innerHTML = '';
+      updateCeilingSliderControls();
       return;
     }
     
@@ -1134,6 +1230,15 @@
         tabEl.classList.remove('dragging');
         renderTabs(); // Redraw tabs to ensure consistent visual state
       });
+    });
+
+    // Auto-scroll active tab into view and refresh slider controls
+    requestAnimationFrame(() => {
+      const activeTabEl = tabsContainer.querySelector('.topbar-tab.active');
+      if (activeTabEl) {
+        activeTabEl.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+      }
+      setTimeout(updateCeilingSliderControls, 100);
     });
   }
 
@@ -1500,8 +1605,9 @@
 
   window.initDashboard = initDashboard;
 
-  // Run dashboard init once on load
+  // Run dashboard and ceiling slider init on load
   initDashboard();
+  initCeilingSlider();
 
   // Re-init dashboard whenever navigating back to it
   window.addEventListener('hashchange', () => {
