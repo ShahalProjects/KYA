@@ -3,6 +3,24 @@
   //  (Split from sales.js for maintainability)
   // ══════════════════════════════════════════════════════════════════
 
+  // A sales party can be a customer from the customer master or a ledger created under
+  // Trade Receivables — both show up in the customer dropdown, so every lookup has to
+  // check both. `fallbackName` is the name stored on the voucher, used when the master
+  // record is gone.
+  function getSalesPartyName(partyId, fallbackName) {
+    if (partyId) {
+      const party = (typeof findPartyById === 'function') ? findPartyById(partyId, 'Customer') : null;
+      if (party && party.name) return party.name;
+
+      if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+        const ledger = coaLedgers.find(l => String(l.id) === String(partyId));
+        if (ledger && ledger.name) return ledger.name;
+      }
+    }
+    return fallbackName || '';
+  }
+  window.getSalesPartyName = getSalesPartyName;
+
   function isSalesReturnInvoiceSelected() {
     if (currentSalesVoucherSubtype !== 'Return') return false;
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
@@ -342,6 +360,8 @@
       payPartialBtn.textContent = 'Partial Payment';
       payFullBtn.textContent = 'Full Payment';
     }
+
+    if (typeof updateSalesMultiPaymentUI === 'function') updateSalesMultiPaymentUI();
   }
 
   // Math expression evaluation helper for calculator behavior

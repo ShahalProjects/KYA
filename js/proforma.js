@@ -15,6 +15,10 @@
   let _proformaFilterStatus = 'all';
   let _proformaSearchQuery = '';
 
+  const PROFORMA_MULTI_PAYMENT_VALUE = 'multi-payment';
+  let _proformaMultiPayments = [];
+  let _proformaPaymentAccountPrev = '';
+
   function safeEsc(str) {
     if (typeof ohEsc === 'function') return ohEsc(str);
     if (!str) return '';
@@ -185,23 +189,17 @@
         amtInput.value = proformaData.tdsTcsAmount;
       }
 
-      // Payment Status
-      const notPaidBtn = document.getElementById('proformaPaymentStatusNotPaid');
-      const fullBtn = document.getElementById('proformaPaymentStatusFull');
-      const partBtn = document.getElementById('proformaPaymentStatusPartial');
-      if (proformaData.paymentStatus === 'Full Payment') {
-        if (fullBtn) fullBtn.click();
-      } else if (proformaData.paymentStatus === 'Partial Payment') {
-        if (partBtn) partBtn.click();
-      } else {
-        if (notPaidBtn) notPaidBtn.click();
-      }
-
+      // Advance Payment
       populateProformaPaymentAccounts(proformaData.paymentAccountId);
+      setProformaMultiPayments(proformaData.paymentSplits || []);
+      _proformaPaymentAccountPrev = proformaData.paymentAccountId || '';
       const payAmtEl = document.getElementById('proformaPaymentAmount');
-      if (payAmtEl && proformaData.paymentAmount !== undefined) {
-        payAmtEl.value = proformaData.paymentAmount || '';
+      if (payAmtEl) {
+        payAmtEl.value = (proformaData.paymentStatus === 'Full Payment')
+          ? (proformaData.paymentAmount || proformaData.total || '')
+          : (proformaData.paymentAmount || '');
       }
+      updateProformaMultiPaymentUI();
 
       // Doc attachment
       updateProformaDocUI(proformaData.document || null);
@@ -229,10 +227,11 @@
       const noneBtn = document.getElementById('proformaTdsTcsNone');
       if (noneBtn) noneBtn.click();
 
-      const notPaidBtn = document.getElementById('proformaPaymentStatusNotPaid');
-      if (notPaidBtn) notPaidBtn.click();
       populateProformaPaymentAccounts();
+      resetProformaMultiPayments();
 
+      const payAccEl = document.getElementById('proformaPaymentAccount');
+      if (payAccEl) payAccEl.value = '';
       const payAmtEl = document.getElementById('proformaPaymentAmount');
       if (payAmtEl) payAmtEl.value = '';
 
@@ -315,15 +314,169 @@
       }
       paySelect.appendChild(opt);
     });
+
+    const multiOpt = document.createElement('option');
+    multiOpt.value = PROFORMA_MULTI_PAYMENT_VALUE;
+    multiOpt.textContent = 'Multi Payment';
+    if (String(selectedId) === PROFORMA_MULTI_PAYMENT_VALUE) multiOpt.selected = true;
+    paySelect.appendChild(multiOpt);
   }
 
-  function getProformaPaymentStatus() {
-    const fullBtn = document.getElementById('proformaPaymentStatusFull');
-    const partBtn = document.getElementById('proformaPaymentStatusPartial');
+  // Debit rows for the advance receipt: one per account, scaled to `amount` when the
+  // advance is split across several of them (rounding lands on the last row).
+  function getProformaAdvanceReceiptRows(data, amount) {
+    const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
+    const nameOf = (id) => {
+      const ledger = ledgers.find(l => String(l.id) === String(id));
+      return ledger ? ledger.name : 'Cash Account';
+    };
 
-    if (fullBtn && fullBtn.classList.contains('active')) return 'Full Payment';
-    if (partBtn && partBtn.classList.contains('active')) return 'Partial Payment';
-    return 'Not Paid';
+    const splits = (Array.isArray(data.paymentSplits) ? data.paymentSplits : [])
+      .filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0);
+    const splitTotal = splits.reduce((sum, sp) => sum + (parseFloat(sp.amount) || 0), 0);
+
+    if (String(data.paymentAccountId) !== PROFORMA_MULTI_PAYMENT_VALUE || splitTotal <= 0) {
+      const single = ledgers.find(l => String(l.id) === String(data.paymentAccountId));
+      return [{ name: single ? single.name : (data.paymentAccountName || 'Cash Account'), amount: amount }];
+    }
+
+    const rows = [];
+    let allocated = 0;
+    splits.forEach((sp, i) => {
+      const amt = (i === splits.length - 1)
+        ? Math.round((amount - allocated) * 100) / 100
+        : Math.round(((parseFloat(sp.amount) || 0) / splitTotal) * amount * 100) / 100;
+      allocated += amt;
+      rows.push({ name: nameOf(sp.accountId), amount: amt });
+    });
+
+    const usable = rows.filter(r => r.amount > 0);
+    return usable.length ? usable : [{ name: nameOf(splits[0].accountId), amount: amount }];
+  }
+
+  function getProformaCashEquivalentLedgers() {
+    let accounts = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
+      ? coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce')
+      : [];
+
+    if (accounts.length === 0 && typeof getOrCreateSystemLedger === 'function') {
+      getOrCreateSystemLedger('Cash Account', 'sg-cce');
+      getOrCreateSystemLedger('Bank Account', 'sg-cce');
+      accounts = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
+    }
+    return accounts;
+  }
+
+  // ── Multi Payment: split the advance across several cash & cash equivalent accounts ──
+  function isProformaMultiPaymentSelected() {
+    const paySelect = document.getElementById('proformaPaymentAccount');
+    return !!paySelect && paySelect.value === PROFORMA_MULTI_PAYMENT_VALUE;
+  }
+
+  // The advance entered is what gets split.
+  function getProformaMultiPaymentTarget() {
+    const total = getProformaGrandTotal();
+    const advance = getProformaAdvanceAmount();
+    return (total > 0) ? Math.min(advance, total) : advance;
+  }
+
+  function openProformaMultiPaymentModal() {
+    if (typeof window.openMultiPaymentModal !== 'function') return;
+    window.openMultiPaymentModal({
+      typeLabel: 'Advance',
+      getTarget: getProformaMultiPaymentTarget,
+      getAccounts: getProformaCashEquivalentLedgers,
+      splits: _proformaMultiPayments,
+      onSave: rows => {
+        _proformaMultiPayments = rows;
+        updateProformaMultiPaymentUI();
+      },
+      onCancel: () => {
+        // Nothing saved yet? Fall back to the account picked before Multi Payment.
+        if (_proformaMultiPayments.length === 0) {
+          const paySelect = document.getElementById('proformaPaymentAccount');
+          if (paySelect) paySelect.value = _proformaPaymentAccountPrev || '';
+        }
+        updateProformaMultiPaymentUI();
+      }
+    });
+  }
+
+  // Compact recap under the Payment Account dropdown; click it to reopen the modal.
+  function updateProformaMultiPaymentUI() {
+    const summaryBtn = document.getElementById('proformaMultiPaymentSummary');
+    if (!summaryBtn) return;
+
+    if (!isProformaMultiPaymentSelected()) {
+      summaryBtn.style.display = 'none';
+      return;
+    }
+
+    const splits = _proformaMultiPayments.filter(s => s.accountId && (parseFloat(s.amount) || 0) > 0);
+    const allocated = splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+    const balanced = Math.abs(getProformaMultiPaymentTarget() - allocated) < 0.01;
+
+    summaryBtn.style.display = 'flex';
+    summaryBtn.innerHTML = splits.length
+      ? `<span>${splits.length} account${splits.length > 1 ? 's' : ''} &middot; <span style="color:${balanced ? '#059669' : '#dc2626'}">₹ ${safeFmtNum(allocated)}</span></span><span style="color:var(--blue-600);">Edit</span>`
+      : `<span style="color:#dc2626;">No accounts selected</span><span style="color:var(--blue-600);">Set up</span>`;
+  }
+
+  function getProformaMultiPaymentSplits() {
+    if (!isProformaMultiPaymentSelected()) return [];
+    return _proformaMultiPayments
+      .filter(s => s.accountId && (parseFloat(s.amount) || 0) > 0)
+      .map(s => ({ accountId: s.accountId, amount: parseFloat(s.amount) || 0 }));
+  }
+
+  function setProformaMultiPayments(splits) {
+    _proformaMultiPayments = (Array.isArray(splits) ? splits : []).map(s => ({
+      accountId: s.accountId ? String(s.accountId) : '',
+      amount: (s.amount || s.amount === 0) ? String(s.amount) : ''
+    }));
+  }
+
+  function resetProformaMultiPayments() {
+    _proformaMultiPayments = [];
+    _proformaPaymentAccountPrev = '';
+    if (typeof window.closeMultiPaymentModal === 'function') window.closeMultiPaymentModal();
+    const summaryBtn = document.getElementById('proformaMultiPaymentSummary');
+    if (summaryBtn) summaryBtn.style.display = 'none';
+  }
+
+  // Grand total of the proforma as shown in the summary card.
+  function getProformaGrandTotal() {
+    const subTotal = calculateProformaSubtotal();
+
+    let tdsTcsMode = 'None';
+    const tdsBtn = document.getElementById('proformaTdsTcsTds');
+    const tcsBtn = document.getElementById('proformaTdsTcsTcs');
+    if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
+    if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
+
+    const amountInput = document.getElementById('proformaTdsTcsAmount');
+    const tdsTcsAmount = amountInput ? (parseFloat(amountInput.value) || 0) : 0;
+    const adjustmentsInput = document.getElementById('proformaAdjustments');
+    const adjustments = adjustmentsInput ? (parseFloat(adjustmentsInput.value) || 0) : 0;
+
+    let total = subTotal;
+    if (tdsTcsMode === 'TDS') total = subTotal - tdsTcsAmount;
+    else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
+    return total + adjustments;
+  }
+
+  function getProformaAdvanceAmount() {
+    return parseFloat(document.getElementById('proformaPaymentAmount')?.value) || 0;
+  }
+
+  // A proforma only records an advance, so the status follows the advance entered:
+  // nothing = Not Paid, the whole total = Full Payment, anything between = Partial.
+  function getProformaPaymentStatus() {
+    const advance = getProformaAdvanceAmount();
+    if (advance <= 0) return 'Not Paid';
+
+    const total = getProformaGrandTotal();
+    return (total > 0 && advance >= total - 0.01) ? 'Full Payment' : 'Partial Payment';
   }
 
   // ── Customer Search & Selection ──
@@ -686,13 +839,11 @@
     const totalEl = document.getElementById('proformaTotal');
     if (totalEl) totalEl.textContent = '₹ ' + safeFmtNum(total);
 
-    // Adjust Payment Amount if in Full payment or exceeds Grand Total
-    const fullBtn = document.getElementById('proformaPaymentStatusFull');
+    // The advance can never exceed the Grand Total
     const payAmtEl = document.getElementById('proformaPaymentAmount');
     if (payAmtEl) {
-      if (fullBtn && fullBtn.classList.contains('active')) {
-        payAmtEl.value = total > 0 ? total.toFixed(2) : '';
-      } else if (payAmtEl.value && total > 0) {
+      payAmtEl.max = total > 0 ? total : '';
+      if (payAmtEl.value && total > 0) {
         const curVal = parseFloat(payAmtEl.value) || 0;
         if (curVal > total) {
           payAmtEl.value = total.toFixed(2);
@@ -865,11 +1016,14 @@
     const paymentStatus = getProformaPaymentStatus();
     const paymentAccountId = document.getElementById('proformaPaymentAccount')?.value || '';
     let paymentAccountName = '';
-    if (paymentAccountId && typeof coaLedgers !== 'undefined') {
+    if (paymentAccountId === PROFORMA_MULTI_PAYMENT_VALUE) {
+      paymentAccountName = 'Multi Payment';
+    } else if (paymentAccountId && typeof coaLedgers !== 'undefined') {
       const acc = coaLedgers.find(l => String(l.id) === String(paymentAccountId));
       if (acc) paymentAccountName = acc.name;
     }
-    const paymentAmount = paymentStatus === 'Full Payment' ? total : (parseFloat(document.getElementById('proformaPaymentAmount')?.value) || 0);
+    const advanceEntered = getProformaAdvanceAmount();
+    const paymentAmount = (total > 0) ? Math.min(advanceEntered, total) : advanceEntered;
 
     return {
       id: _editingProforma ? _editingProforma.id : Date.now(),
@@ -886,6 +1040,7 @@
       paymentAccountId,
       paymentAccountName,
       paymentAmount,
+      paymentSplits: getProformaMultiPaymentSplits(),
       advanceJournalEntryId: _editingProforma ? _editingProforma.advanceJournalEntryId : null,
       advanceVoucherNo: _editingProforma ? _editingProforma.advanceVoucherNo : null,
       advancePaidAmount: _editingProforma ? _editingProforma.advancePaidAmount : 0,
@@ -923,8 +1078,27 @@
     }
 
     if (data.paymentStatus !== 'Not Paid' && !data.paymentAccountId) {
-      showToast('Please select a Payment Account.', 'warning');
+      showToast('Please select a Payment Account for the advance payment.', 'warning');
       return;
+    }
+
+    if (data.paymentAccountId === PROFORMA_MULTI_PAYMENT_VALUE && data.paymentStatus !== 'Not Paid') {
+      const splits = data.paymentSplits || [];
+      if (splits.length === 0) {
+        showToast('Please set up the Multi Payment split for this advance.', 'warning');
+        return;
+      }
+      const hasDuplicate = splits.some((sp, i) =>
+        splits.findIndex(other => String(other.accountId) === String(sp.accountId)) !== i);
+      if (hasDuplicate) {
+        showToast('Each Multi Payment account can be selected only once.', 'warning');
+        return;
+      }
+      const splitTotal = splits.reduce((sum, sp) => sum + sp.amount, 0);
+      if (Math.abs(splitTotal - data.paymentAmount) > 0.01) {
+        showToast(`Multi Payment split of ₹${safeFmtNum(splitTotal)} must equal the advance of ₹${safeFmtNum(data.paymentAmount)}.`, 'warning');
+        return;
+      }
     }
 
     window.KYA_STORE.proformaInvoices = window.KYA_STORE.proformaInvoices || [];
@@ -964,10 +1138,8 @@
           : null;
         const advLedgerName = advLedger ? advLedger.name : 'Advance from Customers';
 
-        const payAcct = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
-          ? coaLedgers.find(l => String(l.id) === String(data.paymentAccountId))
-          : null;
-        const payAccountName = payAcct ? payAcct.name : (data.paymentAccountName || 'Cash Account');
+        const receiptRows = getProformaAdvanceReceiptRows(data, paidAmount);
+        const payAccountName = receiptRows[0].name;
         const custName = data.customerName || 'Customer';
 
         let advanceVoucherNo = data.advanceVoucherNo;
@@ -986,10 +1158,12 @@
         data.advanceVoucherNo = advanceVoucherNo;
         data.advancePaidAmount = paidAmount;
 
-        const advanceJERows = [
-          { id: 1, type: 'By', particular: payAccountName, debit: paidAmount.toFixed(2), credit: '' },
-          { id: 2, type: 'To', particular: advLedgerName,  debit: '', credit: paidAmount.toFixed(2) }
-        ];
+        const advanceJERows = receiptRows.map((r, i) => ({
+          id: i + 1, type: 'By', particular: r.name, debit: r.amount.toFixed(2), credit: ''
+        }));
+        advanceJERows.push({
+          id: advanceJERows.length + 1, type: 'To', particular: advLedgerName, debit: '', credit: paidAmount.toFixed(2)
+        });
 
         const advanceEntry = {
           id: advanceJEId,
@@ -1130,76 +1304,43 @@
       dueEl.addEventListener('input', updateProformaDueDateHelper);
     }
 
-    // Payment Status Buttons
-    const payNotPaidBtn = document.getElementById('proformaPaymentStatusNotPaid');
-    const payFullBtn = document.getElementById('proformaPaymentStatusFull');
-    const payPartialBtn = document.getElementById('proformaPaymentStatusPartial');
-    const payBg = document.getElementById('proformaPaymentStatusBg');
-    const payAccField = document.getElementById('proformaPaymentAccountField');
-    const payAmtField = document.getElementById('proformaPaymentAmountField');
-    const payDueDateField = document.getElementById('proformaDueDateField');
-
-    if (payNotPaidBtn && payFullBtn && payPartialBtn && payBg && payAccField && payAmtField) {
-      payNotPaidBtn.addEventListener('click', () => {
-        payNotPaidBtn.classList.add('active');
-        payFullBtn.classList.remove('active');
-        payPartialBtn.classList.remove('active');
-        payBg.className = 'sales-paystatus-bg notpaid-active';
-        payAccField.style.display = 'none';
-        payAmtField.style.display = 'none';
-        if (payDueDateField) payDueDateField.style.display = 'flex';
-        const wrapper = document.getElementById('proformaDueDateWrapper');
-        if (wrapper) {
-          wrapper.style.flexDirection = 'row';
-          wrapper.style.alignItems = 'center';
-        }
-        updateProformaDueDateHelper();
-        recalculateProformaTotals();
-      });
-
-      payFullBtn.addEventListener('click', () => {
-        payFullBtn.classList.add('active');
-        payNotPaidBtn.classList.remove('active');
-        payPartialBtn.classList.remove('active');
-        payBg.className = 'sales-paystatus-bg fullpaid-active';
-        payAccField.style.display = 'flex';
-        payAmtField.style.display = 'none';
-        if (payDueDateField) payDueDateField.style.display = 'none';
-        populateProformaPaymentAccounts();
-        recalculateProformaTotals();
-      });
-
-      payPartialBtn.addEventListener('click', () => {
-        payPartialBtn.classList.add('active');
-        payNotPaidBtn.classList.remove('active');
-        payFullBtn.classList.remove('active');
-        payBg.className = 'sales-paystatus-bg partpaid-active';
-        payAccField.style.display = 'flex';
-        payAmtField.style.display = 'flex';
-        if (payDueDateField) payDueDateField.style.display = 'flex';
-        const wrapper = document.getElementById('proformaDueDateWrapper');
-        if (wrapper) {
-          wrapper.style.flexDirection = 'column';
-          wrapper.style.alignItems = 'flex-start';
-          wrapper.style.gap = '4px';
-        }
-        updateProformaDueDateHelper();
-        populateProformaPaymentAccounts();
-        recalculateProformaTotals();
-      });
-    }
-
+    // Advance Payment — account + amount, always available on a proforma
     const payAccEl = document.getElementById('proformaPaymentAccount');
     if (payAccEl) {
       payAccEl.addEventListener('focus', () => {
+        _proformaPaymentAccountPrev = payAccEl.value;
         populateProformaPaymentAccounts(payAccEl.value);
       });
+      payAccEl.addEventListener('change', () => {
+        if (payAccEl.value === PROFORMA_MULTI_PAYMENT_VALUE) {
+          openProformaMultiPaymentModal();
+        } else {
+          resetProformaMultiPayments();
+          _proformaPaymentAccountPrev = payAccEl.value;
+        }
+        updateProformaMultiPaymentUI();
+      });
+    }
+
+    const multiPaySummaryBtn = document.getElementById('proformaMultiPaymentSummary');
+    if (multiPaySummaryBtn) {
+      multiPaySummaryBtn.addEventListener('click', () => openProformaMultiPaymentModal());
     }
 
     const payAmtEl = document.getElementById('proformaPaymentAmount');
     if (payAmtEl) {
       payAmtEl.addEventListener('input', () => {
+        const total = getProformaGrandTotal();
+        if (total > 0 && (parseFloat(payAmtEl.value) || 0) > total) {
+          payAmtEl.value = total.toFixed(2);
+          showToast(`Advance Amount adjusted to ₹${safeFmtNum(total)} to not exceed the Grand Total.`, 'warning');
+        }
         recalculateProformaTotals();
+        // The advance is what the split has to add up to, so keep both views current.
+        if (typeof window.isMultiPaymentModalOpen === 'function' && window.isMultiPaymentModalOpen()) {
+          window.updateMultiPaymentModalTotals();
+        }
+        updateProformaMultiPaymentUI();
       });
     }
 
@@ -1519,11 +1660,16 @@
           : null;
         const advLedgerName = advLedger ? advLedger.name : 'Advance from Customers';
 
-        const payAcct = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
-          ? coaLedgers.find(l => String(l.id) === String(prof.paymentAccountId))
-          : null;
-        const payAccountName = payAcct ? payAcct.name : (prof.paymentAccountName || 'Cash Account');
+        const receiptRows = getProformaAdvanceReceiptRows(prof, paidAmt);
+        const payAccountName = receiptRows[0].name;
         const custName = prof.customerName || 'Customer';
+
+        const statusJERows = receiptRows.map((r, i) => ({
+          id: i + 1, type: 'By', particular: r.name, debit: r.amount.toFixed(2), credit: ''
+        }));
+        statusJERows.push({
+          id: statusJERows.length + 1, type: 'To', particular: advLedgerName, debit: '', credit: paidAmt.toFixed(2)
+        });
 
         const advanceEntry = {
           id: jeId,
@@ -1534,10 +1680,7 @@
           isBudget: false,
           firstParticular: payAccountName,
           amount: (typeof fmtNum === 'function' ? fmtNum(paidAmt) : safeFmtNum(paidAmt)),
-          allRows: [
-            { id: 1, type: 'By', particular: payAccountName, debit: paidAmt.toFixed(2), credit: '' },
-            { id: 2, type: 'To', particular: advLedgerName,  debit: '', credit: paidAmt.toFixed(2) }
-          ],
+          allRows: statusJERows,
           narration: `Advance received from customer ${custName} against Proforma Invoice No. ${prof.proformaNo} (${prof.paymentStatus}).`.trim(),
           jeType: 'advance_receipt',
           proformaId: prof.id,
@@ -1642,6 +1785,7 @@
       type: 'Product',
       paymentStatus: prof.paymentStatus || 'Not Paid',
       paymentAccountId: prof.paymentAccountId || '',
+      paymentSplits: Array.isArray(prof.paymentSplits) ? JSON.parse(JSON.stringify(prof.paymentSplits)) : [],
       paymentAmount: prof.paymentAmount || '',
       advancePaidAmount: prof.advancePaidAmount || (prof.paymentStatus === 'Full Payment' ? prof.total : (parseFloat(prof.paymentAmount) || 0)),
       advanceJournalEntryId: prof.advanceJournalEntryId || null,
@@ -1970,8 +2114,8 @@
                 <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap;">${safeEsc(prof.notes) || 'Payment is requested as per agreed terms before delivery. Thank you for your business!'}</div>
                 ${prof.paymentStatus !== 'Not Paid' && prof.paymentAccountName ? `
                   <div style="margin-top: 10px; font-size: 12.5px; color: var(--slate-700); background: #f8fafc; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <strong>Account:</strong> ${safeEsc(prof.paymentAccountName)}
-                    ${prof.paymentAmount ? ` &bull; <strong>Amount:</strong> ₹ ${safeFmtNum(prof.paymentAmount)}` : ''}
+                    <strong>Advance Account:</strong> ${safeEsc(prof.paymentAccountName)}
+                    ${prof.paymentAmount ? ` &bull; <strong>Advance Amount:</strong> ₹ ${safeFmtNum(prof.paymentAmount)}` : ''}
                   </div>
                 ` : ''}
                 ${prof.document && prof.document.data ? `

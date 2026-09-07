@@ -561,12 +561,7 @@
     recalculateSalesTotals();
   }
 
-  function populateSalesPaymentAccounts(selectedId = null) {
-    const paySelect = document.getElementById('salesPaymentAccount');
-    if (!paySelect) return;
-    
-    paySelect.innerHTML = '<option value="">&mdash; Select &mdash;</option>';
-    
+  function getSalesCashEquivalentLedgers() {
     let accounts = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
       ? coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce')
       : [];
@@ -576,8 +571,16 @@
       getOrCreateSystemLedger('Bank Account', 'sg-cce');
       accounts = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
     }
+    return accounts;
+  }
 
-    accounts.forEach(a => {
+  function populateSalesPaymentAccounts(selectedId = null) {
+    const paySelect = document.getElementById('salesPaymentAccount');
+    if (!paySelect) return;
+
+    paySelect.innerHTML = '<option value="">&mdash; Select &mdash;</option>';
+
+    getSalesCashEquivalentLedgers().forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.id;
       opt.textContent = a.name;
@@ -586,7 +589,456 @@
       }
       paySelect.appendChild(opt);
     });
+
+    const multiOpt = document.createElement('option');
+    multiOpt.value = SALES_MULTI_PAYMENT_VALUE;
+    multiOpt.textContent = 'Multi Payment';
+    if (String(selectedId) === SALES_MULTI_PAYMENT_VALUE) multiOpt.selected = true;
+    paySelect.appendChild(multiOpt);
   }
+
+  // ── Multi Payment: split one receipt across several cash & cash equivalent accounts ──
+  const SALES_MULTI_PAYMENT_VALUE = 'multi-payment';
+  window.SALES_MULTI_PAYMENT_VALUE = SALES_MULTI_PAYMENT_VALUE;
+  window.salesMultiPayments = window.salesMultiPayments || [];
+  window._salesMultiPaymentDraft = window._salesMultiPaymentDraft || [];
+  window._salesPaymentAccountPrev = window._salesPaymentAccountPrev || '';
+
+  function isSalesMultiPaymentSelected() {
+    const paySelect = document.getElementById('salesPaymentAccount');
+    return !!paySelect && paySelect.value === SALES_MULTI_PAYMENT_VALUE;
+  }
+
+  function getSalesGrandTotalForPayment() {
+    const subTotal = typeof calculateSubtotal === 'function' ? calculateSubtotal() : 0;
+    let tdsTcsMode = 'None';
+    const tdsBtn = document.getElementById('salesTdsTcsTds');
+    const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
+    if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
+    const amountInput = document.getElementById('salesTdsTcsAmount');
+    const tdsTcsAmount = amountInput ? (parseFloat(amountInput.value) || 0) : 0;
+    const adjustmentsInput = document.getElementById('salesAdjustments');
+    const adjustments = adjustmentsInput ? (parseFloat(adjustmentsInput.value) || 0) : 0;
+
+    let total = subTotal;
+    if (tdsTcsMode === 'TDS') total = subTotal - tdsTcsAmount;
+    else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
+    return total + adjustments;
+  }
+
+  // Amount that has to be distributed across the selected accounts.
+  function getSalesMultiPaymentTarget() {
+    const status = typeof getSalesPaymentStatus === 'function' ? getSalesPaymentStatus() : 'Not Paid';
+    const total = getSalesGrandTotalForPayment();
+
+    if (status === 'Full Payment' || status === 'Full Refund') {
+      return typeof getSalesPaymentMax === 'function' ? getSalesPaymentMax(total) : total;
+    }
+    if (status === 'Partial Payment' || status === 'Partial Refund') {
+      const payAmtEl = document.getElementById('salesPaymentAmount');
+      return payAmtEl ? (parseFloat(payAmtEl.value) || 0) : 0;
+    }
+    return 0;
+  }
+
+  // ── Multi Payment modal ──
+  // Shared by the Sales Voucher and the Proforma advance: the caller supplies the amount
+  // to split, the account list, and what to do with the saved rows. Rows are edited on a
+  // draft copy so Cancel / Esc leaves the saved split untouched.
+  //   cfg = { typeLabel, getTarget(), getAccounts(), splits, onSave(rows), onCancel() }
+  let _multiPayModal = null;
+
+  function openMultiPaymentModal(cfg) {
+    closeMultiPaymentModal();
+
+    _multiPayModal = {
+      cfg: cfg || {},
+      draft: ((cfg && cfg.splits) || []).map(split => ({
+        accountId: split.accountId,
+        amount: split.amount
+      }))
+    };
+    while (_multiPayModal.draft.length < 2) {
+      _multiPayModal.draft.push({ accountId: '', amount: '' });
+    }
+
+    const typeLabel = (cfg && cfg.typeLabel) || 'Payment';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'multiPayOverlay';
+    Object.assign(overlay.style, {
+      position: 'fixed', inset: '0', zIndex: '10100',
+      background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Inter, system-ui, sans-serif'
+    });
+
+    overlay.innerHTML = `
+      <style>
+        @keyframes smpModalIn {
+          from { opacity:0; transform:scale(.94) translateY(14px); }
+          to   { opacity:1; transform:none; }
+        }
+        #multiPayCard { animation: smpModalIn .2s cubic-bezier(.34,1.3,.64,1); }
+        #multiPayAddBtn:hover { background:#eff6ff !important; }
+        #multiPaySaveBtn:hover { filter: brightness(1.08); }
+        #multiPayRows .smp-del:hover { background:#fef2f2 !important; border-color:#fecaca !important; color:#dc2626 !important; }
+      </style>
+      <div id="multiPayCard" style="
+        background:#fff; border-radius:18px; padding:24px 24px 20px;
+        box-shadow:0 24px 64px rgba(0,0,0,.22);
+        width:520px; max-width:92%; max-height:86vh; overflow-y:auto;
+        display:flex; flex-direction:column; position:relative; box-sizing:border-box;
+      ">
+        <button id="multiPayCloseX" type="button" aria-label="Close" style="
+          position:absolute; top:14px; right:16px; background:none; border:none;
+          font-size:20px; cursor:pointer; color:#94a3b8; line-height:1; padding:4px 8px; border-radius:6px;
+        ">&times;</button>
+
+        <h2 style="margin:0 0 4px; font-size:17px; font-weight:700; color:#0f172a;">Multi ${typeLabel}</h2>
+        <p style="margin:0 0 16px; font-size:12.5px; color:#64748b; line-height:1.45;">
+          Split this ${typeLabel.toLowerCase()} across two or more cash &amp; cash equivalent accounts.
+        </p>
+
+        <div style="
+          display:flex; align-items:center; justify-content:space-between; gap:10px;
+          background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:10px;
+          padding:10px 12px; margin-bottom:14px;
+        ">
+          <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8;">
+            ${typeLabel} to split
+          </span>
+          <span id="multiPayTarget" style="font-size:15px; font-weight:800; color:#0f172a;">₹ 0.00</span>
+        </div>
+
+        <div id="multiPayRows" style="display:flex; flex-direction:column; gap:8px;"></div>
+
+        <button id="multiPayAddBtn" type="button" style="
+          margin-top:10px; align-self:flex-start; height:32px; padding:0 12px;
+          border:1.5px solid #bfdbfe; background:#fff; color:#2563eb;
+          border-radius:9px; font-size:12px; font-weight:700; cursor:pointer; transition:background .15s;
+        ">+ Add Account</button>
+
+        <div style="
+          display:flex; align-items:center; justify-content:space-between; gap:10px;
+          margin-top:16px; padding-top:12px; border-top:1px dashed #e2e8f0;
+          font-size:12.5px; font-weight:700; color:#64748b;
+        ">
+          <span>Allocated: <span id="multiPayAllocated" style="color:#0f172a;">₹ 0.00</span></span>
+          <span>Unallocated: <span id="multiPayBalance" style="color:#0f172a;">₹ 0.00</span></span>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:18px;">
+          <button id="multiPayCancelBtn" type="button" style="
+            flex:1; padding:10px 0; border-radius:10px; border:1.5px solid #e2e8f0;
+            background:#fff; color:#475569; font-size:13px; font-weight:600; cursor:pointer;
+          ">Cancel</button>
+          <button id="multiPaySaveBtn" type="button" style="
+            flex:1; padding:10px 0; border-radius:10px; border:none;
+            background:#1d4ed8; color:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:filter .15s;
+          ">Save Split</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('multiPayAddBtn').addEventListener('click', () => {
+      _multiPayModal.draft.push({ accountId: '', amount: '' });
+      renderMultiPaymentModalRows();
+    });
+    document.getElementById('multiPayCloseX').addEventListener('click', () => cancelMultiPaymentModal());
+    document.getElementById('multiPayCancelBtn').addEventListener('click', () => cancelMultiPaymentModal());
+    document.getElementById('multiPaySaveBtn').addEventListener('click', () => saveMultiPaymentModal());
+    overlay.addEventListener('click', e => { if (e.target === overlay) cancelMultiPaymentModal(); });
+    document.addEventListener('keydown', multiPaymentEscHandler);
+
+    renderMultiPaymentModalRows();
+  }
+
+  function multiPaymentEscHandler(e) {
+    if (e.key === 'Escape') cancelMultiPaymentModal();
+  }
+
+  function getMultiPaymentModalTarget() {
+    if (!_multiPayModal || typeof _multiPayModal.cfg.getTarget !== 'function') return 0;
+    return _multiPayModal.cfg.getTarget() || 0;
+  }
+
+  function renderMultiPaymentModalRows() {
+    const wrap = document.getElementById('multiPayRows');
+    if (!wrap || !_multiPayModal) return;
+
+    const accounts = (typeof _multiPayModal.cfg.getAccounts === 'function')
+      ? (_multiPayModal.cfg.getAccounts() || [])
+      : [];
+    wrap.innerHTML = '';
+
+    _multiPayModal.draft.forEach((split, idx) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; align-items:center; gap:8px; width:100%;';
+
+      const sel = document.createElement('select');
+      sel.className = 'je-input';
+      sel.style.cssText = 'height:38px; padding:0 10px; font-size:13px; font-weight:600; cursor:pointer; flex:1; min-width:0;';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.innerHTML = '&mdash; Select Account &mdash;';
+      sel.appendChild(placeholder);
+      accounts.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.name;
+        if (String(a.id) === String(split.accountId)) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', () => { split.accountId = sel.value; });
+
+      const amt = document.createElement('input');
+      amt.type = 'number';
+      amt.className = 'je-input';
+      amt.placeholder = '0.00';
+      amt.min = '0';
+      amt.step = '0.01';
+      const target = getMultiPaymentModalTarget();
+      if (target > 0) amt.max = target;
+      amt.value = (split.amount === null || split.amount === undefined) ? '' : split.amount;
+      amt.style.cssText = 'height:38px; padding:0 10px; font-size:13px; font-weight:600; width:130px; flex-shrink:0;';
+      amt.addEventListener('input', () => {
+        split.amount = amt.value;
+        clampMultiPaymentRow(split, amt);
+        updateMultiPaymentModalTotals();
+      });
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'smp-del';
+      del.title = 'Remove this account';
+      del.innerHTML = '&times;';
+      del.style.cssText = 'height:38px; width:36px; flex-shrink:0; border:1.5px solid #e2e8f0; background:#fff; color:#94a3b8; border-radius:9px; font-size:18px; font-weight:700; line-height:1; cursor:pointer; transition:all .15s;';
+      del.addEventListener('click', () => {
+        _multiPayModal.draft.splice(idx, 1);
+        if (_multiPayModal.draft.length === 0) _multiPayModal.draft.push({ accountId: '', amount: '' });
+        renderMultiPaymentModalRows();
+      });
+
+      row.appendChild(sel);
+      row.appendChild(amt);
+      row.appendChild(del);
+      wrap.appendChild(row);
+    });
+
+    updateMultiPaymentModalTotals();
+  }
+
+  // The split can never add up to more than the amount being split: anything typed beyond
+  // that is trimmed back to whatever is still unallocated.
+  function clampMultiPaymentRow(split, input) {
+    if (!_multiPayModal) return;
+    const target = getMultiPaymentModalTarget();
+    const entered = parseFloat(input.value) || 0;
+    if (entered <= 0) return;
+
+    const typeLabel = ((_multiPayModal.cfg.typeLabel) || 'Payment').toLowerCase();
+
+    if (target <= 0) {
+      input.value = '';
+      split.amount = '';
+      showToast(`Enter the ${typeLabel} amount before splitting it.`, 'warning');
+      return;
+    }
+
+    let others = 0;
+    _multiPayModal.draft.forEach(other => {
+      if (other !== split) others += parseFloat(other.amount) || 0;
+    });
+    const available = Math.max(0, Math.round((target - others) * 100) / 100);
+
+    if (entered > available + 0.001) {
+      input.value = available > 0 ? available.toFixed(2) : '';
+      split.amount = input.value;
+      showToast(`Amount trimmed to ₹${fmtNum(available)} — the split cannot exceed the ${typeLabel} of ₹${fmtNum(target)}.`, 'warning');
+    }
+  }
+
+  function updateMultiPaymentModalTotals() {
+    const targetEl = document.getElementById('multiPayTarget');
+    const allocatedEl = document.getElementById('multiPayAllocated');
+    const balanceEl = document.getElementById('multiPayBalance');
+    if (!targetEl || !_multiPayModal) return;
+
+    const target = getMultiPaymentModalTarget();
+    let allocated = 0;
+    _multiPayModal.draft.forEach(split => { allocated += parseFloat(split.amount) || 0; });
+    const balance = target - allocated;
+
+    targetEl.textContent = '₹ ' + fmtNum(target);
+    if (allocatedEl) allocatedEl.textContent = '₹ ' + fmtNum(allocated);
+    if (balanceEl) {
+      balanceEl.textContent = '₹ ' + fmtNum(balance);
+      balanceEl.style.color = Math.abs(balance) < 0.01 ? '#059669' : '#dc2626';
+    }
+  }
+
+  function saveMultiPaymentModal() {
+    if (!_multiPayModal) return;
+    const typeLabel = _multiPayModal.cfg.typeLabel || 'Payment';
+
+    const rows = _multiPayModal.draft.filter(split => split.accountId || String(split.amount).trim());
+    if (rows.length === 0) {
+      showToast(`Please select at least one account for Multi ${typeLabel}.`, 'warning');
+      return;
+    }
+    if (rows.some(split => !split.accountId)) {
+      showToast('Please select an account for every row, or remove the empty rows.', 'warning');
+      return;
+    }
+    if (rows.some(split => (parseFloat(split.amount) || 0) <= 0)) {
+      showToast('Please enter an amount greater than zero for every selected account.', 'warning');
+      return;
+    }
+    const hasDuplicate = rows.some((split, i) =>
+      rows.findIndex(other => String(other.accountId) === String(split.accountId)) !== i);
+    if (hasDuplicate) {
+      showToast('Each account can be selected only once.', 'warning');
+      return;
+    }
+
+    const target = getMultiPaymentModalTarget();
+    const allocated = rows.reduce((sum, split) => sum + (parseFloat(split.amount) || 0), 0);
+    if (target <= 0) {
+      showToast(`Enter the ${typeLabel.toLowerCase()} amount before splitting it.`, 'warning');
+      return;
+    }
+    if (allocated > target + 0.01) {
+      showToast(`Split of ₹${fmtNum(allocated)} cannot exceed the ${typeLabel.toLowerCase()} of ₹${fmtNum(target)}.`, 'warning');
+      return;
+    }
+    if (Math.abs(target - allocated) > 0.01) {
+      showToast(`₹${fmtNum(target - allocated)} is still unallocated — the split must add up to ₹${fmtNum(target)}.`, 'warning');
+      return;
+    }
+
+    const saved = rows.map(split => ({
+      accountId: split.accountId,
+      amount: String(split.amount)
+    }));
+    const onSave = _multiPayModal.cfg.onSave;
+    closeMultiPaymentModal();
+    if (typeof onSave === 'function') onSave(saved);
+    showToast(`Multi ${typeLabel} split across ${saved.length} accounts saved.`, 'success');
+  }
+
+  function cancelMultiPaymentModal() {
+    const onCancel = _multiPayModal && _multiPayModal.cfg.onCancel;
+    closeMultiPaymentModal();
+    if (typeof onCancel === 'function') onCancel();
+  }
+
+  function closeMultiPaymentModal() {
+    document.removeEventListener('keydown', multiPaymentEscHandler);
+    const overlay = document.getElementById('multiPayOverlay');
+    if (overlay) overlay.remove();
+    _multiPayModal = null;
+  }
+
+  function isMultiPaymentModalOpen() {
+    return !!document.getElementById('multiPayOverlay');
+  }
+
+  // ── Sales Voucher wiring for the shared modal ──
+  function openSalesMultiPaymentModal() {
+    const isRefund = currentSalesVoucherSubtype === 'Return';
+    openMultiPaymentModal({
+      typeLabel: isRefund ? 'Refund' : 'Payment',
+      getTarget: getSalesMultiPaymentTarget,
+      getAccounts: getSalesCashEquivalentLedgers,
+      splits: salesMultiPayments,
+      onSave: rows => {
+        window.salesMultiPayments = rows;
+        updateSalesMultiPaymentUI();
+      },
+      onCancel: () => {
+        // Nothing saved yet? Fall back to the account picked before Multi Payment.
+        if (salesMultiPayments.length === 0) {
+          const paySelect = document.getElementById('salesPaymentAccount');
+          if (paySelect) paySelect.value = window._salesPaymentAccountPrev || '';
+        }
+        updateSalesMultiPaymentUI();
+      }
+    });
+  }
+
+  function closeSalesMultiPaymentModal() {
+    closeMultiPaymentModal();
+  }
+
+  // Compact recap under the Payment Account dropdown; click it to reopen the modal.
+  function updateSalesMultiPaymentUI() {
+    const summaryBtn = document.getElementById('salesMultiPaymentSummary');
+    if (!summaryBtn) return;
+
+    const accField = document.getElementById('salesPaymentAccountField');
+    const accFieldVisible = accField && accField.style.display !== 'none';
+
+    if (!accFieldVisible || !isSalesMultiPaymentSelected()) {
+      summaryBtn.style.display = 'none';
+      return;
+    }
+
+    const splits = salesMultiPayments.filter(split => split.accountId && (parseFloat(split.amount) || 0) > 0);
+    const allocated = splits.reduce((sum, split) => sum + (parseFloat(split.amount) || 0), 0);
+    const balance = getSalesMultiPaymentTarget() - allocated;
+    const balanced = Math.abs(balance) < 0.01;
+
+    summaryBtn.style.display = 'flex';
+    summaryBtn.innerHTML = splits.length
+      ? `<span>${splits.length} account${splits.length > 1 ? 's' : ''} &middot; <span style="color:${balanced ? '#059669' : '#dc2626'}">₹ ${fmtNum(allocated)}</span></span><span style="color:var(--blue-600);">Edit</span>`
+      : `<span style="color:#dc2626;">No accounts selected</span><span style="color:var(--blue-600);">Set up</span>`;
+  }
+
+  function getSalesMultiPaymentSplits() {
+    if (!isSalesMultiPaymentSelected()) return [];
+    return salesMultiPayments
+      .filter(split => split.accountId && (parseFloat(split.amount) || 0) > 0)
+      .map(split => ({ accountId: split.accountId, amount: parseFloat(split.amount) || 0 }));
+  }
+
+  function setSalesMultiPayments(splits) {
+    window.salesMultiPayments = (Array.isArray(splits) ? splits : []).map(split => ({
+      accountId: split.accountId ? String(split.accountId) : '',
+      amount: (split.amount || split.amount === 0) ? String(split.amount) : ''
+    }));
+  }
+
+  function resetSalesMultiPayments() {
+    window.salesMultiPayments = [];
+    window._salesPaymentAccountPrev = '';
+    closeSalesMultiPaymentModal();
+    const summaryBtn = document.getElementById('salesMultiPaymentSummary');
+    if (summaryBtn) summaryBtn.style.display = 'none';
+  }
+
+  // Keeps the modal's figures live while the Payment Amount is being typed.
+  function updateSalesMultiPaymentSummary() {
+    if (isMultiPaymentModalOpen()) updateMultiPaymentModalTotals();
+    updateSalesMultiPaymentUI();
+  }
+
+  window.openMultiPaymentModal = openMultiPaymentModal;
+  window.closeMultiPaymentModal = closeMultiPaymentModal;
+  window.isMultiPaymentModalOpen = isMultiPaymentModalOpen;
+  window.updateMultiPaymentModalTotals = updateMultiPaymentModalTotals;
+  window.getSalesCashEquivalentLedgers = getSalesCashEquivalentLedgers;
+  window.isSalesMultiPaymentSelected = isSalesMultiPaymentSelected;
+  window.openSalesMultiPaymentModal = openSalesMultiPaymentModal;
+  window.closeSalesMultiPaymentModal = closeSalesMultiPaymentModal;
+  window.updateSalesMultiPaymentUI = updateSalesMultiPaymentUI;
+  window.updateSalesMultiPaymentSummary = updateSalesMultiPaymentSummary;
+  window.getSalesMultiPaymentSplits = getSalesMultiPaymentSplits;
+  window.setSalesMultiPayments = setSalesMultiPayments;
+  window.resetSalesMultiPayments = resetSalesMultiPayments;
 
   function getSalesPaymentStatus() {
     const fullBtn = document.getElementById('salesPaymentStatusFull');
@@ -1399,6 +1851,7 @@
     if (payAccEl) payAccEl.value = '';
     const payAmtEl = document.getElementById('salesPaymentAmount');
     if (payAmtEl) payAmtEl.value = '';
+    resetSalesMultiPayments();
     setInvoiceNoMode('Auto');
     
     currentSalesType = 'Product';

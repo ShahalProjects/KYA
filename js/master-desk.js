@@ -8229,8 +8229,16 @@
               <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Central master control and enterprise workspace</div>
             </div>
           </div>
-          <!-- 3-dot more options dropdown -->
-          <div class="rpt-more-wrap">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button id="masterDeskMultiCreateBtn" type="button" class="je-voucher-chip" style="cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.2s, border-color 0.2s;" onmouseover="this.style.background='rgba(255,255,255,.28)'; this.style.borderColor='rgba(255,255,255,.5)';" onmouseout="this.style.background='rgba(255,255,255,.18)'; this.style.borderColor='rgba(255,255,255,.3)';">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Multi Create
+            </button>
+            <!-- 3-dot more options dropdown -->
+            <div class="rpt-more-wrap">
             <button class="rpt-more-btn" id="masterDeskMoreBtn" title="More Options" type="button" aria-label="More Options">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="1.5"></circle>
@@ -8276,6 +8284,7 @@
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </div>
 

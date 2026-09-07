@@ -685,10 +685,27 @@
     const payAccEl = document.getElementById('salesPaymentAccount');
     if (payAccEl) {
       payAccEl.addEventListener('focus', () => {
+        window._salesPaymentAccountPrev = payAccEl.value;
         populateSalesPaymentAccounts(payAccEl.value);
       });
+      payAccEl.addEventListener('change', () => {
+        if (payAccEl.value === 'multi-payment') {
+          if (typeof openSalesMultiPaymentModal === 'function') openSalesMultiPaymentModal();
+        } else {
+          if (typeof resetSalesMultiPayments === 'function') resetSalesMultiPayments();
+          window._salesPaymentAccountPrev = payAccEl.value;
+        }
+        if (typeof updateSalesMultiPaymentUI === 'function') updateSalesMultiPaymentUI();
+      });
     }
-    
+
+    const multiPaySummaryBtn = document.getElementById('salesMultiPaymentSummary');
+    if (multiPaySummaryBtn) {
+      multiPaySummaryBtn.addEventListener('click', () => {
+        if (typeof openSalesMultiPaymentModal === 'function') openSalesMultiPaymentModal();
+      });
+    }
+
     const payAmtEl = document.getElementById('salesPaymentAmount');
     if (payAmtEl) {
       payAmtEl.addEventListener('input', () => {
@@ -726,6 +743,8 @@
           payAmtEl.value = maxVal.toFixed(2);
           showToast(`Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the Grand Total.`, 'warning');
         }
+
+        if (typeof updateSalesMultiPaymentSummary === 'function') updateSalesMultiPaymentSummary();
       });
     }
 

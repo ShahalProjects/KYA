@@ -490,10 +490,12 @@
     let periodDebitSum = 0;
     let periodCreditSum = 0;
 
-    const custs = (ledger.sgId === 'sg-tr' || (ledger.name || '').trim().toLowerCase() === 'trade receivables')
+    // Only the control accounts roll every party up; a party ledger of its own under
+    // Trade Receivables / Payables must show that party's rows alone.
+    const custs = ((ledger.name || '').trim().toLowerCase() === 'trade receivables')
       ? (typeof getKyaCustomers === 'function' ? getKyaCustomers() : [])
       : [];
-    const supps = (ledger.sgId === 'sg-tp' || (ledger.name || '').trim().toLowerCase() === 'trade payables')
+    const supps = ((ledger.name || '').trim().toLowerCase() === 'trade payables')
       ? (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [])
       : [];
     const custNames = new Set(custs.map(c => (c.name || '').trim().toLowerCase()));
@@ -949,10 +951,12 @@
     const balances = calculateLedgerBalances(ledger, dateFrom, dateTo);
 
     // Filter transactions
-    const custs = (ledger.sgId === 'sg-tr' || (ledger.name || '').trim().toLowerCase() === 'trade receivables')
+    // Only the control accounts roll every party up; a party ledger of its own under
+    // Trade Receivables / Payables must show that party's rows alone.
+    const custs = ((ledger.name || '').trim().toLowerCase() === 'trade receivables')
       ? (typeof getKyaCustomers === 'function' ? getKyaCustomers() : [])
       : [];
-    const supps = (ledger.sgId === 'sg-tp' || (ledger.name || '').trim().toLowerCase() === 'trade payables')
+    const supps = ((ledger.name || '').trim().toLowerCase() === 'trade payables')
       ? (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [])
       : [];
     const custNames = new Set(custs.map(c => (c.name || '').trim().toLowerCase()));
@@ -1281,10 +1285,12 @@
 
     const balances = calculateLedgerBalances(ledger, dateFrom, dateTo);
 
-    const custs = (ledger.sgId === 'sg-tr' || (ledger.name || '').trim().toLowerCase() === 'trade receivables')
+    // Only the control accounts roll every party up; a party ledger of its own under
+    // Trade Receivables / Payables must show that party's rows alone.
+    const custs = ((ledger.name || '').trim().toLowerCase() === 'trade receivables')
       ? (typeof getKyaCustomers === 'function' ? getKyaCustomers() : [])
       : [];
-    const supps = (ledger.sgId === 'sg-tp' || (ledger.name || '').trim().toLowerCase() === 'trade payables')
+    const supps = ((ledger.name || '').trim().toLowerCase() === 'trade payables')
       ? (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [])
       : [];
     const custNames = new Set(custs.map(c => (c.name || '').trim().toLowerCase()));

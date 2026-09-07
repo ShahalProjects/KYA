@@ -85,6 +85,8 @@
     }
     
     populateSalesPaymentAccounts(inv.paymentAccountId);
+    if (typeof setSalesMultiPayments === 'function') setSalesMultiPayments(inv.paymentSplits || []);
+    if (typeof updateSalesMultiPaymentUI === 'function') updateSalesMultiPaymentUI();
     const payAmtEl = document.getElementById('salesPaymentAmount');
     if (payAmtEl) {
       if (inv.paymentStatus === 'Full Payment' || inv.paymentStatus === 'Full Refund') {
@@ -231,6 +233,7 @@
       isReturn: currentSalesVoucherSubtype === 'Return',
       returnAgainstInvoice: currentSalesVoucherSubtype === 'Return' ? (document.getElementById('salesInvoiceSelectTriggerText')?.textContent.trim() || '') : '',
       customerId,
+      customerName: getSalesPartyName(customerId),
       salesExecutiveId,
       salesSupplyType,
       date,
@@ -245,6 +248,7 @@
       paymentStatus,
       paymentAccountId,
       paymentAmount,
+      paymentSplits: (typeof getSalesMultiPaymentSplits === 'function') ? getSalesMultiPaymentSplits() : [],
       rows: JSON.parse(JSON.stringify(salesRows)),
       partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
@@ -427,8 +431,9 @@
     
     let paymentStatus = getSalesPaymentStatus();
     const paymentAccountId = document.getElementById('salesPaymentAccount').value;
+    const paymentSplits = (typeof getSalesMultiPaymentSplits === 'function') ? getSalesMultiPaymentSplits() : [];
     let paymentAmount = 0;
-    
+
     if (paymentStatus !== 'Not Paid' && paymentStatus !== 'No Refund') {
       if (!paymentAccountId) {
         showToast('Please select a Payment Account.', 'warning');
@@ -467,6 +472,25 @@
           }
         }
       }
+
+      if (paymentAccountId === 'multi-payment') {
+        const typeLabel = currentSalesVoucherSubtype === 'Return' ? 'Refund' : 'Payment';
+        if (paymentSplits.length === 0) {
+          showToast(`Please select at least one account with an amount for Multi ${typeLabel}.`, 'warning');
+          return;
+        }
+        const hasDuplicate = paymentSplits.some((sp, i) =>
+          paymentSplits.findIndex(other => String(other.accountId) === String(sp.accountId)) !== i);
+        if (hasDuplicate) {
+          showToast(`Each Multi ${typeLabel} account can be selected only once.`, 'warning');
+          return;
+        }
+        const splitTotal = paymentSplits.reduce((sum, sp) => sum + sp.amount, 0);
+        if (Math.abs(splitTotal - paymentAmount) > 0.01) {
+          showToast(`Multi ${typeLabel} split of ₹${fmtNum(splitTotal)} must equal the ${typeLabel.toLowerCase()} amount of ₹${fmtNum(paymentAmount)}.`, 'warning');
+          return;
+        }
+      }
     }
 
     const isEditPosted = window._editingSalesInvoice && !window._editingSalesInvoice.isDraft;
@@ -480,6 +504,7 @@
       isReturn: currentSalesVoucherSubtype === 'Return',
       returnAgainstInvoice: currentSalesVoucherSubtype === 'Return' ? (document.getElementById('salesInvoiceSelectTriggerText')?.textContent.trim() || '') : '',
       customerId,
+      customerName: getSalesPartyName(customerId),
       salesExecutiveId,
       salesSupplyType,
       date,
@@ -494,6 +519,7 @@
       paymentStatus,
       paymentAccountId,
       paymentAmount,
+      paymentSplits,
       convertedFromQuotationId: window._pendingConvertQuotationId || (window._editingSalesInvoice && window._editingSalesInvoice.convertedFromQuotationId) || null,
       convertedFromProformaId: window._pendingConvertProformaId || (window._editingSalesInvoice && window._editingSalesInvoice.convertedFromProformaId) || null,
       advancePaidAmount: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.amount) ||
@@ -766,6 +792,39 @@
     });
   }
 
+  // Splits a paid amount into the ledger rows it should hit. A single payment account
+  // gives one row; a Multi Payment invoice gives one row per selected account, scaled
+  // to `amount` (so an advance-adjusted part payment still balances) with the rounding
+  // difference absorbed by the last row.
+  function getSalesPaymentSplitRows(invoice, amount) {
+    const ledgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []);
+    const nameOf = (id) => {
+      const ledger = ledgers.find(l => l.id == id);
+      return ledger ? ledger.name : 'Cash Account';
+    };
+
+    const splits = (Array.isArray(invoice.paymentSplits) ? invoice.paymentSplits : [])
+      .filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0);
+    const splitTotal = splits.reduce((sum, sp) => sum + (parseFloat(sp.amount) || 0), 0);
+
+    if (String(invoice.paymentAccountId) !== 'multi-payment' || splitTotal <= 0) {
+      return [{ name: nameOf(invoice.paymentAccountId), amount: amount }];
+    }
+
+    const rows = [];
+    let allocated = 0;
+    splits.forEach((sp, i) => {
+      const amt = (i === splits.length - 1)
+        ? Math.round((amount - allocated) * 100) / 100
+        : Math.round(((parseFloat(sp.amount) || 0) / splitTotal) * amount * 100) / 100;
+      allocated += amt;
+      rows.push({ name: nameOf(sp.accountId), amount: amt });
+    });
+
+    const usable = rows.filter(r => r.amount > 0);
+    return usable.length ? usable : [{ name: nameOf(splits[0].accountId), amount: amount }];
+  }
+
   function postSalesVoucherToJournal(invoice) {
     if (!invoice) return '';
     const isRet = !!invoice.isReturn;
@@ -793,9 +852,14 @@
         : 0);
 
     const journalRows = [];
-    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-    const cust = custs.find(c => String(c.id) === String(invoice.customerId));
-    const customerName = cust ? cust.name : (invoice.customerName || 'Customer');
+    // The party can be a customer from the master or a ledger created under Trade
+    // Receivables — findPartyById covers both, so the entry always names the real party
+    // and lands in that party's ledger.
+    const party = (typeof findPartyById === 'function') ? findPartyById(invoice.customerId, 'Customer') : null;
+    const customerName = (party && party.name)
+      || invoice.customerName
+      || ((typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => String(l.id) === String(invoice.customerId)) || {}).name
+      || 'Customer';
 
     let execText = '';
     if (invoice.salesExecutiveId && typeof ohEmployees !== 'undefined') {
@@ -882,9 +946,9 @@
       }
 
       if (paidAmount > 0) {
-        const payAccount = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
-        const payAccountName = payAccount ? payAccount.name : 'Cash Account';
-        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: payAccountName, debit: '', credit: paidAmount.toFixed(2) });
+        getSalesPaymentSplitRows(invoice, paidAmount).forEach(p => {
+          journalRows.push({ id: journalRows.length + 1, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) });
+        });
       }
 
     } else {
@@ -1072,8 +1136,7 @@
           paymentVoucherNo = `JV-${yr}-001`;
         }
 
-        const payAcct = (typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => l.id == invoice.paymentAccountId);
-        const payAccountName = payAcct ? payAcct.name : 'Cash Account';
+        const payAccountName = getSalesPaymentSplitRows(invoice, paidAmount)[0].name;
 
         // Check if this invoice was converted from a Proforma with advance payment
         const convertedProformaId = invoice.convertedFromProformaId || window._pendingConvertProformaId;
@@ -1107,12 +1170,14 @@
         }
 
         if (cashPortion > 0) {
-          payJERows.push({
-            id: rId++,
-            type: 'By',
-            particular: payAccountName,
-            debit: cashPortion.toFixed(2),
-            credit: ''
+          getSalesPaymentSplitRows(invoice, cashPortion).forEach(p => {
+            payJERows.push({
+              id: rId++,
+              type: 'By',
+              particular: p.name,
+              debit: p.amount.toFixed(2),
+              credit: ''
+            });
           });
           if (advPortion === 0) primaryParticular = payAccountName;
         }
@@ -1167,7 +1232,7 @@
       preparedBy:      'Sales Module',
       departmentId:    '',
       isBudget:        false,
-      firstParticular: customerName || ((paidAmount > 0) ? (coaLedgers.find(l => l.id == invoice.paymentAccountId)?.name || 'Cash Account') : 'Trade Receivables'),
+      firstParticular: customerName || ((paidAmount > 0) ? getSalesPaymentSplitRows(invoice, paidAmount)[0].name : 'Trade Receivables'),
       amount:          fmtNum(invoice.total),
       allRows:         journalRows,
       narration:       `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`.trim(),

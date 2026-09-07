@@ -23,7 +23,7 @@
     const sorted = [...list].sort((a,b) => b.postedAt - a.postedAt);
     
     let rowsHtml = sorted.map(inv => {
-      const custName = (coaLedgers.find(l => l.id == inv.customerId) || { name: 'Unknown Customer' }).name;
+      const custName = getSalesPartyName(inv.customerId, inv.customerName) || 'Unknown Customer';
       let execName = '&mdash;';
       if (inv.salesExecutiveId) {
         const execEmp = ohEmployees.find(e => e.id == inv.salesExecutiveId);
@@ -173,7 +173,7 @@
     const sorted = [...list].sort((a,b) => b.updatedAt - a.updatedAt);
     
     let rowsHtml = sorted.map(draft => {
-      const custName = draft.customerId ? ((coaLedgers.find(l => l.id == draft.customerId) || { name: 'Unknown Customer' }).name) : '&mdash; No Customer &mdash;';
+      const custName = draft.customerId ? (getSalesPartyName(draft.customerId, draft.customerName) || 'Unknown Customer') : '&mdash; No Customer &mdash;';
       let execName = '&mdash;';
       if (draft.salesExecutiveId) {
         const execEmp = ohEmployees.find(e => e.id == draft.salesExecutiveId);
