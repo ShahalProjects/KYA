@@ -4,7 +4,6 @@
 
     // Load initial data
     let coData = getCompanyDetails();
-    if (!coData.gstins) coData.gstins = [];
     if (!coData.banks) coData.banks = [];
     if (!coData.people) coData.people = { directors: [], keyEmployees: [], auditor: {}, taxConsultant: {} };
     if (!coData.people.directors) coData.people.directors = [];
@@ -171,10 +170,19 @@
             <!-- TAB 2: LEGAL & REGISTRATIONS -->
             <div id="coSubpanel-registrations" class="co-subpanel-content" style="display:none;">
               <div style="display:flex;flex-direction:column;gap:20px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">GST Registration Number (GSTIN)</label>
+                    <input id="coGSTIN" value="${ohEsc(coData.gstin||'')}" placeholder="e.g. 27AAAAA0000A1Z5" maxlength="15" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                    <div id="coGstinStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                  </div>
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Permanent Account Number (PAN)</label>
-                    <input id="coPAN" value="${ohEsc(coData.pan||'')}" placeholder="e.g. ABCDE1234F" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                    <div style="position:relative;">
+                      <input id="coPAN" value="${ohEsc(coData.pan||'')}" placeholder="e.g. ABCDE1234F" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 70px 0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                      <button type="button" id="coPanFromGstinBtn" class="sales-roundoff-btn-inline" style="display:none;position:absolute;right:5px;top:50%;transform:translateY(-50%);height:30px;width:auto;min-width:0;padding:0 10px;">Update</button>
+                    </div>
+                    <div id="coPanStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
                   </div>
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Corporate Identification Number (CIN)</label>
@@ -194,19 +202,6 @@
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Import Export Code (IEC)</label>
                   <input id="coIEC" value="${ohEsc(coData.iec||'')}" placeholder="10-digit Code" style="width:50%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
-                </div>
-
-                <!-- GSTIN Registrations List -->
-                <div style="margin-top:16px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">GSTIN Registrations</label>
-                    <button type="button" id="coAddGstinBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
-                      + Add GSTIN
-                    </button>
-                  </div>
-                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;min-height:60px;">
-                    <div id="coGstinsListContainer"></div>
-                  </div>
                 </div>
               </div>
 
@@ -512,38 +507,6 @@
 
 
     // ── DYNAMIC LIST RENDERING ──
-
-    // 2. GSTINs List
-    const renderGstins = () => {
-      const cont = wrap.querySelector('#coGstinsListContainer');
-      if (coData.gstins.length === 0) {
-        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No GSTIN registrations added.</div>`;
-        return;
-      }
-      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
-            <th style="padding:8px 6px;">State / Union Territory</th>
-            <th style="padding:8px 6px;">GSTIN</th>
-            <th style="padding:8px 6px;text-align:right;width:60px;">Action</th>
-          </tr>
-        </thead>
-        <tbody>`;
-      coData.gstins.forEach((g, idx) => {
-        html += `<tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:6px;"><input data-list="gstins" data-index="${idx}" data-field="state" value="${ohEsc(g.state||'')}" placeholder="e.g. Maharashtra" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="gstins" data-index="${idx}" data-field="gstin" value="${ohEsc(g.gstin||'')}" placeholder="27AAAAA0000A1Z5" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;text-transform:uppercase;outline:none;"></td>
-          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="gstins" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-      cont.innerHTML = html;
-    };
-
-    wrap.querySelector('#coAddGstinBtn').addEventListener('click', () => {
-      coData.gstins.push({ state: '', gstin: '' });
-      renderGstins();
-    });
 
     // 4. Banking List
     const renderBanks = () => {
@@ -962,10 +925,7 @@
         const list = e.target.dataset.list;
         const index = parseInt(e.target.dataset.index);
         if (list && !isNaN(index)) {
-          if (list === 'gstins') {
-            coData.gstins.splice(index, 1);
-            renderGstins();
-          } else if (list === 'banks') {
+          if (list === 'banks') {
             coData.banks.splice(index, 1);
             renderBanks();
           } else if (list === 'directors') {
@@ -1003,8 +963,87 @@
     });
 
 
+    // ── GSTIN VALIDATION (format + checksum) ──
+    const GSTIN_CODE_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const gstinCheckDigit = (gstin14) => {
+      let factor = 2, sum = 0;
+      for (let i = 13; i >= 0; i--) {
+        const codePoint = GSTIN_CODE_CHARS.indexOf(gstin14[i]);
+        let d = factor * codePoint;
+        d = Math.floor(d / 36) + (d % 36);
+        sum += d;
+        factor = factor === 2 ? 1 : 2;
+      }
+      return GSTIN_CODE_CHARS[(36 - (sum % 36)) % 36];
+    };
+    const isValidGstin = (raw) => {
+      const match = /^([0-9]{2})([A-Z]{5}[0-9]{4}[A-Z])([1-9A-Z])(Z)([0-9A-Z])$/.test(raw);
+      return match && raw[14] === gstinCheckDigit(raw.slice(0, 14));
+    };
+    const isValidPan = (raw) => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(raw);
+
+    const gstinInput = wrap.querySelector('#coGSTIN');
+    const gstinStatus = wrap.querySelector('#coGstinStatus');
+    const panInput = wrap.querySelector('#coPAN');
+    const panStatus = wrap.querySelector('#coPanStatus');
+    const panHintBtn = wrap.querySelector('#coPanFromGstinBtn');
+
+    const renderPanStatus = () => {
+      const raw = panInput.value.toUpperCase().trim();
+      if (!raw) {
+        panStatus.textContent = '';
+      } else if (isValidPan(raw)) {
+        panStatus.textContent = 'Valid PAN';
+        panStatus.style.color = '#059669';
+      } else {
+        panStatus.textContent = 'Invalid PAN';
+        panStatus.style.color = '#dc2626';
+      }
+    };
+    panInput.addEventListener('input', renderPanStatus);
+    renderPanStatus();
+
+    const renderGstinStatus = () => {
+      const raw = gstinInput.value.toUpperCase().trim();
+      panHintBtn.style.display = 'none';
+
+      if (!raw) {
+        gstinStatus.textContent = '';
+        return;
+      }
+
+      if (!isValidGstin(raw)) {
+        gstinStatus.textContent = 'Invalid GSTIN';
+        gstinStatus.style.color = '#dc2626';
+        return;
+      }
+
+      gstinStatus.textContent = 'Valid GSTIN';
+      gstinStatus.style.color = '#059669';
+
+      const panFromGstin = raw.slice(2, 12);
+      const currentPan = panInput.value.trim().toUpperCase();
+      if (!currentPan) {
+        panInput.value = panFromGstin;
+        renderPanStatus();
+      } else if (currentPan !== panFromGstin) {
+        panHintBtn.style.display = 'block';
+      }
+    };
+
+    panHintBtn.addEventListener('click', () => {
+      const raw = gstinInput.value.toUpperCase().trim();
+      if (isValidGstin(raw)) {
+        panInput.value = raw.slice(2, 12);
+        panHintBtn.style.display = 'none';
+        renderPanStatus();
+      }
+    });
+
+    gstinInput.addEventListener('input', renderGstinStatus);
+    renderGstinStatus();
+
     // ── INITIALIZING LISTS & LOADS ──
-    renderGstins();
     renderBanks();
     renderDirectors();
     renderEmployees();
@@ -1038,6 +1077,7 @@
         }
 
         else if (section === 'registrations') {
+          coData.gstin = wrap.querySelector('#coGSTIN').value.trim().toUpperCase();
           coData.pan = wrap.querySelector('#coPAN').value.trim().toUpperCase();
           coData.cin = wrap.querySelector('#coCIN').value.trim().toUpperCase();
           coData.udyam = wrap.querySelector('#coUdyam').value.trim();

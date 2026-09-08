@@ -40,6 +40,61 @@
   let _masterAlterUnitAliases = [];
   let _masterAlterWarehouseAliases = [];
 
+  // RBI-regulated banks operating in India (Public Sector, Domestic Private Sector,
+  // Small Finance, Payments, Regional Rural & Foreign Banks) — powers the searchable
+  // Bank Name field. Ref: https://www.rbi.org.in/commonman/english/scripts/BanksInIndia.aspx
+  const INDIAN_BANKS_LIST = [
+    // Public Sector Banks
+    'State Bank of India', 'Bank of Baroda', 'Bank of India', 'Bank of Maharashtra',
+    'Canara Bank', 'Central Bank of India', 'Indian Bank', 'Indian Overseas Bank',
+    'Punjab & Sind Bank', 'Punjab National Bank', 'UCO Bank', 'Union Bank of India',
+    // Domestic Private Sector Banks
+    'Axis Bank Limited', 'Bandhan Bank Limited', 'CSB Bank Limited', 'City Union Bank Limited',
+    'DCB Bank Limited', 'Dhanlaxmi Bank Limited', 'Federal Bank Limited', 'HDFC Bank Limited',
+    'ICICI Bank Limited', 'IndusInd Bank Limited', 'IDFC FIRST Bank Limited',
+    'Jammu & Kashmir Bank Limited', 'Karnataka Bank Limited', 'Karur Vysya Bank Limited',
+    'Kotak Mahindra Bank Limited', 'Nainital Bank Limited', 'RBL Bank Limited',
+    'South Indian Bank Limited', 'Tamilnad Mercantile Bank Limited', 'YES Bank Limited',
+    'IDBI Bank Limited',
+    // Small Finance Banks
+    'Au Small Finance Bank Limited', 'Capital Small Finance Bank Limited',
+    'Equitas Small Finance Bank Limited', 'ESAF Small Finance Bank Limited',
+    'Suryoday Small Finance Bank Limited', 'Ujjivan Small Finance Bank Limited',
+    'Utkarsh Small Finance Bank Limited', 'slice Small Finance Bank Limited',
+    'Jana Small Finance Bank Limited', 'Shivalik Small Finance Bank Limited',
+    'Unity Small Finance Bank Limited',
+    // Payments Banks
+    'India Post Payments Bank Limited', 'Fino Payments Bank Limited',
+    'Paytm Payments Bank Limited', 'Airtel Payments Bank Limited', 'NSDL Payments Bank Limited',
+    // Regional Rural Banks
+    'Andhra Pradesh Grameena Bank', 'Assam Gramin Bank', 'Arunachal Pradesh Rural Bank',
+    'Bihar Gramin Bank', 'Chhattisgarh Gramin Bank', 'Gujarat Gramin Bank',
+    'Haryana Gramin Bank', 'Himachal Pradesh Gramin Bank', 'Jharkhand Gramin Bank',
+    'Jammu and Kashmir Grameen Bank', 'Karnataka Grameena Bank', 'Kerala Grameena Bank',
+    'Maharashtra Gramin Bank', 'Madhya Pradesh Gramin Bank', 'Manipur Rural Bank',
+    'Meghalaya Rural Bank', 'Mizoram Rural Bank', 'Nagaland Rural Bank',
+    'Odisha Grameen Bank', 'Punjab Gramin Bank', 'Puducherry Grama Bank',
+    'Rajasthan Gramin Bank', 'Tamil Nadu Grama Bank', 'Telangana Grameena Bank',
+    'Tripura Gramin Bank', 'Uttar Pradesh Gramin Bank', 'Uttarakhand Gramin Bank',
+    'West Bengal Gramin Bank',
+    // Foreign Banks in India
+    'AB Bank PLC', 'American Express Banking Corporation',
+    'Australia and New Zealand Banking Group Ltd.', 'Barclays Bank Plc.',
+    'Bank of America National Association', 'Bank of Bahrain and Kuwait B.S.C.',
+    'Bank of Ceylon', 'Bank of China Limited', 'Bank of Nova Scotia', 'BNP Paribas',
+    'Citibank N.A.', 'Cooperatieve Rabobank U.A.',
+    'Credit Agricole Corporate and Investment Bank', 'CTBC Bank Co., Ltd.',
+    'DBS Bank India Limited', 'Deutsche Bank A.G.', 'Doha Bank Q.P.S.C',
+    'Emirates NBD Bank P.J.S.C', 'First Abu Dhabi Bank PJSC', 'FirstRand Bank Limited',
+    'Hong Kong and Shanghai Banking Corporation Limited', 'Industrial and Commercial Bank of China',
+    'Industrial Bank of Korea', 'J.P. Morgan Chase Bank N.A.', 'JSC VTB Bank', 'KEB Hana Bank',
+    'Kookmin Bank', 'Mashreqbank P.S.C', 'Mizuho Bank Ltd.', 'MUFG Bank, Ltd.',
+    'NatWest Markets Plc', 'NongHyup Bank', 'PT Bank Maybank Indonesia TBK',
+    'Qatar National Bank (Q.P.S.C.)', 'Sberbank', 'SBM Bank (India) Limited', 'Shinhan Bank',
+    'Societe Generale', 'Sonali Bank PLC', 'Standard Chartered Bank',
+    'Sumitomo Mitsui Banking Corporation', 'United Overseas Bank Limited', 'UBS AG', 'Woori Bank'
+  ].sort((a, b) => a.localeCompare(b));
+
   const KYA_STOCK_GROUPS_KEY = 'kya_master_stock_groups';
   const KYA_STOCK_CATEGORIES_KEY = 'kya_master_stock_categories';
   const KYA_UNITS_KEY = 'kya_master_units';
@@ -115,6 +170,313 @@
       .replace(/'/g, '&#39;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  // ── GSTIN / PAN validation (format + checksum) — matches Company Profile & Vault ──
+  const GSTIN_CODE_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  function gstinCheckDigit(gstin14) {
+    let factor = 2, sum = 0;
+    for (let i = 13; i >= 0; i--) {
+      const codePoint = GSTIN_CODE_CHARS.indexOf(gstin14[i]);
+      let d = factor * codePoint;
+      d = Math.floor(d / 36) + (d % 36);
+      sum += d;
+      factor = factor === 2 ? 1 : 2;
+    }
+    return GSTIN_CODE_CHARS[(36 - (sum % 36)) % 36];
+  }
+  function isValidGstin(raw) {
+    const match = /^([0-9]{2})([A-Z]{5}[0-9]{4}[A-Z])([1-9A-Z])(Z)([0-9A-Z])$/.test(raw);
+    return match && raw[14] === gstinCheckDigit(raw.slice(0, 14));
+  }
+  function isValidPan(raw) {
+    return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(raw);
+  }
+
+  // Wires live GSTIN/PAN validity status + "Update PAN from GSTIN" affordance onto an
+  // existing GSTIN/PAN input pair. Safe to call after every render (creates its DOM
+  // helpers once per fresh input, since contentArea is fully re-rendered each time).
+  function wireGstinPanValidation(container, gstinId, panId) {
+    const gstinInput = container.querySelector('#' + gstinId);
+    const panInput = container.querySelector('#' + panId);
+    if (!gstinInput || !panInput) return;
+
+    // Wrap GSTIN input + its status line in one box so it stays a single grid cell
+    // (keeps GSTIN & PAN side-by-side in the same row, status text below each).
+    // width:100%/min-width:0 are required here — once the input is no longer a direct
+    // grid item it loses the grid's automatic stretch/shrink sizing and will overflow
+    // the row without them.
+    const gstinCell = document.createElement('div');
+    gstinCell.style.cssText = 'width: 100%; min-width: 0;';
+    gstinInput.parentNode.insertBefore(gstinCell, gstinInput);
+    gstinCell.appendChild(gstinInput);
+    gstinInput.style.width = '100%';
+
+    const gstinStatus = document.createElement('div');
+    gstinStatus.id = gstinId + 'Status';
+    gstinStatus.style.cssText = 'font-size: 11px; font-weight: 600; margin-top: 5px; min-height: 14px;';
+    gstinCell.appendChild(gstinStatus);
+
+    // Wrap PAN input (input + inline Update button) + its status line, same as GSTIN cell
+    const panCell = document.createElement('div');
+    panCell.style.cssText = 'width: 100%; min-width: 0;';
+    panInput.parentNode.insertBefore(panCell, panInput);
+
+    const panFieldBox = document.createElement('div');
+    panFieldBox.style.cssText = 'position: relative; width: 100%; min-width: 0;';
+    panCell.appendChild(panFieldBox);
+    panFieldBox.appendChild(panInput);
+    panInput.style.width = '100%';
+    panInput.style.paddingRight = '70px';
+
+    // Matches Company Profile & Vault's "Update" affordance (same class + placement)
+    const panUpdateBtn = document.createElement('button');
+    panUpdateBtn.type = 'button';
+    panUpdateBtn.id = panId + 'UpdateBtn';
+    panUpdateBtn.className = 'sales-roundoff-btn-inline';
+    panUpdateBtn.textContent = 'Update';
+    panUpdateBtn.style.cssText = 'display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); height: 26px; width: auto; min-width: 0; padding: 0 10px;';
+    panFieldBox.appendChild(panUpdateBtn);
+
+    const panStatus = document.createElement('div');
+    panStatus.id = panId + 'Status';
+    panStatus.style.cssText = 'font-size: 11px; font-weight: 600; margin-top: 5px; min-height: 14px;';
+    panCell.appendChild(panStatus);
+
+    const renderPanStatus = () => {
+      const raw = panInput.value.toUpperCase().trim();
+      if (!raw) {
+        panStatus.textContent = '';
+      } else if (isValidPan(raw)) {
+        panStatus.textContent = 'Valid PAN';
+        panStatus.style.color = '#059669';
+      } else {
+        panStatus.textContent = 'Invalid PAN';
+        panStatus.style.color = '#dc2626';
+      }
+    };
+
+    const renderGstinStatus = () => {
+      const raw = gstinInput.value.toUpperCase().trim();
+      panUpdateBtn.style.display = 'none';
+
+      if (!raw) {
+        gstinStatus.textContent = '';
+        return;
+      }
+      if (!isValidGstin(raw)) {
+        gstinStatus.textContent = 'Invalid GSTIN';
+        gstinStatus.style.color = '#dc2626';
+        return;
+      }
+
+      gstinStatus.textContent = 'Valid GSTIN';
+      gstinStatus.style.color = '#059669';
+
+      const panFromGstin = raw.slice(2, 12);
+      const currentPan = panInput.value.trim().toUpperCase();
+      if (!currentPan) {
+        panInput.value = panFromGstin;
+        renderPanStatus();
+      } else if (currentPan !== panFromGstin) {
+        panUpdateBtn.style.display = 'block';
+      }
+    };
+
+    gstinInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+      renderGstinStatus();
+    });
+    panInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+      renderPanStatus();
+    });
+    panUpdateBtn.addEventListener('click', () => {
+      const raw = gstinInput.value.toUpperCase().trim();
+      if (isValidGstin(raw)) {
+        panInput.value = raw.slice(2, 12);
+        panUpdateBtn.style.display = 'none';
+        renderPanStatus();
+      }
+    });
+
+    renderGstinStatus();
+    renderPanStatus();
+  }
+
+  // ── HSN Code -> Description (Master Desk > Stock Item) ──
+  // Code is searchable; Description is a read-only display auto-filled from the
+  // selected code, showing a hover popup when its text is truncated.
+  // Backed by window.HSN_CODE_LIST ([code, description] pairs) from js/hsn-codes.js.
+  function wireHsnCodeDescFields(container, codePrefix, descPrefix) {
+    const hsnList = (typeof window !== 'undefined' && Array.isArray(window.HSN_CODE_LIST)) ? window.HSN_CODE_LIST : [];
+
+    const codeHidden = container.querySelector('#' + codePrefix);
+    const codeTrigger = container.querySelector('#' + codePrefix + 'Trigger');
+    const codeTriggerText = container.querySelector('#' + codePrefix + 'TriggerText');
+    const codeDropdown = container.querySelector('#' + codePrefix + 'Dropdown');
+    const codeSearch = container.querySelector('#' + codePrefix + 'Search');
+    const codeOptionsList = container.querySelector('#' + codePrefix + 'OptionsList');
+
+    const descHidden = container.querySelector('#' + descPrefix);
+    const descTrigger = container.querySelector('#' + descPrefix + 'Trigger');
+    const descTriggerText = container.querySelector('#' + descPrefix + 'TriggerText');
+
+    if (!codeHidden || !descHidden || !codeTrigger) return;
+
+    const MAX_RESULTS = 60;
+
+    const setPair = (code, desc) => {
+      codeHidden.value = code || '';
+      codeTriggerText.textContent = code || 'Search HSN code...';
+      codeTriggerText.style.color = code ? 'var(--slate-700)' : 'var(--slate-400)';
+
+      descHidden.value = desc || '';
+      if (descTriggerText) {
+        descTriggerText.textContent = desc || 'Auto-filled from HSN Code';
+        descTriggerText.style.color = desc ? 'var(--slate-700)' : 'var(--slate-400)';
+      }
+    };
+
+    // Hover popup for the truncated description box
+    if (descTrigger && descTriggerText) {
+      let descTooltip = null;
+      descTrigger.addEventListener('mouseenter', () => {
+        const isTruncated = descTriggerText.scrollWidth > descTriggerText.clientWidth;
+        const text = descHidden.value;
+        if (!isTruncated || !text) return;
+
+        descTooltip = document.createElement('div');
+        descTooltip.textContent = text;
+        descTooltip.style.cssText = 'position: fixed; z-index: 3000; max-width: 320px; max-height: 240px; overflow-y: auto; padding: 8px 12px; font-size: 12.5px; font-weight: 500; line-height: 1.4; color: var(--slate-700); background: #fff; border: 1.5px solid var(--slate-200); border-radius: 8px; box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1));';
+        document.body.appendChild(descTooltip);
+
+        const rect = descTrigger.getBoundingClientRect();
+        const tipRect = descTooltip.getBoundingClientRect();
+        let top = rect.bottom + 6;
+        let left = rect.left;
+        if (left + tipRect.width > window.innerWidth - 8) {
+          left = Math.max(8, window.innerWidth - tipRect.width - 8);
+        }
+        if (top + tipRect.height > window.innerHeight - 8) {
+          top = rect.top - tipRect.height - 6;
+        }
+        top = Math.max(8, top);
+        descTooltip.style.top = top + 'px';
+        descTooltip.style.left = left + 'px';
+      });
+      descTrigger.addEventListener('mouseleave', () => {
+        if (descTooltip) {
+          descTooltip.remove();
+          descTooltip = null;
+        }
+      });
+    }
+
+    const filterList = (query) => {
+      const q = query.toLowerCase().trim();
+      if (!q) return [];
+      return hsnList.filter(pair => pair[0].toLowerCase().includes(q) || pair[1].toLowerCase().includes(q));
+    };
+
+    const renderRows = (optionsList, matches, query, onUseTyped) => {
+      optionsList.innerHTML = '';
+
+      matches.slice(0, MAX_RESULTS).forEach(([code, desc]) => {
+        const item = document.createElement('div');
+        item.style.padding = '8px 12px';
+        item.style.fontSize = '13px';
+        item.style.borderRadius = '6px';
+        item.style.cursor = 'pointer';
+        item.style.lineHeight = '1.4';
+        item.innerHTML = '<span style="font-weight:700; color: var(--blue-700);">' + escapeHtml(code) +
+          '</span><span style="color: var(--slate-400);"> &mdash; </span>' +
+          '<span style="color: var(--slate-700);">' + escapeHtml(desc) + '</span>';
+
+        item.addEventListener('mouseover', () => { item.style.background = 'var(--slate-50)'; });
+        item.addEventListener('mouseout', () => { item.style.background = 'transparent'; });
+        item.addEventListener('click', () => {
+          setPair(code, desc);
+          codeDropdown.style.display = 'none';
+        });
+
+        optionsList.appendChild(item);
+      });
+
+      if (matches.length === 0) {
+        if (query) {
+          const useRow = document.createElement('div');
+          useRow.style.padding = '8px 12px';
+          useRow.style.fontSize = '12.5px';
+          useRow.style.fontWeight = '600';
+          useRow.style.color = 'var(--blue-700)';
+          useRow.style.cursor = 'pointer';
+          useRow.textContent = 'Use "' + query + '" as typed';
+          useRow.addEventListener('mouseover', () => { useRow.style.background = 'var(--slate-50)'; });
+          useRow.addEventListener('mouseout', () => { useRow.style.background = 'transparent'; });
+          useRow.addEventListener('click', () => {
+            onUseTyped(query);
+            codeDropdown.style.display = 'none';
+          });
+          optionsList.appendChild(useRow);
+        } else {
+          const emptyState = document.createElement('div');
+          emptyState.style.padding = '10px 12px';
+          emptyState.style.fontSize = '12px';
+          emptyState.style.color = 'var(--slate-400)';
+          emptyState.textContent = 'No matching HSN code found';
+          optionsList.appendChild(emptyState);
+        }
+      } else if (matches.length > MAX_RESULTS) {
+        const moreState = document.createElement('div');
+        moreState.style.padding = '8px 12px 2px 12px';
+        moreState.style.fontSize = '11px';
+        moreState.style.color = 'var(--slate-400)';
+        moreState.style.textAlign = 'center';
+        moreState.textContent = '+' + (matches.length - MAX_RESULTS) + ' more — refine your search';
+        optionsList.appendChild(moreState);
+      }
+    };
+
+    const showInitialPrompt = (optionsList) => {
+      optionsList.innerHTML = '';
+      const prompt = document.createElement('div');
+      prompt.style.padding = '10px 12px';
+      prompt.style.fontSize = '12px';
+      prompt.style.color = 'var(--slate-400)';
+      prompt.textContent = 'Type to search ' + hsnList.length.toLocaleString('en-IN') + ' HSN codes...';
+      optionsList.appendChild(prompt);
+    };
+
+    const openDropdown = (dropdown, searchInput, optionsList) => {
+      document.querySelectorAll('.kya-searchable-select-dropdown').forEach(dd => {
+        if (dd !== dropdown) dd.style.display = 'none';
+      });
+      dropdown.style.display = 'flex';
+      searchInput.value = '';
+      showInitialPrompt(optionsList);
+      setTimeout(() => searchInput.focus(), 50);
+    };
+
+    codeTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = codeDropdown.style.display === 'flex';
+      if (!isOpen) {
+        openDropdown(codeDropdown, codeSearch, codeOptionsList);
+      } else {
+        codeDropdown.style.display = 'none';
+      }
+    });
+    codeSearch.addEventListener('input', (e) => {
+      const q = e.target.value;
+      renderRows(codeOptionsList, filterList(q), q.trim(), (typed) => setPair(typed, descHidden.value));
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!codeDropdown.contains(e.target) && !codeTrigger.contains(e.target)) {
+        codeDropdown.style.display = 'none';
+      }
+    });
   }
 
   function syncStockGroupsToCoa() {
@@ -589,6 +951,25 @@
     }
 
     return false;
+  }
+
+  function isBankAccountGroup(groupVal) {
+    if (!groupVal) return false;
+    const [pType, pId] = groupVal.split(':');
+
+    let targetName = '';
+
+    if (pType === 'gl') {
+      const gl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => String(l.id) === String(pId)) : null;
+      if (gl) targetName = (gl.name || '').toLowerCase();
+    } else if (pType === 'sg') {
+      if (typeof COA_SYS_SGS !== 'undefined') {
+        const sg = COA_SYS_SGS.find(s => s.id === pId);
+        if (sg) targetName = (sg.name || '').toLowerCase();
+      }
+    }
+
+    return targetName.includes('bank');
   }
 
   function validateMasterGroupAliasesLive() {
@@ -2922,6 +3303,96 @@
             <input class="coa-modal-inp" id="masterLedgerBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
           </div>
 
+          <!-- Additional Information (Dynamic for Bank Account group) -->
+          <div id="masterLedgerBankAcctWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 24px; transition: all 0.2s ease;">
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; gap: 7px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+              <span>Additional Information</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="kya-searchable-select-wrap" id="masterLedgerBankAcctBankNameWrap" style="position: relative; width: 100%;">
+                  <input type="hidden" id="masterLedgerBankAcctBankName" value="">
+                  <div class="kya-searchable-select-trigger" id="masterLedgerBankAcctBankNameTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--slate-400);">
+                    <span id="masterLedgerBankAcctBankNameTriggerText">Search or select bank...</span>
+                    <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                  </div>
+                  <div class="kya-searchable-select-dropdown" id="masterLedgerBankAcctBankNameDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                    <input type="text" id="masterLedgerBankAcctBankNameSearch" placeholder="Search bank name..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                    <div id="masterLedgerBankAcctBankNameOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                  </div>
+                </div>
+                <input type="text" id="masterLedgerBankAcctHolder" placeholder="Account Holder Name" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="text" id="masterLedgerBankAcctNo" placeholder="Account No" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                <input type="text" id="masterLedgerBankAcctIfsc" placeholder="IFSC Code (e.g. HDFC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+              </div>
+              <div>
+                <input type="text" id="masterLedgerBankAcctBranch" placeholder="Branch" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+              </div>
+            </div>
+
+            <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 14px;"></div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="font-size: 10.5px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; gap: 5px; margin: 0;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                  &nbsp;Upload QR Code (Image Only)
+                </label>
+                <span id="masterLedgerBankAcctQrStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+              </div>
+
+              <input type="file" id="masterLedgerBankAcctQrInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" style="display: none;">
+
+              <div id="masterLedgerBankAcctQrDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 12px 14px; text-align: center; background: #fff; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'; this.style.background='#eff6ff';" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='#fff';">
+
+                <!-- Empty State -->
+                <div id="masterLedgerBankAcctQrEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                  <div style="width: 28px; height: 28px; border-radius: 50%; background: #f8fafc; border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: #2563eb; flex-shrink: 0;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                  </div>
+                  <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                    <span style="font-size: 12.5px; font-weight: 600; color: var(--slate-700);">Click or Drag to Upload QR Code</span>
+                    <span style="font-size: 10.5px; color: var(--slate-400);">PNG, JPG, WEBP, SVG (Max 5MB)</span>
+                  </div>
+                </div>
+
+                <!-- Selected State -->
+                <div id="masterLedgerBankAcctQrSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                    <img id="masterLedgerBankAcctQrPreviewImg" src="" alt="QR Code" style="width: 34px; height: 34px; object-fit: contain; border-radius: 6px; border: 1px solid var(--slate-200); background: #fff; flex-shrink: 0;">
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                      <span id="masterLedgerBankAcctQrFileName" style="font-size: 12.5px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;"></span>
+                      <span id="masterLedgerBankAcctQrFileSize" style="font-size: 10.5px; color: var(--slate-500); font-weight: 500;"></span>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                    <a id="masterLedgerBankAcctQrPreviewBtn" href="#" target="_blank" style="padding: 4px 9px; font-size: 11.5px; font-weight: 600; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; text-decoration: none;" title="View full image">View</a>
+                    <button id="masterLedgerBankAcctQrRemoveBtn" type="button" style="background: none; border: none; color: #dc2626; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center;" title="Remove QR code">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
           <div style="display: flex; gap: 12px; align-items: center;">
             <button class="btn btn-primary" id="masterLedgerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">＋ Create Ledger</button>
             <button class="btn btn-secondary" id="masterLedgerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
@@ -2948,6 +3419,7 @@
       // Additional Information Dynamic Visibility and Save As Slider Toggle
       const groupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel');
       const addInfoWrap = contentArea.querySelector('#masterLedgerAdditionalInfoWrap');
+      const bankAcctWrap = contentArea.querySelector('#masterLedgerBankAcctWrap');
       const saveAsLedgerBtn = contentArea.querySelector('#masterLedgerSaveAsLedgerBtn');
       const saveAsPartyBtn = contentArea.querySelector('#masterLedgerSaveAsPartyBtn');
       const saveAsBg = contentArea.querySelector('#masterLedgerSaveAsBg');
@@ -3004,6 +3476,10 @@
           _masterLedgerSaveAsMode = 'ledger';
           if (saveBtn) saveBtn.textContent = '＋ Create Ledger';
         }
+
+        if (bankAcctWrap) {
+          bankAcctWrap.style.display = isBankAccountGroup(groupSel.value) ? 'block' : 'none';
+        }
       };
 
       if (groupSel) {
@@ -3011,28 +3487,195 @@
         updateAdditionalInfoVisibility();
       }
 
-      // GSTIN / PAN / IFSC Auto Uppercase & Auto-fill
-      const gstinInp = contentArea.querySelector('#masterLedgerGstin');
-      const panInp = contentArea.querySelector('#masterLedgerPan');
+      // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
+      wireGstinPanValidation(contentArea, 'masterLedgerGstin', 'masterLedgerPan');
       const ifscInp = contentArea.querySelector('#masterLedgerIfsc');
-
-      if (gstinInp) {
-        gstinInp.addEventListener('input', (e) => {
-          const val = e.target.value.toUpperCase();
-          e.target.value = val;
-          if (val.length >= 12 && panInp && !panInp.value) {
-            panInp.value = val.substring(2, 12);
-          }
-        });
-      }
-      if (panInp) {
-        panInp.addEventListener('input', (e) => {
-          e.target.value = e.target.value.toUpperCase();
-        });
-      }
       if (ifscInp) {
         ifscInp.addEventListener('input', (e) => {
           e.target.value = e.target.value.toUpperCase();
+        });
+      }
+
+      // Bank Account group: IFSC auto-uppercase + QR code upload
+      const bankAcctIfscInp = contentArea.querySelector('#masterLedgerBankAcctIfsc');
+      if (bankAcctIfscInp) {
+        bankAcctIfscInp.addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase();
+        });
+      }
+
+      // Bank Account group: searchable Bank Name field (matches Group field's
+      // trigger + caret + in-dropdown search box pattern)
+      const bankNameHidden = contentArea.querySelector('#masterLedgerBankAcctBankName');
+      const bankNameTrigger = contentArea.querySelector('#masterLedgerBankAcctBankNameTrigger');
+      const bankNameTriggerText = contentArea.querySelector('#masterLedgerBankAcctBankNameTriggerText');
+      const bankNameDropdown = contentArea.querySelector('#masterLedgerBankAcctBankNameDropdown');
+      const bankNameSearch = contentArea.querySelector('#masterLedgerBankAcctBankNameSearch');
+      const bankNameOptionsList = contentArea.querySelector('#masterLedgerBankAcctBankNameOptionsList');
+
+      if (bankNameHidden && bankNameTrigger && bankNameTriggerText && bankNameDropdown && bankNameSearch && bankNameOptionsList) {
+        const setBankName = (val) => {
+          bankNameHidden.value = val;
+          bankNameTriggerText.textContent = val || 'Search or select bank...';
+          bankNameTriggerText.style.color = val ? 'var(--slate-700)' : 'var(--slate-400)';
+        };
+
+        const renderBankOptions = (filter = '') => {
+          bankNameOptionsList.innerHTML = '';
+          const query = filter.toLowerCase().trim();
+          const matches = query ? INDIAN_BANKS_LIST.filter(b => b.toLowerCase().includes(query)) : INDIAN_BANKS_LIST;
+
+          const renderRow = (label, value, isSelected) => {
+            const item = document.createElement('div');
+            item.textContent = label;
+            item.style.padding = '8.5px 12px';
+            item.style.fontSize = '13.5px';
+            item.style.borderRadius = '6px';
+            item.style.cursor = 'pointer';
+            item.style.fontWeight = isSelected ? '700' : '500';
+            item.style.background = isSelected ? 'var(--blue-50)' : 'transparent';
+            item.style.color = isSelected ? 'var(--blue-700)' : 'var(--slate-700)';
+
+            item.addEventListener('mouseover', () => {
+              if (!isSelected) item.style.background = 'var(--slate-50)';
+            });
+            item.addEventListener('mouseout', () => {
+              if (!isSelected) item.style.background = 'transparent';
+            });
+            item.addEventListener('click', () => {
+              setBankName(value);
+              bankNameDropdown.style.display = 'none';
+            });
+
+            bankNameOptionsList.appendChild(item);
+          };
+
+          matches.forEach(bankName => renderRow(bankName, bankName, bankNameHidden.value === bankName));
+
+          if (matches.length === 0 && query) {
+            const emptyState = document.createElement('div');
+            emptyState.style.padding = '10px 12px';
+            emptyState.style.fontSize = '12px';
+            emptyState.style.color = 'var(--slate-400)';
+            emptyState.textContent = 'No matching bank found';
+            bankNameOptionsList.appendChild(emptyState);
+            renderRow(`Use "${filter.trim()}"`, filter.trim(), false);
+          }
+        };
+
+        bankNameTrigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isOpen = bankNameDropdown.style.display === 'flex';
+          if (!isOpen) {
+            document.querySelectorAll('.kya-searchable-select-dropdown').forEach(dd => {
+              if (dd !== bankNameDropdown) dd.style.display = 'none';
+            });
+            bankNameDropdown.style.display = 'flex';
+            bankNameSearch.value = '';
+            renderBankOptions('');
+            setTimeout(() => bankNameSearch.focus(), 50);
+          } else {
+            bankNameDropdown.style.display = 'none';
+          }
+        });
+
+        bankNameSearch.addEventListener('input', (e) => renderBankOptions(e.target.value));
+
+        document.addEventListener('click', (e) => {
+          if (!bankNameDropdown.contains(e.target) && !bankNameTrigger.contains(e.target)) {
+            bankNameDropdown.style.display = 'none';
+          }
+        });
+      }
+
+      let _masterLedgerBankAcctQrData = null;
+      const bankAcctQrInput = contentArea.querySelector('#masterLedgerBankAcctQrInput');
+      const bankAcctQrDropzone = contentArea.querySelector('#masterLedgerBankAcctQrDropzone');
+      const bankAcctQrEmptyState = contentArea.querySelector('#masterLedgerBankAcctQrEmptyState');
+      const bankAcctQrSelectedState = contentArea.querySelector('#masterLedgerBankAcctQrSelectedState');
+      const bankAcctQrStatusBadge = contentArea.querySelector('#masterLedgerBankAcctQrStatusBadge');
+      const bankAcctQrPreviewImg = contentArea.querySelector('#masterLedgerBankAcctQrPreviewImg');
+      const bankAcctQrFileNameEl = contentArea.querySelector('#masterLedgerBankAcctQrFileName');
+      const bankAcctQrFileSizeEl = contentArea.querySelector('#masterLedgerBankAcctQrFileSize');
+      const bankAcctQrPreviewBtn = contentArea.querySelector('#masterLedgerBankAcctQrPreviewBtn');
+      const bankAcctQrRemoveBtn = contentArea.querySelector('#masterLedgerBankAcctQrRemoveBtn');
+
+      const formatQrBytes = (bytes) => {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      };
+
+      const updateQrUI = (doc) => {
+        _masterLedgerBankAcctQrData = doc;
+
+        if (!doc || !doc.fileData) {
+          if (bankAcctQrEmptyState) bankAcctQrEmptyState.style.display = 'flex';
+          if (bankAcctQrSelectedState) bankAcctQrSelectedState.style.display = 'none';
+          if (bankAcctQrStatusBadge) bankAcctQrStatusBadge.style.display = 'none';
+          if (bankAcctQrInput) bankAcctQrInput.value = '';
+          if (bankAcctQrPreviewImg) bankAcctQrPreviewImg.src = '';
+          return;
+        }
+
+        if (bankAcctQrEmptyState) bankAcctQrEmptyState.style.display = 'none';
+        if (bankAcctQrSelectedState) bankAcctQrSelectedState.style.display = 'flex';
+        if (bankAcctQrStatusBadge) bankAcctQrStatusBadge.style.display = 'inline-block';
+        if (bankAcctQrPreviewImg) bankAcctQrPreviewImg.src = doc.fileData;
+        if (bankAcctQrFileNameEl) bankAcctQrFileNameEl.textContent = doc.fileName || 'QR Code';
+        if (bankAcctQrFileSizeEl) bankAcctQrFileSizeEl.textContent = doc.fileSize || formatQrBytes(doc.fileBytes || 0);
+        if (bankAcctQrPreviewBtn) bankAcctQrPreviewBtn.href = doc.fileData;
+      };
+
+      const handleQrUpload = (file) => {
+        if (!file) return;
+        if (!file.type || !file.type.startsWith('image/')) {
+          if (typeof showToast === 'function') showToast('Only image files are supported for the QR code.', 'error');
+          else alert('Only image files are supported for the QR code.');
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          if (typeof showToast === 'function') showToast('Image size exceeds 5MB limit.', 'error');
+          else alert('Image size exceeds 5MB limit.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          updateQrUI({
+            fileName: file.name,
+            fileSize: formatQrBytes(file.size),
+            fileBytes: file.size,
+            fileData: ev.target.result
+          });
+        };
+        reader.readAsDataURL(file);
+      };
+
+      if (bankAcctQrDropzone && bankAcctQrInput) {
+        bankAcctQrDropzone.addEventListener('click', (e) => {
+          if (e.target.closest('#masterLedgerBankAcctQrPreviewBtn') || e.target.closest('#masterLedgerBankAcctQrRemoveBtn')) return;
+          bankAcctQrInput.click();
+        });
+        bankAcctQrInput.addEventListener('change', (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) handleQrUpload(file);
+        });
+        bankAcctQrDropzone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); bankAcctQrDropzone.style.borderColor = '#2563eb'; bankAcctQrDropzone.style.background = '#eff6ff'; });
+        bankAcctQrDropzone.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); bankAcctQrDropzone.style.borderColor = 'var(--slate-300)'; bankAcctQrDropzone.style.background = '#fff'; });
+        bankAcctQrDropzone.addEventListener('drop', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          bankAcctQrDropzone.style.borderColor = 'var(--slate-300)'; bankAcctQrDropzone.style.background = '#fff';
+          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file) handleQrUpload(file);
+        });
+      }
+
+      if (bankAcctQrRemoveBtn) {
+        bankAcctQrRemoveBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          updateQrUI(null);
         });
       }
 
@@ -3163,6 +3806,18 @@
           const branch = contentArea.querySelector('#masterLedgerBranch')?.value?.trim() || '';
           const gstin = contentArea.querySelector('#masterLedgerGstin')?.value?.trim() || '';
           const pan = contentArea.querySelector('#masterLedgerPan')?.value?.trim() || '';
+
+          // Bank Account group: Additional Information fields
+          const isBankAcctGroup = isBankAccountGroup(groupVal);
+          const bankAcctInfo = isBankAcctGroup ? {
+            bankName: contentArea.querySelector('#masterLedgerBankAcctBankName')?.value?.trim() || '',
+            accountHolder: contentArea.querySelector('#masterLedgerBankAcctHolder')?.value?.trim() || '',
+            accountNo: contentArea.querySelector('#masterLedgerBankAcctNo')?.value?.trim() || '',
+            ifscCode: contentArea.querySelector('#masterLedgerBankAcctIfsc')?.value?.trim() || '',
+            branch: contentArea.querySelector('#masterLedgerBankAcctBranch')?.value?.trim() || '',
+            qrCode: _masterLedgerBankAcctQrData ? _masterLedgerBankAcctQrData.fileData : '',
+            qrCodeFileName: _masterLedgerBankAcctQrData ? _masterLedgerBankAcctQrData.fileName : ''
+          } : null;
 
           // ── If Save As "Customer" is selected ──
           if (_masterLedgerSaveAsMode === 'customer') {
@@ -3411,7 +4066,8 @@
             ifsc: ifsc,
             branch: branch,
             gstin: gstin,
-            pan: pan
+            pan: pan,
+            bankAccountInfo: bankAcctInfo
           };
 
           if (typeof coaLedgers !== 'undefined') {
@@ -3657,25 +4313,9 @@
         });
       }
 
-      // GSTIN / PAN / IFSC Auto Uppercase & Auto-fill
-      const gstinInp = contentArea.querySelector('#masterCustomerGstin');
-      const panInp = contentArea.querySelector('#masterCustomerPan');
+      // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
+      wireGstinPanValidation(contentArea, 'masterCustomerGstin', 'masterCustomerPan');
       const ifscInp = contentArea.querySelector('#masterCustomerIfsc');
-
-      if (gstinInp) {
-        gstinInp.addEventListener('input', (e) => {
-          const val = e.target.value.toUpperCase();
-          e.target.value = val;
-          if (val.length >= 12 && panInp && !panInp.value) {
-            panInp.value = val.substring(2, 12);
-          }
-        });
-      }
-      if (panInp) {
-        panInp.addEventListener('input', (e) => {
-          e.target.value = e.target.value.toUpperCase();
-        });
-      }
       if (ifscInp) {
         ifscInp.addEventListener('input', (e) => {
           e.target.value = e.target.value.toUpperCase();
@@ -4042,25 +4682,9 @@
         });
       }
 
-      // GSTIN / PAN / IFSC Auto Uppercase & Auto-fill
-      const gstinInp = contentArea.querySelector('#masterSupplierGstin');
-      const panInp = contentArea.querySelector('#masterSupplierPan');
+      // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
+      wireGstinPanValidation(contentArea, 'masterSupplierGstin', 'masterSupplierPan');
       const ifscInp = contentArea.querySelector('#masterSupplierIfsc');
-
-      if (gstinInp) {
-        gstinInp.addEventListener('input', (e) => {
-          const val = e.target.value.toUpperCase();
-          e.target.value = val;
-          if (val.length >= 12 && panInp && !panInp.value) {
-            panInp.value = val.substring(2, 12);
-          }
-        });
-      }
-      if (panInp) {
-        panInp.addEventListener('input', (e) => {
-          e.target.value = e.target.value.toUpperCase();
-        });
-      }
       if (ifscInp) {
         ifscInp.addEventListener('input', (e) => {
           e.target.value = e.target.value.toUpperCase();
@@ -4515,6 +5139,33 @@
             </button>
           </div>
 
+          <!-- HSN Code & Description (searchable, cross-fill) -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+            <div style="min-width: 0;">
+              <label class="coa-modal-label" for="masterStockItemHsnCode" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">HSN Code</label>
+              <div class="kya-searchable-select-wrap" id="masterStockItemHsnCodeWrap" style="position: relative; width: 100%;">
+                <input type="hidden" id="masterStockItemHsnCode" value="">
+                <div class="kya-searchable-select-trigger" id="masterStockItemHsnCodeTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-400);">
+                  <span id="masterStockItemHsnCodeTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Search HSN code...</span>
+                  <span style="font-size: 10px; color: var(--slate-400); flex-shrink: 0; margin-left: 6px;">▼</span>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="masterStockItemHsnCodeDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                  <input type="text" id="masterStockItemHsnCodeSearch" placeholder="Search by HSN code..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="masterStockItemHsnCodeOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
+            <div style="min-width: 0;">
+              <label class="coa-modal-label" for="masterStockItemHsnDesc" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">HSN Description</label>
+              <div style="position: relative; width: 100%; min-width: 0;">
+                <input type="hidden" id="masterStockItemHsnDesc" value="">
+                <div id="masterStockItemHsnDescTrigger" style="display: flex; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #f8fafc; cursor: default; font-size: 13.5px; font-weight: 500; color: var(--slate-400); overflow: hidden;">
+                  <span id="masterStockItemHsnDescTriggerText" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto;">Auto-filled from HSN Code</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Group & Category -->
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
             <div>
@@ -4633,6 +5284,7 @@
       initSearchableSelectHelper(contentArea, 'masterStockItemGroupSel', 'Select Stock Group');
       initSearchableSelectHelper(contentArea, 'masterStockItemCategorySel', 'Select Stock Category');
       initSearchableSelectHelper(contentArea, 'masterStockItemWarehouseSel', 'Select Warehouse / Godown');
+      wireHsnCodeDescFields(contentArea, 'masterStockItemHsnCode', 'masterStockItemHsnDesc');
 
       const qtyInp = contentArea.querySelector('#masterStockItemQty');
       const rateInp = contentArea.querySelector('#masterStockItemRate');
@@ -4668,6 +5320,8 @@
           const rate = parseFloat(rateInp?.value) || 0;
           const reorder = parseFloat(contentArea.querySelector('#masterStockItemReorder')?.value) || 0;
           const gst = parseFloat(contentArea.querySelector('#masterStockItemGstSel')?.value) || 18;
+          const hsnCode = contentArea.querySelector('#masterStockItemHsnCode')?.value?.trim() || '';
+          const hsnDesc = contentArea.querySelector('#masterStockItemHsnDesc')?.value?.trim() || '';
 
           const newItem = {
             id: 'item-' + Date.now(),
@@ -4681,6 +5335,8 @@
             rate: rate,
             reorder: reorder,
             gst: gst,
+            hsnCode: hsnCode,
+            hsnDesc: hsnDesc,
             aliases: _masterStockItemAliases.filter(a => a.trim() !== '')
           };
           _masterStockItems.push(newItem);
@@ -5866,24 +6522,8 @@
           updateAdditionalInfoVisibility();
         }
 
-        const gstinInp = contentArea.querySelector('#masterAlterLedgerGstin');
-        const panInp = contentArea.querySelector('#masterAlterLedgerPan');
+        wireGstinPanValidation(contentArea, 'masterAlterLedgerGstin', 'masterAlterLedgerPan');
         const ifscInp = contentArea.querySelector('#masterAlterLedgerIfsc');
-
-        if (gstinInp) {
-          gstinInp.addEventListener('input', (e) => {
-            const val = e.target.value.toUpperCase();
-            e.target.value = val;
-            if (val.length >= 12 && panInp && !panInp.value) {
-              panInp.value = val.substring(2, 12);
-            }
-          });
-        }
-        if (panInp) {
-          panInp.addEventListener('input', (e) => {
-            e.target.value = e.target.value.toUpperCase();
-          });
-        }
         if (ifscInp) {
           ifscInp.addEventListener('input', (e) => {
             e.target.value = e.target.value.toUpperCase();
@@ -6282,24 +6922,8 @@
           });
         }
 
-        const gstinInp = contentArea.querySelector('#masterAlterCustomerGstin');
-        const panInp = contentArea.querySelector('#masterAlterCustomerPan');
+        wireGstinPanValidation(contentArea, 'masterAlterCustomerGstin', 'masterAlterCustomerPan');
         const ifscInp = contentArea.querySelector('#masterAlterCustomerIfsc');
-
-        if (gstinInp) {
-          gstinInp.addEventListener('input', (e) => {
-            const val = e.target.value.toUpperCase();
-            e.target.value = val;
-            if (val.length >= 12 && panInp && !panInp.value) {
-              panInp.value = val.substring(2, 12);
-            }
-          });
-        }
-        if (panInp) {
-          panInp.addEventListener('input', (e) => {
-            e.target.value = e.target.value.toUpperCase();
-          });
-        }
         if (ifscInp) {
           ifscInp.addEventListener('input', (e) => {
             e.target.value = e.target.value.toUpperCase();
@@ -6686,24 +7310,8 @@
           });
         }
 
-        const gstinInp = contentArea.querySelector('#masterAlterSupplierGstin');
-        const panInp = contentArea.querySelector('#masterAlterSupplierPan');
+        wireGstinPanValidation(contentArea, 'masterAlterSupplierGstin', 'masterAlterSupplierPan');
         const ifscInp = contentArea.querySelector('#masterAlterSupplierIfsc');
-
-        if (gstinInp) {
-          gstinInp.addEventListener('input', (e) => {
-            const val = e.target.value.toUpperCase();
-            e.target.value = val;
-            if (val.length >= 12 && panInp && !panInp.value) {
-              panInp.value = val.substring(2, 12);
-            }
-          });
-        }
-        if (panInp) {
-          panInp.addEventListener('input', (e) => {
-            e.target.value = e.target.value.toUpperCase();
-          });
-        }
         if (ifscInp) {
           ifscInp.addEventListener('input', (e) => {
             e.target.value = e.target.value.toUpperCase();
