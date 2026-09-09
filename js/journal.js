@@ -3660,7 +3660,9 @@
               const cleanNo = vNo.replace(/^(SV-|SR-|SO-|INV-)/, '');
               sInv = (window.KYA_STORE?.salesVouchers || []).find(v => v.invoiceNo === cleanNo || v.invoiceNo === vNo);
             }
-            if (sInv && typeof viewPrintInvoice === 'function') {
+            if (sInv && typeof window.viewSalesTaxInvoice === 'function') {
+              window.viewSalesTaxInvoice(sInv.id);
+            } else if (sInv && typeof viewPrintInvoice === 'function') {
               viewPrintInvoice(sInv.id);
             } else {
               const entry = postedEntries.find(e => e.id === id);

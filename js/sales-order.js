@@ -420,7 +420,10 @@
             </div>
           </td>
           <td class="sales-cell-hsn" style="width: 90px; padding: 4px 6px;">
-            <input type="text" class="sales-row-hsn je-input" value="${safeEsc(row.hsn || '')}" placeholder="HSN/SAC" style="border: none; background: transparent; box-shadow: none; padding: 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" />
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="text" class="sales-row-hsn je-input" value="${safeEsc(row.hsn || '')}" placeholder="HSN/SAC" title="${safeEsc(row.hsnDesc || 'Search the HSN / SAC code master')}" style="border: none; background: transparent; box-shadow: none; padding: 0 14px 0 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" autocomplete="off" />
+              <span class="sales-row-drop-arrow" style="position: absolute; right: 0; pointer-events: none; color: var(--slate-400); font-size: 9px;">▼</span>
+            </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
             <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
@@ -473,10 +476,15 @@
         const attachPortal = () => {
           _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
-            orderRows[index].item = selectedItem.name;
-            orderRows[index].itemType = selectedItem.type;
-            if (selectedItem.type === 'Service' && selectedItem.id) {
-              orderRows[index].revenueLedgerId = selectedItem.id;
+            if (typeof window.applyMasterItemToVoucherRow === 'function') {
+              window.applyMasterItemToVoucherRow(orderRows[index], tr, selectedItem);
+              updateOrderRowFromDOM(index, tr, 'item');
+            } else {
+              orderRows[index].item = selectedItem.name;
+              orderRows[index].itemType = selectedItem.type;
+              if (selectedItem.type === 'Service' && selectedItem.id) {
+                orderRows[index].revenueLedgerId = selectedItem.id;
+              }
             }
             recalculateOrderTotals();
           });
@@ -486,8 +494,17 @@
         itemInp.addEventListener('click', attachPortal);
         itemInp.addEventListener('input', () => {
           orderRows[index].item = itemInp.value;
+          if (!itemInp.value.trim() && typeof window.clearVoucherRowItemLink === 'function') {
+            window.clearVoucherRowItemLink(orderRows[index], tr);
+            recalculateOrderTotals();
+          }
           attachPortal();
         });
+      }
+
+      const hsnInp = tr.querySelector('.sales-row-hsn');
+      if (hsnInp && typeof window.attachVoucherRowCodePicker === 'function') {
+        window.attachVoucherRowCodePicker(hsnInp, () => orderRows[index]);
       }
     });
   }

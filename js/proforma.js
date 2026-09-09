@@ -621,7 +621,10 @@
             </div>
           </td>
           <td class="sales-cell-hsn" style="width: 90px; padding: 4px 6px;">
-            <input type="text" class="sales-row-hsn je-input" value="${safeEsc(row.hsn || '')}" placeholder="HSN/SAC" style="border: none; background: transparent; box-shadow: none; padding: 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" />
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="text" class="sales-row-hsn je-input" value="${safeEsc(row.hsn || '')}" placeholder="HSN/SAC" title="${safeEsc(row.hsnDesc || 'Search the HSN / SAC code master')}" style="border: none; background: transparent; box-shadow: none; padding: 0 14px 0 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" autocomplete="off" />
+              <span class="sales-row-drop-arrow" style="position: absolute; right: 0; pointer-events: none; color: var(--slate-400); font-size: 9px;">▼</span>
+            </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
             <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
@@ -674,10 +677,15 @@
         const attachPortal = () => {
           _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
-            proformaRows[index].item = selectedItem.name;
-            proformaRows[index].itemType = selectedItem.type;
-            if (selectedItem.type === 'Service' && selectedItem.id) {
-              proformaRows[index].revenueLedgerId = selectedItem.id;
+            if (typeof window.applyMasterItemToVoucherRow === 'function') {
+              window.applyMasterItemToVoucherRow(proformaRows[index], tr, selectedItem);
+              updateProformaRowFromDOM(index, tr, 'item');
+            } else {
+              proformaRows[index].item = selectedItem.name;
+              proformaRows[index].itemType = selectedItem.type;
+              if (selectedItem.type === 'Service' && selectedItem.id) {
+                proformaRows[index].revenueLedgerId = selectedItem.id;
+              }
             }
             recalculateProformaTotals();
           });
@@ -687,8 +695,17 @@
         itemInp.addEventListener('click', attachPortal);
         itemInp.addEventListener('input', () => {
           proformaRows[index].item = itemInp.value;
+          if (!itemInp.value.trim() && typeof window.clearVoucherRowItemLink === 'function') {
+            window.clearVoucherRowItemLink(proformaRows[index], tr);
+            recalculateProformaTotals();
+          }
           attachPortal();
         });
+      }
+
+      const hsnInp = tr.querySelector('.sales-row-hsn');
+      if (hsnInp && typeof window.attachVoucherRowCodePicker === 'function') {
+        window.attachVoucherRowCodePicker(hsnInp, () => proformaRows[index]);
       }
     });
   }

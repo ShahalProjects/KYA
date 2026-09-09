@@ -304,12 +304,11 @@
     renderPanStatus();
   }
 
-  // ── HSN Code -> Description (Master Desk > Stock Item) ──
+  // ── Generic Code -> Description combobox (HSN / SAC and similar code masters) ──
   // Code is searchable; Description is a read-only display auto-filled from the
   // selected code, showing a hover popup when its text is truncated.
-  // Backed by window.HSN_CODE_LIST ([code, description] pairs) from js/hsn-codes.js.
-  function wireHsnCodeDescFields(container, codePrefix, descPrefix) {
-    const hsnList = (typeof window !== 'undefined' && Array.isArray(window.HSN_CODE_LIST)) ? window.HSN_CODE_LIST : [];
+  function wireCodeDescComboField(container, codePrefix, descPrefix, codeList, noun) {
+    const list = Array.isArray(codeList) ? codeList : [];
 
     const codeHidden = container.querySelector('#' + codePrefix);
     const codeTrigger = container.querySelector('#' + codePrefix + 'Trigger');
@@ -328,12 +327,12 @@
 
     const setPair = (code, desc) => {
       codeHidden.value = code || '';
-      codeTriggerText.textContent = code || 'Search HSN code...';
+      codeTriggerText.textContent = code || ('Search ' + noun + ' code...');
       codeTriggerText.style.color = code ? 'var(--slate-700)' : 'var(--slate-400)';
 
       descHidden.value = desc || '';
       if (descTriggerText) {
-        descTriggerText.textContent = desc || 'Auto-filled from HSN Code';
+        descTriggerText.textContent = desc || ('Auto-filled from ' + noun + ' Code');
         descTriggerText.style.color = desc ? 'var(--slate-700)' : 'var(--slate-400)';
       }
     };
@@ -376,7 +375,7 @@
     const filterList = (query) => {
       const q = query.toLowerCase().trim();
       if (!q) return [];
-      return hsnList.filter(pair => pair[0].toLowerCase().includes(q) || pair[1].toLowerCase().includes(q));
+      return list.filter(pair => pair[0].toLowerCase().includes(q) || pair[1].toLowerCase().includes(q));
     };
 
     const renderRows = (optionsList, matches, query, onUseTyped) => {
@@ -424,7 +423,7 @@
           emptyState.style.padding = '10px 12px';
           emptyState.style.fontSize = '12px';
           emptyState.style.color = 'var(--slate-400)';
-          emptyState.textContent = 'No matching HSN code found';
+          emptyState.textContent = 'No matching ' + noun + ' code found';
           optionsList.appendChild(emptyState);
         }
       } else if (matches.length > MAX_RESULTS) {
@@ -444,7 +443,7 @@
       prompt.style.padding = '10px 12px';
       prompt.style.fontSize = '12px';
       prompt.style.color = 'var(--slate-400)';
-      prompt.textContent = 'Type to search ' + hsnList.length.toLocaleString('en-IN') + ' HSN codes...';
+      prompt.textContent = 'Type to search ' + list.length.toLocaleString('en-IN') + ' ' + noun + ' codes...';
       optionsList.appendChild(prompt);
     };
 
@@ -477,6 +476,20 @@
         codeDropdown.style.display = 'none';
       }
     });
+  }
+
+  // HSN Code <-> Description (Master Desk > Stock Item)
+  // Backed by window.HSN_CODE_LIST ([code, description] pairs) from js/hsn-codes.js.
+  function wireHsnCodeDescFields(container, codePrefix, descPrefix) {
+    const hsnList = (typeof window !== 'undefined' && Array.isArray(window.HSN_CODE_LIST)) ? window.HSN_CODE_LIST : [];
+    wireCodeDescComboField(container, codePrefix, descPrefix, hsnList, 'HSN');
+  }
+
+  // SAC Code <-> Description (Master Desk > Ledger — Revenue from Operations group)
+  // Backed by window.SAC_CODE_LIST ([code, description] pairs) from js/sac-codes.js.
+  function wireSacCodeDescFields(container, codePrefix, descPrefix) {
+    const sacList = (typeof window !== 'undefined' && Array.isArray(window.SAC_CODE_LIST)) ? window.SAC_CODE_LIST : [];
+    wireCodeDescComboField(container, codePrefix, descPrefix, sacList, 'SAC');
   }
 
   function syncStockGroupsToCoa() {
@@ -970,6 +983,36 @@
     }
 
     return targetName.includes('bank');
+  }
+
+  function isRevenueFromOperationsGroup(groupVal) {
+    if (!groupVal) return false;
+    const [pType, pId] = groupVal.split(':');
+
+    let targetSgId = pId;
+    let targetName = '';
+
+    if (pType === 'gl') {
+      const gl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => String(l.id) === String(pId)) : null;
+      if (gl) {
+        targetSgId = gl.sgId;
+        targetName = (gl.name || '').toLowerCase();
+      }
+    }
+
+    if (targetSgId === 'sg-rfo') return true;
+    if (targetName.includes('revenue from operations')) return true;
+
+    if (typeof COA_SYS_SGS !== 'undefined') {
+      const sg = COA_SYS_SGS.find(s => s.id === targetSgId);
+      if (sg) {
+        if (sg.id === 'sg-rfo' || sg.parent === 'sg-rfo') return true;
+        const sName = (sg.name || '').toLowerCase();
+        if (sName.includes('revenue from operations')) return true;
+      }
+    }
+
+    return false;
   }
 
   function validateMasterGroupAliasesLive() {
@@ -3393,6 +3436,62 @@
             </div>
           </div>
 
+          <!-- Additional Information (Dynamic for Revenue from Operations group) -->
+          <div id="masterLedgerSacWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 24px; transition: all 0.2s ease;">
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; gap: 7px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+              <span>Additional Information</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+              <div style="min-width: 0;">
+                <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">SAC Code</label>
+                <div class="kya-searchable-select-wrap" id="masterLedgerSacCodeWrap" style="position: relative; width: 100%;">
+                  <input type="hidden" id="masterLedgerSacCode" value="">
+                  <div class="kya-searchable-select-trigger" id="masterLedgerSacCodeTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--slate-400);">
+                    <span id="masterLedgerSacCodeTriggerText">Search or select SAC code...</span>
+                    <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                  </div>
+                  <div class="kya-searchable-select-dropdown" id="masterLedgerSacCodeDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                    <input type="text" id="masterLedgerSacCodeSearch" placeholder="Search by SAC code..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                    <div id="masterLedgerSacCodeOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="min-width: 0;">
+                <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">SAC Description</label>
+                <div style="position: relative; width: 100%; min-width: 0;">
+                  <input type="hidden" id="masterLedgerSacDesc" value="">
+                  <div id="masterLedgerSacDescTrigger" style="display: flex; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: default; font-size: 13px; font-weight: 500; color: var(--slate-400); overflow: hidden;">
+                    <span id="masterLedgerSacDescTriggerText" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto;">Auto-filled from SAC Code</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">Rate</label>
+                <input type="number" min="0" step="0.01" id="masterLedgerSacRate" placeholder="0.00" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+              </div>
+              <div>
+                <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">GST / Tax Rate (%)</label>
+                <select id="masterLedgerSacGstSel" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <option value="0">0% (Nil / Exempt)</option>
+                  <option value="5">5% GST</option>
+                  <option value="12">12% GST</option>
+                  <option value="18" selected>18% GST</option>
+                  <option value="28">28% GST</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div style="display: flex; gap: 12px; align-items: center;">
             <button class="btn btn-primary" id="masterLedgerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">＋ Create Ledger</button>
             <button class="btn btn-secondary" id="masterLedgerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
@@ -3420,6 +3519,7 @@
       const groupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel');
       const addInfoWrap = contentArea.querySelector('#masterLedgerAdditionalInfoWrap');
       const bankAcctWrap = contentArea.querySelector('#masterLedgerBankAcctWrap');
+      const sacWrap = contentArea.querySelector('#masterLedgerSacWrap');
       const saveAsLedgerBtn = contentArea.querySelector('#masterLedgerSaveAsLedgerBtn');
       const saveAsPartyBtn = contentArea.querySelector('#masterLedgerSaveAsPartyBtn');
       const saveAsBg = contentArea.querySelector('#masterLedgerSaveAsBg');
@@ -3480,6 +3580,10 @@
         if (bankAcctWrap) {
           bankAcctWrap.style.display = isBankAccountGroup(groupSel.value) ? 'block' : 'none';
         }
+
+        if (sacWrap) {
+          sacWrap.style.display = isRevenueFromOperationsGroup(groupSel.value) ? 'block' : 'none';
+        }
       };
 
       if (groupSel) {
@@ -3495,6 +3599,9 @@
           e.target.value = e.target.value.toUpperCase();
         });
       }
+
+      // Revenue from Operations group: searchable SAC Code -> Description
+      wireSacCodeDescFields(contentArea, 'masterLedgerSacCode', 'masterLedgerSacDesc');
 
       // Bank Account group: IFSC auto-uppercase + QR code upload
       const bankAcctIfscInp = contentArea.querySelector('#masterLedgerBankAcctIfsc');
@@ -3819,6 +3926,15 @@
             qrCodeFileName: _masterLedgerBankAcctQrData ? _masterLedgerBankAcctQrData.fileName : ''
           } : null;
 
+          // Revenue from Operations group: Additional Information fields
+          const isRevenueOpsGroup = isRevenueFromOperationsGroup(groupVal);
+          const sacInfo = isRevenueOpsGroup ? {
+            sacCode: contentArea.querySelector('#masterLedgerSacCode')?.value?.trim() || '',
+            sacDesc: contentArea.querySelector('#masterLedgerSacDesc')?.value?.trim() || '',
+            rate: parseFloat(contentArea.querySelector('#masterLedgerSacRate')?.value) || 0,
+            gstRate: parseFloat(contentArea.querySelector('#masterLedgerSacGstSel')?.value) || 0
+          } : null;
+
           // ── If Save As "Customer" is selected ──
           if (_masterLedgerSaveAsMode === 'customer') {
             const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
@@ -4067,7 +4183,8 @@
             branch: branch,
             gstin: gstin,
             pan: pan,
-            bankAccountInfo: bankAcctInfo
+            bankAccountInfo: bankAcctInfo,
+            sacInfo: sacInfo
           };
 
           if (typeof coaLedgers !== 'undefined') {
@@ -6468,6 +6585,62 @@
               <input class="coa-modal-inp" id="masterAlterLedgerBalance" type="number" min="0" step="0.01" value="${balVal}" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
             </div>
 
+            <!-- Additional Information (Dynamic for Revenue from Operations group) -->
+            <div id="masterAlterLedgerSacWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 24px; transition: all 0.2s ease;">
+              <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; gap: 7px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                <span>Additional Information</span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+                <div style="min-width: 0;">
+                  <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">SAC Code</label>
+                  <div class="kya-searchable-select-wrap" id="masterAlterLedgerSacCodeWrap" style="position: relative; width: 100%;">
+                    <input type="hidden" id="masterAlterLedgerSacCode" value="${escapeHtml(currentLedger.sacInfo?.sacCode || '')}">
+                    <div class="kya-searchable-select-trigger" id="masterAlterLedgerSacCodeTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: ${currentLedger.sacInfo?.sacCode ? 'var(--slate-700)' : 'var(--slate-400)'};">
+                      <span id="masterAlterLedgerSacCodeTriggerText">${escapeHtml(currentLedger.sacInfo?.sacCode || 'Search or select SAC code...')}</span>
+                      <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                    </div>
+                    <div class="kya-searchable-select-dropdown" id="masterAlterLedgerSacCodeDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                      <input type="text" id="masterAlterLedgerSacCodeSearch" placeholder="Search by SAC code..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                      <div id="masterAlterLedgerSacCodeOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                    </div>
+                  </div>
+                </div>
+                <div style="min-width: 0;">
+                  <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">SAC Description</label>
+                  <div style="position: relative; width: 100%; min-width: 0;">
+                    <input type="hidden" id="masterAlterLedgerSacDesc" value="${escapeHtml(currentLedger.sacInfo?.sacDesc || '')}">
+                    <div id="masterAlterLedgerSacDescTrigger" style="display: flex; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: default; font-size: 13px; font-weight: 500; color: ${currentLedger.sacInfo?.sacDesc ? 'var(--slate-700)' : 'var(--slate-400)'}; overflow: hidden;">
+                      <span id="masterAlterLedgerSacDescTriggerText" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto;">${escapeHtml(currentLedger.sacInfo?.sacDesc || 'Auto-filled from SAC Code')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">Rate</label>
+                  <input type="number" min="0" step="0.01" id="masterAlterLedgerSacRate" value="${currentLedger.sacInfo?.rate || ''}" placeholder="0.00" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                </div>
+                <div>
+                  <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">GST / Tax Rate (%)</label>
+                  <select id="masterAlterLedgerSacGstSel" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                    <option value="0" ${(currentLedger.sacInfo?.gstRate === 0) ? 'selected' : ''}>0% (Nil / Exempt)</option>
+                    <option value="5" ${(currentLedger.sacInfo?.gstRate === 5) ? 'selected' : ''}>5% GST</option>
+                    <option value="12" ${(currentLedger.sacInfo?.gstRate === 12) ? 'selected' : ''}>12% GST</option>
+                    <option value="18" ${(!currentLedger.sacInfo || currentLedger.sacInfo.gstRate === 18) ? 'selected' : ''}>18% GST</option>
+                    <option value="28" ${(currentLedger.sacInfo?.gstRate === 28) ? 'selected' : ''}>28% GST</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div style="display: flex; gap: 12px; align-items: center;">
                 <button class="btn btn-primary" id="masterAlterLedgerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Save Changes</button>
@@ -6511,10 +6684,15 @@
 
         const groupSel = contentArea.querySelector('#masterAlterLedgerGroupCombinedSel');
         const addInfoWrap = contentArea.querySelector('#masterAlterLedgerAdditionalInfoWrap');
+        const sacWrap = contentArea.querySelector('#masterAlterLedgerSacWrap');
         const updateAdditionalInfoVisibility = () => {
           if (!groupSel || !addInfoWrap) return;
           const isParty = isTradePartyGroup(groupSel.value);
           addInfoWrap.style.display = isParty ? 'block' : 'none';
+
+          if (sacWrap) {
+            sacWrap.style.display = isRevenueFromOperationsGroup(groupSel.value) ? 'block' : 'none';
+          }
         };
 
         if (groupSel) {
@@ -6529,6 +6707,9 @@
             e.target.value = e.target.value.toUpperCase();
           });
         }
+
+        // Revenue from Operations group: searchable SAC Code -> Description
+        wireSacCodeDescFields(contentArea, 'masterAlterLedgerSacCode', 'masterAlterLedgerSacDesc');
 
         const saveBtn = contentArea.querySelector('#masterAlterLedgerSaveBtn');
         const cancelBtn = contentArea.querySelector('#masterAlterLedgerCancelBtn');
@@ -6646,6 +6827,14 @@
             const gstin = isParty && contentArea.querySelector('#masterAlterLedgerGstin') ? contentArea.querySelector('#masterAlterLedgerGstin').value.trim() : '';
             const pan = isParty && contentArea.querySelector('#masterAlterLedgerPan') ? contentArea.querySelector('#masterAlterLedgerPan').value.trim() : '';
 
+            const isRevenueOpsGroup = isRevenueFromOperationsGroup(groupVal);
+            const sacInfo = isRevenueOpsGroup ? {
+              sacCode: contentArea.querySelector('#masterAlterLedgerSacCode')?.value?.trim() || '',
+              sacDesc: contentArea.querySelector('#masterAlterLedgerSacDesc')?.value?.trim() || '',
+              rate: parseFloat(contentArea.querySelector('#masterAlterLedgerSacRate')?.value) || 0,
+              gstRate: parseFloat(contentArea.querySelector('#masterAlterLedgerSacGstSel')?.value) || 0
+            } : null;
+
             currentLedger.name = name;
             currentLedger.aliases = aliases;
             currentLedger.sgId = parentSgId;
@@ -6665,6 +6854,7 @@
               currentLedger.gstin = gstin;
               currentLedger.pan = pan;
             }
+            currentLedger.sacInfo = sacInfo;
 
             if (typeof renderChartPanel === 'function') renderChartPanel();
             if (typeof refreshAllReports === 'function') refreshAllReports();
@@ -7863,6 +8053,33 @@
               </button>
             </div>
 
+            <!-- HSN Code & Description (searchable, cross-fill) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <div style="min-width: 0;">
+                <label class="coa-modal-label" for="masterAlterStockItemHsnCode" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">HSN Code</label>
+                <div class="kya-searchable-select-wrap" id="masterAlterStockItemHsnCodeWrap" style="position: relative; width: 100%;">
+                  <input type="hidden" id="masterAlterStockItemHsnCode" value="${escapeHtml(currentItem.hsnCode || '')}">
+                  <div class="kya-searchable-select-trigger" id="masterAlterStockItemHsnCodeTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: ${currentItem.hsnCode ? 'var(--slate-700)' : 'var(--slate-400)'};">
+                    <span id="masterAlterStockItemHsnCodeTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(currentItem.hsnCode || 'Search HSN code...')}</span>
+                    <span style="font-size: 10px; color: var(--slate-400); flex-shrink: 0; margin-left: 6px;">▼</span>
+                  </div>
+                  <div class="kya-searchable-select-dropdown" id="masterAlterStockItemHsnCodeDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                    <input type="text" id="masterAlterStockItemHsnCodeSearch" placeholder="Search by HSN code..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                    <div id="masterAlterStockItemHsnCodeOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="min-width: 0;">
+                <label class="coa-modal-label" for="masterAlterStockItemHsnDesc" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">HSN Description</label>
+                <div style="position: relative; width: 100%; min-width: 0;">
+                  <input type="hidden" id="masterAlterStockItemHsnDesc" value="${escapeHtml(currentItem.hsnDesc || '')}">
+                  <div id="masterAlterStockItemHsnDescTrigger" style="display: flex; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #f8fafc; cursor: default; font-size: 13.5px; font-weight: 500; color: ${currentItem.hsnDesc ? 'var(--slate-700)' : 'var(--slate-400)'}; overflow: hidden;">
+                    <span id="masterAlterStockItemHsnDescTriggerText" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto;">${escapeHtml(currentItem.hsnDesc || 'Auto-filled from HSN Code')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Group & Category -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
               <div>
@@ -7999,6 +8216,7 @@
         initSearchableSelectHelper(contentArea, 'masterAlterStockItemGroupSel', 'Select Stock Group');
         initSearchableSelectHelper(contentArea, 'masterAlterStockItemCategorySel', 'Select Stock Category');
         initSearchableSelectHelper(contentArea, 'masterAlterStockItemWarehouseSel', 'Select Warehouse / Godown');
+        wireHsnCodeDescFields(contentArea, 'masterAlterStockItemHsnCode', 'masterAlterStockItemHsnDesc');
 
         const qtyInp = contentArea.querySelector('#masterAlterStockItemQty');
         const rateInp = contentArea.querySelector('#masterAlterStockItemRate');
@@ -8035,6 +8253,8 @@
             const rate = parseFloat(rateInp?.value) || 0;
             const reorder = parseFloat(contentArea.querySelector('#masterAlterStockItemReorder')?.value) || 0;
             const gst = parseFloat(contentArea.querySelector('#masterAlterStockItemGstSel')?.value) || 18;
+            const hsnCode = contentArea.querySelector('#masterAlterStockItemHsnCode')?.value?.trim() || '';
+            const hsnDesc = contentArea.querySelector('#masterAlterStockItemHsnDesc')?.value?.trim() || '';
 
             currentItem.name = name;
             currentItem.sku = sku;
@@ -8046,6 +8266,8 @@
             currentItem.rate = rate;
             currentItem.reorder = reorder;
             currentItem.gst = gst;
+            currentItem.hsnCode = hsnCode;
+            currentItem.hsnDesc = hsnDesc;
             currentItem.aliases = _masterAlterStockItemAliases.filter(a => a.trim() !== '');
 
             persistMasterStockItems();

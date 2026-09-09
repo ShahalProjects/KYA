@@ -72,7 +72,7 @@
           <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: ${totalColor};">₹ ${fmtNum(inv.total)}</td>
           <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
             <button class="btn btn-secondary btn-sm" onclick="loadSalesInvoice((window.KYA_STORE.salesVouchers || []).find(v => v.id === ${inv.id}), false)" style="padding: 6px 12px; font-size: 12px; border: 1.5px solid var(--blue-200); color: var(--blue-600); background: #fff;">Edit</button>
-            <button class="btn btn-secondary btn-sm" onclick="viewPrintInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px;">View / Print</button>
+            <button class="btn btn-secondary btn-sm" onclick="(window.viewSalesTaxInvoice || window.viewPrintInvoice)(${inv.id})" style="padding: 6px 12px; font-size: 12px;">View / Print</button>
             <button class="btn btn-danger btn-sm" onclick="deleteSalesInvoice(${inv.id})" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
           </td>
         </tr>

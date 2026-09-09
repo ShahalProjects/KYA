@@ -1,3 +1,32 @@
+  // ── Stock Item / Revenue-from-Operations masters used by the row pickers ──
+  const KYA_STOCK_ITEMS_STORAGE_KEY = 'kya_master_stock_items';
+
+  function getMasterStockItemList() {
+    if (window._masterStockItems && Array.isArray(window._masterStockItems)) {
+      return window._masterStockItems;
+    }
+    try {
+      const saved = localStorage.getItem(KYA_STOCK_ITEMS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  }
+  window.getMasterStockItemList = getMasterStockItemList;
+
+  function getRevenueFromOperationsLedgers() {
+    if (typeof coaLedgers === 'undefined' || !Array.isArray(coaLedgers)) return [];
+    const list = coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-rfo');
+    if (list.length === 0 && typeof getOrCreateSystemLedger === 'function') {
+      getOrCreateSystemLedger('Sales Account', 'sg-rfo');
+      return coaLedgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-rfo');
+    }
+    return list;
+  }
+  window.getRevenueFromOperationsLedgers = getRevenueFromOperationsLedgers;
+
   // ── Global Sales State Variables ──
   window.salesRows = window.salesRows || [];
   window.currentSalesType = window.currentSalesType || 'Product';
@@ -80,26 +109,37 @@
       }
     }
 
+    // Products come from the Stock Item master (Master Desk / Stock Hub), carrying their
+    // HSN code, GST rate, unit and selling price so the row can fill itself in.
     function getProductsList() {
-      const set = new Set();
-      set.add('Finished Goods');
-      set.add('Stock Item A');
-      set.add('Raw Materials');
-      set.add('Product Goods');
-      if (window.KYA_STORE && window.KYA_STORE.salesVouchers) {
-        window.KYA_STORE.salesVouchers.forEach(v => {
-          if (v.rows) {
-            v.rows.forEach(r => {
-              if (r.item && (!r.itemType || r.itemType === 'Product')) set.add(r.item);
-            });
-          }
-        });
-      }
-      return Array.from(set).map(name => ({ name, type: 'Product' }));
+      return getMasterStockItemList().map(it => ({
+        name: it.name || 'Unnamed Item',
+        type: 'Product',
+        id: it.id || '',
+        sku: it.sku || '',
+        unit: it.uom || '',
+        rate: (typeof it.price === 'number' && it.price > 0) ? it.price : (parseFloat(it.rate) || 0),
+        stockQty: parseFloat(it.qty) || 0,
+        hsn: it.hsnCode || '',
+        hsnDesc: it.hsnDesc || '',
+        gst: (typeof it.gst === 'number') ? it.gst : 18,
+        aliases: Array.isArray(it.aliases) ? it.aliases : []
+      }));
     }
 
+    // Services come from the Revenue from Operations ledgers, carrying their SAC code
+    // and GST rate.
     function getServicesList() {
-      return getIncomeLedgers().map(l => ({ name: l.name, type: 'Service', id: l.id, aliases: l.aliases, code: l.code }));
+      return getRevenueFromOperationsLedgers().map(l => ({
+        name: l.name,
+        type: 'Service',
+        id: l.id,
+        aliases: l.aliases,
+        code: l.code,
+        sac: (l.sacInfo && l.sacInfo.sacCode) || '',
+        sacDesc: (l.sacInfo && l.sacInfo.sacDesc) || '',
+        gst: (l.sacInfo && typeof l.sacInfo.gstRate === 'number') ? l.sacInfo.gstRate : undefined
+      }));
     }
 
     function open(inp, query, onSelect) {
@@ -156,8 +196,15 @@
       let services = _activeFilter === 'product' ? [] : getServicesList();
 
       if (q) {
-        products = products.filter(p => p.name.toLowerCase().includes(q));
-        services = services.filter(s => s.name.toLowerCase().includes(q) || (s.aliases && s.aliases.some(a => a.toLowerCase().includes(q))));
+        products = products.filter(p =>
+          p.name.toLowerCase().includes(q) ||
+          (p.sku && p.sku.toLowerCase().includes(q)) ||
+          (p.hsn && p.hsn.toLowerCase().includes(q)) ||
+          (p.aliases && p.aliases.some(a => (a || '').toLowerCase().includes(q))));
+        services = services.filter(s =>
+          s.name.toLowerCase().includes(q) ||
+          (s.sac && s.sac.toLowerCase().includes(q)) ||
+          (s.aliases && s.aliases.some(a => a.toLowerCase().includes(q))));
       }
 
       const queryHighlight = (text, pat) => {
@@ -177,22 +224,27 @@
             <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
             <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
-          <span class="je-drop-empty-txt">No product or service found</span>
-          <span class="je-drop-empty-sub">Type custom description directly or filter by category</span>
+          <span class="je-drop-empty-txt">No stock item or service found</span>
+          <span class="je-drop-empty-sub">Create them in Master Desk (Stock Item / Revenue from Operations), or type a description directly</span>
         `;
         el.appendChild(emptyDiv);
       } else {
         if (products.length > 0) {
           const hdr = document.createElement('div');
           hdr.className = 'je-drop-header';
-          hdr.textContent = 'Products';
+          hdr.textContent = 'Stock Items';
           el.appendChild(hdr);
           products.forEach(p => {
             const item = document.createElement('div');
             item.className = 'je-drop-item';
+            const meta = [];
+            if (p.sku) meta.push(p.sku);
+            if (p.hsn) meta.push('HSN ' + p.hsn);
+            if (typeof p.gst === 'number') meta.push(p.gst + '% GST');
+            if (p.unit) meta.push(p.unit);
             item.innerHTML = `
               <span class="je-drop-dot" style="background:#3b82f6"></span>
-              <span class="je-drop-name" style="flex:1">${queryHighlight(p.name, q)}</span>
+              <span class="je-drop-name" style="flex:1">${queryHighlight(p.name, q)}${meta.length ? `<span style="display:block;font-size:10.5px;font-weight:600;color:#94a3b8;margin-top:1px">${meta.join(' · ')}</span>` : ''}</span>
               <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#eff6ff;color:#2563eb;text-transform:uppercase;">Product</span>
             `;
             const handleItemSelect = (e) => {
@@ -211,15 +263,18 @@
         if (services.length > 0) {
           const hdr = document.createElement('div');
           hdr.className = 'je-drop-header';
-          hdr.textContent = 'Services';
+          hdr.textContent = 'Revenue from Operations';
           el.appendChild(hdr);
           services.forEach(s => {
             const item = document.createElement('div');
             item.className = 'je-drop-item';
             const akaStr = s.aliases && s.aliases.length > 0 ? ` [A.K.A: ${s.aliases.join(', ')}]` : '';
+            const meta = [];
+            if (s.sac) meta.push('SAC ' + s.sac);
+            if (typeof s.gst === 'number') meta.push(s.gst + '% GST');
             item.innerHTML = `
               <span class="je-drop-dot" style="background:#10b981"></span>
-              <span class="je-drop-name" style="flex:1">${queryHighlight(s.name, q)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${queryHighlight(akaStr, q)}</span>` : ''}</span>
+              <span class="je-drop-name" style="flex:1">${queryHighlight(s.name, q)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${queryHighlight(akaStr, q)}</span>` : ''}${meta.length ? `<span style="display:block;font-size:10.5px;font-weight:600;color:#94a3b8;margin-top:1px">${meta.join(' · ')}</span>` : ''}</span>
               <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#ecfdf5;color:#059669;text-transform:uppercase;">Service</span>
             `;
             const handleItemSelect = (e) => {
@@ -268,6 +323,201 @@
   })();
 
   const _salesItemPortal = _salesRevPortal;
+
+  // ══════════════════════════════════════════════════════════════════
+  //  HSN / SAC CODE PICKER — searchable code master for the row's HSN/SAC cell.
+  //  Products list HSN codes, services list SAC codes (same masters Master Desk uses).
+  // ══════════════════════════════════════════════════════════════════
+  const _salesCodePortal = (() => {
+    let el = document.getElementById('sales-code-portal-dropdown');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sales-code-portal-dropdown';
+      el.style.cssText = `
+        position: fixed;
+        z-index: 99999;
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,.06), 0 12px 32px -4px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.02);
+        max-height: 320px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: none;
+        min-width: 320px;
+        font-family: Inter, sans-serif;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      `;
+      document.body.appendChild(el);
+    }
+
+    if (!document.getElementById('sales-code-portal-styles')) {
+      const style = document.createElement('style');
+      style.id = 'sales-code-portal-styles';
+      style.textContent = `
+        #sales-code-portal-dropdown.open {
+          display: block !important;
+          animation: jeDropIn .14s cubic-bezier(.2,0,.2,1);
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const MAX_RESULTS = 60;
+
+    let _activeInp = null;
+    let _activeCb  = null;
+    let _activeKind = 'HSN';
+    let _highlightIdx = -1;
+    let _open = false;
+
+    function _items() { return el.querySelectorAll('.je-drop-item'); }
+
+    function _setHL(idx) {
+      const items = _items();
+      items.forEach(it => it.classList.remove('highlighted'));
+      _highlightIdx = idx;
+      if (idx >= 0 && idx < items.length) {
+        items[idx].classList.add('highlighted');
+        items[idx].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function _position(inp) {
+      const r = inp.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - r.bottom - 8;
+      const spaceAbove = r.top - 8;
+      const maxH = Math.min(320, Math.max(spaceBelow, spaceAbove) - 8);
+      el.style.maxHeight = maxH + 'px';
+      el.style.width = Math.max(r.width, 340) + 'px';
+      el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 340) - 8)) + 'px';
+      if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+        el.style.top = (r.bottom + 6) + 'px';
+        el.style.bottom = 'auto';
+      } else {
+        el.style.top = 'auto';
+        el.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+      }
+    }
+
+    function _codeList(kind) {
+      const list = (kind === 'SAC') ? window.SAC_CODE_LIST : window.HSN_CODE_LIST;
+      return Array.isArray(list) ? list : [];
+    }
+
+    function open(inp, query, kind, onSelect) {
+      _activeInp = inp;
+      _activeCb = onSelect;
+      _activeKind = (kind === 'SAC') ? 'SAC' : 'HSN';
+      _highlightIdx = -1;
+      _position(inp);
+      _render(query);
+      el.classList.add('open');
+      _open = true;
+    }
+
+    function _render(query) {
+      const q = (query || '').toLowerCase().trim();
+      el.innerHTML = '';
+
+      const hdr = document.createElement('div');
+      hdr.className = 'je-drop-header';
+      hdr.textContent = _activeKind === 'SAC' ? 'SAC Codes (Services)' : 'HSN Codes (Products)';
+      el.appendChild(hdr);
+
+      const all = _codeList(_activeKind);
+      let matches = q
+        ? all.filter(pair => String(pair[0]).toLowerCase().startsWith(q) ||
+                             String(pair[0]).toLowerCase().includes(q) ||
+                             String(pair[1]).toLowerCase().includes(q))
+        : all;
+
+      // Codes matching from the start rank first — that is how people type them.
+      if (q) {
+        matches = matches.slice().sort((a, b) => {
+          const aStarts = String(a[0]).toLowerCase().startsWith(q) ? 0 : 1;
+          const bStarts = String(b[0]).toLowerCase().startsWith(q) ? 0 : 1;
+          return aStarts - bStarts;
+        });
+      }
+
+      const shown = matches.slice(0, MAX_RESULTS);
+
+      if (!shown.length) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'je-drop-empty';
+        emptyDiv.innerHTML = `
+          <svg class="je-drop-empty-icon" width="28" height="28" viewBox="0 0 32 32" fill="none">
+            <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span class="je-drop-empty-txt">No ${_activeKind} code found</span>
+          <span class="je-drop-empty-sub">Search by code or description, or type the code directly</span>
+        `;
+        el.appendChild(emptyDiv);
+        return;
+      }
+
+      shown.forEach(pair => {
+        const code = String(pair[0]);
+        const desc = String(pair[1] || '');
+        const item = document.createElement('div');
+        item.className = 'je-drop-item';
+        item.innerHTML = `
+          <span style="font-family: monospace, inherit; font-size: 12.5px; font-weight: 800; color: #1d4ed8; min-width: 66px;">${ohEsc(code)}</span>
+          <span class="je-drop-name" style="flex:1; font-size: 12.5px; color: #475569;">${ohEsc(desc)}</span>
+        `;
+        const handleSelect = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          close();
+          if (_activeCb) _activeCb({ code: code, desc: desc, kind: _activeKind });
+        };
+        item.addEventListener('mousedown', handleSelect);
+        item.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+        el.appendChild(item);
+      });
+
+      if (matches.length > shown.length) {
+        const more = document.createElement('div');
+        more.className = 'je-drop-header';
+        more.style.cssText = 'text-align:center; color:#94a3b8; font-weight:600;';
+        more.textContent = `${matches.length - shown.length} more — keep typing to narrow`;
+        el.appendChild(more);
+      }
+    }
+
+    function close() {
+      el.classList.remove('open');
+      _open = false;
+      _highlightIdx = -1;
+      _activeInp = null;
+    }
+
+    function isOpen() { return _open; }
+    function moveHighlight(d) {
+      const items = _items();
+      if (!items.length) return;
+      _setHL(Math.max(0, Math.min(_highlightIdx + d, items.length - 1)));
+    }
+    function selectHighlighted() {
+      const items = _items();
+      const idx = _highlightIdx >= 0 ? _highlightIdx : 0;
+      if (items[idx]) items[idx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    }
+
+    function _reposition() { if (_open && _activeInp) _position(_activeInp); }
+    window.addEventListener('scroll', _reposition, true);
+    window.addEventListener('resize', _reposition);
+
+    document.addEventListener('mousedown', e => {
+      if (_open && !el.contains(e.target) && e.target !== _activeInp) close();
+    });
+
+    return { open, close, isOpen, moveHighlight, selectHighlighted };
+  })();
+  window._salesCodePortal = _salesCodePortal;
 
   // ══════════════════════════════════════════════════════════════════
   //  SALES FORM — Row rendering, totals calculation, invoice/order autofill, form init
@@ -1139,7 +1389,10 @@
             </div>
           </td>
           <td class="sales-cell-hsn" style="width: 90px; padding: 4px 6px;">
-            <input type="text" class="sales-row-hsn je-input" value="${ohEsc(row.hsn || '')}" placeholder="HSN/SAC" style="border: none; background: transparent; box-shadow: none; padding: 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" ${isLocked ? 'readonly' : ''} />
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="text" class="sales-row-hsn je-input" value="${ohEsc(row.hsn || '')}" placeholder="HSN/SAC" title="${ohEsc(row.hsnDesc || 'Search the HSN / SAC code master')}" style="border: none; background: transparent; box-shadow: none; padding: 0 14px 0 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" ${isLocked ? 'readonly' : ''} autocomplete="off" />
+              <span class="sales-row-drop-arrow" style="position: absolute; right: 0; pointer-events: none; color: var(--slate-400); font-size: 9px;">▼</span>
+            </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
             <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
@@ -1191,12 +1444,7 @@
         const attachPortal = () => {
           _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
-            salesRows[index].item = selectedItem.name;
-            salesRows[index].itemType = selectedItem.type;
-            if (selectedItem.type === 'Service' && selectedItem.id) {
-              salesRows[index].revenueLedgerId = selectedItem.id;
-            }
-            recalculateSalesTotals();
+            applySalesMasterItemToRow(index, tr, selectedItem);
           });
         };
 
@@ -1204,10 +1452,177 @@
         itemInp.addEventListener('click', attachPortal);
         itemInp.addEventListener('input', () => {
           salesRows[index].item = itemInp.value;
+          if (!itemInp.value.trim()) {
+            clearVoucherRowItemLink(salesRows[index], tr);
+            recalculateSalesTotals();
+          }
           attachPortal();
         });
+        itemInp.addEventListener('keydown', e => handlePortalKeydown(e, _salesItemPortal));
+      }
+
+      const hsnInp = tr.querySelector('.sales-row-hsn');
+      if (hsnInp && !isLocked) {
+        attachVoucherRowCodePicker(hsnInp, () => salesRows[index]);
       }
     });
+  }
+
+  function handlePortalKeydown(e, portal) {
+    if (!portal || !portal.isOpen()) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      portal.moveHighlight(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      portal.moveHighlight(-1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      portal.selectHighlighted();
+    } else if (e.key === 'Escape') {
+      portal.close();
+    }
+  }
+
+  // Product rows pick from the HSN master, service rows from the SAC master.
+  function getSalesRowCodeKind(row, defaultType) {
+    const fallback = defaultType || (typeof currentSalesType !== 'undefined' ? currentSalesType : 'Product');
+    const type = (row && row.itemType) || fallback;
+    return type === 'Service' ? 'SAC' : 'HSN';
+  }
+  window.getSalesRowCodeKind = getSalesRowCodeKind;
+
+  // Copies a picked stock item / Revenue-from-Operations service onto a voucher row —
+  // its HSN or SAC code, GST rate, unit and price — and refreshes that row's inputs.
+  // Shared by the Sales Voucher and every Pre Invoice module (they use the same row
+  // schema and the same `.sales-row-*` classes).
+  function applyMasterItemToVoucherRow(row, tr, selectedItem, options) {
+    if (!row || !selectedItem) return;
+    const opts = options || {};
+
+    row.item = selectedItem.name;
+    row.itemType = selectedItem.type;
+
+    // The row always describes the item currently selected: switching the item replaces
+    // its code, unit and price, and blanks them when the new item carries none.
+    if (selectedItem.type === 'Service') {
+      row.revenueLedgerId = selectedItem.id || '';
+      row.stockItemId = '';
+      row.hsn = selectedItem.sac || '';
+      row.hsnDesc = selectedItem.sacDesc || '';
+      row.unit = '';
+      row.rate = 0;
+    } else {
+      row.stockItemId = selectedItem.id || '';
+      row.revenueLedgerId = '';
+      row.hsn = selectedItem.hsn || '';
+      row.hsnDesc = selectedItem.hsnDesc || '';
+      row.unit = selectedItem.unit || '';
+      row.rate = parseFloat(selectedItem.rate) || 0;
+    }
+    row.autoRate = row.rate;
+
+    if (!opts.zeroTax && typeof selectedItem.gst === 'number') row.tax = selectedItem.gst;
+
+    if (tr) refreshVoucherRowInputs(row, tr);
+  }
+  window.applyMasterItemToVoucherRow = applyMasterItemToVoucherRow;
+
+  // Emptying the Description unlinks the row: its HSN/SAC, unit and price go with it.
+  function clearVoucherRowItemLink(row, tr) {
+    if (!row) return;
+
+    row.itemType = '';
+    row.stockItemId = '';
+    row.revenueLedgerId = '';
+    row.hsn = '';
+    row.hsnDesc = '';
+    row.unit = '';
+    row.rate = 0;
+    row.autoRate = 0;
+    row.baseAmount = 0;
+    row.amount = 0;
+
+    if (tr) {
+      refreshVoucherRowInputs(row, tr);
+      const baseEl = tr.querySelector('.sales-row-base');
+      if (baseEl) baseEl.value = '';
+      const amtEl = tr.querySelector('.sales-row-amount-input');
+      if (amtEl) amtEl.value = '';
+    }
+  }
+  window.clearVoucherRowItemLink = clearVoucherRowItemLink;
+
+  // Writes the row's HSN/SAC, unit, rate and tax back into its inputs, without
+  // re-rendering the whole table.
+  function refreshVoucherRowInputs(row, tr) {
+    if (!row || !tr) return;
+
+    const hsnEl = tr.querySelector('.sales-row-hsn');
+    if (hsnEl) {
+      hsnEl.value = row.hsn || '';
+      hsnEl.title = row.hsnDesc || '';
+    }
+    const unitEl = tr.querySelector('.sales-row-unit');
+    if (unitEl) unitEl.value = row.unit || '';
+    const rateEl = tr.querySelector('.sales-row-rate');
+    if (rateEl) rateEl.value = row.rate ? Number(row.rate).toFixed(2) : '';
+    const taxEl = tr.querySelector('.sales-row-tax');
+    if (taxEl) {
+      const taxVal = String(row.tax);
+      if (!Array.from(taxEl.options).some(o => o.value === taxVal)) {
+        const opt = document.createElement('option');
+        opt.value = taxVal;
+        opt.textContent = taxVal + '%';
+        taxEl.appendChild(opt);
+      }
+      taxEl.value = taxVal;
+    }
+  }
+  window.refreshVoucherRowInputs = refreshVoucherRowInputs;
+
+  // Turns a row's HSN/SAC cell into a searchable code picker: HSN codes for product
+  // rows, SAC codes for service rows.
+  function attachVoucherRowCodePicker(hsnInp, getRow, defaultType, onPicked) {
+    if (!hsnInp) return;
+
+    const attach = () => {
+      const row = getRow() || {};
+      _salesCodePortal.open(hsnInp, hsnInp.value, getSalesRowCodeKind(row, defaultType), (picked) => {
+        hsnInp.value = picked.code;
+        hsnInp.title = picked.desc || '';
+        row.hsn = picked.code;
+        row.hsnDesc = picked.desc || '';
+        if (typeof onPicked === 'function') onPicked(picked);
+      });
+    };
+
+    hsnInp.addEventListener('focus', attach);
+    hsnInp.addEventListener('click', attach);
+    hsnInp.addEventListener('input', () => {
+      const row = getRow();
+      if (row) {
+        row.hsn = hsnInp.value;
+        row.hsnDesc = '';
+      }
+      attach();
+    });
+    hsnInp.addEventListener('keydown', e => handlePortalKeydown(e, _salesCodePortal));
+  }
+  window.attachVoucherRowCodePicker = attachVoucherRowCodePicker;
+
+  function isSalesZeroTaxSupply() {
+    const supplyTypeEl = document.getElementById('salesSupplyType');
+    return !!supplyTypeEl && (supplyTypeEl.value === 'Export (Zero-Rated / LUT)' || supplyTypeEl.value === 'SEZ Without Tax');
+  }
+
+  function applySalesMasterItemToRow(index, tr, selectedItem) {
+    const row = salesRows[index];
+    if (!row) return;
+
+    applyMasterItemToVoucherRow(row, tr, selectedItem, { zeroTax: isSalesZeroTaxSupply() });
+    if (tr) updateRowFromDOM(index, tr, 'item');
+    recalculateSalesTotals();
   }
 
   function addSalesRow() {
@@ -1234,16 +1649,17 @@
     if (isService) {
       const revSelect = tr.querySelector('.sales-row-rev');
       if (revSelect && revSelect.value) row.revenueLedgerId = revSelect.value;
-    } else {
-      const itemEl = tr.querySelector('.sales-row-item');
-      if (itemEl) row.item = itemEl.value;
-
-      const hsnEl = tr.querySelector('.sales-row-hsn');
-      if (hsnEl) row.hsn = hsnEl.value;
-
-      const unitEl = tr.querySelector('.sales-row-unit');
-      if (unitEl) row.unit = unitEl.value;
     }
+
+    // Description, HSN/SAC and Unit live on every row, whatever the voucher type.
+    const itemEl = tr.querySelector('.sales-row-item');
+    if (itemEl) row.item = itemEl.value;
+
+    const hsnEl = tr.querySelector('.sales-row-hsn');
+    if (hsnEl) row.hsn = hsnEl.value;
+
+    const unitEl = tr.querySelector('.sales-row-unit');
+    if (unitEl) row.unit = unitEl.value;
 
     let qty      = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
     let rate     = Math.round(parseSalesAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
