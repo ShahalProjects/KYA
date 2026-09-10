@@ -141,23 +141,67 @@
                   </div>
                 </div>
 
-                <!-- Custom Logo Upload Column -->
-                <div>
-                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:12px;">Company Logo / Icon</label>
-                  <div style="background:#fafbfc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;">
-                    <div id="coPreviewAvatar" style="width:72px;height:72px;border-radius:16px;background:${coData.iconImage ? `url(${coData.iconImage})` : 'linear-gradient(135deg,#2563eb,#059669)'};background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;">${coData.iconImage ? '' : initials}</div>
-                    
-                    <div style="display:flex;gap:8px;justify-content:center;">
-                      <button type="button" id="coUploadBtn" style="height:32px;padding:0 12px;border:1.5px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:4px;">
-                        Upload Logo
-                      </button>
-                      <button type="button" id="coRemoveImageBtn" style="height:32px;padding:0 10px;border:none;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:${coData.iconImage ? 'block' : 'none'};">
-                        Remove
-                      </button>
+                <!-- Right column: Logo + Authorised Signatory -->
+                <div style="display:flex;flex-direction:column;gap:20px;">
+                  <!-- Custom Logo Upload Column -->
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:12px;">Company Logo / Icon</label>
+                    <div style="background:#fafbfc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;">
+                      <div id="coPreviewAvatar" style="width:72px;height:72px;border-radius:16px;background:${coData.iconImage ? `url(${coData.iconImage})` : 'linear-gradient(135deg,#2563eb,#059669)'};background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;">${coData.iconImage ? '' : initials}</div>
+
+                      <div style="display:flex;gap:8px;justify-content:center;">
+                        <button type="button" id="coUploadBtn" style="height:32px;padding:0 12px;border:1.5px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:4px;">
+                          Upload Logo
+                        </button>
+                        <button type="button" id="coRemoveImageBtn" style="height:32px;padding:0 10px;border:none;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:${coData.iconImage ? 'block' : 'none'};">
+                          Remove
+                        </button>
+                      </div>
+                      <input type="file" id="coFileInput" accept="image/*" style="display:none;">
+                      <input type="hidden" id="coIconImage" value="${ohEsc(coData.iconImage || '')}">
+                      <div style="font-size:10.5px;color:#94a3b8;line-height:1.3;">JPG, PNG, SVG supported.<br>Square aspect ratio works best.</div>
                     </div>
-                    <input type="file" id="coFileInput" accept="image/*" style="display:none;">
-                    <input type="hidden" id="coIconImage" value="${ohEsc(coData.iconImage || '')}">
-                    <div style="font-size:10.5px;color:#94a3b8;line-height:1.3;">JPG, PNG, SVG supported.<br>Square aspect ratio works best.</div>
+                  </div>
+
+                  <!-- Authorised Signatory: Signature Upload + Seal Creator -->
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:12px;">Authorised Signatory</label>
+                    <div style="background:#fafbfc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px;">
+
+                      <!-- Signature -->
+                      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+                        <div id="coSignaturePreview" style="width:100%;height:64px;border:1px solid #e2e8f0;border-radius:8px;background:${coData.signatureImage ? `url(${coData.signatureImage}) center/contain no-repeat #fff` : '#fff'};display:flex;align-items:center;justify-content:center;font-size:10.5px;color:#94a3b8;box-sizing:border-box;">${coData.signatureImage ? '' : 'No signature uploaded'}</div>
+                        <div style="display:flex;gap:8px;justify-content:center;">
+                          <button type="button" id="coUploadSignBtn" style="height:30px;padding:0 10px;border:1.5px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-size:11.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">
+                            Upload Signature
+                          </button>
+                          <button type="button" id="coRemoveSignBtn" style="height:30px;padding:0 10px;border:none;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:11.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:${coData.signatureImage ? 'block' : 'none'};">
+                            Remove
+                          </button>
+                        </div>
+                        <input type="file" id="coSignFileInput" accept="image/*" style="display:none;">
+                        <input type="hidden" id="coSignatureImage" value="${ohEsc(coData.signatureImage || '')}">
+                      </div>
+
+                      <div style="border-top:1px dashed #cbd5e1;"></div>
+
+                      <!-- Create Seal -->
+                      <div style="display:flex;flex-direction:column;gap:8px;">
+                        <label style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Create Seal</label>
+                        <input id="coSealName" value="${ohEsc(coData.sealName || '')}" placeholder="Seal name (e.g. company name)" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box;">
+                        <select id="coSealShape" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 8px;font-size:12px;background:#fff;color:#334155;outline:none;">
+                          <option value="round" ${coData.sealShape !== 'square' ? 'selected' : ''}>Round Seal</option>
+                          <option value="square" ${coData.sealShape === 'square' ? 'selected' : ''}>Square Seal</option>
+                        </select>
+                        <button type="button" id="coGenerateSealBtn" style="height:32px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
+                          Generate Seal
+                        </button>
+                      </div>
+
+                      <!-- Seal Preview (rendered below the signature) -->
+                      <div id="coSealPreview" style="width:120px;height:120px;margin:4px auto 0;background:${coData.sealImage ? `url(${coData.sealImage}) center/contain no-repeat` : 'transparent'};"></div>
+                      <input type="hidden" id="coSealImage" value="${ohEsc(coData.sealImage || '')}">
+                    </div>
                   </div>
                 </div>
               </div>
@@ -503,6 +547,89 @@
       previewAvatar.style.backgroundImage = 'none';
       previewAvatar.textContent = getCompanyInitials(nameInp.value || dispInp.value);
       removeBtn.style.display = 'none';
+    });
+
+    // Authorised Signatory: signature image upload wiring
+    const signFileInp = wrap.querySelector('#coSignFileInput');
+    const uploadSignBtn = wrap.querySelector('#coUploadSignBtn');
+    const removeSignBtn = wrap.querySelector('#coRemoveSignBtn');
+    const signatureImageInp = wrap.querySelector('#coSignatureImage');
+    const signaturePreview = wrap.querySelector('#coSignaturePreview');
+
+    uploadSignBtn.addEventListener('click', () => signFileInp.click());
+
+    signFileInp.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const base64 = evt.target.result;
+        signatureImageInp.value = base64;
+        coData.signatureImage = base64;
+        signaturePreview.textContent = '';
+        signaturePreview.style.background = `url(${base64}) center/contain no-repeat #fff`;
+        removeSignBtn.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    removeSignBtn.addEventListener('click', () => {
+      signatureImageInp.value = '';
+      coData.signatureImage = '';
+      signFileInp.value = '';
+      signaturePreview.style.background = '#fff';
+      signaturePreview.textContent = 'No signature uploaded';
+      removeSignBtn.style.display = 'none';
+    });
+
+    // Authorised Signatory: auto-generate an official-style seal (round or square)
+    const escSealText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const buildSealSVG = (name, shape) => {
+      const label = escSealText((name || 'COMPANY NAME').toUpperCase());
+      const ink = '#b91c1c';
+      if (shape === 'square') {
+        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="6" width="188" height="188" fill="none" stroke="${ink}" stroke-width="4"/>
+          <rect x="15" y="15" width="170" height="170" fill="none" stroke="${ink}" stroke-width="1.2"/>
+          <text x="100" y="82" text-anchor="middle" font-family="Georgia, serif" font-size="15" font-weight="700" fill="${ink}">${label}</text>
+          <line x1="45" y1="100" x2="155" y2="100" stroke="${ink}" stroke-width="1"/>
+          <text x="100" y="124" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="700" fill="${ink}" letter-spacing="1.5">AUTHORISED</text>
+          <text x="100" y="142" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="700" fill="${ink}" letter-spacing="1.5">SIGNATORY</text>
+        </svg>`;
+      }
+      return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <path id="sealTopArc" d="M 22,100 A 78,78 0 1 1 178,100" fill="none"/>
+          <path id="sealBottomArc" d="M 178,105 A 78,78 0 1 1 22,105" fill="none"/>
+        </defs>
+        <circle cx="100" cy="100" r="90" fill="none" stroke="${ink}" stroke-width="3"/>
+        <circle cx="100" cy="100" r="78" fill="none" stroke="${ink}" stroke-width="1.2"/>
+        <text font-family="Georgia, serif" font-size="13" font-weight="700" fill="${ink}" letter-spacing="1.5">
+          <textPath href="#sealTopArc" startOffset="50%" text-anchor="middle">${label}</textPath>
+        </text>
+        <text font-family="Georgia, serif" font-size="11" font-weight="700" fill="${ink}" letter-spacing="2.5">
+          <textPath href="#sealBottomArc" startOffset="50%" text-anchor="middle">AUTHORISED SIGNATORY</textPath>
+        </text>
+        <circle cx="100" cy="100" r="3" fill="${ink}"/>
+      </svg>`;
+    };
+
+    const sealNameInp = wrap.querySelector('#coSealName');
+    const sealShapeInp = wrap.querySelector('#coSealShape');
+    const sealImageInp = wrap.querySelector('#coSealImage');
+    const sealPreview = wrap.querySelector('#coSealPreview');
+
+    wrap.querySelector('#coGenerateSealBtn').addEventListener('click', () => {
+      const name = sealNameInp.value.trim();
+      const shape = sealShapeInp.value;
+      const svg = buildSealSVG(name, shape);
+      const dataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+      coData.sealName = name;
+      coData.sealShape = shape;
+      coData.sealImage = dataUrl;
+      sealImageInp.value = dataUrl;
+      sealPreview.style.background = `url(${dataUrl}) center/contain no-repeat`;
     });
 
 

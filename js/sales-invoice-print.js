@@ -97,10 +97,32 @@
     return co;
   }
 
+  // The invoice prints the trading name only: the display name when one is set,
+  // otherwise the legal name with its entity suffix (Pvt Ltd, LLP, Inc …) dropped.
+  const COMPANY_NAME_SUFFIXES = [
+    'pvt', 'private', 'ltd', 'limited', 'llp', 'llc', 'plc', 'inc', 'incorporated',
+    'corp', 'corporation', 'co', 'company', 'gmbh', 'sa', 'bv', 'nv', 'pte', 'sdn', 'bhd'
+  ];
+
+  function getInvoiceCompanyName(co) {
+    if (co.displayName && co.displayName.trim()) return co.displayName.trim();
+
+    const raw = (co.name || '').trim();
+    if (!raw) return 'Your Company';
+
+    const words = raw.split(/\s+/);
+    while (words.length > 1) {
+      const last = words[words.length - 1].replace(/[.,&]/g, '').toLowerCase();
+      if (last === '' || COMPANY_NAME_SUFFIXES.indexOf(last) > -1) words.pop();
+      else break;
+    }
+    return words.join(' ') || raw;
+  }
+
   function getCompanyLogoHtml(co) {
-    const name = co.displayName || co.name || 'Your Company';
+    const name = getInvoiceCompanyName(co);
     if (co.iconImage) {
-      return `<img src="${siEsc(co.iconImage)}" alt="${siEsc(name)}" style="width:58px;height:58px;border-radius:12px;object-fit:cover;flex-shrink:0;" />`;
+      return `<img src="${siEsc(co.iconImage)}" alt="${siEsc(name)}" style="width:82px;height:82px;border-radius:14px;object-fit:contain;flex-shrink:0;" />`;
     }
     const initials = (typeof getCompanyInitials === 'function')
       ? getCompanyInitials(co.name || name)
@@ -114,7 +136,7 @@
       'dark-slate': 'linear-gradient(135deg, #475569, #1e293b)'
     };
     const bg = presets[co.iconColor] || presets['blue-green'];
-    return `<div style="width:58px;height:58px;border-radius:12px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;letter-spacing:.5px;flex-shrink:0;">${siEsc(initials)}</div>`;
+    return `<div style="width:82px;height:82px;border-radius:14px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;letter-spacing:.5px;flex-shrink:0;">${siEsc(initials)}</div>`;
   }
 
   // Billed-to is always the customer master; shipped-to prefers the
@@ -294,7 +316,7 @@
         <div style="flex:1; min-width:0; padding:12px 14px;">
           <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:6px;">${label}</div>
           <div style="font-size:${FS.name}; font-weight:800; color:#0f172a;">${siEsc(p.name) || '&mdash;'}</div>
-          ${p.contactName ? `<div style="font-size:${FS.body}; color:#475569; font-weight:600; margin-top:3px;">Attn: ${siEsc(p.contactName)}</div>` : ''}
+          ${p.contactName ? `<div style="font-size:${FS.body}; color:#475569; font-weight:600; margin-top:3px;">${siEsc(p.contactName)}</div>` : ''}
           ${p.address ? `<div style="font-size:${FS.body}; color:#475569; margin-top:3px; line-height:1.5;">${siEsc(p.address).replace(/\n/g, '<br>')}</div>` : ''}
           ${cityPin ? `<div style="font-size:${FS.body}; color:#475569; line-height:1.5;">${siEsc(cityPin)}</div>` : ''}
           ${stateCountry ? `<div style="font-size:${FS.body}; color:#475569; line-height:1.5;">${siEsc(stateCountry)}</div>` : ''}
@@ -309,35 +331,35 @@
     const shippedParty = parties.shipped || parties.billed;
     const shippedNote = parties.isTemporary
       ? 'Delivery details entered on this voucher.'
-      : 'Same as billing address.';
+      : '';
 
     // ── Items table ──
     const taxHeaders = taxMode === 'split'
-      ? `<th style="padding:8px 6px; text-align:right; width:70px; white-space:nowrap;">CGST</th>
-         <th style="padding:8px 6px; text-align:right; width:70px; white-space:nowrap;">SGST</th>`
-      : (taxMode === 'igst' ? `<th style="padding:8px 6px; text-align:right; width:88px; white-space:nowrap;">IGST</th>` : '');
+      ? `<th class="si-nowrap" style="padding:6px; text-align:right;">CGST</th>
+         <th class="si-nowrap" style="padding:6px; text-align:right;">SGST</th>`
+      : (taxMode === 'igst' ? `<th class="si-nowrap" style="padding:6px; text-align:right;">IGST</th>` : '');
 
     const itemRowsHtml = rows.map((r, i) => {
       const discStr = r.discAmt > 0
         ? (r.discountType === 'pct' ? `${siNum(r.discount)}%` : `₹ ${siNum(r.discAmt)}`)
         : '&mdash;';
       const taxCells = taxMode === 'split'
-        ? `<td style="padding:7px 6px; text-align:right;">${r.taxPct ? siNum(r.taxAmt / 2) : '&mdash;'}</td>
-           <td style="padding:7px 6px; text-align:right;">${r.taxPct ? siNum(r.taxAmt / 2) : '&mdash;'}</td>`
+        ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.taxPct ? siNum(r.taxAmt / 2) : '&mdash;'}</td>
+           <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.taxPct ? siNum(r.taxAmt / 2) : '&mdash;'}</td>`
         : (taxMode === 'igst'
-          ? `<td style="padding:7px 6px; text-align:right;">${r.taxPct ? siNum(r.taxAmt) : '&mdash;'}</td>`
+          ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.taxPct ? siNum(r.taxAmt) : '&mdash;'}</td>`
           : '');
       return `
-        <tr style="border-bottom:1px solid #e2e8f0;">
-          <td style="padding:7px 6px; color:#64748b;">${i + 1}</td>
-          <td style="padding:7px 6px; font-weight:600; color:#0f172a;">${siEsc(r.name)}</td>
-          <td style="padding:7px 6px; font-family:monospace; color:#475569;">${siEsc(r.hsn) || '&mdash;'}</td>
-          <td style="padding:7px 6px; text-align:right;">${r.qty}</td>
-          <td style="padding:7px 6px; text-align:center; text-transform:uppercase; color:#475569;">${siEsc(r.unit) || '&mdash;'}</td>
-          <td style="padding:7px 6px; text-align:right;">${siNum(r.rate)}</td>
-          <td style="padding:7px 6px; text-align:right; color:#475569;">${discStr}</td>
+        <tr>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:center; color:#64748b;">${i + 1}</td>
+          <td class="si-desc" style="padding:5px 6px; font-weight:600; color:#0f172a;">${siEsc(r.name)}</td>
+          <td class="si-nowrap" style="padding:5px 6px; font-family:monospace; color:#475569;">${siEsc(r.hsn) || '&mdash;'}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.qty}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:center; text-transform:uppercase; color:#475569;">${siEsc(r.unit) || '&mdash;'}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${siNum(r.rate)}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right; color:#475569;">${discStr}</td>
           ${taxCells}
-          <td style="padding:7px 6px; text-align:right; font-weight:700; color:#0f172a;">${siNum(r.total)}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right; font-weight:700; color:#0f172a;">${siNum(r.total)}</td>
         </tr>`;
     }).join('');
 
@@ -365,7 +387,7 @@
           : `<td style="padding:5px 6px; text-align:right;">${pct}%</td>
              <td style="padding:5px 6px; text-align:right;">${siNum(s.tax)}</td>`;
         return `
-          <tr style="border-bottom:1px solid #e2e8f0;">
+          <tr style="white-space:nowrap;">
             <td style="padding:5px 6px;">${pct}%</td>
             <td style="padding:5px 6px; text-align:right;">${siNum(s.taxable)}</td>
             ${cells}
@@ -381,9 +403,9 @@
       gstSummaryHtml = `
         <div style="margin-top:14px;">
           <div style="font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:6px;">GST Summary</div>
-          <table style="width:100%; border-collapse:collapse; font-size:10.5px; border:1px solid #e2e8f0;">
+          <table class="si-grid" style="width:100%; font-size:10.5px;">
             <thead>
-              <tr style="background:#f8fafc; color:#64748b; font-weight:700;">
+              <tr style="background:#f8fafc; color:#64748b; font-weight:700; white-space:nowrap;">
                 <th style="padding:6px; text-align:left;">GST %</th>
                 <th style="padding:6px; text-align:right;">Taxable</th>
                 ${headCells}
@@ -400,7 +422,7 @@
     // no bank account has been set up yet.
     bank = bank || { bankName: '', accountHolder: '', accountNo: '', ifsc: '', branch: '', qrCode: '' };
     const bankHtml = `
-      <div style="flex:1; min-width:0; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;">
+      <div style="flex:1; min-width:0; border:1px solid #94a3b8; border-radius:8px; padding:10px 12px;">
         <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:6px;">Bank Details for Payment</div>
         <div style="display:flex; gap:12px; align-items:center;">
           <div style="flex:1; min-width:0; font-size:${FS.body}; color:#334155; line-height:1.55;">
@@ -412,7 +434,7 @@
           </div>
           ${bank.qrCode ? `
           <div style="flex-shrink:0; text-align:center;">
-            <img src="${siEsc(bank.qrCode)}" alt="Payment QR" style="width:104px;height:104px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;padding:4px;background:#fff;box-sizing:border-box;display:block;" />
+            <img src="${siEsc(bank.qrCode)}" alt="Payment QR" style="width:104px;height:104px;object-fit:contain;border:1px solid #94a3b8;border-radius:8px;padding:4px;background:#fff;box-sizing:border-box;display:block;" />
             <div style="font-size:10px; font-weight:700; color:#64748b; margin-top:3px;">Scan to Pay</div>
           </div>` : ''}
         </div>
@@ -420,28 +442,38 @@
 
     // Terms always print too — an invoice without notes still shows the column.
     const termsHtml = `
-      <div style="flex:1; min-width:0; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; min-height:92px; box-sizing:border-box;">
-        <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:6px;">Terms &amp; Conditions</div>
-        <div style="font-size:${FS.body}; color:#334155; line-height:1.7; white-space:pre-wrap;">${siEsc(inv.notes || '')}</div>
+      <div style="flex:1 1 auto; min-width:0; border:1px solid #94a3b8; border-radius:8px; padding:12px 14px; min-height:172px; box-sizing:border-box;">
+        <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">Terms &amp; Conditions</div>
+        <div style="font-size:${FS.body}; color:#334155; line-height:1.9; white-space:pre-wrap;">${siEsc(inv.notes || '')}</div>
       </div>`;
 
     const totalsRow = (label, value, opts) => {
       const o = opts || {};
       return `
-        <div style="display:flex; justify-content:space-between; gap:16px; font-size:${o.size || '11.5px'}; color:${o.color || '#334155'}; font-weight:${o.weight || 600}; padding:${o.pad || '3px 0'};${o.border ? ' border-top:1px solid #e2e8f0; margin-top:4px; padding-top:6px;' : ''}">
+        <div style="display:flex; justify-content:space-between; gap:16px; font-size:${o.size || '11.5px'}; color:${o.color || '#334155'}; font-weight:${o.weight || 600}; padding:${o.pad || '3px 0'};${o.border ? ' border-top:1px solid #94a3b8; margin-top:4px; padding-top:6px;' : ''}">
           <span>${label}</span><span>${value}</span>
         </div>`;
     };
 
     return `
       <div id="${SALES_INVOICE_SHEET_ID}" style="background:#fff; color:#0f172a; font-family:Inter, system-ui, sans-serif; padding:26px 28px; box-sizing:border-box;">
+        <style>
+          /* One uniform grid for the line items and the GST summary: every cell — header
+             cells included — draws the same line, so the frame never breaks.
+             Columns size themselves to their content; only the description wraps. */
+          #${SALES_INVOICE_SHEET_ID} .si-grid { border-collapse: collapse; table-layout: auto; }
+          #${SALES_INVOICE_SHEET_ID} .si-grid th,
+          #${SALES_INVOICE_SHEET_ID} .si-grid td { border: 1px solid #94a3b8; box-sizing: border-box; }
+          /* Codes and figures stay on one line, whatever the column width */
+          #${SALES_INVOICE_SHEET_ID} .si-grid .si-nowrap { white-space: nowrap; width: 1%; }
+          #${SALES_INVOICE_SHEET_ID} .si-grid .si-desc { overflow-wrap: anywhere; }
+        </style>
         <!-- Header -->
         <div style="display:flex; justify-content:space-between; gap:20px; align-items:flex-start; border-bottom:2px solid #1d4ed8; padding-bottom:14px;">
           <div style="display:flex; gap:12px; align-items:flex-start; min-width:0;">
             ${getCompanyLogoHtml(co)}
             <div style="min-width:0;">
-              <div style="font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-.2px;">${siEsc(co.name || co.displayName || 'Your Company')}</div>
-              ${co.businessType ? `<div style="font-size:${FS.note}; font-weight:700; color:#2563eb; text-transform:uppercase; letter-spacing:.06em; margin-top:2px;">${siEsc(co.businessType)}</div>` : ''}
+              <div style="font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-.2px;">${siEsc(getInvoiceCompanyName(co))}</div>
               <div style="font-size:${FS.body}; color:#475569; margin-top:5px; line-height:1.55;">${coLines.join('<br>')}</div>
             </div>
           </div>
@@ -456,17 +488,17 @@
           </div>
         </div>
 
-        ${coReg.length ? `<div style="display:flex; flex-wrap:wrap; gap:8px 16px; font-size:${FS.body}; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-top:none; padding:8px 12px; border-radius:0 0 8px 8px;">${coReg.join('')}</div>` : ''}
+        ${coReg.length ? `<div style="display:flex; flex-wrap:wrap; gap:8px 16px; font-size:${FS.body}; color:#475569; background:#f8fafc; border:1px solid #94a3b8; border-top:none; padding:8px 12px; border-radius:0 0 8px 8px;">${coReg.join('')}</div>` : ''}
 
         <!-- Parties -->
-        <div style="display:flex; gap:0; border:1px solid #e2e8f0; border-radius:8px; margin-top:14px; overflow:hidden;">
+        <div style="display:flex; gap:0; border:1px solid #94a3b8; border-radius:8px; margin-top:14px; overflow:hidden;">
           ${partyHtml(parties.billed, 'Billed To (Recipient)', '')}
-          <div style="width:1px; background:#e2e8f0;"></div>
+          <div style="width:1px; background:#94a3b8;"></div>
           ${partyHtml(shippedParty, 'Shipped To (Delivery)', shippedNote)}
         </div>
 
         <!-- Meta strip -->
-        <div style="display:flex; flex-wrap:wrap; gap:22px; font-size:10.5px; color:#475569; margin-top:12px; padding:8px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+        <div style="display:flex; flex-wrap:wrap; gap:22px; font-size:10.5px; color:#475569; margin-top:12px; padding:8px 12px; background:#f8fafc; border:1px solid #94a3b8; border-radius:8px;">
           <div><span style="color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.06em;">Place of Supply:</span> <strong>${siEsc(placeOfSupply) || '&mdash;'}</strong></div>
           <div><span style="color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.06em;">Supply Type:</span> <strong>${siEsc(inv.salesSupplyType || 'Intra-State (CGST + SGST)')}</strong></div>
           ${execName ? `<div><span style="color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.06em;">Sales Executive:</span> <strong>${siEsc(execName)}</strong></div>` : ''}
@@ -474,18 +506,18 @@
         </div>
 
         <!-- Items -->
-        <table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:14px; border:1px solid #e2e8f0;">
+        <table class="si-grid" style="width:100%; font-size:10.5px; margin-top:14px;">
           <thead>
-            <tr style="background:#1d4ed8; color:#fff; font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap;">
-              <th style="padding:8px 6px; text-align:left; width:32px;">Sl No.</th>
-              <th style="padding:8px 6px; text-align:left;">Item Description</th>
-              <th style="padding:8px 6px; text-align:left; width:66px;">HSN/SAC</th>
-              <th style="padding:8px 6px; text-align:right; width:40px;">Qty</th>
-              <th style="padding:8px 6px; text-align:center; width:46px;">Unit</th>
-              <th style="padding:8px 6px; text-align:right; width:72px;">Rate</th>
-              <th style="padding:8px 6px; text-align:right; width:64px;">Discount</th>
+            <tr style="background:#1d4ed8; color:#fff; font-size:9px; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap;">
+              <th class="si-nowrap" style="padding:6px; text-align:left;">Sl No.</th>
+              <th class="si-desc" style="padding:6px; text-align:left;">Item Description</th>
+              <th class="si-nowrap" style="padding:6px; text-align:left;">HSN/SAC</th>
+              <th class="si-nowrap" style="padding:6px; text-align:right;">Qty</th>
+              <th class="si-nowrap" style="padding:6px; text-align:center;">Unit</th>
+              <th class="si-nowrap" style="padding:6px; text-align:right;">Rate</th>
+              <th class="si-nowrap" style="padding:6px; text-align:right;">Discount</th>
               ${taxHeaders}
-              <th style="padding:8px 6px; text-align:right; width:84px;">Amount</th>
+              <th class="si-nowrap" style="padding:6px; text-align:right;">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -499,7 +531,7 @@
         <!-- Bank details + totals, side by side -->
         <div style="display:flex; gap:14px; margin-top:14px; align-items:stretch;">
           ${bankHtml}
-          <div style="width:290px; flex-shrink:0; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center;">
+          <div style="width:290px; flex-shrink:0; border:1px solid #94a3b8; border-radius:8px; padding:10px 12px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center;">
             ${totalsRow('Taxable Value', '₹ ' + siNum(subTotal))}
             ${totalDiscount > 0 ? totalsRow('Total Discount', '&minus; ₹ ' + siNum(totalDiscount)) : ''}
             ${taxMode === 'split' ? totalsRow('CGST', '₹ ' + siNum(totalTax / 2)) + totalsRow('SGST', '₹ ' + siNum(totalTax / 2)) : ''}
@@ -510,31 +542,32 @@
           </div>
         </div>
 
-        <!-- Amount in words + amount payable -->
+        <!-- Two stacked columns: every card follows the one above it by the same 14px,
+             and the last card in each column stretches so both columns end level. -->
         <div style="display:flex; gap:14px; margin-top:14px; align-items:stretch;">
-          <div style="flex:1; min-width:0; padding:7px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center;">
-            <div style="color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
-            <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${siEsc(siAmountInWords(grandTotal))}</div>
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:14px;">
+            <div style="flex:0 0 auto; padding:7px 12px; background:#f8fafc; border:1px solid #94a3b8; border-radius:8px; box-sizing:border-box;">
+              <div style="color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
+              <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${siEsc(siAmountInWords(grandTotal))}</div>
+            </div>
+            ${termsHtml}
           </div>
-          <div style="width:290px; flex-shrink:0; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center;">
-            ${totalsRow('Total Amount Payable', '₹ ' + siNum(grandTotal), { size: '14px', weight: 800, color: '#0f172a', pad: '2px 0 6px' })}
-            ${paidAmount > 0 ? totalsRow('Paid (' + siEsc(inv.paymentStatus) + ')', '₹ ' + siNum(paidAmount), { color: '#059669', border: true }) : ''}
-            ${totalsRow('Balance Due', '₹ ' + siNum(balanceDue), { weight: 800, color: balanceDue > 0 ? '#dc2626' : '#059669', border: true })}
-          </div>
-        </div>
-
-        <!-- Terms + authorised signatory -->
-        <div style="display:flex; gap:14px; margin-top:14px; align-items:stretch;">
-          ${termsHtml}
-          <div style="width:290px; flex-shrink:0; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; box-sizing:border-box; text-align:center; display:flex; flex-direction:column;">
-            <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${siEsc(co.name || co.displayName || 'Your Company')}</div>
-            <div style="flex:1; min-height:40px;"></div>
-            <div style="border-top:1px solid #94a3b8; padding-top:5px; font-size:10.5px; color:#475569; font-weight:600;">Authorised Signatory</div>
+          <div style="width:290px; flex-shrink:0; display:flex; flex-direction:column; gap:14px;">
+            <div style="flex:0 0 auto; border:1px solid #94a3b8; border-radius:8px; padding:10px 12px; box-sizing:border-box;">
+              ${totalsRow('Total Amount Payable', '₹ ' + siNum(grandTotal), { size: '14px', weight: 800, color: '#0f172a', pad: '2px 0 6px' })}
+              ${paidAmount > 0 ? totalsRow('Paid (' + siEsc(inv.paymentStatus) + ')', '₹ ' + siNum(paidAmount), { color: '#059669', border: true }) : ''}
+              ${totalsRow('Balance Due', '₹ ' + siNum(balanceDue), { weight: 800, color: balanceDue > 0 ? '#dc2626' : '#059669', border: true })}
+            </div>
+            <div style="flex:1 1 auto; border:1px solid #94a3b8; border-radius:8px; padding:10px 12px; box-sizing:border-box; text-align:center; display:flex; flex-direction:column;">
+              <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${siEsc(getInvoiceCompanyName(co))}</div>
+              <div style="flex:1 1 auto; min-height:46px;"></div>
+              <div style="border-top:1px solid #94a3b8; padding-top:5px; font-size:10.5px; color:#475569; font-weight:600;">Authorised Signatory</div>
+            </div>
           </div>
         </div>
 
         <!-- Thank you -->
-        <div style="text-align:center; margin-top:18px; padding-top:12px; border-top:1px solid #e2e8f0;">
+        <div style="text-align:center; margin-top:18px; padding-top:12px; border-top:1px solid #94a3b8;">
           <div style="font-size:13px; font-weight:800; color:#1d4ed8; letter-spacing:.02em;">Thank you for your business!</div>
           <div style="font-size:10px; color:#94a3b8; margin-top:4px;">
             Certified that the particulars given above are true and correct. This is a computer generated ${docTitle.toLowerCase()}.
