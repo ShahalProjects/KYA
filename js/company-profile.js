@@ -15,6 +15,76 @@
     if (!coData.insuranceAssets.policies) coData.insuranceAssets.policies = [];
     if (!coData.insuranceAssets.assets) coData.insuranceAssets.assets = [];
 
+    const escSealText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const buildSealSVG = (name, shape) => {
+      const rawName = (name || 'COMPANY NAME').trim();
+      const label = escSealText(rawName.toUpperCase());
+      const ink = '#b91c1c';
+      const labelLen = label.length;
+
+      let fsTop = 15;
+      let letterSpacing = '1.2';
+      if (labelLen > 18) { fsTop = 13; letterSpacing = '0.8'; }
+      if (labelLen > 24) { fsTop = 11; letterSpacing = '0.5'; }
+      if (labelLen > 30) { fsTop = 9.5; letterSpacing = '0.2'; }
+
+      if (shape === 'rectangle') {
+        return `<svg viewBox="0 0 260 160" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="6" width="248" height="148" fill="none" stroke="${ink}" stroke-width="3.5"/>
+          <rect x="13" y="13" width="234" height="134" fill="none" stroke="${ink}" stroke-width="1.2"/>
+          <rect x="20" y="20" width="220" height="120" fill="none" stroke="${ink}" stroke-width="1.5"/>
+          <text x="130" y="66" text-anchor="middle" font-family="'Arial Black', Arial, sans-serif" font-size="${fsTop}" font-weight="900" fill="${ink}">${label}</text>
+          <line x1="46" y1="82" x2="214" y2="82" stroke="${ink}" stroke-width="1.2"/>
+          <text x="130" y="98" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}" letter-spacing="3">★ ★ ★</text>
+          <line x1="46" y1="106" x2="214" y2="106" stroke="${ink}" stroke-width="1.2"/>
+          <text x="130" y="132" text-anchor="middle" font-family="'Arial Black', Arial, sans-serif" font-size="11.5" font-weight="900" fill="${ink}" letter-spacing="1.8">AUTHORISED SIGNATORY</text>
+        </svg>`;
+      }
+
+      // ROUND — top/bottom arc text share the same chord (left↔right through the ring
+      // radius) so both halves stay concentric and upright: sweep=1 draws the upper
+      // semicircle, sweep=0 the lower one, both traversed left-to-right.
+      const cx = 100, cy = 100;
+      const rText = 68;
+      const leftX = cx - rText, rightX = cx + rText;
+      return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <defs>
+          <path id="coSealTopArc" d="M ${leftX},${cy} A ${rText},${rText} 0 1 1 ${rightX},${cy}" fill="none"/>
+          <path id="coSealBottomArc" d="M ${leftX},${cy} A ${rText},${rText} 0 1 0 ${rightX},${cy}" fill="none"/>
+        </defs>
+        <circle cx="${cx}" cy="${cy}" r="93" fill="none" stroke="${ink}" stroke-width="3.5"/>
+        <circle cx="${cx}" cy="${cy}" r="87" fill="none" stroke="${ink}" stroke-width="1"/>
+        <circle cx="${cx}" cy="${cy}" r="48" fill="none" stroke="${ink}" stroke-width="1.8"/>
+
+        <text font-family="'Arial Black', Arial, sans-serif" font-size="${fsTop}" font-weight="900" fill="${ink}" letter-spacing="${letterSpacing}">
+          <textPath href="#coSealTopArc" xlink:href="#coSealTopArc" startOffset="50%" text-anchor="middle">${label}</textPath>
+        </text>
+
+        <text x="24" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}">★</text>
+        <text x="176" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}">★</text>
+
+        <text font-family="'Arial Black', Arial, sans-serif" font-size="10.5" font-weight="900" fill="${ink}" letter-spacing="1.8">
+          <textPath href="#coSealBottomArc" xlink:href="#coSealBottomArc" startOffset="50%" text-anchor="middle">AUTHORISED SIGNATORY</textPath>
+        </text>
+
+        <line x1="62" y1="88" x2="138" y2="88" stroke="${ink}" stroke-width="1.2"/>
+        <text x="100" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}" letter-spacing="3">★ ★ ★</text>
+        <line x1="62" y1="112" x2="138" y2="112" stroke="${ink}" stroke-width="1.2"/>
+      </svg>`;
+    };
+
+    if (coData.sealShape === 'square') coData.sealShape = 'rectangle';
+
+    if (coData.sealImage && typeof coData.sealImage === 'string' && coData.sealImage.startsWith('data:image/svg+xml')) {
+      try {
+        const svg = buildSealSVG(coData.sealName || coData.name || coData.displayName || '', coData.sealShape || 'round');
+        const dataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+        coData.sealImage = dataUrl;
+        saveCompanyDetails(coData);
+      } catch (e) {}
+    }
+
     const initials = getCompanyInitials(coData.name);
 
     // Header layout
@@ -187,19 +257,24 @@
 
                       <!-- Create Seal -->
                       <div style="display:flex;flex-direction:column;gap:8px;">
-                        <label style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Create Seal</label>
-                        <input id="coSealName" value="${ohEsc(coData.sealName || '')}" placeholder="Seal name (e.g. company name)" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box;">
+                        <label style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Company Seal / Stamp</label>
+                        <input id="coSealName" value="${ohEsc(coData.sealName || coData.name || coData.displayName || '')}" placeholder="Seal name (e.g. company name)" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box;">
                         <select id="coSealShape" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 8px;font-size:12px;background:#fff;color:#334155;outline:none;">
-                          <option value="round" ${coData.sealShape !== 'square' ? 'selected' : ''}>Round Seal</option>
-                          <option value="square" ${coData.sealShape === 'square' ? 'selected' : ''}>Square Seal</option>
+                          <option value="round" ${coData.sealShape !== 'rectangle' ? 'selected' : ''}>Round Seal</option>
+                          <option value="rectangle" ${coData.sealShape === 'rectangle' ? 'selected' : ''}>Rectangle Seal</option>
                         </select>
-                        <button type="button" id="coGenerateSealBtn" style="height:32px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
-                          Generate Seal
-                        </button>
+                        <div style="display:flex;gap:8px;">
+                          <button type="button" id="coGenerateSealBtn" style="flex:1;height:32px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
+                            Generate Seal
+                          </button>
+                          <button type="button" id="coRemoveSealBtn" style="height:32px;padding:0 10px;border:none;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:11.5px;font-weight:600;cursor:pointer;display:${coData.sealImage ? 'block' : 'none'};">
+                            Remove
+                          </button>
+                        </div>
                       </div>
 
                       <!-- Seal Preview (rendered below the signature) -->
-                      <div id="coSealPreview" style="width:120px;height:120px;margin:4px auto 0;background:${coData.sealImage ? `url(${coData.sealImage}) center/contain no-repeat` : 'transparent'};"></div>
+                      <div id="coSealPreview" style="width:100%;max-width:180px;height:120px;margin:4px auto 0;background:${coData.sealImage ? `url(${coData.sealImage}) center/contain no-repeat` : 'transparent'};"></div>
                       <input type="hidden" id="coSealImage" value="${ohEsc(coData.sealImage || '')}">
                     </div>
                   </div>
@@ -582,55 +657,39 @@
       removeSignBtn.style.display = 'none';
     });
 
-    // Authorised Signatory: auto-generate an official-style seal (round or square)
-    const escSealText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-    const buildSealSVG = (name, shape) => {
-      const label = escSealText((name || 'COMPANY NAME').toUpperCase());
-      const ink = '#b91c1c';
-      if (shape === 'square') {
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-          <rect x="6" y="6" width="188" height="188" fill="none" stroke="${ink}" stroke-width="4"/>
-          <rect x="15" y="15" width="170" height="170" fill="none" stroke="${ink}" stroke-width="1.2"/>
-          <text x="100" y="82" text-anchor="middle" font-family="Georgia, serif" font-size="15" font-weight="700" fill="${ink}">${label}</text>
-          <line x1="45" y1="100" x2="155" y2="100" stroke="${ink}" stroke-width="1"/>
-          <text x="100" y="124" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="700" fill="${ink}" letter-spacing="1.5">AUTHORISED</text>
-          <text x="100" y="142" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="700" fill="${ink}" letter-spacing="1.5">SIGNATORY</text>
-        </svg>`;
-      }
-      return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <path id="sealTopArc" d="M 22,100 A 78,78 0 1 1 178,100" fill="none"/>
-          <path id="sealBottomArc" d="M 178,105 A 78,78 0 1 1 22,105" fill="none"/>
-        </defs>
-        <circle cx="100" cy="100" r="90" fill="none" stroke="${ink}" stroke-width="3"/>
-        <circle cx="100" cy="100" r="78" fill="none" stroke="${ink}" stroke-width="1.2"/>
-        <text font-family="Georgia, serif" font-size="13" font-weight="700" fill="${ink}" letter-spacing="1.5">
-          <textPath href="#sealTopArc" startOffset="50%" text-anchor="middle">${label}</textPath>
-        </text>
-        <text font-family="Georgia, serif" font-size="11" font-weight="700" fill="${ink}" letter-spacing="2.5">
-          <textPath href="#sealBottomArc" startOffset="50%" text-anchor="middle">AUTHORISED SIGNATORY</textPath>
-        </text>
-        <circle cx="100" cy="100" r="3" fill="${ink}"/>
-      </svg>`;
-    };
-
     const sealNameInp = wrap.querySelector('#coSealName');
     const sealShapeInp = wrap.querySelector('#coSealShape');
     const sealImageInp = wrap.querySelector('#coSealImage');
     const sealPreview = wrap.querySelector('#coSealPreview');
 
+    const removeSealBtn = wrap.querySelector('#coRemoveSealBtn');
     wrap.querySelector('#coGenerateSealBtn').addEventListener('click', () => {
-      const name = sealNameInp.value.trim();
+      const name = sealNameInp.value.trim() || (nameInp ? nameInp.value.trim() : '') || 'COMPANY NAME';
       const shape = sealShapeInp.value;
       const svg = buildSealSVG(name, shape);
       const dataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
       coData.sealName = name;
       coData.sealShape = shape;
       coData.sealImage = dataUrl;
+      coData.sealRemoved = false;
       sealImageInp.value = dataUrl;
       sealPreview.style.background = `url(${dataUrl}) center/contain no-repeat`;
+      if (removeSealBtn) removeSealBtn.style.display = 'block';
+      saveCompanyDetails(coData);
+      if (typeof showToast === 'function') showToast('Company seal generated and saved.', 'success');
     });
+
+    if (removeSealBtn) {
+      removeSealBtn.addEventListener('click', () => {
+        coData.sealImage = '';
+        coData.sealRemoved = true;
+        sealImageInp.value = '';
+        sealPreview.style.background = 'transparent';
+        removeSealBtn.style.display = 'none';
+        saveCompanyDetails(coData);
+        if (typeof showToast === 'function') showToast('Company seal removed.', 'info');
+      });
+    }
 
 
     // ── DYNAMIC LIST RENDERING ──
@@ -1201,6 +1260,16 @@
           coData.phone = wrap.querySelector('#coPhoneInput').value.trim();
           coData.email = wrap.querySelector('#coEmailInput').value.trim();
           coData.website = wrap.querySelector('#coWebsiteInput').value.trim();
+          const sealVal = wrap.querySelector('#coSealImage')?.value;
+          if (sealVal !== undefined) coData.sealImage = sealVal;
+          const sealNameVal = wrap.querySelector('#coSealName')?.value;
+          if (sealNameVal !== undefined) coData.sealName = sealNameVal;
+          const sealShapeVal = wrap.querySelector('#coSealShape')?.value;
+          if (sealShapeVal !== undefined) coData.sealShape = sealShapeVal;
+          const signVal = wrap.querySelector('#coSignatureImage')?.value;
+          if (signVal !== undefined) coData.signatureImage = signVal;
+          const iconVal = wrap.querySelector('#coIconImage')?.value;
+          if (iconVal !== undefined) coData.iconImage = iconVal;
         }
 
         else if (section === 'registrations') {
