@@ -431,8 +431,8 @@
           ${stateCountry ? `<div style="font-size:${FS.body}; color:#475569; line-height:1.5;">${siEsc(stateCountry)}</div>` : ''}
           ${p.phone ? `<div style="font-size:${FS.body}; color:#475569; margin-top:3px; line-height:1.5;">Phone: ${siEsc(p.phone)}</div>` : ''}
           ${p.email ? `<div style="font-size:${FS.body}; color:#475569; line-height:1.5;">${siEsc(p.email)}</div>` : ''}
-          ${p.gstin ? `<div style="font-size:${FS.body}; color:#0f172a; margin-top:4px; line-height:1.5;">GSTIN: ${siEsc(p.gstin)}</div>` : ''}
-          ${p.pan ? `<div style="font-size:${FS.body}; color:#0f172a; line-height:1.5;">PAN: ${siEsc(p.pan)}</div>` : ''}
+          ${p.gstin ? `<div style="font-size:${FS.body}; color:#475569; margin-top:3px; line-height:1.5;">GSTIN: ${siEsc(p.gstin)}</div>` : ''}
+          ${p.pan ? `<div style="font-size:${FS.body}; color:#475569; line-height:1.5;">PAN: ${siEsc(p.pan)}</div>` : ''}
           ${note ? `<div style="font-size:${FS.note}; color:#64748b; font-style:italic; margin-top:6px;">${note}</div>` : ''}
         </div>`;
     };
@@ -481,9 +481,9 @@
     // paid invoice prints the Paid line alone.
     const isFullyPaid = balanceDue <= 0.005;
     const payLines = [];
-    if (inv.dueDate && !isFullyPaid) payLines.push(`<span style="color:#475569;">Due Date:</span> ${siEsc(siDate(inv.dueDate))}`);
-    if (paidAmount > 0) payLines.push(`<span style="color:#475569;">Paid (${siEsc(inv.paymentStatus)}):</span> ₹ ${siNum(paidAmount)}`);
-    if (!isFullyPaid) payLines.push(`<span style="color:#475569;">Balance Due:</span> ₹ ${siNum(balanceDue)}`);
+    if (inv.dueDate && !isFullyPaid) payLines.push(`<span style="color:#334155;">Due Date:</span> ${siEsc(siDate(inv.dueDate))}`);
+    if (paidAmount > 0) payLines.push(`<span style="color:#334155;">Paid (${siEsc(inv.paymentStatus)}):</span> ₹ ${siNum(paidAmount)}`);
+    if (!isFullyPaid) payLines.push(`<span style="color:#334155;">Balance Due:</span> ₹ ${siNum(balanceDue)}`);
     const payLinesHtml = payLines.map((line, i) => `<div${i === 0 ? ' style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"' : ''}>${line}</div>`).join('');
 
     const bankHtml = `
@@ -491,11 +491,11 @@
         <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#2563eb; margin-bottom:6px;">Bank Details for Payment</div>
         <div style="display:flex; gap:12px; align-items:flex-start;">
           <div style="flex:1; min-width:0; font-size:${FS.body}; color:#0f172a; line-height:1.55;">
-            ${bank.bankName ? `<div><span style="color:#475569;">Bank:</span> ${siEsc(bank.bankName)}</div>` : ''}
-            ${bank.accountHolder ? `<div><span style="color:#475569;">A/c Holder:</span> ${siEsc(bank.accountHolder)}</div>` : ''}
-            ${bank.accountNo ? `<div><span style="color:#475569;">A/c No.:</span> ${siEsc(bank.accountNo)}</div>` : ''}
-            ${bank.ifsc ? `<div><span style="color:#475569;">IFSC:</span> ${siEsc(bank.ifsc)}</div>` : ''}
-            ${bank.branch ? `<div><span style="color:#475569;">Branch:</span> ${siEsc(bank.branch)}</div>` : ''}
+            ${bank.bankName ? `<div><span style="color:#334155;">Bank:</span> ${siEsc(bank.bankName)}</div>` : ''}
+            ${bank.accountHolder ? `<div><span style="color:#334155;">A/c Holder:</span> ${siEsc(bank.accountHolder)}</div>` : ''}
+            ${bank.accountNo ? `<div><span style="color:#334155;">A/c No.:</span> ${siEsc(bank.accountNo)}</div>` : ''}
+            ${bank.ifsc ? `<div><span style="color:#334155;">IFSC:</span> ${siEsc(bank.ifsc)}</div>` : ''}
+            ${bank.branch ? `<div><span style="color:#334155;">Branch:</span> ${siEsc(bank.branch)}</div>` : ''}
             ${payLinesHtml}
           </div>
           ${bank.qrCode ? `
