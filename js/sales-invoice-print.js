@@ -233,6 +233,31 @@
       </div>`;
   }
 
+  // GST state codes (first two digits of a GSTIN), used to print the code with
+  // the Place of Supply, e.g. "32 - Kerala".
+  const GST_STATE_CODES = {
+    'jammu and kashmir': '01', 'himachal pradesh': '02', 'punjab': '03', 'chandigarh': '04',
+    'uttarakhand': '05', 'uttaranchal': '05', 'haryana': '06', 'delhi': '07', 'new delhi': '07',
+    'nct of delhi': '07', 'rajasthan': '08', 'uttar pradesh': '09', 'bihar': '10', 'sikkim': '11',
+    'arunachal pradesh': '12', 'nagaland': '13', 'manipur': '14', 'mizoram': '15', 'tripura': '16',
+    'meghalaya': '17', 'assam': '18', 'west bengal': '19', 'jharkhand': '20', 'odisha': '21',
+    'orissa': '21', 'chhattisgarh': '22', 'madhya pradesh': '23', 'gujarat': '24',
+    'dadra and nagar haveli and daman and diu': '26', 'dadra and nagar haveli': '26',
+    'daman and diu': '26', 'maharashtra': '27', 'karnataka': '29', 'goa': '30',
+    'lakshadweep': '31', 'kerala': '32', 'tamil nadu': '33', 'puducherry': '34',
+    'pondicherry': '34', 'andaman and nicobar islands': '35', 'andaman and nicobar': '35',
+    'telangana': '36', 'andhra pradesh': '37', 'ladakh': '38', 'other territory': '97'
+  };
+
+  function getGstStateCode(state, country, gstin) {
+    const c = String(country || '').trim().toLowerCase();
+    if (c && c !== 'india' && c !== 'in' && c !== 'bharat') return '';
+    const key = String(state || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (GST_STATE_CODES[key]) return GST_STATE_CODES[key];
+    const fromGstin = String(gstin || '').trim().slice(0, 2);
+    return /^\d{2}$/.test(fromGstin) ? fromGstin : '';
+  }
+
   // Billed-to is always the customer master; shipped-to prefers the
   // voucher's temporary details when they were entered.
   function getInvoiceParties(inv) {
@@ -379,13 +404,16 @@
       note: '11.5px'     // italic helper lines
     };
 
-    const placeOfSupply = [parties.billed.state, parties.billed.country].filter(Boolean).join(', ')
-      || co.state || '';
+    const posFromParty = !!(parties.billed.state || parties.billed.country);
+    const posState = posFromParty ? (parties.billed.state || '') : (co.state || '');
+    const posCountry = posFromParty ? (parties.billed.country || '') : '';
+    const posCode = posState ? getGstStateCode(posState, posCountry, posFromParty ? parties.billed.gstin : co.gstin) : '';
+    const placeOfSupply = [posCode ? posCode + ' - ' + posState : posState, posCountry].filter(Boolean).join(', ');
 
     // ── Company block ──
     const coLines = [];
     if (co.address) coLines.push(siEsc(co.address).replace(/\n/g, '<br>'));
-    if (co.gstin) coLines.push(`GSTIN: <strong>${siEsc(co.gstin)}</strong>`);
+    if (co.gstin) coLines.push(`GSTIN: ${siEsc(co.gstin)}`);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(siEsc(co.website));
@@ -403,8 +431,8 @@
           ${stateCountry ? `<div style="font-size:${FS.body}; color:#475569; line-height:1.5;">${siEsc(stateCountry)}</div>` : ''}
           ${p.phone ? `<div style="font-size:${FS.body}; color:#475569; margin-top:3px; line-height:1.5;">Phone: ${siEsc(p.phone)}</div>` : ''}
           ${p.email ? `<div style="font-size:${FS.body}; color:#475569; line-height:1.5;">${siEsc(p.email)}</div>` : ''}
-          ${p.gstin ? `<div style="font-size:${FS.body}; color:#0f172a; margin-top:4px; line-height:1.5;">GSTIN: <strong>${siEsc(p.gstin)}</strong></div>` : ''}
-          ${p.pan ? `<div style="font-size:${FS.body}; color:#0f172a; line-height:1.5;">PAN: <strong>${siEsc(p.pan)}</strong></div>` : ''}
+          ${p.gstin ? `<div style="font-size:${FS.body}; color:#0f172a; margin-top:4px; line-height:1.5;">GSTIN: ${siEsc(p.gstin)}</div>` : ''}
+          ${p.pan ? `<div style="font-size:${FS.body}; color:#0f172a; line-height:1.5;">PAN: ${siEsc(p.pan)}</div>` : ''}
           ${note ? `<div style="font-size:${FS.note}; color:#64748b; font-style:italic; margin-top:6px;">${note}</div>` : ''}
         </div>`;
     };
@@ -433,13 +461,13 @@
       return `
         <tr>
           <td class="si-nowrap" style="padding:5px 6px; text-align:center; color:#64748b;">${i + 1}</td>
-          <td class="si-desc" style="padding:5px 6px; font-weight:600; color:#0f172a;">${siEsc(r.name)}</td>
+          <td class="si-desc" style="padding:5px 6px; color:#0f172a;">${siEsc(r.name)}</td>
           <td class="si-nowrap" style="padding:5px 6px; color:#475569;">${siEsc(r.hsn) || '&mdash;'}</td>
           <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.qty}</td>
           <td class="si-nowrap" style="padding:5px 6px; text-align:center; text-transform:uppercase; color:#475569;">${siEsc(r.unit) || '&mdash;'}</td>
           <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${siNum(r.rate)}</td>
           ${taxCells}
-          <td class="si-nowrap" style="padding:5px 6px; text-align:right; font-weight:700; color:#0f172a;">${siNum(r.total)}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right; color:#0f172a;">${siNum(r.total)}</td>
         </tr>`;
     }).join('');
 
@@ -453,27 +481,27 @@
     // paid invoice prints the Paid line alone.
     const isFullyPaid = balanceDue <= 0.005;
     const payLines = [];
-    if (inv.dueDate && !isFullyPaid) payLines.push(`<span style="color:#94a3b8;">Due Date:</span> <strong>${siEsc(siDate(inv.dueDate))}</strong>`);
-    if (paidAmount > 0) payLines.push(`<span style="color:#94a3b8;">Paid (${siEsc(inv.paymentStatus)}):</span> <strong>₹ ${siNum(paidAmount)}</strong>`);
-    if (!isFullyPaid) payLines.push(`<span style="color:#94a3b8;">Balance Due:</span> <strong>₹ ${siNum(balanceDue)}</strong>`);
+    if (inv.dueDate && !isFullyPaid) payLines.push(`<span style="color:#475569;">Due Date:</span> ${siEsc(siDate(inv.dueDate))}`);
+    if (paidAmount > 0) payLines.push(`<span style="color:#475569;">Paid (${siEsc(inv.paymentStatus)}):</span> ₹ ${siNum(paidAmount)}`);
+    if (!isFullyPaid) payLines.push(`<span style="color:#475569;">Balance Due:</span> ₹ ${siNum(balanceDue)}`);
     const payLinesHtml = payLines.map((line, i) => `<div${i === 0 ? ' style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"' : ''}>${line}</div>`).join('');
 
     const bankHtml = `
       <div style="flex:0 0 auto; min-width:0; border:1px solid #94a3b8; border-radius:8px; padding:10px 12px; background:#f8fafc; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
         <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#2563eb; margin-bottom:6px;">Bank Details for Payment</div>
         <div style="display:flex; gap:12px; align-items:flex-start;">
-          <div style="flex:1; min-width:0; font-size:${FS.body}; color:#334155; line-height:1.55;">
-            ${bank.bankName ? `<div><span style="color:#94a3b8;">Bank:</span> <strong>${siEsc(bank.bankName)}</strong></div>` : ''}
-            ${bank.accountHolder ? `<div><span style="color:#94a3b8;">A/c Holder:</span> ${siEsc(bank.accountHolder)}</div>` : ''}
-            ${bank.accountNo ? `<div><span style="color:#94a3b8;">A/c No.:</span> <strong>${siEsc(bank.accountNo)}</strong></div>` : ''}
-            ${bank.ifsc ? `<div><span style="color:#94a3b8;">IFSC:</span> <strong>${siEsc(bank.ifsc)}</strong></div>` : ''}
-            ${bank.branch ? `<div><span style="color:#94a3b8;">Branch:</span> ${siEsc(bank.branch)}</div>` : ''}
+          <div style="flex:1; min-width:0; font-size:${FS.body}; color:#0f172a; line-height:1.55;">
+            ${bank.bankName ? `<div><span style="color:#475569;">Bank:</span> ${siEsc(bank.bankName)}</div>` : ''}
+            ${bank.accountHolder ? `<div><span style="color:#475569;">A/c Holder:</span> ${siEsc(bank.accountHolder)}</div>` : ''}
+            ${bank.accountNo ? `<div><span style="color:#475569;">A/c No.:</span> ${siEsc(bank.accountNo)}</div>` : ''}
+            ${bank.ifsc ? `<div><span style="color:#475569;">IFSC:</span> ${siEsc(bank.ifsc)}</div>` : ''}
+            ${bank.branch ? `<div><span style="color:#475569;">Branch:</span> ${siEsc(bank.branch)}</div>` : ''}
             ${payLinesHtml}
           </div>
           ${bank.qrCode ? `
           <div style="flex-shrink:0; text-align:center;">
-            <img src="${siEsc(bank.qrCode)}" alt="Payment QR" style="width:104px;height:104px;object-fit:contain;border:1px solid #94a3b8;border-radius:8px;padding:4px;background:#fff;box-sizing:border-box;display:block;" />
-            <div style="font-size:10px; font-weight:700; color:#64748b; margin-top:6px; line-height:1.1;">Scan to Pay</div>
+            <img src="${siEsc(bank.qrCode)}" alt="Payment QR" style="width:88px;height:88px;object-fit:contain;border:1px solid #bfdbfe;border-radius:8px;padding:4px;background:#fff;box-sizing:border-box;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact;" />
+            <div style="font-size:9px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#2563eb; margin-top:5px; line-height:1.1;">Scan to Pay</div>
           </div>` : ''}
         </div>
       </div>`;
