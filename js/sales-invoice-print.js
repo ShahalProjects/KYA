@@ -360,6 +360,7 @@
         rate: isServiceRow ? base : rate,
         discount: discount,
         discountType: r.discountType || 'val',
+        gross: base,
         discAmt: discAmt,
         taxable: taxable,
         taxPct: taxPct,
@@ -387,6 +388,7 @@
     const docTitle = isReturn ? 'Credit Note' : 'Tax Invoice';
 
     const subTotal = rows.reduce((s, r) => s + r.taxable, 0);
+    const grossTotal = rows.reduce((s, r) => s + r.gross, 0);
     const totalTax = rows.reduce((s, r) => s + r.taxAmt, 0);
     const totalDiscount = rows.reduce((s, r) => s + r.discAmt, 0);
     const adjustments = parseFloat(inv.adjustments) || 0;
@@ -444,17 +446,15 @@
 
     // ── Items table ──
     const taxHeaders = taxMode === 'split'
-      ? `<th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">CGST</th>
-         <th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">SGST</th>`
-      : (taxMode === 'igst' ? `<th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">IGST</th>` : '');
+      ? `<th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Tax</th>`
+      : (taxMode === 'igst' ? `<th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Tax</th>` : '');
 
     const itemRowsHtml = rows.map((r, i) => {
       // The tax columns carry the rate only; the amounts are in the totals block.
       const halfPct = r.taxPct ? (Math.round((r.taxPct / 2) * 100) / 100) + '%' : '&mdash;';
       const fullPct = r.taxPct ? r.taxPct + '%' : '&mdash;';
       const taxCells = taxMode === 'split'
-        ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${halfPct}</td>
-           <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${halfPct}</td>`
+        ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${fullPct}</td>`
         : (taxMode === 'igst'
           ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${fullPct}</td>`
           : '');
@@ -466,12 +466,14 @@
           <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.qty}</td>
           <td class="si-nowrap" style="padding:5px 6px; text-align:center; text-transform:uppercase; color:#475569;">${siEsc(r.unit) || '&mdash;'}</td>
           <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${siNum(r.rate)}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.discAmt ? siNum(r.discAmt) : '&mdash;'}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${siNum(r.taxable)}</td>
           ${taxCells}
           <td class="si-nowrap" style="padding:5px 6px; text-align:right; color:#0f172a;">${siNum(r.total)}</td>
         </tr>`;
     }).join('');
 
-    const colCount = 7 + (taxMode === 'split' ? 2 : (taxMode === 'igst' ? 1 : 0));
+    const colCount = 9 + (taxMode === 'none' ? 0 : 1);
 
     // ── Bank block ──
     // The bank card always prints, so the invoice keeps its column layout even when
@@ -482,8 +484,8 @@
     const isFullyPaid = balanceDue <= 0.005;
     const payLines = [];
     if (inv.dueDate && !isFullyPaid) payLines.push(`<span style="color:#334155;">Due Date:</span> ${siEsc(siDate(inv.dueDate))}`);
-    if (paidAmount > 0) payLines.push(`<span style="color:#334155;">Paid (${siEsc(inv.paymentStatus)}):</span> ₹ ${siNum(paidAmount)}`);
-    if (!isFullyPaid) payLines.push(`<span style="color:#334155;">Balance Due:</span> ₹ ${siNum(balanceDue)}`);
+    if (paidAmount > 0) payLines.push(`<span style="color:#334155;">Paid (${siEsc(inv.paymentStatus)}):</span> ${siNum(paidAmount)}`);
+    if (!isFullyPaid) payLines.push(`<span style="color:#334155;">Balance Due:</span> ${siNum(balanceDue)}`);
     const payLinesHtml = payLines.map((line, i) => `<div${i === 0 ? ' style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"' : ''}>${line}</div>`).join('');
 
     const bankHtml = `
@@ -533,11 +535,11 @@
       const amt = gstByRate[pct];
       const half = Math.round((parseFloat(pct) / 2) * 100) / 100;
       if (taxMode === 'split') {
-        return totalsRow('CGST ' + half + '%', '₹ ' + siNum(amt / 2))
-             + totalsRow('SGST ' + half + '%', '₹ ' + siNum(amt / 2));
+        return totalsRow('CGST ' + half + '%', siNum(amt / 2))
+             + totalsRow('SGST ' + half + '%', siNum(amt / 2));
       }
-      if (taxMode === 'igst') return totalsRow('IGST ' + pct + '%', '₹ ' + siNum(amt));
-      return totalsRow('GST ' + pct + '%', '₹ ' + siNum(amt));
+      if (taxMode === 'igst') return totalsRow('IGST ' + pct + '%', siNum(amt));
+      return totalsRow('GST ' + pct + '%', siNum(amt));
     }).join('');
 
     return `
@@ -552,7 +554,7 @@
           /* Codes and figures stay on one line, whatever the column width */
           #${SALES_INVOICE_SHEET_ID} .si-grid .si-nowrap { white-space: nowrap; width: 1%; }
           #${SALES_INVOICE_SHEET_ID} .si-grid .si-desc { overflow-wrap: anywhere; }
-          #${SALES_INVOICE_SHEET_ID} .si-grid tbody td { background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          #${SALES_INVOICE_SHEET_ID} .si-grid tbody td { font-size: 11.5px; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           /* Header row carries the KYA UI blue — the same blue-600 -> blue-700 gradient the
              app's primary buttons use. The flat colour stays as the fallback and
              print-color-adjust keeps the fill when the sheet goes to a printer. */
@@ -563,7 +565,7 @@
             background-image: none !important;
             color: #ffffff !important;
             border: 1px solid #1d4ed8 !important;
-            font-size: 11.5px !important;
+            font-size: 10.5px !important;
             font-weight: 700 !important;
             padding: 9px 8px !important;
             line-height: 1.35 !important;
@@ -602,15 +604,17 @@
         <!-- Items -->
         <table class="si-grid" style="width:100%; font-size:10.5px; margin-top:10px;">
           <thead>
-            <tr style="color:#fff; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; background-color:#2563eb;">
-              <th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Sl No.</th>
-              <th class="si-desc" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Item Description</th>
-              <th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">HSN/SAC</th>
-              <th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Qty</th>
-              <th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:center; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Unit</th>
-              <th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Rate</th>
+            <tr style="color:#fff; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; background-color:#2563eb;">
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Sl No.</th>
+              <th class="si-desc" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Item Description</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">HSN/SAC</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Qty</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:center; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Unit</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Rate</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Discount</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Value</th>
               ${taxHeaders}
-              <th class="si-nowrap" style="padding:9px 8px; font-size:11.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Amount</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -632,15 +636,14 @@
           </div>
           <div style="width:290px; flex-shrink:0; display:flex; flex-direction:column; gap:10px;">
             <div style="flex:0 0 auto; padding:4px 12px; box-sizing:border-box;">
-              ${totalsRow('Taxable Value', '₹ ' + siNum(subTotal))}
-              ${totalDiscount > 0 ? totalsRow('Total Discount', '&minus; ₹ ' + siNum(totalDiscount)) : ''}
+              ${totalsRow('Taxable Value', siNum(subTotal))}
               ${gstTotalsRows ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${gstTotalsRows}` : ''}
-              ${(inv.tdsTcsMode === 'TCS' && tdsTcsAmount) ? totalsRow('TCS @ ' + siNum(inv.tdsTcsRate) + '%', '₹ ' + siNum(tdsTcsAmount)) : ''}
-              ${(inv.tdsTcsMode === 'TDS' && tdsTcsAmount) ? totalsRow('TDS @ ' + siNum(inv.tdsTcsRate) + '%', '&minus; ₹ ' + siNum(tdsTcsAmount)) : ''}
-              ${adjustments !== 0 ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${totalsRow('Round Off', '₹ ' + siNum(adjustments))}` : ''}
+              ${(inv.tdsTcsMode === 'TCS' && tdsTcsAmount) ? totalsRow('TCS @ ' + siNum(inv.tdsTcsRate) + '%', siNum(tdsTcsAmount)) : ''}
+              ${(inv.tdsTcsMode === 'TDS' && tdsTcsAmount) ? totalsRow('TDS @ ' + siNum(inv.tdsTcsRate) + '%', '&minus; ' + siNum(tdsTcsAmount)) : ''}
+              ${adjustments !== 0 ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${totalsRow('Round Off', siNum(adjustments))}` : ''}
             </div>
             <div style="flex:0 0 auto; background:var(--blue-600, #2563eb); border:1px solid #1d4ed8; border-radius:6px; padding:6px 12px; box-sizing:border-box; color:#ffffff; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
-              ${totalsRow('Total Amount Payable', '₹ ' + siNum(grandTotal), { size: '12px', weight: 700, color: '#ffffff', pad: '1px 0' })}
+              ${totalsRow('Total Amount', siNum(grandTotal), { size: '12px', weight: 700, color: '#ffffff', pad: '1px 0' })}
             </div>
             <div style="flex:1 1 auto; padding:8px 12px 0; box-sizing:border-box; text-align:center; display:flex; flex-direction:column; justify-content:space-between;">
               <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${siEsc(getInvoiceCompanyName(co))}</div>
@@ -658,6 +661,69 @@
           </div>
         </div>
       </div>`;
+  }
+
+  // ── Export data ──────────────────────────────────────────────────
+  // PDF and Excel exports read the same figures, labels and rules the sheet prints.
+  function getSalesInvoiceExportData(inv) {
+    const co = getInvoiceCompany();
+    const parties = getInvoiceParties(inv);
+    const bank = getInvoiceBankDetails(inv) || { bankName: '', accountHolder: '', accountNo: '', ifsc: '', branch: '', qrCode: '' };
+    const rows = getInvoiceLineRows(inv);
+    const taxMode = getInvoiceTaxMode(inv);
+    const isReturn = !!inv.isReturn;
+
+    const subTotal = rows.reduce((s, r) => s + r.taxable, 0);
+    const grossTotal = rows.reduce((s, r) => s + r.gross, 0);
+    const totalTax = rows.reduce((s, r) => s + r.taxAmt, 0);
+    const totalDiscount = rows.reduce((s, r) => s + r.discAmt, 0);
+    const adjustments = parseFloat(inv.adjustments) || 0;
+    const tdsTcsAmount = parseFloat(inv.tdsTcsAmount) || 0;
+    const grandTotal = parseFloat(inv.total) || (subTotal + totalTax + adjustments);
+    const paidAmount = parseFloat(inv.paymentAmount) || 0;
+    const balanceDue = Math.max(0, grandTotal - paidAmount);
+    const isFullyPaid = balanceDue <= 0.005;
+
+    const posFromParty = !!(parties.billed.state || parties.billed.country);
+    const posState = posFromParty ? (parties.billed.state || '') : (co.state || '');
+    const posCountry = posFromParty ? (parties.billed.country || '') : '';
+    const posCode = posState ? getGstStateCode(posState, posCountry, posFromParty ? parties.billed.gstin : co.gstin) : '';
+    const placeOfSupply = [posCode ? posCode + ' - ' + posState : posState, posCountry].filter(Boolean).join(', ');
+
+    const gstByRate = {};
+    rows.forEach(r => { if (r.taxPct) gstByRate[r.taxPct] = (gstByRate[r.taxPct] || 0) + r.taxAmt; });
+    const gstLines = [];
+    Object.keys(gstByRate).sort((a, b) => parseFloat(a) - parseFloat(b)).forEach(pct => {
+      const amt = gstByRate[pct];
+      const half = Math.round((parseFloat(pct) / 2) * 100) / 100;
+      if (taxMode === 'split') {
+        gstLines.push({ label: 'CGST ' + half + '%', amount: amt / 2 });
+        gstLines.push({ label: 'SGST ' + half + '%', amount: amt / 2 });
+      } else if (taxMode === 'igst') {
+        gstLines.push({ label: 'IGST ' + pct + '%', amount: amt });
+      } else {
+        gstLines.push({ label: 'GST ' + pct + '%', amount: amt });
+      }
+    });
+
+    const payLines = [];
+    if (inv.dueDate && !isFullyPaid) payLines.push({ label: 'Due Date', value: siDate(inv.dueDate) });
+    if (paidAmount > 0) payLines.push({ label: 'Paid (' + (inv.paymentStatus || '') + ')', value: siNum(paidAmount) });
+    if (!isFullyPaid) payLines.push({ label: 'Balance Due', value: siNum(balanceDue) });
+
+    const docTitle = isReturn ? 'Credit Note' : 'Tax Invoice';
+    return {
+      inv, co, parties, bank, rows, taxMode, isReturn, docTitle,
+      companyName: getInvoiceCompanyName(co),
+      companySeal: getInvoiceCompanySeal(co),
+      signatureImage: co.signatureImage || '',
+      subtitle: isReturn ? 'Against Invoice ' + (inv.returnAgainstInvoice || '') : 'Original for Recipient',
+      subTotal, grossTotal, totalTax, totalDiscount, adjustments, tdsTcsAmount, grandTotal,
+      paidAmount, balanceDue, isFullyPaid, placeOfSupply, gstLines, payLines,
+      amountInWords: siAmountInWords(grandTotal),
+      invoiceDate: siDate(inv.date),
+      fileBase: (docTitle.replace(/\s+/g, '_') + '_' + (inv.invoiceNo || 'Invoice')).replace(/[^a-zA-Z0-9_-]/g, '_')
+    };
   }
 
   // ── Preview modal ────────────────────────────────────────────────
@@ -681,7 +747,13 @@
       <style>
         @media print {
           body * { visibility: hidden !important; }
+          body > *:not(#salesTaxInvoiceOverlay) { display: none !important; }
+          #salesTaxInvoiceOverlay .inv-modal-card > div:first-child { display: none !important; }
+          #salesTaxInvoiceOverlay .inv-modal-card, #salesTaxInvoiceOverlay .inv-modal-card > div { position: static !important; padding: 0 !important; margin: 0 !important; background: none !important; max-width: none !important; width: auto !important; }
           #${SALES_INVOICE_SHEET_ID}, #${SALES_INVOICE_SHEET_ID} * { visibility: visible !important; }
+          #${SALES_INVOICE_SHEET_ID}, #${SALES_INVOICE_SHEET_ID} * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          #salesTaxInvoiceOverlay { position: absolute !important; top: 0 !important; left: 0 !important; right: auto !important; bottom: auto !important; background: none !important; backdrop-filter: none !important; }
+          #salesTaxInvoiceOverlay, #salesTaxInvoiceOverlay * { overflow: visible !important; max-height: none !important; box-shadow: none !important; }
           #${SALES_INVOICE_SHEET_ID} { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; }
           @page { size: A4; margin: 12mm; }
         }
@@ -698,7 +770,36 @@
               </svg>
               Print
             </button>
-            <button class="btn btn-secondary" id="btnSalesInvoicePdf" type="button" style="padding:7px 14px; height:34px; font-size:13px;">PDF</button>
+            <div class="si-export-wrap" style="position:relative; display:inline-block;">
+              <button class="btn btn-secondary" id="btnSalesInvoiceExport" type="button" aria-haspopup="menu" aria-expanded="false" style="padding:7px 12px 7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span class="si-export-label">Export</span>
+                <svg width="10" height="10" viewBox="0 0 14 14" fill="none" style="margin-left:2px;">
+                  <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
+              <div class="rpt-more-dropdown" id="salesInvoiceExportMenu" role="menu" style="min-width:160px; text-align:left;">
+                <button class="rpt-menu-item" id="btnSalesInvoiceExportPdf" type="button" role="menuitem">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="M9 15h6M9 18h4"></path>
+                  </svg>
+                  <span>PDF</span>
+                </button>
+                <button class="rpt-menu-item" id="btnSalesInvoiceExportExcel" type="button" role="menuitem">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                    <path d="M3 9h18M3 15h18M9 3v18"></path>
+                  </svg>
+                  <span>Excel</span>
+                </button>
+              </div>
+            </div>
             <button class="btn btn-danger" id="btnSalesInvoiceClose" type="button" style="padding:7px 14px; height:34px; font-size:13px;">Close</button>
           </div>
         </div>
@@ -716,21 +817,67 @@
     if (closeBtn) closeBtn.addEventListener('click', () => overlay.remove());
 
     const printBtn = overlay.querySelector('#btnSalesInvoicePrint');
-    if (printBtn) printBtn.addEventListener('click', () => window.print());
+    if (printBtn) printBtn.addEventListener('click', () => {
+      if (typeof window.printSalesInvoice === 'function') {
+        window.printSalesInvoice(inv).catch(err => { console.error('Invoice print failed:', err); window.print(); });
+      } else {
+        window.print();
+      }
+    });
 
-    const pdfBtn = overlay.querySelector('#btnSalesInvoicePdf');
-    if (pdfBtn) {
-      pdfBtn.addEventListener('click', async () => {
-        if (typeof window.exportInvoiceToPDF === 'function') {
-          await window.exportInvoiceToPDF(inv);
-        } else {
-          window.print();
-        }
+    const exportBtn = overlay.querySelector('#btnSalesInvoiceExport');
+    const exportMenu = overlay.querySelector('#salesInvoiceExportMenu');
+    const exportLabel = overlay.querySelector('.si-export-label');
+    const isExportMenuOpen = () => !!(exportMenu && exportMenu.classList.contains('open'));
+    const setExportMenu = (open) => {
+      if (!exportMenu || !exportBtn) return;
+      exportMenu.classList.toggle('open', open);
+      exportBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    let exporting = false;
+    const runExport = async (kind) => {
+      setExportMenu(false);
+      if (exporting) return;
+      const fn = kind === 'pdf' ? window.exportSalesInvoiceToPDF : window.exportSalesInvoiceToExcel;
+      const kindName = kind === 'pdf' ? 'PDF' : 'Excel';
+      if (typeof fn !== 'function') {
+        alert(kindName + ' export is not available. Please reload the page and try again.');
+        return;
+      }
+      exporting = true;
+      if (exportBtn) exportBtn.disabled = true;
+      if (exportLabel) exportLabel.textContent = 'Exporting…';
+      try {
+        await fn(inv);
+      } catch (err) {
+        console.error('Invoice ' + kindName + ' export failed:', err);
+        alert('Could not export ' + kindName + ': ' + (err && err.message ? err.message : err));
+      } finally {
+        exporting = false;
+        if (exportBtn) exportBtn.disabled = false;
+        if (exportLabel) exportLabel.textContent = 'Export';
+      }
+    };
+    if (exportBtn) {
+      exportBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        setExportMenu(!isExportMenuOpen());
       });
     }
+    const exportPdfItem = overlay.querySelector('#btnSalesInvoiceExportPdf');
+    if (exportPdfItem) exportPdfItem.addEventListener('click', e => { e.stopPropagation(); runExport('pdf'); });
+    const exportExcelItem = overlay.querySelector('#btnSalesInvoiceExportExcel');
+    if (exportExcelItem) exportExcelItem.addEventListener('click', e => { e.stopPropagation(); runExport('excel'); });
+    overlay.addEventListener('click', e => {
+      if (isExportMenuOpen() && !e.target.closest('.si-export-wrap')) setExportMenu(false);
+    });
 
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-    overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
+    overlay.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (isExportMenuOpen()) { setExportMenu(false); return; }
+      overlay.remove();
+    });
   }
 
   window.renderSalesTaxInvoiceHTML = renderSalesTaxInvoiceHTML;
@@ -738,3 +885,5 @@
   window.getInvoiceCompany = getInvoiceCompany;
   window.getInvoiceBankDetails = getInvoiceBankDetails;
   window.siAmountInWords = siAmountInWords;
+  window.getSalesInvoiceExportData = getSalesInvoiceExportData;
+  window.SALES_INVOICE_SHEET_ID = SALES_INVOICE_SHEET_ID;
