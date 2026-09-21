@@ -5,11 +5,34 @@
 (function() {
   let _masterDeskInitialized = false;
   let currentMasterDeskSubtype = 'Create';
-  let currentMasterDeskTab = 'group';
+  let currentMasterDeskTab = 'overview';
   let _masterGroupAliases = [];
+  // Create Group multi-row: each row keeps its own Alternate Names. _masterGroupAliases
+  // always holds the active row's list; other rows' lists are parked here by row index.
+  let _masterGroupRowAliases = {};
+  let _masterGroupActiveRowIdx = 0;
+  let _masterGroupExtraRowKeys = [];
+  let _masterGroupExtraRowSeq = 0;
   let _masterLedgerAliases = [];
+  // Create Ledger multi-row: _masterLedgerAliases (and the side box / popup fields) hold
+  // the active row's values; other rows' values are parked here by row index.
+  let _masterLedgerRowState = {};
+  let _masterLedgerActiveRowIdx = 0;
+  let _masterLedgerExtraRowKeys = [];
+  let _masterLedgerExtraRowSeq = 0;
   let _masterCustomerAliases = [];
+  // Create Customer multi-row: same scheme as Create Ledger (active row's values live in
+  // _masterCustomerAliases and the side box / popup fields; other rows are parked here).
+  let _masterCustomerRowState = {};
+  let _masterCustomerActiveRowIdx = 0;
+  let _masterCustomerExtraRowKeys = [];
+  let _masterCustomerExtraRowSeq = 0;
   let _masterSupplierAliases = [];
+  // Create Supplier multi-row: same scheme as Create Customer / Ledger.
+  let _masterSupplierRowState = {};
+  let _masterSupplierActiveRowIdx = 0;
+  let _masterSupplierExtraRowKeys = [];
+  let _masterSupplierExtraRowSeq = 0;
   let _masterDeskReturnContext = null;
 
   let _masterAlterSelectedGroupId = null;
@@ -658,6 +681,7 @@
   function setMasterDeskTab(tab) {
     currentMasterDeskTab = tab;
 
+    const btnOverview = document.getElementById('masterTabOverview');
     const btnGroup = document.getElementById('masterTabGroup');
     const btnLedger = document.getElementById('masterTabLedger');
     const btnCustomers = document.getElementById('masterTabCustomers');
@@ -668,6 +692,10 @@
     const btnUnit = document.getElementById('masterTabUnit');
     const btnWarehouse = document.getElementById('masterTabWarehouse');
 
+    if (btnOverview) {
+      btnOverview.classList.toggle('active', tab === 'overview');
+      btnOverview.setAttribute('aria-selected', tab === 'overview');
+    }
     if (btnGroup) {
       btnGroup.classList.toggle('active', tab === 'group');
       btnGroup.setAttribute('aria-selected', tab === 'group');
@@ -1015,10 +1043,35 @@
     return false;
   }
 
+  // Name input of the Create Group row whose Alternate Names are currently shown.
+  function getMasterGroupActiveNameInput() {
+    return document.getElementById('masterGroupName' + (_masterGroupActiveRowIdx ? _masterGroupActiveRowIdx : ''));
+  }
+
+  // Lower-cased Names and Alternate Names of every Create Group row except the active one.
+  function getMasterGroupOtherRowValues() {
+    const values = new Set();
+    const activeInp = getMasterGroupActiveNameInput();
+    document.querySelectorAll('.master-group-row input[id^="masterGroupName"]').forEach(inp => {
+      if (inp === activeInp) return;
+      const v = inp.value.trim().toLowerCase();
+      if (v) values.add(v);
+    });
+    Object.keys(_masterGroupRowAliases).forEach(key => {
+      if (Number(key) === _masterGroupActiveRowIdx) return;
+      (_masterGroupRowAliases[key] || []).forEach(a => {
+        const v = a.trim().toLowerCase();
+        if (v) values.add(v);
+      });
+    });
+    return values;
+  }
+
   function validateMasterGroupAliasesLive() {
     const container = document.getElementById('masterGroupAliasesContainer');
-    const nameInp = document.getElementById('masterGroupName');
+    const nameInp = getMasterGroupActiveNameInput();
     if (!container) return true;
+    const otherRowValues = getMasterGroupOtherRowValues();
 
     const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
     const rows = container.querySelectorAll('.master-alias-row-wrap');
@@ -1059,10 +1112,21 @@
         return;
       }
 
-      // Check 2: Duplicate of another alias in current form
+      // Check 2: Duplicate of another alternate name in current form
       const duplicateInForm = aliasValues.some((otherVal, otherIdx) => otherIdx !== idx && otherVal !== '' && otherVal === valLower);
       if (duplicateInForm) {
-        const errorText = `"${val}" is already entered as another alias in this form.`;
+        const errorText = `"${val}" is already entered as another alternate name in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
+      // Check 2b: Duplicate of another group row's Name / Alternate Name in this form
+      if (otherRowValues.has(valLower)) {
+        const errorText = `"${val}" is already used by another group in this form.`;
         errDiv.textContent = errorText;
         errDiv.style.display = 'block';
         input.style.borderColor = '#ef4444';
@@ -1094,135 +1158,238 @@
     return !hasAnyError;
   }
 
+  function getMasterGroupAliasRowIndex(block) {
+    const container = document.getElementById('masterGroupAliasesContainer');
+    if (!container) return -1;
+    return Array.from(container.children).indexOf(block);
+  }
+
+  function updateMasterGroupAliasPlaceholders() {
+    const container = document.getElementById('masterGroupAliasesContainer');
+    if (!container) return;
+    const rows = container.querySelectorAll('.master-alias-row-wrap');
+    rows.forEach((row, i) => {
+      const inp = row.querySelector('.master-alias-input');
+      if (inp) {
+        inp.placeholder = `Enter Alternate Name`;
+      }
+    });
+  }
+
+  // Appends a fresh empty alias box below the current last one, once it's been typed
+  // into — no limit on how many can chain this way.
+  function maybeAddNextMasterGroupAliasBox(currentIdx, val) {
+    if (!val) return;
+    const isLast = currentIdx === _masterGroupAliases.length - 1;
+    if (!isLast) return;
+
+    _masterGroupAliases.push('');
+    const container = document.getElementById('masterGroupAliasesContainer');
+    if (container) {
+      container.appendChild(createMasterGroupAliasBox(_masterGroupAliases.length - 1));
+      updateMasterGroupAliasPlaceholders();
+    }
+  }
+
+  // If alternate name was cleared/removed, also remove the box under it if it is empty.
+  function maybeRemoveNextMasterGroupAliasBox(currentIdx) {
+    const container = document.getElementById('masterGroupAliasesContainer');
+    if (!container) return;
+
+    while (currentIdx + 1 < _masterGroupAliases.length && _masterGroupAliases[currentIdx + 1].trim() === '') {
+      _masterGroupAliases.splice(currentIdx + 1, 1);
+      const nextChild = container.children[currentIdx + 1];
+      if (nextChild) {
+        nextChild.remove();
+      }
+    }
+    updateMasterGroupAliasPlaceholders();
+    validateMasterGroupAliasesLive();
+  }
+
+  // Builds one Alternate Name box (input + remove button + error line) for the given
+  // index in _masterGroupAliases, without touching any other already-rendered box.
+  function createMasterGroupAliasBox(idx) {
+    const block = document.createElement('div');
+    block.className = 'master-alias-row-wrap';
+    block.style.display = 'flex';
+    block.style.flexDirection = 'column';
+    block.style.gap = '2px';
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+
+    const input = document.createElement('input');
+    input.className = 'master-alias-input';
+    input.placeholder = `Enter Alternate Name`;
+    input.value = _masterGroupAliases[idx] || '';
+    input.style.cssText = `
+      flex: 1;
+      height: 38px;
+      padding: 8px 12px;
+      font-size: 13.5px;
+      font-family: inherit;
+      color: var(--slate-800);
+      background: #ffffff;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    `;
+
+    input.addEventListener('focus', () => {
+      if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+        input.style.borderColor = '#3b82f6';
+        input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      validateMasterGroupAliasesLive();
+    });
+
+    input.addEventListener('input', (e) => {
+      const currentIdx = getMasterGroupAliasRowIndex(block);
+      if (currentIdx === -1) return;
+
+      const val = e.target.value;
+      _masterGroupAliases[currentIdx] = val;
+      const trimmed = val.trim();
+
+      validateMasterGroupAliasesLive();
+
+      if (trimmed !== '') {
+        maybeAddNextMasterGroupAliasBox(currentIdx, trimmed);
+      } else {
+        maybeRemoveNextMasterGroupAliasBox(currentIdx);
+      }
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-master-alias-del';
+    delBtn.title = 'Remove Alternate Name';
+    delBtn.style.cssText = `
+      width: 38px;
+      height: 38px;
+      min-width: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--slate-400);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    `;
+    delBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/>
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/>
+        <line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>
+    `;
+
+    delBtn.addEventListener('mouseenter', () => {
+      delBtn.style.background = '#fef2f2';
+      delBtn.style.color = '#dc2626';
+      delBtn.style.borderColor = '#fecaca';
+    });
+    delBtn.addEventListener('mouseleave', () => {
+      delBtn.style.background = '#ffffff';
+      delBtn.style.color = 'var(--slate-400)';
+      delBtn.style.borderColor = 'var(--slate-200)';
+    });
+
+    delBtn.addEventListener('click', () => {
+      const currentIdx = getMasterGroupAliasRowIndex(block);
+      if (currentIdx === -1) return;
+
+      // Remove this box
+      _masterGroupAliases.splice(currentIdx, 1);
+
+      // Also drop the box(es) right under it as long as they're still empty
+      while (currentIdx < _masterGroupAliases.length && _masterGroupAliases[currentIdx].trim() === '') {
+        _masterGroupAliases.splice(currentIdx, 1);
+      }
+
+      const nameInp = getMasterGroupActiveNameInput();
+      const hasName = nameInp && nameInp.value.trim() !== '';
+
+      if (_masterGroupAliases.length === 0) {
+        if (hasName) {
+          _masterGroupAliases = [''];
+        }
+      } else {
+        if (_masterGroupAliases[_masterGroupAliases.length - 1].trim() !== '') {
+          _masterGroupAliases.push('');
+        }
+      }
+      renderMasterGroupAliases();
+    });
+
+    const errDiv = document.createElement('div');
+    errDiv.className = 'master-alias-err';
+    errDiv.style.cssText = `
+      display: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: #dc2626;
+      margin-top: 4px;
+      line-height: 1.4;
+    `;
+
+    row.appendChild(input);
+    row.appendChild(delBtn);
+    block.appendChild(row);
+    block.appendChild(errDiv);
+    return block;
+  }
+
   function renderMasterGroupAliases() {
     const container = document.getElementById('masterGroupAliasesContainer');
-    const addAliasBtn = document.getElementById('masterGroupAddAliasBtn');
+    const akaPanel = document.getElementById('masterGroupAkaPanel');
     if (!container) return;
 
     container.innerHTML = '';
-    const hasEmpty = _masterGroupAliases.some(a => a.trim() === '');
-    if (addAliasBtn) {
-      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
-    }
-
     _masterGroupAliases.forEach((alias, idx) => {
-      const block = document.createElement('div');
-      block.className = 'master-alias-row-wrap';
-      block.style.display = 'flex';
-      block.style.flexDirection = 'column';
-      block.style.gap = '2px';
-
-      const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.gap = '8px';
-      row.style.alignItems = 'center';
-
-      const input = document.createElement('input');
-      input.className = 'master-alias-input';
-      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
-      input.value = alias;
-      input.style.cssText = `
-        flex: 1;
-        height: 38px;
-        padding: 8px 12px;
-        font-size: 13.5px;
-        font-family: inherit;
-        color: var(--slate-800);
-        background: #ffffff;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        box-sizing: border-box;
-        outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      `;
-
-      input.addEventListener('focus', () => {
-        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
-          input.style.borderColor = '#3b82f6';
-          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
-        }
-      });
-
-      input.addEventListener('blur', () => {
-        validateMasterGroupAliasesLive();
-      });
-
-      input.addEventListener('input', (e) => {
-        _masterGroupAliases[idx] = e.target.value;
-        const nowHasEmpty = _masterGroupAliases.some(a => a.trim() === '');
-        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
-        validateMasterGroupAliasesLive();
-      });
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'btn-master-alias-del';
-      delBtn.title = 'Remove Alias';
-      delBtn.style.cssText = `
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        background: #ffffff;
-        color: var(--slate-400);
-        cursor: pointer;
-        transition: all 0.15s ease;
-      `;
-      delBtn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      `;
-
-      delBtn.addEventListener('mouseenter', () => {
-        delBtn.style.background = '#fef2f2';
-        delBtn.style.color = '#dc2626';
-        delBtn.style.borderColor = '#fecaca';
-      });
-      delBtn.addEventListener('mouseleave', () => {
-        delBtn.style.background = '#ffffff';
-        delBtn.style.color = 'var(--slate-400)';
-        delBtn.style.borderColor = 'var(--slate-200)';
-      });
-
-      delBtn.addEventListener('click', () => {
-        _masterGroupAliases.splice(idx, 1);
-        renderMasterGroupAliases();
-      });
-
-      const errDiv = document.createElement('div');
-      errDiv.className = 'master-alias-err';
-      errDiv.style.cssText = `
-        display: none;
-        font-size: 12px;
-        font-weight: 600;
-        color: #dc2626;
-        margin-top: 4px;
-        line-height: 1.4;
-      `;
-
-      row.appendChild(input);
-      row.appendChild(delBtn);
-      block.appendChild(row);
-      block.appendChild(errDiv);
-      container.appendChild(block);
+      container.appendChild(createMasterGroupAliasBox(idx));
     });
+
+    if (akaPanel) {
+      akaPanel.style.display = _masterGroupAliases.length > 0 ? 'block' : 'none';
+    }
 
     validateMasterGroupAliasesLive();
   }
 
   function validateMasterLedgerAliasesLive() {
     const container = document.getElementById('masterLedgerAliasesContainer');
-    const nameInp = document.getElementById('masterLedgerName');
+    const nameInp = document.getElementById('masterLedgerName' + (_masterLedgerActiveRowIdx ? _masterLedgerActiveRowIdx : ''));
     if (!container) return true;
 
     const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
+    // Lower-cased Names and Alternate Names of every other Create Ledger row
+    const otherRowValues = new Set();
+    document.querySelectorAll('.master-ledger-row input[id^="masterLedgerName"]').forEach(inp => {
+      if (inp === nameInp) return;
+      const v = inp.value.trim().toLowerCase();
+      if (v) otherRowValues.add(v);
+    });
+    Object.keys(_masterLedgerRowState).forEach(key => {
+      if (Number(key) === (_masterLedgerActiveRowIdx || 0)) return;
+      ((_masterLedgerRowState[key] && _masterLedgerRowState[key].aliases) || []).forEach(a => {
+        const v = a.trim().toLowerCase();
+        if (v) otherRowValues.add(v);
+      });
+    });
     const rows = container.querySelectorAll('.master-alias-row-wrap');
     let hasAnyError = false;
 
@@ -1272,6 +1439,17 @@
         return;
       }
 
+      // Check 2b: Duplicate of another ledger row's Name / Alternate Name in this form
+      if (otherRowValues.has(valLower)) {
+        const errorText = `"${val}" is already used by another ledger in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
       // Check 3: Duplicate of existing CoA entity
       const dup = findDuplicateCoaNameOrAlias(val);
       if (dup) {
@@ -1295,135 +1473,207 @@
     return !hasAnyError;
   }
 
+  // ── Ledger Alternate Names (same behaviour as Create Group): the panel beside the
+  // form appears once Name is filled in, one box per alias, auto-adding another box
+  // below as you type (no limit) ──
+  function getMasterLedgerAliasRowIndex(block) {
+    const container = document.getElementById('masterLedgerAliasesContainer');
+    if (!container) return -1;
+    return Array.from(container.children).indexOf(block);
+  }
+
+  function updateMasterLedgerAliasPlaceholders() {
+    const container = document.getElementById('masterLedgerAliasesContainer');
+    if (!container) return;
+    container.querySelectorAll('.master-alias-row-wrap').forEach((row, i) => {
+      const inp = row.querySelector('.master-alias-input');
+      if (inp) inp.placeholder = `Enter Alternate Name`;
+    });
+  }
+
+  function createMasterLedgerAliasBox(idx) {
+    const block = document.createElement('div');
+    block.className = 'master-alias-row-wrap';
+    block.style.display = 'flex';
+    block.style.flexDirection = 'column';
+    block.style.gap = '2px';
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+
+    const input = document.createElement('input');
+    input.className = 'master-alias-input';
+    input.placeholder = `Enter Alternate Name`;
+    input.value = _masterLedgerAliases[idx] || '';
+    input.style.cssText = `
+      flex: 1;
+      height: 38px;
+      padding: 8px 12px;
+      font-size: 13.5px;
+      font-family: inherit;
+      color: var(--slate-800);
+      background: #ffffff;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    `;
+
+    input.addEventListener('focus', () => {
+      if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+        input.style.borderColor = '#3b82f6';
+        input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      validateMasterLedgerAliasesLive();
+    });
+
+    input.addEventListener('input', (e) => {
+      const currentIdx = getMasterLedgerAliasRowIndex(block);
+      if (currentIdx === -1) return;
+      _masterLedgerAliases[currentIdx] = e.target.value;
+      validateMasterLedgerAliasesLive();
+
+      const container = document.getElementById('masterLedgerAliasesContainer');
+      if (e.target.value.trim() !== '') {
+        // Typed into the last box: append a fresh empty one below
+        if (currentIdx === _masterLedgerAliases.length - 1 && container) {
+          _masterLedgerAliases.push('');
+          container.appendChild(createMasterLedgerAliasBox(_masterLedgerAliases.length - 1));
+          updateMasterLedgerAliasPlaceholders();
+        }
+      } else if (container) {
+        // Cleared: drop the empty box(es) right under it
+        while (currentIdx + 1 < _masterLedgerAliases.length && _masterLedgerAliases[currentIdx + 1].trim() === '') {
+          _masterLedgerAliases.splice(currentIdx + 1, 1);
+          const nextChild = container.children[currentIdx + 1];
+          if (nextChild) nextChild.remove();
+        }
+        updateMasterLedgerAliasPlaceholders();
+        validateMasterLedgerAliasesLive();
+      }
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-master-alias-del';
+    delBtn.title = 'Remove Alternate Name';
+    delBtn.style.cssText = `
+      width: 38px;
+      height: 38px;
+      min-width: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--slate-400);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    `;
+    delBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/>
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/>
+        <line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>
+    `;
+
+    delBtn.addEventListener('mouseenter', () => {
+      delBtn.style.background = '#fef2f2';
+      delBtn.style.color = '#dc2626';
+      delBtn.style.borderColor = '#fecaca';
+    });
+    delBtn.addEventListener('mouseleave', () => {
+      delBtn.style.background = '#ffffff';
+      delBtn.style.color = 'var(--slate-400)';
+      delBtn.style.borderColor = 'var(--slate-200)';
+    });
+
+    delBtn.addEventListener('click', () => {
+      const currentIdx = getMasterLedgerAliasRowIndex(block);
+      if (currentIdx === -1) return;
+
+      _masterLedgerAliases.splice(currentIdx, 1);
+      // Also drop the box(es) right under it as long as they're still empty
+      while (currentIdx < _masterLedgerAliases.length && _masterLedgerAliases[currentIdx].trim() === '') {
+        _masterLedgerAliases.splice(currentIdx, 1);
+      }
+
+      const nameInp = document.getElementById('masterLedgerName' + (_masterLedgerActiveRowIdx ? _masterLedgerActiveRowIdx : ''));
+      const hasName = nameInp && nameInp.value.trim() !== '';
+      if (_masterLedgerAliases.length === 0) {
+        if (hasName) _masterLedgerAliases = [''];
+      } else if (_masterLedgerAliases[_masterLedgerAliases.length - 1].trim() !== '') {
+        _masterLedgerAliases.push('');
+      }
+      renderMasterLedgerAliases();
+    });
+
+    const errDiv = document.createElement('div');
+    errDiv.className = 'master-alias-err';
+    errDiv.style.cssText = `
+      display: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: #dc2626;
+      margin-top: 4px;
+      line-height: 1.4;
+    `;
+
+    row.appendChild(input);
+    row.appendChild(delBtn);
+    block.appendChild(row);
+    block.appendChild(errDiv);
+    return block;
+  }
+
   function renderMasterLedgerAliases() {
     const container = document.getElementById('masterLedgerAliasesContainer');
-    const addAliasBtn = document.getElementById('masterLedgerAddAliasBtn');
+    const akaPanel = document.getElementById('masterLedgerAkaPanel');
     if (!container) return;
 
     container.innerHTML = '';
-    const hasEmpty = _masterLedgerAliases.some(a => a.trim() === '');
-    if (addAliasBtn) {
-      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
-    }
-
     _masterLedgerAliases.forEach((alias, idx) => {
-      const block = document.createElement('div');
-      block.className = 'master-alias-row-wrap';
-      block.style.display = 'flex';
-      block.style.flexDirection = 'column';
-      block.style.gap = '2px';
-
-      const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.gap = '8px';
-      row.style.alignItems = 'center';
-
-      const input = document.createElement('input');
-      input.className = 'master-alias-input';
-      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
-      input.value = alias;
-      input.style.cssText = `
-        flex: 1;
-        height: 38px;
-        padding: 8px 12px;
-        font-size: 13.5px;
-        font-family: inherit;
-        color: var(--slate-800);
-        background: #ffffff;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        box-sizing: border-box;
-        outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      `;
-
-      input.addEventListener('focus', () => {
-        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
-          input.style.borderColor = '#3b82f6';
-          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
-        }
-      });
-
-      input.addEventListener('blur', () => {
-        validateMasterLedgerAliasesLive();
-      });
-
-      input.addEventListener('input', (e) => {
-        _masterLedgerAliases[idx] = e.target.value;
-        const nowHasEmpty = _masterLedgerAliases.some(a => a.trim() === '');
-        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
-        validateMasterLedgerAliasesLive();
-      });
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'btn-master-alias-del';
-      delBtn.title = 'Remove Alias';
-      delBtn.style.cssText = `
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        background: #ffffff;
-        color: var(--slate-400);
-        cursor: pointer;
-        transition: all 0.15s ease;
-      `;
-      delBtn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      `;
-
-      delBtn.addEventListener('mouseenter', () => {
-        delBtn.style.background = '#fef2f2';
-        delBtn.style.color = '#dc2626';
-        delBtn.style.borderColor = '#fecaca';
-      });
-      delBtn.addEventListener('mouseleave', () => {
-        delBtn.style.background = '#ffffff';
-        delBtn.style.color = 'var(--slate-400)';
-        delBtn.style.borderColor = 'var(--slate-200)';
-      });
-
-      delBtn.addEventListener('click', () => {
-        _masterLedgerAliases.splice(idx, 1);
-        renderMasterLedgerAliases();
-      });
-
-      const errDiv = document.createElement('div');
-      errDiv.className = 'master-alias-err';
-      errDiv.style.cssText = `
-        display: none;
-        font-size: 12px;
-        font-weight: 600;
-        color: #dc2626;
-        margin-top: 4px;
-        line-height: 1.4;
-      `;
-
-      row.appendChild(input);
-      row.appendChild(delBtn);
-      block.appendChild(row);
-      block.appendChild(errDiv);
-      container.appendChild(block);
+      container.appendChild(createMasterLedgerAliasBox(idx));
     });
+
+    if (akaPanel) {
+      akaPanel.style.display = _masterLedgerAliases.length > 0 ? 'block' : 'none';
+    }
 
     validateMasterLedgerAliasesLive();
   }
 
   function validateMasterCustomerAliasesLive() {
     const container = document.getElementById('masterCustomerAliasesContainer');
-    const nameInp = document.getElementById('masterCustomerName');
+    const nameInp = document.getElementById('masterCustomerName' + (_masterCustomerActiveRowIdx ? _masterCustomerActiveRowIdx : ''));
     if (!container) return true;
 
     const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
+    // Lower-cased Names and Alternate Names of every other Create Customer row
+    const otherRowValues = new Set();
+    document.querySelectorAll('.master-customer-row input[id^="masterCustomerName"]').forEach(inp => {
+      if (inp === nameInp) return;
+      const v = inp.value.trim().toLowerCase();
+      if (v) otherRowValues.add(v);
+    });
+    Object.keys(_masterCustomerRowState).forEach(key => {
+      if (Number(key) === (_masterCustomerActiveRowIdx || 0)) return;
+      ((_masterCustomerRowState[key] && _masterCustomerRowState[key].aliases) || []).forEach(a => {
+        const v = a.trim().toLowerCase();
+        if (v) otherRowValues.add(v);
+      });
+    });
     const rows = container.querySelectorAll('.master-alias-row-wrap');
     let hasAnyError = false;
 
@@ -1473,6 +1723,17 @@
         return;
       }
 
+      // Check 2b: Duplicate of another customer row's Name / Alternate Name in this form
+      if (otherRowValues.has(valLower)) {
+        const errorText = `"${val}" is already used by another customer in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
       // Check 3: Duplicate of existing CoA entity
       const dup = findDuplicateCoaNameOrAlias(val);
       if (dup) {
@@ -1496,135 +1757,207 @@
     return !hasAnyError;
   }
 
+  // ── Customer Alternate Names (same behaviour as Create Group / Ledger): the panel beside the
+  // form appears once Name is filled in, one box per alias, auto-adding another box
+  // below as you type (no limit) ──
+  function getMasterCustomerAliasRowIndex(block) {
+    const container = document.getElementById('masterCustomerAliasesContainer');
+    if (!container) return -1;
+    return Array.from(container.children).indexOf(block);
+  }
+
+  function updateMasterCustomerAliasPlaceholders() {
+    const container = document.getElementById('masterCustomerAliasesContainer');
+    if (!container) return;
+    container.querySelectorAll('.master-alias-row-wrap').forEach((row, i) => {
+      const inp = row.querySelector('.master-alias-input');
+      if (inp) inp.placeholder = `Enter Alternate Name`;
+    });
+  }
+
+  function createMasterCustomerAliasBox(idx) {
+    const block = document.createElement('div');
+    block.className = 'master-alias-row-wrap';
+    block.style.display = 'flex';
+    block.style.flexDirection = 'column';
+    block.style.gap = '2px';
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+
+    const input = document.createElement('input');
+    input.className = 'master-alias-input';
+    input.placeholder = `Enter Alternate Name`;
+    input.value = _masterCustomerAliases[idx] || '';
+    input.style.cssText = `
+      flex: 1;
+      height: 38px;
+      padding: 8px 12px;
+      font-size: 13.5px;
+      font-family: inherit;
+      color: var(--slate-800);
+      background: #ffffff;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    `;
+
+    input.addEventListener('focus', () => {
+      if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+        input.style.borderColor = '#3b82f6';
+        input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      validateMasterCustomerAliasesLive();
+    });
+
+    input.addEventListener('input', (e) => {
+      const currentIdx = getMasterCustomerAliasRowIndex(block);
+      if (currentIdx === -1) return;
+      _masterCustomerAliases[currentIdx] = e.target.value;
+      validateMasterCustomerAliasesLive();
+
+      const container = document.getElementById('masterCustomerAliasesContainer');
+      if (e.target.value.trim() !== '') {
+        // Typed into the last box: append a fresh empty one below
+        if (currentIdx === _masterCustomerAliases.length - 1 && container) {
+          _masterCustomerAliases.push('');
+          container.appendChild(createMasterCustomerAliasBox(_masterCustomerAliases.length - 1));
+          updateMasterCustomerAliasPlaceholders();
+        }
+      } else if (container) {
+        // Cleared: drop the empty box(es) right under it
+        while (currentIdx + 1 < _masterCustomerAliases.length && _masterCustomerAliases[currentIdx + 1].trim() === '') {
+          _masterCustomerAliases.splice(currentIdx + 1, 1);
+          const nextChild = container.children[currentIdx + 1];
+          if (nextChild) nextChild.remove();
+        }
+        updateMasterCustomerAliasPlaceholders();
+        validateMasterCustomerAliasesLive();
+      }
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-master-alias-del';
+    delBtn.title = 'Remove Alternate Name';
+    delBtn.style.cssText = `
+      width: 38px;
+      height: 38px;
+      min-width: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--slate-400);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    `;
+    delBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/>
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/>
+        <line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>
+    `;
+
+    delBtn.addEventListener('mouseenter', () => {
+      delBtn.style.background = '#fef2f2';
+      delBtn.style.color = '#dc2626';
+      delBtn.style.borderColor = '#fecaca';
+    });
+    delBtn.addEventListener('mouseleave', () => {
+      delBtn.style.background = '#ffffff';
+      delBtn.style.color = 'var(--slate-400)';
+      delBtn.style.borderColor = 'var(--slate-200)';
+    });
+
+    delBtn.addEventListener('click', () => {
+      const currentIdx = getMasterCustomerAliasRowIndex(block);
+      if (currentIdx === -1) return;
+
+      _masterCustomerAliases.splice(currentIdx, 1);
+      // Also drop the box(es) right under it as long as they're still empty
+      while (currentIdx < _masterCustomerAliases.length && _masterCustomerAliases[currentIdx].trim() === '') {
+        _masterCustomerAliases.splice(currentIdx, 1);
+      }
+
+      const nameInp = document.getElementById('masterCustomerName' + (_masterCustomerActiveRowIdx ? _masterCustomerActiveRowIdx : ''));
+      const hasName = nameInp && nameInp.value.trim() !== '';
+      if (_masterCustomerAliases.length === 0) {
+        if (hasName) _masterCustomerAliases = [''];
+      } else if (_masterCustomerAliases[_masterCustomerAliases.length - 1].trim() !== '') {
+        _masterCustomerAliases.push('');
+      }
+      renderMasterCustomerAliases();
+    });
+
+    const errDiv = document.createElement('div');
+    errDiv.className = 'master-alias-err';
+    errDiv.style.cssText = `
+      display: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: #dc2626;
+      margin-top: 4px;
+      line-height: 1.4;
+    `;
+
+    row.appendChild(input);
+    row.appendChild(delBtn);
+    block.appendChild(row);
+    block.appendChild(errDiv);
+    return block;
+  }
+
   function renderMasterCustomerAliases() {
     const container = document.getElementById('masterCustomerAliasesContainer');
-    const addAliasBtn = document.getElementById('masterCustomerAddAliasBtn');
+    const akaPanel = document.getElementById('masterCustomerAkaPanel');
     if (!container) return;
 
     container.innerHTML = '';
-    const hasEmpty = _masterCustomerAliases.some(a => a.trim() === '');
-    if (addAliasBtn) {
-      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
-    }
-
     _masterCustomerAliases.forEach((alias, idx) => {
-      const block = document.createElement('div');
-      block.className = 'master-alias-row-wrap';
-      block.style.display = 'flex';
-      block.style.flexDirection = 'column';
-      block.style.gap = '2px';
-
-      const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.gap = '8px';
-      row.style.alignItems = 'center';
-
-      const input = document.createElement('input');
-      input.className = 'master-alias-input';
-      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
-      input.value = alias;
-      input.style.cssText = `
-        flex: 1;
-        height: 38px;
-        padding: 8px 12px;
-        font-size: 13.5px;
-        font-family: inherit;
-        color: var(--slate-800);
-        background: #ffffff;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        box-sizing: border-box;
-        outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      `;
-
-      input.addEventListener('focus', () => {
-        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
-          input.style.borderColor = '#3b82f6';
-          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
-        }
-      });
-
-      input.addEventListener('blur', () => {
-        validateMasterCustomerAliasesLive();
-      });
-
-      input.addEventListener('input', (e) => {
-        _masterCustomerAliases[idx] = e.target.value;
-        const nowHasEmpty = _masterCustomerAliases.some(a => a.trim() === '');
-        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
-        validateMasterCustomerAliasesLive();
-      });
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'btn-master-alias-del';
-      delBtn.title = 'Remove Alias';
-      delBtn.style.cssText = `
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        background: #ffffff;
-        color: var(--slate-400);
-        cursor: pointer;
-        transition: all 0.15s ease;
-      `;
-      delBtn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      `;
-
-      delBtn.addEventListener('mouseenter', () => {
-        delBtn.style.background = '#fef2f2';
-        delBtn.style.color = '#dc2626';
-        delBtn.style.borderColor = '#fecaca';
-      });
-      delBtn.addEventListener('mouseleave', () => {
-        delBtn.style.background = '#ffffff';
-        delBtn.style.color = 'var(--slate-400)';
-        delBtn.style.borderColor = 'var(--slate-200)';
-      });
-
-      delBtn.addEventListener('click', () => {
-        _masterCustomerAliases.splice(idx, 1);
-        renderMasterCustomerAliases();
-      });
-
-      const errDiv = document.createElement('div');
-      errDiv.className = 'master-alias-err';
-      errDiv.style.cssText = `
-        display: none;
-        font-size: 12px;
-        font-weight: 600;
-        color: #dc2626;
-        margin-top: 4px;
-        line-height: 1.4;
-      `;
-
-      row.appendChild(input);
-      row.appendChild(delBtn);
-      block.appendChild(row);
-      block.appendChild(errDiv);
-      container.appendChild(block);
+      container.appendChild(createMasterCustomerAliasBox(idx));
     });
+
+    if (akaPanel) {
+      akaPanel.style.display = _masterCustomerAliases.length > 0 ? 'block' : 'none';
+    }
 
     validateMasterCustomerAliasesLive();
   }
 
   function validateMasterSupplierAliasesLive() {
     const container = document.getElementById('masterSupplierAliasesContainer');
-    const nameInp = document.getElementById('masterSupplierName');
+    const nameInp = document.getElementById('masterSupplierName' + (_masterSupplierActiveRowIdx ? _masterSupplierActiveRowIdx : ''));
     if (!container) return true;
 
     const currentName = nameInp ? nameInp.value.trim().toLowerCase() : '';
+    // Lower-cased Names and Alternate Names of every other Create Supplier row
+    const otherRowValues = new Set();
+    document.querySelectorAll('.master-supplier-row input[id^="masterSupplierName"]').forEach(inp => {
+      if (inp === nameInp) return;
+      const v = inp.value.trim().toLowerCase();
+      if (v) otherRowValues.add(v);
+    });
+    Object.keys(_masterSupplierRowState).forEach(key => {
+      if (Number(key) === (_masterSupplierActiveRowIdx || 0)) return;
+      ((_masterSupplierRowState[key] && _masterSupplierRowState[key].aliases) || []).forEach(a => {
+        const v = a.trim().toLowerCase();
+        if (v) otherRowValues.add(v);
+      });
+    });
     const rows = container.querySelectorAll('.master-alias-row-wrap');
     let hasAnyError = false;
 
@@ -1672,6 +2005,17 @@
         return;
       }
 
+      // Check 2b: Duplicate of another supplier row's Name / Alternate Name in this form
+      if (otherRowValues.has(valLower)) {
+        const errorText = `"${val}" is already used by another supplier in this form.`;
+        errDiv.textContent = errorText;
+        errDiv.style.display = 'block';
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+        hasAnyError = true;
+        return;
+      }
+
       const dup = findDuplicateCoaNameOrAlias(val);
       if (dup) {
         const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
@@ -1693,125 +2037,183 @@
     return !hasAnyError;
   }
 
+  // ── Supplier Alternate Names (same behaviour as Create Group / Ledger): the panel beside the
+  // form appears once Name is filled in, one box per alias, auto-adding another box
+  // below as you type (no limit) ──
+  function getMasterSupplierAliasRowIndex(block) {
+    const container = document.getElementById('masterSupplierAliasesContainer');
+    if (!container) return -1;
+    return Array.from(container.children).indexOf(block);
+  }
+
+  function updateMasterSupplierAliasPlaceholders() {
+    const container = document.getElementById('masterSupplierAliasesContainer');
+    if (!container) return;
+    container.querySelectorAll('.master-alias-row-wrap').forEach((row, i) => {
+      const inp = row.querySelector('.master-alias-input');
+      if (inp) inp.placeholder = `Enter Alternate Name`;
+    });
+  }
+
+  function createMasterSupplierAliasBox(idx) {
+    const block = document.createElement('div');
+    block.className = 'master-alias-row-wrap';
+    block.style.display = 'flex';
+    block.style.flexDirection = 'column';
+    block.style.gap = '2px';
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+
+    const input = document.createElement('input');
+    input.className = 'master-alias-input';
+    input.placeholder = `Enter Alternate Name`;
+    input.value = _masterSupplierAliases[idx] || '';
+    input.style.cssText = `
+      flex: 1;
+      height: 38px;
+      padding: 8px 12px;
+      font-size: 13.5px;
+      font-family: inherit;
+      color: var(--slate-800);
+      background: #ffffff;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    `;
+
+    input.addEventListener('focus', () => {
+      if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
+        input.style.borderColor = '#3b82f6';
+        input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      validateMasterSupplierAliasesLive();
+    });
+
+    input.addEventListener('input', (e) => {
+      const currentIdx = getMasterSupplierAliasRowIndex(block);
+      if (currentIdx === -1) return;
+      _masterSupplierAliases[currentIdx] = e.target.value;
+      validateMasterSupplierAliasesLive();
+
+      const container = document.getElementById('masterSupplierAliasesContainer');
+      if (e.target.value.trim() !== '') {
+        // Typed into the last box: append a fresh empty one below
+        if (currentIdx === _masterSupplierAliases.length - 1 && container) {
+          _masterSupplierAliases.push('');
+          container.appendChild(createMasterSupplierAliasBox(_masterSupplierAliases.length - 1));
+          updateMasterSupplierAliasPlaceholders();
+        }
+      } else if (container) {
+        // Cleared: drop the empty box(es) right under it
+        while (currentIdx + 1 < _masterSupplierAliases.length && _masterSupplierAliases[currentIdx + 1].trim() === '') {
+          _masterSupplierAliases.splice(currentIdx + 1, 1);
+          const nextChild = container.children[currentIdx + 1];
+          if (nextChild) nextChild.remove();
+        }
+        updateMasterSupplierAliasPlaceholders();
+        validateMasterSupplierAliasesLive();
+      }
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-master-alias-del';
+    delBtn.title = 'Remove Alternate Name';
+    delBtn.style.cssText = `
+      width: 38px;
+      height: 38px;
+      min-width: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1.5px solid var(--slate-200);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--slate-400);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    `;
+    delBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/>
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/>
+        <line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>
+    `;
+
+    delBtn.addEventListener('mouseenter', () => {
+      delBtn.style.background = '#fef2f2';
+      delBtn.style.color = '#dc2626';
+      delBtn.style.borderColor = '#fecaca';
+    });
+    delBtn.addEventListener('mouseleave', () => {
+      delBtn.style.background = '#ffffff';
+      delBtn.style.color = 'var(--slate-400)';
+      delBtn.style.borderColor = 'var(--slate-200)';
+    });
+
+    delBtn.addEventListener('click', () => {
+      const currentIdx = getMasterSupplierAliasRowIndex(block);
+      if (currentIdx === -1) return;
+
+      _masterSupplierAliases.splice(currentIdx, 1);
+      // Also drop the box(es) right under it as long as they're still empty
+      while (currentIdx < _masterSupplierAliases.length && _masterSupplierAliases[currentIdx].trim() === '') {
+        _masterSupplierAliases.splice(currentIdx, 1);
+      }
+
+      const nameInp = document.getElementById('masterSupplierName' + (_masterSupplierActiveRowIdx ? _masterSupplierActiveRowIdx : ''));
+      const hasName = nameInp && nameInp.value.trim() !== '';
+      if (_masterSupplierAliases.length === 0) {
+        if (hasName) _masterSupplierAliases = [''];
+      } else if (_masterSupplierAliases[_masterSupplierAliases.length - 1].trim() !== '') {
+        _masterSupplierAliases.push('');
+      }
+      renderMasterSupplierAliases();
+    });
+
+    const errDiv = document.createElement('div');
+    errDiv.className = 'master-alias-err';
+    errDiv.style.cssText = `
+      display: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: #dc2626;
+      margin-top: 4px;
+      line-height: 1.4;
+    `;
+
+    row.appendChild(input);
+    row.appendChild(delBtn);
+    block.appendChild(row);
+    block.appendChild(errDiv);
+    return block;
+  }
+
   function renderMasterSupplierAliases() {
     const container = document.getElementById('masterSupplierAliasesContainer');
-    const addAliasBtn = document.getElementById('masterSupplierAddAliasBtn');
+    const akaPanel = document.getElementById('masterSupplierAkaPanel');
     if (!container) return;
 
     container.innerHTML = '';
-    const hasEmpty = _masterSupplierAliases.some(a => a.trim() === '');
-    if (addAliasBtn) {
-      addAliasBtn.style.display = hasEmpty ? 'none' : 'inline-flex';
-    }
-
     _masterSupplierAliases.forEach((alias, idx) => {
-      const block = document.createElement('div');
-      block.className = 'master-alias-row-wrap';
-      block.style.display = 'flex';
-      block.style.flexDirection = 'column';
-      block.style.gap = '2px';
-
-      const row = document.createElement('div');
-      row.style.display = 'flex';
-      row.style.gap = '8px';
-      row.style.alignItems = 'center';
-
-      const input = document.createElement('input');
-      input.className = 'master-alias-input';
-      input.placeholder = `Alias #${idx + 1} (e.g. Alternate name / Code)`;
-      input.value = alias;
-      input.style.cssText = `
-        flex: 1;
-        height: 38px;
-        padding: 8px 12px;
-        font-size: 13.5px;
-        font-family: inherit;
-        color: var(--slate-800);
-        background: #ffffff;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        box-sizing: border-box;
-        outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      `;
-
-      input.addEventListener('focus', () => {
-        if (!input.style.borderColor || input.style.borderColor === 'var(--slate-200)' || input.style.borderColor === 'rgb(226, 232, 240)') {
-          input.style.borderColor = '#3b82f6';
-          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.12)';
-        }
-      });
-
-      input.addEventListener('blur', () => {
-        validateMasterSupplierAliasesLive();
-      });
-
-      input.addEventListener('input', (e) => {
-        _masterSupplierAliases[idx] = e.target.value;
-        const nowHasEmpty = _masterSupplierAliases.some(a => a.trim() === '');
-        if (addAliasBtn) addAliasBtn.style.display = nowHasEmpty ? 'none' : 'inline-flex';
-        validateMasterSupplierAliasesLive();
-      });
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'btn-master-alias-del';
-      delBtn.title = 'Remove Alias';
-      delBtn.style.cssText = `
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        border: 1.5px solid var(--slate-200);
-        border-radius: 8px;
-        background: #ffffff;
-        color: var(--slate-400);
-        cursor: pointer;
-        transition: all 0.15s ease;
-      `;
-      delBtn.innerHTML = `
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      `;
-
-      delBtn.addEventListener('mouseenter', () => {
-        delBtn.style.background = '#fef2f2';
-        delBtn.style.color = '#dc2626';
-        delBtn.style.borderColor = '#fecaca';
-      });
-      delBtn.addEventListener('mouseleave', () => {
-        delBtn.style.background = '#ffffff';
-        delBtn.style.color = 'var(--slate-400)';
-        delBtn.style.borderColor = 'var(--slate-200)';
-      });
-
-      delBtn.addEventListener('click', () => {
-        _masterSupplierAliases.splice(idx, 1);
-        renderMasterSupplierAliases();
-      });
-
-      const errDiv = document.createElement('div');
-      errDiv.className = 'master-alias-err';
-      errDiv.style.cssText = `
-        display: none;
-        font-size: 12px;
-        font-weight: 600;
-        color: #dc2626;
-        margin-top: 4px;
-        line-height: 1.4;
-      `;
-
-      row.appendChild(input);
-      row.appendChild(delBtn);
-      block.appendChild(row);
-      block.appendChild(errDiv);
-      container.appendChild(block);
+      container.appendChild(createMasterSupplierAliasBox(idx));
     });
+
+    if (akaPanel) {
+      akaPanel.style.display = _masterSupplierAliases.length > 0 ? 'block' : 'none';
+    }
 
     validateMasterSupplierAliasesLive();
   }
@@ -1971,8 +2373,11 @@
       `;
       delBtn.innerHTML = `
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
+          <path d="M3 6h18"/>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
         </svg>
       `;
 
@@ -2864,14 +3269,277 @@
     return { refresh: () => { updateTriggerText(); populateList(''); } };
   }
 
+  // Builds the "Under" searchable-select block (Parent Groups only) for a Create Group
+  // row. `suffix` is '' for the first/primary row, or the row index (1, 2, ...) for
+  // additional rows added automatically as the user fills them in (Multi Create style).
+  function buildGroupUnderSelectHtml(suffix, groupOptionsHtml, defaultLabel) {
+    const selId = 'masterGroupUnderCombinedSel' + suffix;
+    const labelText = defaultLabel || 'Select parent group';
+    return `
+      <select class="coa-modal-sel" id="${selId}" style="display: none;">
+        ${groupOptionsHtml}
+      </select>
+      <div class="kya-searchable-select-wrap" id="${selId}SearchableWrap" style="position: relative; width: 100%;">
+        <div class="kya-searchable-select-trigger" id="${selId}Trigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+          <span id="${selId}TriggerText">${escapeHtml(labelText)}</span>
+          <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+        </div>
+        <div class="kya-searchable-select-dropdown" id="${selId}Dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+          <input type="text" id="${selId}Search" placeholder="Search parent group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+          <div id="${selId}OptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Builds the "Group" searchable-select block for a Create Ledger row. `suffix` is ''
+  // for the first row, or the row index (1, 2, ...) for rows added with "Add Another Ledger".
+  function buildLedgerGroupSelectHtml(suffix, ledgerGroupOptionsHtml, defaultLabel) {
+    const selId = 'masterLedgerGroupCombinedSel' + suffix;
+    return `
+      <select class="coa-modal-sel" id="${selId}" style="display: none;">
+        ${ledgerGroupOptionsHtml}
+      </select>
+      <div class="kya-searchable-select-wrap" id="${selId}SearchableWrap" style="position: relative; width: 100%;">
+        <div class="kya-searchable-select-trigger" id="${selId}Trigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+          <span id="${selId}TriggerText">${escapeHtml(defaultLabel || 'Select Group')}</span>
+          <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+        </div>
+        <div class="kya-searchable-select-dropdown" id="${selId}Dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+          <input type="text" id="${selId}Search" placeholder="Search group or group ledger..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+          <div id="${selId}OptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Builds one additional "Name + Group" row (index >= 1) for the Create Ledger form,
+  // with a dustbin remove button after Group (same look as Create Group's rows).
+  function buildLedgerExtraRowHtml(idx, ledgerGroupOptionsHtml, defaultLabel) {
+    return `
+      <div class="master-ledger-row" data-row-index="${idx}" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+        <div>
+          <label class="coa-modal-label" for="masterLedgerName${idx}" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+          <input class="coa-modal-inp" id="masterLedgerName${idx}" placeholder="Enter Name" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+          <div id="masterLedgerName${idx}Error" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+        </div>
+        <div>
+          <label class="coa-modal-label" for="masterLedgerGroupCombinedSel${idx}" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Group *</label>
+          ${buildLedgerGroupSelectHtml(String(idx), ledgerGroupOptionsHtml, defaultLabel)}
+        </div>
+        <div>
+          <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+          <button type="button" class="master-ledger-row-remove" data-row-index="${idx}" title="Remove this ledger" style="width: 38px; height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #ffffff; color: var(--slate-400); cursor: pointer; transition: all 0.15s ease;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"/>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Builds one additional "Name + Under" row (index >= 1) for the Create Group form's
+  // Multi Create style row list, with a dustbin remove button after Under.
+  function buildGroupExtraRowHtml(idx, groupOptionsHtml, defaultLabel) {
+    return `
+      <div class="master-group-row" data-row-index="${idx}" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+        <div>
+          <label class="coa-modal-label" for="masterGroupName${idx}" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+          <input class="coa-modal-inp" id="masterGroupName${idx}" placeholder="Enter Name" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+          <div id="masterGroupName${idx}Error" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+        </div>
+        <div>
+          <label class="coa-modal-label" for="masterGroupUnderCombinedSel${idx}" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Under *</label>
+          ${buildGroupUnderSelectHtml(String(idx), groupOptionsHtml, defaultLabel)}
+        </div>
+        <div>
+          <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+          <button type="button" class="master-group-row-remove" data-row-index="${idx}" title="Remove this group" style="width: 38px; height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #ffffff; color: var(--slate-400); cursor: pointer; transition: all 0.15s ease;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"/>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Auto Title Case for the Create Group / Ledger / Customer / Supplier text boxes ──
+  // Each word gets a capital first letter as you type, except small words (prepositions,
+  // articles, conjunctions) after the first word, which stay lowercase. Letters typed as
+  // capitals are kept (HDFC, LLP), and an all-caps small word (e.g. "AND") is left alone.
+  const MASTER_TITLE_CASE_SMALL_WORDS = new Set([
+    'a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'so', 'yet',
+    'as', 'at', 'by', 'in', 'of', 'off', 'on', 'per', 'to', 'up', 'via',
+    'with', 'from', 'into', 'onto', 'over', 'upon', 'than', 'vs'
+  ]);
+
+  function toMasterTitleCase(text) {
+    let wordIdx = 0;
+    return String(text).replace(/\S+/g, (word) => {
+      const idx = wordIdx++;
+      const core = word.replace(/[^A-Za-z]/g, '').toLowerCase();
+      if (idx > 0 && MASTER_TITLE_CASE_SMALL_WORDS.has(core) && word !== word.toUpperCase()) {
+        return word.toLowerCase();
+      }
+      // Capitalise only when the word starts with a letter (after any opening
+      // bracket / quote), so "12th" or "#5" are left as typed
+      return word.replace(/^([("'\[]*)([a-z])/, (m, lead, ch) => lead + ch.toUpperCase());
+    });
+  }
+
+  // Boxes that get Title Case: Names (every row), Alternate Names and the popup's
+  // name / address / bank text fields. GSTIN, PAN, IFSC, numbers etc. are left alone.
+  const MASTER_TITLE_CASE_NAME_ID = /^master(Group|Ledger|Customer|Supplier)Name\d*$/;
+  const MASTER_TITLE_CASE_FIELD_ID = /^master(Ledger|Customer|Supplier)(ContactName|Address|City|State|Country|BankName|Branch|BankAcctHolder|BankAcctBranch)$/;
+  const MASTER_TITLE_CASE_ALIAS_BOXES = ['masterGroupAliasesContainer', 'masterLedgerAliasesContainer', 'masterCustomerAliasesContainer', 'masterSupplierAliasesContainer'];
+
+  function isMasterTitleCaseField(el) {
+    if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return false;
+    if (el.tagName === 'INPUT' && el.type && el.type !== 'text') return false;
+    if (el.id && (MASTER_TITLE_CASE_NAME_ID.test(el.id) || MASTER_TITLE_CASE_FIELD_ID.test(el.id))) return true;
+    if (el.classList.contains('master-alias-input')) {
+      const box = el.closest('[id]');
+      return !!box && MASTER_TITLE_CASE_ALIAS_BOXES.includes(box.id);
+    }
+    return false;
+  }
+
+  // One capture-phase listener on the content area: it runs before the fields' own
+  // input handlers, so validation and saved values already see the Title Cased text.
+  function wireMasterTitleCase(contentArea) {
+    if (!contentArea || contentArea._kyaTitleCaseWired) return;
+    contentArea._kyaTitleCaseWired = true;
+    contentArea.addEventListener('input', (e) => {
+      const el = e.target;
+      if (!isMasterTitleCaseField(el)) return;
+      const next = toMasterTitleCase(el.value);
+      if (next === el.value) return;
+      // Only letter case changes, so the caret position stays valid
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      el.value = next;
+      try { el.setSelectionRange(start, end); } catch (err) { /* not focused */ }
+    }, true);
+  }
+
+  // Counts backing the Master Desk "Overview" tab — how many of each master type exist.
+  function computeMasterDeskCounts() {
+    const groupCount = (typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS.length : 0) +
+      (typeof coaLedgers !== 'undefined' ? coaLedgers.filter(l => l.type === 'group-ledger').length : 0);
+    const ledgerCount = typeof coaLedgers !== 'undefined' ? coaLedgers.filter(l => l.type === 'ledger').length : 0;
+    const customerCount = typeof getKyaCustomers === 'function' ? getKyaCustomers().length : 0;
+    const supplierCount = typeof getKyaSuppliers === 'function' ? getKyaSuppliers().length : 0;
+    const stockGroupCount = Array.isArray(_masterStockGroups) ? _masterStockGroups.length : 0;
+    const stockItemCount = Array.isArray(_masterStockItems) ? _masterStockItems.length : 0;
+    const stockCategoryCount = Array.isArray(_masterStockCategories) ? _masterStockCategories.length : 0;
+    const unitCount = Array.isArray(_masterUnits) ? _masterUnits.length : 0;
+    const warehouseCount = Array.isArray(_masterWarehouses) ? _masterWarehouses.length : 0;
+    return {
+      groupCount, ledgerCount, customerCount, supplierCount,
+      stockGroupCount, stockItemCount, stockCategoryCount, unitCount, warehouseCount
+    };
+  }
+
+  function renderMasterDeskOverviewHtml() {
+    const counts = computeMasterDeskCounts();
+
+    const tile = (count, label, iconSvg) => `
+      <div style="border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 16px 14px; text-align: center; background: #f8fafc;">
+        <div style="width: 32px; height: 32px; margin: 0 auto 8px auto; border-radius: 8px; background: var(--blue-50, #eff6ff); display: flex; align-items: center; justify-content: center; color: var(--blue-600);">
+          ${iconSvg}
+        </div>
+        <div style="font-size: 22px; font-weight: 700; color: var(--slate-800); line-height: 1.2;">${count}</div>
+        <div style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px;">${label}</div>
+      </div>
+    `;
+
+    const icoGroup = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><line x1="2" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.6"/></svg>';
+    const icoLedger = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 5h12M4 10h8M4 15h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    const icoPeople = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+    const icoTruck = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>';
+    const icoFolder = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+    const icoBox = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
+    const icoGrid = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>';
+    const icoUnit = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    const icoWarehouse = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>';
+
+    return `
+      <div class="coa-modal-card" style="max-width: 640px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
+        <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          Overview
+        </h3>
+        <p style="font-size: 12.5px; color: var(--slate-500); margin: 0 0 18px 0;">Snapshot of everything currently set up in your masters.</p>
+
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); margin-bottom: 10px;">Accounting Masters</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px;">
+          ${tile(counts.groupCount, 'Groups', icoGroup)}
+          ${tile(counts.ledgerCount, 'Ledgers', icoLedger)}
+          ${tile(counts.customerCount, 'Customers', icoPeople)}
+          ${tile(counts.supplierCount, 'Suppliers', icoTruck)}
+        </div>
+
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); margin-bottom: 10px;">Inventory Masters</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          ${tile(counts.stockGroupCount, 'Stock Groups', icoFolder)}
+          ${tile(counts.stockItemCount, 'Stock Items', icoBox)}
+          ${tile(counts.stockCategoryCount, 'Stock Categories', icoGrid)}
+          ${tile(counts.unitCount, 'Units', icoUnit)}
+          ${tile(counts.warehouseCount, 'Warehouses', icoWarehouse)}
+        </div>
+      </div>
+    `;
+  }
+
   function updateMasterDeskContent() {
     const contentArea = document.getElementById('masterDeskContentArea');
     if (!contentArea) return;
+    wireMasterTitleCase(contentArea);
+
+    // Group, Ledger, Customer and Supplier modules open full screen (sidebar hidden) with a Back button to return to Overview.
+    const isFullScreenTab = ['group', 'ledger', 'customers', 'suppliers'].includes(currentMasterDeskTab);
+    const layoutContainer = document.getElementById('masterDeskLayoutContainer');
+    const sidebar = document.getElementById('masterDeskSidebar');
+    const backBar = document.getElementById('masterDeskBackBar');
+    if (layoutContainer && sidebar) {
+      layoutContainer.classList.toggle('full-width', isFullScreenTab);
+      sidebar.style.display = isFullScreenTab ? 'none' : 'flex';
+    }
+    if (backBar) {
+      backBar.style.display = isFullScreenTab ? 'flex' : 'none';
+      // Quick-jump buttons: hide the one for the screen we're already on
+      backBar.querySelectorAll('.master-back-bar-nav').forEach(btn => {
+        btn.style.display = btn.getAttribute('data-tab') === currentMasterDeskTab ? 'none' : 'inline-flex';
+      });
+    }
+    // Group count lives in the back bar; the Group form re-renders it as needed
+    const backBarGroupCount = document.getElementById('masterDeskBackBarGroupCount');
+    if (backBarGroupCount) backBarGroupCount.innerHTML = '';
+
+    if (currentMasterDeskTab === 'overview') {
+      contentArea.innerHTML = renderMasterDeskOverviewHtml();
+      return;
+    }
 
     if (currentMasterDeskSubtype === 'Create' && currentMasterDeskTab === 'group') {
       _masterGroupAliases = [];
+      _masterGroupRowAliases = {};
+      _masterGroupActiveRowIdx = 0;
 
       let groupOptionsHtml = '';
+      const firstGroupLabel = 'Select Group';
       if (typeof COA_SYS_SGS !== 'undefined') {
         COA_SYS_SGS.forEach(sg => {
           const sgIndent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
@@ -2892,84 +3560,277 @@
       }
 
       contentArea.innerHTML = `
-        <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
-          <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
-            </svg>
-            Create Group
-          </h3>
-
-          <!-- Name field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" for="masterGroupName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
-            <input class="coa-modal-inp" id="masterGroupName" placeholder="e.g. Current Assets / Bank Accounts" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
-            <div id="masterGroupNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
-          </div>
-
-          <!-- Also Known As field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
-            <div id="masterGroupAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
-            <button type="button" id="masterGroupAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Add A.K.A
-            </button>
-          </div>
-
-          <!-- Under field (Single box with separated Primary Categories & Parent Groups) -->
-          <div class="coa-modal-fg" style="margin-bottom: 24px;">
-            <label class="coa-modal-label" for="masterGroupUnderCombinedSel" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Under *</label>
-            <select class="coa-modal-sel" id="masterGroupUnderCombinedSel" style="display: none;">
-              <optgroup label="Primary Categories">
-                <option value="primary:assets" data-badge="Primary" selected>Asset</option>
-                <option value="primary:equity-liabilities" data-badge="Primary">Liability</option>
-                <option value="primary:expense" data-badge="Primary">Expense</option>
-                <option value="primary:income" data-badge="Primary">Income</option>
-              </optgroup>
-              <optgroup label="Parent Groups">
-                ${groupOptionsHtml}
-              </optgroup>
-            </select>
-            <div class="kya-searchable-select-wrap" id="masterGroupUnderCombinedSelSearchableWrap" style="position: relative; width: 100%;">
-              <div class="kya-searchable-select-trigger" id="masterGroupUnderCombinedSelTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
-                <span id="masterGroupUnderCombinedSelTriggerText">Asset</span>
-                <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+        <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+          <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            <!-- Name & Under (row format) -->
+            <div class="master-group-row" data-row-index="0" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+              <div>
+                <label class="coa-modal-label" for="masterGroupName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+                <input class="coa-modal-inp" id="masterGroupName" placeholder="Enter Name" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+                <div id="masterGroupNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
               </div>
-              <div class="kya-searchable-select-dropdown" id="masterGroupUnderCombinedSelDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
-                <input type="text" id="masterGroupUnderCombinedSelSearch" placeholder="Search primary category or parent group..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
-                <div id="masterGroupUnderCombinedSelOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+              <div>
+                <label class="coa-modal-label" for="masterGroupUnderCombinedSel" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Under *</label>
+                ${buildGroupUnderSelectHtml('', groupOptionsHtml, firstGroupLabel)}
               </div>
+              <div>
+                <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+                <button type="button" class="master-group-row-clean" id="masterGroupRowCleanBtn" title="Clean this group" style="width: 38px; height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #ffffff; color: var(--slate-400); cursor: pointer; transition: all 0.15s ease;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Additional groups (added row-by-row via the Add button, like Multi Create) -->
+            <div id="masterGroupExtraRowsContainer"></div>
+
+            <!-- Add another group — shown once the last row's Name is filled in -->
+            <div id="masterGroupAddRowWrap" style="display: none; margin: -4px 0 16px 0;">
+              <button type="button" id="masterGroupAddRowBtn" title="Add another group" style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; color: var(--blue-600); background: #ffffff; border: 1.5px dashed var(--blue-600); border-radius: 8px; cursor: pointer; transition: all 0.15s ease;">＋ Add Another Group</button>
+            </div>
+
+            <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
+              <button class="btn btn-primary" id="masterGroupSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Create Group</button>
+              <button class="btn btn-secondary" id="masterGroupCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
             </div>
           </div>
 
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <button class="btn btn-primary" id="masterGroupSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">＋ Create Group</button>
-            <button class="btn btn-secondary" id="masterGroupCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+          <!-- Alternate Name — appears once Name is filled in, one box per alias, auto-adding another below as you type (no limit) -->
+          <div class="coa-modal-card" id="masterGroupAkaPanel" style="display: none; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            <div style="margin: 0 0 12px 0; display: flex;">
+              <span id="masterGroupAkaFor" style="font-size: 12.5px; font-weight: 600; color: var(--blue-600); background: var(--blue-50, #eff6ff); padding: 2px 8px; border-radius: 6px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+            </div>
+            <div id="masterGroupAliasesContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
           </div>
         </div>
       `;
 
       renderMasterGroupAliases();
 
-      const addAliasBtn = contentArea.querySelector('#masterGroupAddAliasBtn');
-      if (addAliasBtn) {
-        addAliasBtn.addEventListener('click', () => {
+      // ── Multi Create style row list: Name + Under, auto-adding a fresh row below
+      // once the current last row's Name is filled in ──
+      _masterGroupExtraRowKeys = [];
+      _masterGroupExtraRowSeq = 0;
+      const extraRowsContainer = contentArea.querySelector('#masterGroupExtraRowsContainer');
+
+      const wireGroupRowRemoveBtn = (idx) => {
+        const btn = extraRowsContainer.querySelector('.master-group-row-remove[data-row-index="' + idx + '"]');
+        if (!btn) return;
+        btn.addEventListener('mouseenter', () => {
+          btn.style.background = '#fef2f2';
+          btn.style.color = '#dc2626';
+          btn.style.borderColor = '#fecaca';
+        });
+        btn.addEventListener('mouseleave', () => {
+          btn.style.background = '#ffffff';
+          btn.style.color = 'var(--slate-400)';
+          btn.style.borderColor = 'var(--slate-200)';
+        });
+        btn.addEventListener('click', () => {
+          const rowEl = extraRowsContainer.querySelector('.master-group-row[data-row-index="' + idx + '"]');
+          if (rowEl) rowEl.remove();
+          const pos = _masterGroupExtraRowKeys.indexOf(idx);
+          const prevIdx = pos > 0 ? _masterGroupExtraRowKeys[pos - 1] : 0;
+          _masterGroupExtraRowKeys = _masterGroupExtraRowKeys.filter(k => k !== idx);
+          delete _masterGroupRowAliases[idx];
+          if (_masterGroupActiveRowIdx === idx) {
+            // Removed row's aliases go with it — switch the panel to the row above
+            _masterGroupActiveRowIdx = null;
+            setActiveGroupRow(prevIdx);
+            const prevInp = getGroupRowNameInput(prevIdx);
+            if (prevInp) prevInp.focus();
+          } else {
+            validateMasterGroupAliasesLive();
+          }
+          refreshGroupAddRowBtn();
+        });
+      };
+
+      const getGroupRowNameInput = (idx) => contentArea.querySelector('#masterGroupName' + (idx ? idx : ''));
+
+      // Shows / hides the Alternate Name panel for the active row based on its Name,
+      // and labels the panel with the group it belongs to.
+      const syncGroupAkaPanel = () => {
+        const activeInp = getGroupRowNameInput(_masterGroupActiveRowIdx);
+        const nameVal = activeInp ? activeInp.value.trim() : '';
+        const akaPanel = contentArea.querySelector('#masterGroupAkaPanel');
+        const akaFor = contentArea.querySelector('#masterGroupAkaFor');
+        if (akaFor) {
+          akaFor.textContent = nameVal;
+          akaFor.title = nameVal;
+          akaFor.style.display = nameVal ? 'inline-block' : 'none';
+        }
+
+        if (!nameVal) {
+          if (akaPanel) akaPanel.style.display = 'none';
+          if (_masterGroupAliases.every(a => a.trim() === '')) {
+            _masterGroupAliases = [];
+            renderMasterGroupAliases();
+          }
+          return;
+        }
+
+        validateMasterGroupAliasesLive();
+        if (_masterGroupAliases.length === 0) {
           _masterGroupAliases.push('');
           renderMasterGroupAliases();
-          const inputs = contentArea.querySelectorAll('.master-alias-input');
-          if (inputs.length) {
-            inputs[inputs.length - 1].focus();
-          }
-        });
+        } else if (akaPanel) {
+          akaPanel.style.display = 'block';
+        }
+      };
+
+      // Switches the Alternate Name panel to the given row, parking the current row's list.
+      const setActiveGroupRow = (idx) => {
+        if (idx === _masterGroupActiveRowIdx) return;
+        if (_masterGroupActiveRowIdx !== null) {
+          _masterGroupRowAliases[_masterGroupActiveRowIdx] = _masterGroupAliases;
+        }
+        _masterGroupActiveRowIdx = idx;
+        _masterGroupAliases = _masterGroupRowAliases[idx] || [];
+        renderMasterGroupAliases();
+        syncGroupAkaPanel();
+        renderGroupCount();
+      };
+
+      // Shows the "Add Another Group" button only when the last row's Name has a value.
+      const addRowWrap = contentArea.querySelector('#masterGroupAddRowWrap');
+      const addRowBtn = contentArea.querySelector('#masterGroupAddRowBtn');
+      // Group count (1, 2, 3...) in the right corner of the Back bar — how many groups
+      // this form will create; goes up by one each time another group row is added.
+      const renderGroupCount = () => {
+        const countWrap = document.getElementById('masterDeskBackBarGroupCount');
+        if (!countWrap) return;
+        const count = 1 + _masterGroupExtraRowKeys.length;
+        countWrap.innerHTML = `<span title="Groups in this form" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-family: var(--font-main); font-size: 12.5px; font-weight: 600;">${count}</span>`;
+      };
+
+      const refreshGroupAddRowBtn = () => {
+        renderGroupCount();
+        if (!addRowWrap) return;
+        const lastIdx = _masterGroupExtraRowKeys.length ? _masterGroupExtraRowKeys[_masterGroupExtraRowKeys.length - 1] : 0;
+        const lastInp = contentArea.querySelector('#masterGroupName' + (lastIdx === 0 ? '' : lastIdx));
+        addRowWrap.style.display = lastInp && lastInp.value.trim() ? 'block' : 'none';
+      };
+
+      const addNextGroupRow = () => {
+        _masterGroupExtraRowSeq++;
+        const idx = _masterGroupExtraRowSeq;
+        // New row's "Under" defaults to the row above it
+        const prevIdx = _masterGroupExtraRowKeys.length ? _masterGroupExtraRowKeys[_masterGroupExtraRowKeys.length - 1] : 0;
+        const prevUnderSel = contentArea.querySelector('#masterGroupUnderCombinedSel' + (prevIdx ? prevIdx : ''));
+        extraRowsContainer.insertAdjacentHTML('beforeend', buildGroupExtraRowHtml(idx, groupOptionsHtml, firstGroupLabel));
+        const newUnderSel = contentArea.querySelector('#masterGroupUnderCombinedSel' + idx);
+        if (prevUnderSel && newUnderSel && prevUnderSel.value) {
+          newUnderSel.value = prevUnderSel.value;
+        } else if (newUnderSel) {
+          newUnderSel.selectedIndex = -1; // nothing chosen above -> show "Select Group"
+        }
+        initSearchableSelectHelper(contentArea, 'masterGroupUnderCombinedSel' + idx, 'Select Group');
+        const newNameInp = contentArea.querySelector('#masterGroupName' + idx);
+        if (newNameInp) {
+          newNameInp.addEventListener('focus', () => setActiveGroupRow(idx));
+          newNameInp.addEventListener('input', () => {
+            setActiveGroupRow(idx);
+            syncGroupAkaPanel();
+            refreshGroupAddRowBtn();
+          });
+        }
+        wireGroupRowRemoveBtn(idx);
+        _masterGroupExtraRowKeys.push(idx);
+        refreshGroupAddRowBtn();
+        if (newNameInp) newNameInp.focus();
+      };
+
+      if (addRowBtn) {
+        addRowBtn.addEventListener('mouseenter', () => { addRowBtn.style.background = 'var(--blue-50, #eff6ff)'; });
+        addRowBtn.addEventListener('mouseleave', () => { addRowBtn.style.background = '#ffffff'; });
+        addRowBtn.addEventListener('click', addNextGroupRow);
       }
 
-      const searchableUnderControl = initSearchableSelectHelper(contentArea, 'masterGroupUnderCombinedSel', 'Select category or parent group');
+      // Under starts unselected so the dropdown shows "Select Group"
+      const groupUnderSelInit = contentArea.querySelector('#masterGroupUnderCombinedSel');
+      if (groupUnderSelInit) groupUnderSelInit.selectedIndex = -1;
+      const searchableUnderControl = initSearchableSelectHelper(contentArea, 'masterGroupUnderCombinedSel', 'Select Group');
+      renderGroupCount();
+
+      const cleanBtn = contentArea.querySelector('#masterGroupRowCleanBtn');
+      if (cleanBtn) {
+        cleanBtn.addEventListener('mouseenter', () => {
+          cleanBtn.style.background = '#fef2f2';
+          cleanBtn.style.color = '#dc2626';
+          cleanBtn.style.borderColor = '#fecaca';
+        });
+        cleanBtn.addEventListener('mouseleave', () => {
+          cleanBtn.style.background = '#ffffff';
+          cleanBtn.style.color = 'var(--slate-400)';
+          cleanBtn.style.borderColor = 'var(--slate-200)';
+        });
+        cleanBtn.addEventListener('click', () => {
+          // With more groups below, the first row's dustbin removes this group and moves
+          // the next row (Name, Under, Alternate Names) up into its place.
+          if (_masterGroupExtraRowKeys.length > 0) {
+            const nextIdx = _masterGroupExtraRowKeys[0];
+            const nextNameInp = getGroupRowNameInput(nextIdx);
+            const nextUnderSel = contentArea.querySelector('#masterGroupUnderCombinedSel' + nextIdx);
+
+            if (_masterGroupActiveRowIdx !== null) {
+              _masterGroupRowAliases[_masterGroupActiveRowIdx] = _masterGroupAliases;
+            }
+            _masterGroupRowAliases[0] = _masterGroupRowAliases[nextIdx] || [];
+            delete _masterGroupRowAliases[nextIdx];
+
+            if (nameInp) nameInp.value = nextNameInp ? nextNameInp.value : '';
+            const underSel = contentArea.querySelector('#masterGroupUnderCombinedSel');
+            if (underSel && nextUnderSel) {
+              underSel.value = nextUnderSel.value;
+              if (searchableUnderControl && typeof searchableUnderControl.refresh === 'function') {
+                searchableUnderControl.refresh();
+              }
+            }
+
+            const nextRowEl = extraRowsContainer.querySelector('.master-group-row[data-row-index="' + nextIdx + '"]');
+            if (nextRowEl) nextRowEl.remove();
+            _masterGroupExtraRowKeys = _masterGroupExtraRowKeys.slice(1);
+
+            _masterGroupActiveRowIdx = null;
+            setActiveGroupRow(0);
+            validateNameInputLive();
+            refreshGroupAddRowBtn();
+            if (nameInp) nameInp.focus();
+            return;
+          }
+
+          if (nameInp) {
+            nameInp.value = '';
+            nameInp.style.borderColor = 'var(--slate-200)';
+            nameInp.style.boxShadow = 'none';
+          }
+          if (nameErr) {
+            nameErr.style.display = 'none';
+            nameErr.textContent = '';
+          }
+          const underSel = contentArea.querySelector('#masterGroupUnderCombinedSel');
+          if (underSel && underSel.options.length > 0) {
+            underSel.selectedIndex = -1;
+            if (searchableUnderControl && typeof searchableUnderControl.refresh === 'function') {
+              searchableUnderControl.refresh();
+            }
+          }
+          setActiveGroupRow(0);
+          _masterGroupAliases = [];
+          renderMasterGroupAliases();
+          syncGroupAkaPanel();
+          refreshGroupAddRowBtn();
+
+          if (nameInp) nameInp.focus();
+        });
+      }
 
       const saveBtn = contentArea.querySelector('#masterGroupSaveBtn');
       const cancelBtn = contentArea.querySelector('#masterGroupCancelBtn');
@@ -3002,12 +3863,81 @@
       };
 
       if (nameInp) {
+        nameInp.addEventListener('focus', () => setActiveGroupRow(0));
         nameInp.addEventListener('input', () => {
+          setActiveGroupRow(0);
           validateNameInputLive();
-          // revalidate aliases against new name without destroying DOM
-          validateMasterGroupAliasesLive();
+
+          // Hides / reveals the Alternate Name panel (and first box) for this row
+          syncGroupAkaPanel();
+          refreshGroupAddRowBtn();
         });
       }
+
+      // Creates one group/group-ledger entry from a resolved Under value.
+      const createSingleGroupEntry = (name, underVal, aliases) => {
+        const isPrimary = underVal.startsWith('primary:');
+
+        if (isPrimary) {
+          const mainNature = underVal.replace('primary:', ''); // 'assets', 'equity-liabilities', 'expense', 'income'
+          const newSgId = 'sg-grp-' + Date.now() + '-' + Math.floor(Math.random() * 100000);
+          const newSg = {
+            id: newSgId,
+            main: mainNature,
+            parent: null,
+            name: name,
+            aliases: aliases
+          };
+          if (typeof COA_SYS_SGS !== 'undefined') {
+            COA_SYS_SGS.push(newSg);
+            if (typeof saveCoaSubGroups === 'function') saveCoaSubGroups();
+          }
+
+          if (typeof _coaExpanded !== 'undefined') {
+            _coaExpanded.add(mainNature);
+            _coaExpanded.add(newSgId);
+          }
+        } else {
+          const selectedVal = underVal.replace('group:', '');
+          let parentSgId = selectedVal;
+          let parentGlId = null;
+
+          if (selectedVal.startsWith('gl:')) {
+            const targetGlId = Number(selectedVal.replace('gl:', ''));
+            const targetGl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id === targetGlId) : null;
+            if (targetGl) {
+              parentSgId = targetGl.sgId;
+              parentGlId = targetGl.id;
+            }
+          } else if (selectedVal.startsWith('sg:')) {
+            parentSgId = selectedVal.replace('sg:', '');
+          }
+
+          const parentSg = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS.find(s => s.id === parentSgId) : null;
+          const newGroup = {
+            id: Date.now() + Math.floor(Math.random() * 100000),
+            name: name,
+            sgId: parentSgId,
+            glId: parentGlId,
+            type: 'group-ledger',
+            balance: 0,
+            aliases: aliases
+          };
+          if (typeof coaLedgers !== 'undefined') {
+            coaLedgers.push(newGroup);
+          }
+
+          if (typeof _coaExpanded !== 'undefined') {
+            if (parentSg) {
+              _coaExpanded.add(parentSg.main);
+              _coaExpanded.add(parentSg.id);
+              if (parentSg.parent) _coaExpanded.add(parentSg.parent);
+            }
+            if (parentGlId) _coaExpanded.add('gl-' + parentGlId);
+            _coaExpanded.add('gl-' + newGroup.id);
+          }
+        }
+      };
 
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
@@ -3031,16 +3961,24 @@
           // Check if any Alias has errors
           const aliasesValid = validateMasterGroupAliasesLive();
           if (!aliasesValid) {
-            const msg = 'Please fix duplicate or invalid Also Known As entries.';
+            const msg = 'Please fix duplicate or invalid Alternate Name entries.';
             if (typeof showToast === 'function') showToast(msg, 'error');
             else alert(msg);
             return;
           }
 
           const underSel = contentArea.querySelector('#masterGroupUnderCombinedSel');
-          const underVal = underSel && underSel.value ? underSel.value : 'primary:assets';
-          const isPrimary = underVal.startsWith('primary:');
-          const aliases = _masterGroupAliases.map(a => a.trim()).filter(a => a !== '');
+          const underVal = underSel && underSel.value ? underSel.value : '';
+          if (!underVal) {
+            const msg = `Please select a group for "${name}".`;
+            if (typeof showToast === 'function') showToast(msg, 'warning');
+            else alert(msg);
+            return;
+          }
+          // Park the active row's list so every row's Alternate Names are in _masterGroupRowAliases
+          _masterGroupRowAliases[_masterGroupActiveRowIdx] = _masterGroupAliases;
+          const getRowAliases = (idx) => (_masterGroupRowAliases[idx] || []).map(a => a.trim()).filter(a => a !== '');
+          const aliases = getRowAliases(0);
 
           // Check if any Alias duplicates the Name, another Alias in form, or already exists in system
           const formNamesSet = new Set([name.toLowerCase()]);
@@ -3066,65 +4004,70 @@
             }
           }
 
-          if (isPrimary) {
-            const mainNature = underVal.replace('primary:', ''); // 'assets', 'equity-liabilities', 'expense', 'income'
-            const newSgId = 'sg-grp-' + Date.now();
-            const newSg = {
-              id: newSgId,
-              main: mainNature,
-              parent: null,
-              name: name,
-              aliases: aliases
-            };
-            if (typeof COA_SYS_SGS !== 'undefined') {
-              COA_SYS_SGS.push(newSg);
-              if (typeof saveCoaSubGroups === 'function') saveCoaSubGroups();
+          // Collect the additional Multi Create style rows (Name + Under + their own Alternate Names).
+          // A trailing row left empty is just unfilled — it's skipped, not an error.
+          const extraEntries = [];
+          for (const idx of _masterGroupExtraRowKeys) {
+            const rowNameInp = contentArea.querySelector('#masterGroupName' + idx);
+            const rowName = rowNameInp ? rowNameInp.value.trim() : '';
+            if (!rowName) continue;
+
+            const rowNameLower = rowName.toLowerCase();
+            if (formNamesSet.has(rowNameLower)) {
+              const msg = `Duplicate entry "${rowName}" found in the form. Each group name must be unique.`;
+              if (typeof showToast === 'function') showToast(msg, 'error');
+              else alert(msg);
+              rowNameInp.focus();
+              return;
+            }
+            formNamesSet.add(rowNameLower);
+
+            const dupRow = findDuplicateCoaNameOrAlias(rowName);
+            if (dupRow) {
+              const typeLabel = dupRow.parentName ? `Alias of "${dupRow.parentName}"` : dupRow.type;
+              const msg = `"${rowName}" already exists (${typeLabel}).`;
+              if (typeof showToast === 'function') showToast(msg, 'error');
+              else alert(msg);
+              rowNameInp.focus();
+              return;
             }
 
-            if (typeof _coaExpanded !== 'undefined') {
-              _coaExpanded.add(mainNature);
-              _coaExpanded.add(newSgId);
+            const rowUnderSel = contentArea.querySelector('#masterGroupUnderCombinedSel' + idx);
+            const rowUnderVal = rowUnderSel && rowUnderSel.value ? rowUnderSel.value : '';
+            if (!rowUnderVal) {
+              const msg = `Please select a group for "${rowName}".`;
+              if (typeof showToast === 'function') showToast(msg, 'warning');
+              else alert(msg);
+              return;
             }
-          } else {
-            const selectedVal = underVal.replace('group:', '');
-            let parentSgId = selectedVal;
-            let parentGlId = null;
 
-            if (selectedVal.startsWith('gl:')) {
-              const targetGlId = Number(selectedVal.replace('gl:', ''));
-              const targetGl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id === targetGlId) : null;
-              if (targetGl) {
-                parentSgId = targetGl.sgId;
-                parentGlId = targetGl.id;
+            const rowAliases = getRowAliases(idx);
+            for (const al of rowAliases) {
+              const alLower = al.toLowerCase();
+              if (formNamesSet.has(alLower)) {
+                const msg = `Duplicate entry "${al}" found in the form (Alternate Name of "${rowName}"). Names and Alternate Names must be unique.`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                rowNameInp.focus();
+                return;
               }
-            } else if (selectedVal.startsWith('sg:')) {
-              parentSgId = selectedVal.replace('sg:', '');
-            }
+              formNamesSet.add(alLower);
 
-            const parentSg = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS.find(s => s.id === parentSgId) : null;
-            const newGroup = {
-              id: Date.now(),
-              name: name,
-              sgId: parentSgId,
-              glId: parentGlId,
-              type: 'group-ledger',
-              balance: 0,
-              aliases: aliases
-            };
-            if (typeof coaLedgers !== 'undefined') {
-              coaLedgers.push(newGroup);
-            }
-
-            if (typeof _coaExpanded !== 'undefined') {
-              if (parentSg) {
-                _coaExpanded.add(parentSg.main);
-                _coaExpanded.add(parentSg.id);
-                if (parentSg.parent) _coaExpanded.add(parentSg.parent);
+              const dupAl = findDuplicateCoaNameOrAlias(al);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                const msg = `"${al}" (Alternate Name of "${rowName}") already exists (${typeLabel}).`;
+                if (typeof showToast === 'function') showToast(msg, 'error');
+                else alert(msg);
+                rowNameInp.focus();
+                return;
               }
-              if (parentGlId) _coaExpanded.add('gl-' + parentGlId);
-              _coaExpanded.add('gl-' + newGroup.id);
             }
+            extraEntries.push({ name: rowName, underVal: rowUnderVal, aliases: rowAliases });
           }
+
+          createSingleGroupEntry(name, underVal, aliases);
+          extraEntries.forEach(entry => createSingleGroupEntry(entry.name, entry.underVal, entry.aliases));
 
           if (typeof renderChartPanel === 'function') {
             renderChartPanel();
@@ -3138,7 +4081,12 @@
             triggerAutoBackup();
           }
 
-          showToast(`Group "${name}" created successfully.`, 'success');
+          const totalCreated = 1 + extraEntries.length;
+          if (totalCreated > 1) {
+            showToast(`${totalCreated} groups created successfully.`, 'success');
+          } else {
+            showToast(`Group "${name}" created successfully.`, 'success');
+          }
 
           _masterGroupAliases = [];
           updateMasterDeskContent();
@@ -3173,9 +4121,6 @@
           sgsInCat.forEach(sg => {
             const sgIndent = sg.parent ? '\u00a0\u00a0\u00a0\u00a0' : '';
             catOptionsHtml += `<option value="sg:${sg.id}" data-badge="Group">${sgIndent}${sg.name}</option>`;
-            if (firstGroupLabel === 'Select Group') {
-              firstGroupLabel = sg.name;
-            }
 
             if (typeof coaLedgers !== 'undefined') {
               const addGlOptions = (parentId, depth) => {
@@ -3199,63 +4144,96 @@
       let _masterLedgerSaveAsMode = 'ledger';
 
       contentArea.innerHTML = `
-        <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
-          <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="var(--blue-600)" stroke-width="1.8" stroke-linecap="round">
-              <path d="M4 5h12M4 10h8M4 15h10"/>
-            </svg>
-            Create Ledger
-          </h3>
-
-          <!-- Name field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" for="masterLedgerName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
-            <input class="coa-modal-inp" id="masterLedgerName" placeholder="e.g. ICICI Bank / Rent Expense / Office Supplies" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
-            <div id="masterLedgerNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
-          </div>
-
-          <!-- Also Known As field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
-            <div id="masterLedgerAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
-            <button type="button" id="masterLedgerAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Add A.K.A
-            </button>
-          </div>
-
-          <!-- Group field (Groups and Group Ledgers) -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" for="masterLedgerGroupCombinedSel" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Group *</label>
-            <select class="coa-modal-sel" id="masterLedgerGroupCombinedSel" style="display: none;">
-              ${ledgerGroupOptionsHtml}
-            </select>
-            <div class="kya-searchable-select-wrap" id="masterLedgerGroupCombinedSelSearchableWrap" style="position: relative; width: 100%;">
-              <div class="kya-searchable-select-trigger" id="masterLedgerGroupCombinedSelTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
-                <span id="masterLedgerGroupCombinedSelTriggerText">${firstGroupLabel}</span>
-                <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+        <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+          <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            <!-- Name & Group (row format, like Create Group) -->
+            <div class="master-ledger-row" data-row-index="0" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+              <div>
+                <label class="coa-modal-label" for="masterLedgerName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+                <input class="coa-modal-inp" id="masterLedgerName" placeholder="Enter Name" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+                <div id="masterLedgerNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
               </div>
-              <div class="kya-searchable-select-dropdown" id="masterLedgerGroupCombinedSelDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
-                <input type="text" id="masterLedgerGroupCombinedSelSearch" placeholder="Search group or group ledger..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
-                <div id="masterLedgerGroupCombinedSelOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+              <div>
+                <label class="coa-modal-label" for="masterLedgerGroupCombinedSel" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Group *</label>
+                ${buildLedgerGroupSelectHtml('', ledgerGroupOptionsHtml, firstGroupLabel)}
               </div>
+              <div>
+                <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+                <button type="button" class="master-ledger-row-clean" id="masterLedgerRowCleanBtn" title="Clean this ledger" style="width: 38px; height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #ffffff; color: var(--slate-400); cursor: pointer; transition: all 0.15s ease;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Additional ledgers (added row-by-row via the Add button, like Create Group) -->
+            <div id="masterLedgerExtraRowsContainer"></div>
+
+            <!-- Add another ledger — shown once the last row's Name is filled in -->
+            <div id="masterLedgerAddRowWrap" style="display: none; margin: -4px 0 16px 0;">
+              <button type="button" id="masterLedgerAddRowBtn" title="Add another ledger" style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; color: var(--blue-600); background: #ffffff; border: 1.5px dashed var(--blue-600); border-radius: 8px; cursor: pointer; transition: all 0.15s ease;">＋ Add Another Ledger</button>
+            </div>
+
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <button class="btn btn-primary" id="masterLedgerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Create Ledger</button>
+              <button class="btn btn-secondary" id="masterLedgerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
             </div>
           </div>
 
-          <!-- Additional Information (Dynamic for Trade Receivable / Payable) -->
-          <div id="masterLedgerAdditionalInfoWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px; transition: all 0.2s ease;">
-            
-            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-              <div style="display: flex; align-items: center; gap: 7px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
+          <!-- Second box: Opening Balance first, then Alternate Names once Name is filled in -->
+          <div class="coa-modal-card" id="masterLedgerSidePanel" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            <label class="coa-modal-label" for="masterLedgerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
+            <input class="coa-modal-inp" id="masterLedgerBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+
+            <!-- Additional Details (only for groups that need them) -->
+            <div id="masterLedgerAddlBtnWrap" style="display: none; margin-top: 16px;">
+              <button type="button" class="btn btn-secondary" id="masterLedgerAddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
                 </svg>
-                <span>Additional Information</span>
+                Additional Details
+              </button>
+            </div>
+
+            <!-- Alternate Name — one box per alias, auto-adding another below as you type (no limit) -->
+            <div id="masterLedgerAkaPanel" style="display: none; margin-top: 16px;">
+              <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Alternate Name</label>
+              <div id="masterLedgerAliasesContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Additional Details popup — opens when a group that needs extra details is selected -->
+        <style>
+          /* Popup fields fill their grid column instead of overflowing it on narrow screens */
+          #masterLedgerAddlModal .master-ledger-addl-body input:not([type=hidden]):not([type=file]),
+          #masterLedgerAddlModal .master-ledger-addl-body textarea,
+          #masterLedgerAddlModal .master-ledger-addl-body select { width: 100%; min-width: 0; box-sizing: border-box; }
+        </style>
+        <div class="oh-modal-overlay" id="masterLedgerAddlModal" style="display: none;">
+          <div style="background: var(--white); border-radius: 14px; width: 94%; max-width: 640px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 40px 100px rgba(0,0,0,.24);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--slate-200);">
+              <div style="min-width: 0;">
+                <div style="font-size: 15px; font-weight: 700; color: var(--slate-800);">Additional Details</div>
+                <div id="masterLedgerAddlModalSub" style="font-size: 12.5px; color: var(--slate-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
               </div>
+              <button type="button" class="oh-modal-close" id="masterLedgerAddlCloseBtn" title="Close">✕</button>
+            </div>
+
+            <div class="master-ledger-addl-body" style="padding: 20px 24px; overflow-y: auto; overflow-x: hidden;">
+
+          <!-- Additional Information (Dynamic for Trade Receivable / Payable) -->
+          <div id="masterLedgerAdditionalInfoWrap" style="display: none; margin: 0; transition: all 0.2s ease;">
+            
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px;">
 
               <!-- Right Side Slide: Save As [ Ledger | Customer / Supplier ] -->
               <div class="master-saveas-wrap" id="masterLedgerSaveAsWrap" style="display: flex; align-items: center; gap: 8px;">
@@ -3279,18 +4257,18 @@
               </div>
               <div style="display: flex; flex-direction: column; gap: 10px;">
                 <div>
-                  <input type="text" id="masterLedgerContactName" placeholder="Contact Person / Trade Name (Optional)" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerContactName" placeholder="Enter Contact Person" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
                 </div>
                 <div>
-                  <textarea id="masterLedgerAddress" placeholder="Street Address / Building / Area" rows="2" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; resize: vertical; font-family: inherit; outline: none; background: #fff;"></textarea>
+                  <textarea id="masterLedgerAddress" placeholder="Enter Address" rows="2" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; resize: vertical; font-family: inherit; outline: none; background: #fff;"></textarea>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterLedgerCity" placeholder="City / Town" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterLedgerPincode" placeholder="PIN / Postal Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerCity" placeholder="Enter City" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerPincode" placeholder="Enter PIN Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterLedgerState" placeholder="State (e.g. Maharashtra)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterLedgerCountry" placeholder="Country" value="India" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerState" placeholder="Enter State" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerCountry" placeholder="Enter Country" value="India" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
                 </div>
               </div>
             </div>
@@ -3308,12 +4286,12 @@
               </div>
               <div style="display: flex; flex-direction: column; gap: 10px;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterLedgerBankName" placeholder="Bank Name (e.g. HDFC Bank)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterLedgerAccountNo" placeholder="Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerBankName" placeholder="Enter Bank Name" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerAccountNo" placeholder="Enter Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterLedgerIfsc" placeholder="IFSC Code (e.g. HDFC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
-                  <input type="text" id="masterLedgerBranch" placeholder="Branch Name (Optional)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                  <input type="text" id="masterLedgerIfsc" placeholder="Enter IFSC Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                  <input type="text" id="masterLedgerBranch" placeholder="Enter Branch" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
                 </div>
               </div>
             </div>
@@ -3333,35 +4311,22 @@
                 GSTIN & PAN
               </div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <input type="text" id="masterLedgerGstin" placeholder="GSTIN (e.g. 27AAAAA0000A1Z5)" maxlength="15" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
-                <input type="text" id="masterLedgerPan" placeholder="PAN (e.g. AAAAA0000A)" maxlength="10" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                <input type="text" id="masterLedgerGstin" placeholder="Enter GSTIN" maxlength="15" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                <input type="text" id="masterLedgerPan" placeholder="Enter PAN" maxlength="10" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
               </div>
             </div>
 
           </div>
 
-          <!-- Opening Balance field (Optional) -->
-          <div class="coa-modal-fg" style="margin-bottom: 24px;">
-            <label class="coa-modal-label" for="masterLedgerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance (Optional)</label>
-            <input class="coa-modal-inp" id="masterLedgerBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
-          </div>
-
           <!-- Additional Information (Dynamic for Bank Account group) -->
-          <div id="masterLedgerBankAcctWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 24px; transition: all 0.2s ease;">
-            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; gap: 7px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                <line x1="2" y1="10" x2="22" y2="10"></line>
-              </svg>
-              <span>Additional Information</span>
-            </div>
+          <div id="masterLedgerBankAcctWrap" style="display: none; margin: 0; transition: all 0.2s ease;">
 
             <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div class="kya-searchable-select-wrap" id="masterLedgerBankAcctBankNameWrap" style="position: relative; width: 100%;">
                   <input type="hidden" id="masterLedgerBankAcctBankName" value="">
                   <div class="kya-searchable-select-trigger" id="masterLedgerBankAcctBankNameTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--slate-400);">
-                    <span id="masterLedgerBankAcctBankNameTriggerText">Search or select bank...</span>
+                    <span id="masterLedgerBankAcctBankNameTriggerText">Select Bank</span>
                     <span style="font-size: 10px; color: var(--slate-400);">▼</span>
                   </div>
                   <div class="kya-searchable-select-dropdown" id="masterLedgerBankAcctBankNameDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
@@ -3369,14 +4334,14 @@
                     <div id="masterLedgerBankAcctBankNameOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
                   </div>
                 </div>
-                <input type="text" id="masterLedgerBankAcctHolder" placeholder="Account Holder Name" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                <input type="text" id="masterLedgerBankAcctHolder" placeholder="Enter Account Holder Name" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
               </div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <input type="text" id="masterLedgerBankAcctNo" placeholder="Account No" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                <input type="text" id="masterLedgerBankAcctIfsc" placeholder="IFSC Code (e.g. HDFC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+                <input type="text" id="masterLedgerBankAcctNo" placeholder="Enter Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                <input type="text" id="masterLedgerBankAcctIfsc" placeholder="Enter IFSC Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
               </div>
               <div>
-                <input type="text" id="masterLedgerBankAcctBranch" placeholder="Branch" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                <input type="text" id="masterLedgerBankAcctBranch" placeholder="Enter Branch" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
               </div>
             </div>
 
@@ -3437,16 +4402,7 @@
           </div>
 
           <!-- Additional Information (Dynamic for Revenue from Operations group) -->
-          <div id="masterLedgerSacWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 24px; transition: all 0.2s ease;">
-            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; gap: 7px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-              </svg>
-              <span>Additional Information</span>
-            </div>
+          <div id="masterLedgerSacWrap" style="display: none; margin: 0; transition: all 0.2s ease;">
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
               <div style="min-width: 0;">
@@ -3454,7 +4410,7 @@
                 <div class="kya-searchable-select-wrap" id="masterLedgerSacCodeWrap" style="position: relative; width: 100%;">
                   <input type="hidden" id="masterLedgerSacCode" value="">
                   <div class="kya-searchable-select-trigger" id="masterLedgerSacCodeTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--slate-400);">
-                    <span id="masterLedgerSacCodeTriggerText">Search or select SAC code...</span>
+                    <span id="masterLedgerSacCodeTriggerText">Select SAC Code</span>
                     <span style="font-size: 10px; color: var(--slate-400);">▼</span>
                   </div>
                   <div class="kya-searchable-select-dropdown" id="masterLedgerSacCodeDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
@@ -3492,31 +4448,33 @@
             </div>
           </div>
 
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <button class="btn btn-primary" id="masterLedgerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">＋ Create Ledger</button>
-            <button class="btn btn-secondary" id="masterLedgerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--slate-200);">
+              <button type="button" class="btn btn-primary" id="masterLedgerAddlDoneBtn" style="height: 38px; padding: 8px 18px; font-size: 13px; font-weight: 600;">Done</button>
+            </div>
           </div>
         </div>
       `;
 
       renderMasterLedgerAliases();
 
-      const addAliasBtn = contentArea.querySelector('#masterLedgerAddAliasBtn');
-      if (addAliasBtn) {
-        addAliasBtn.addEventListener('click', () => {
-          _masterLedgerAliases.push('');
-          renderMasterLedgerAliases();
-          const inputs = contentArea.querySelectorAll('.master-alias-input');
-          if (inputs.length) {
-            inputs[inputs.length - 1].focus();
-          }
-        });
-      }
-
+      // Group starts unselected so the dropdown shows "Select Group"
+      const ledgerGroupSelInit = contentArea.querySelector('#masterLedgerGroupCombinedSel');
+      if (ledgerGroupSelInit) ledgerGroupSelInit.selectedIndex = -1;
       const searchableGroupControl = initSearchableSelectHelper(contentArea, 'masterLedgerGroupCombinedSel', 'Select Group');
 
       // Additional Information Dynamic Visibility and Save As Slider Toggle
       const groupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel');
+
+      // Multi-row state (see the row list further below); row 0 is the first row
+      _masterLedgerRowState = {};
+      _masterLedgerActiveRowIdx = 0;
+      _masterLedgerExtraRowKeys = [];
+      _masterLedgerExtraRowSeq = 0;
+      const ledgerRowNameInput = (idx) => contentArea.querySelector('#masterLedgerName' + (idx ? idx : ''));
+      const activeNameInp = () => ledgerRowNameInput(_masterLedgerActiveRowIdx || 0);
+      const activeGroupSel = () => contentArea.querySelector('#masterLedgerGroupCombinedSel' + (_masterLedgerActiveRowIdx ? _masterLedgerActiveRowIdx : ''));
       const addInfoWrap = contentArea.querySelector('#masterLedgerAdditionalInfoWrap');
       const bankAcctWrap = contentArea.querySelector('#masterLedgerBankAcctWrap');
       const sacWrap = contentArea.querySelector('#masterLedgerSacWrap');
@@ -3527,7 +4485,7 @@
 
       const applySaveAsModeUi = () => {
         if (!saveAsBg || !saveAsLedgerBtn || !saveAsPartyBtn || !saveBtn) return;
-        const isPay = isTradePayableGroup(groupSel ? groupSel.value : '');
+        const isPay = isTradePayableGroup(activeGroupSel() ? activeGroupSel().value : '');
         const partyLabel = isPay ? 'Supplier' : 'Customer';
         saveAsPartyBtn.textContent = partyLabel;
 
@@ -3536,13 +4494,13 @@
           saveAsBg.className = 'master-saveas-slider-bg party-active';
           saveAsLedgerBtn.className = 'master-saveas-btn';
           saveAsPartyBtn.className = 'master-saveas-btn active';
-          saveBtn.textContent = `＋ Create ${partyLabel}`;
+          saveBtn.textContent = `Create ${partyLabel}`;
         } else {
           _masterLedgerSaveAsMode = 'ledger';
           saveAsBg.className = 'master-saveas-slider-bg ledger-active';
           saveAsLedgerBtn.className = 'master-saveas-btn active';
           saveAsPartyBtn.className = 'master-saveas-btn';
-          saveBtn.textContent = '＋ Create Ledger';
+          saveBtn.textContent = 'Create Ledger';
         }
       };
 
@@ -3557,16 +4515,16 @@
       if (saveAsPartyBtn) {
         saveAsPartyBtn.addEventListener('click', (e) => {
           e.preventDefault();
-          const isPay = isTradePayableGroup(groupSel ? groupSel.value : '');
+          const isPay = isTradePayableGroup(activeGroupSel() ? activeGroupSel().value : '');
           _masterLedgerSaveAsMode = isPay ? 'supplier' : 'customer';
           applySaveAsModeUi();
         });
       }
 
       const updateAdditionalInfoVisibility = () => {
-        if (!groupSel || !addInfoWrap) return;
-        const isRec = isTradeReceivableGroup(groupSel.value);
-        const isPay = isTradePayableGroup(groupSel.value);
+        if (!activeGroupSel() || !addInfoWrap) return;
+        const isRec = isTradeReceivableGroup(activeGroupSel().value);
+        const isPay = isTradePayableGroup(activeGroupSel().value);
         const isParty = isRec || isPay;
 
         addInfoWrap.style.display = isParty ? 'block' : 'none';
@@ -3574,22 +4532,69 @@
           applySaveAsModeUi();
         } else {
           _masterLedgerSaveAsMode = 'ledger';
-          if (saveBtn) saveBtn.textContent = '＋ Create Ledger';
+          if (saveBtn) saveBtn.textContent = 'Create Ledger';
         }
 
         if (bankAcctWrap) {
-          bankAcctWrap.style.display = isBankAccountGroup(groupSel.value) ? 'block' : 'none';
+          bankAcctWrap.style.display = isBankAccountGroup(activeGroupSel().value) ? 'block' : 'none';
         }
 
         if (sacWrap) {
-          sacWrap.style.display = isRevenueFromOperationsGroup(groupSel.value) ? 'block' : 'none';
+          sacWrap.style.display = isRevenueFromOperationsGroup(activeGroupSel().value) ? 'block' : 'none';
+        }
+
+        if (addlBtnWrap) {
+          addlBtnWrap.style.display = ledgerGroupHasAddlDetails() ? 'block' : 'none';
         }
       };
 
-      if (groupSel) {
-        groupSel.addEventListener('change', updateAdditionalInfoVisibility);
-        updateAdditionalInfoVisibility();
+      // ── Additional Details popup (Trade Receivables / Payables, Bank Accounts,
+      // Revenue from Operations) — opens when such a group is selected ──
+      const addlModal = contentArea.querySelector('#masterLedgerAddlModal');
+      const addlModalSub = contentArea.querySelector('#masterLedgerAddlModalSub');
+      const addlBtnWrap = contentArea.querySelector('#masterLedgerAddlBtnWrap');
+      const addlBtn = contentArea.querySelector('#masterLedgerAddlBtn');
+
+      const ledgerGroupHasAddlDetails = () => {
+        const val = activeGroupSel() ? activeGroupSel().value : '';
+        return isTradePartyGroup(val) || isBankAccountGroup(val) || isRevenueFromOperationsGroup(val);
+      };
+
+      const openLedgerAddlModal = () => {
+        if (!addlModal || !ledgerGroupHasAddlDetails()) return;
+        if (addlModalSub) {
+          const opt = activeGroupSel().options[activeGroupSel().selectedIndex];
+          const nameVal = activeNameInp() ? activeNameInp().value.trim() : '';
+          const groupLabel = opt ? opt.textContent.trim().replace(/^📁\s*/, '') : '';
+          addlModalSub.textContent = nameVal ? `${nameVal} · ${groupLabel}` : groupLabel;
+        }
+        addlModal.style.display = 'flex';
+      };
+
+      const closeLedgerAddlModal = () => {
+        if (addlModal) addlModal.style.display = 'none';
+      };
+
+      if (addlBtn) addlBtn.addEventListener('click', openLedgerAddlModal);
+      ['#masterLedgerAddlCloseBtn', '#masterLedgerAddlDoneBtn'].forEach(sel => {
+        const btn = contentArea.querySelector(sel);
+        if (btn) btn.addEventListener('click', closeLedgerAddlModal);
+      });
+      if (addlModal) {
+        // Click on the dimmed backdrop (outside the card) closes the popup
+        addlModal.addEventListener('mousedown', (e) => {
+          if (e.target === addlModal) closeLedgerAddlModal();
+        });
+        addlModal.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            closeLedgerAddlModal();
+          }
+        });
       }
+
+      // (Each row's Group change — incl. the first row — is wired in wireLedgerRowInputs)
+      updateAdditionalInfoVisibility();
 
       // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
       wireGstinPanValidation(contentArea, 'masterLedgerGstin', 'masterLedgerPan');
@@ -3623,7 +4628,7 @@
       if (bankNameHidden && bankNameTrigger && bankNameTriggerText && bankNameDropdown && bankNameSearch && bankNameOptionsList) {
         const setBankName = (val) => {
           bankNameHidden.value = val;
-          bankNameTriggerText.textContent = val || 'Search or select bank...';
+          bankNameTriggerText.textContent = val || 'Select Bank';
           bankNameTriggerText.style.color = val ? 'var(--slate-700)' : 'var(--slate-400)';
         };
 
@@ -3790,29 +4795,28 @@
       const nameInp = contentArea.querySelector('#masterLedgerName');
       const nameErr = contentArea.querySelector('#masterLedgerNameError');
 
-      const validateLedgerNameInputLive = () => {
-        const val = nameInp ? nameInp.value.trim() : '';
+      // Live "already exists" check for a row's Name (row 0 is the first row)
+      const validateLedgerRowNameLive = (idx) => {
+        const inp = ledgerRowNameInput(idx);
+        const err = contentArea.querySelector('#masterLedgerName' + (idx ? idx : '') + 'Error');
+        const val = inp ? inp.value.trim() : '';
+        const setErr = (text) => {
+          if (err) { err.textContent = text || ''; err.style.display = text ? 'block' : 'none'; }
+          if (inp) inp.style.borderColor = text ? '#ef4444' : 'var(--slate-200)';
+        };
         if (!val) {
-          if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
-          if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+          setErr('');
           return null;
         }
-
         const dup = findDuplicateCoaNameOrAlias(val);
         if (dup) {
           const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
           const errorText = `"${val}" already exists (${typeLabel}).`;
-          if (nameErr) {
-            nameErr.textContent = errorText;
-            nameErr.style.display = 'block';
-          }
-          if (nameInp) nameInp.style.borderColor = '#ef4444';
+          setErr(errorText);
           return errorText;
-        } else {
-          if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
-          if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
-          return null;
         }
+        setErr('');
+        return null;
       };
 
       if (nameInp) {
@@ -3831,447 +4835,526 @@
             }
           }
         });
-        nameInp.addEventListener('input', () => {
-          validateLedgerNameInputLive();
-          validateMasterLedgerAliasesLive();
+      }
+
+      // ── Multi Create style row list (like Create Group): Name + Group per row, with an
+      // "Add Another Ledger" button under the rows. The side box (Opening Balance,
+      // Additional Details popup, Alternate Names) always shows the active row; each
+      // row's values are parked in _masterLedgerRowState while another row is active. ──
+      const extraLedgerRowsContainer = contentArea.querySelector('#masterLedgerExtraRowsContainer');
+      const ledgerAddRowWrap = contentArea.querySelector('#masterLedgerAddRowWrap');
+      const ledgerAddRowBtn = contentArea.querySelector('#masterLedgerAddRowBtn');
+      const ledgerBalanceInp = contentArea.querySelector('#masterLedgerBalance');
+
+      // Popup field ids and the value a fresh row starts with
+      const LEDGER_ADDL_FIELD_DEFAULTS = {
+        masterLedgerContactName: '', masterLedgerAddress: '', masterLedgerCity: '', masterLedgerPincode: '',
+        masterLedgerState: '', masterLedgerCountry: 'India',
+        masterLedgerBankName: '', masterLedgerAccountNo: '', masterLedgerIfsc: '', masterLedgerBranch: '',
+        masterLedgerGstin: '', masterLedgerPan: '',
+        masterLedgerBankAcctBankName: '', masterLedgerBankAcctHolder: '', masterLedgerBankAcctNo: '',
+        masterLedgerBankAcctIfsc: '', masterLedgerBankAcctBranch: '',
+        masterLedgerSacCode: '', masterLedgerSacDesc: '', masterLedgerSacRate: '', masterLedgerSacGstSel: '18'
+      };
+
+      const newLedgerRowState = () => ({
+        aliases: [],
+        balance: '',
+        fields: Object.assign({}, LEDGER_ADDL_FIELD_DEFAULTS),
+        qr: null,
+        saveAsMode: 'ledger'
+      });
+
+      // Copies the shared side box / popup values into the active row's state
+      const captureActiveLedgerRow = () => {
+        if (_masterLedgerActiveRowIdx === null) return;
+        const st = _masterLedgerRowState[_masterLedgerActiveRowIdx] || newLedgerRowState();
+        st.aliases = _masterLedgerAliases;
+        st.balance = ledgerBalanceInp ? ledgerBalanceInp.value : '';
+        Object.keys(LEDGER_ADDL_FIELD_DEFAULTS).forEach(id => {
+          const el = contentArea.querySelector('#' + id);
+          if (el) st.fields[id] = el.value;
+        });
+        st.qr = _masterLedgerBankAcctQrData;
+        st.saveAsMode = _masterLedgerSaveAsMode;
+        _masterLedgerRowState[_masterLedgerActiveRowIdx] = st;
+      };
+
+      const setLedgerTriggerText = (id, value, placeholder) => {
+        const txt = contentArea.querySelector('#' + id + 'TriggerText');
+        if (!txt) return;
+        txt.textContent = value || placeholder;
+        txt.style.color = value ? 'var(--slate-700)' : 'var(--slate-400)';
+      };
+
+      // Puts a row's stored values into the shared side box / popup
+      const loadLedgerRowState = (idx) => {
+        const st = _masterLedgerRowState[idx] || newLedgerRowState();
+        _masterLedgerRowState[idx] = st;
+        if (ledgerBalanceInp) ledgerBalanceInp.value = st.balance;
+        Object.keys(LEDGER_ADDL_FIELD_DEFAULTS).forEach(id => {
+          const el = contentArea.querySelector('#' + id);
+          if (el) el.value = st.fields[id] !== undefined ? st.fields[id] : LEDGER_ADDL_FIELD_DEFAULTS[id];
+        });
+        setLedgerTriggerText('masterLedgerBankAcctBankName', st.fields.masterLedgerBankAcctBankName, 'Select Bank');
+        setLedgerTriggerText('masterLedgerSacCode', st.fields.masterLedgerSacCode, 'Select SAC Code');
+        setLedgerTriggerText('masterLedgerSacDesc', st.fields.masterLedgerSacDesc, 'Auto-filled from SAC Code');
+        // Refresh the GSTIN / PAN validity hints for the loaded values
+        ['#masterLedgerGstin', '#masterLedgerPan'].forEach(sel => {
+          const el = contentArea.querySelector(sel);
+          if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        updateQrUI(st.qr);
+        _masterLedgerSaveAsMode = st.saveAsMode;
+        _masterLedgerAliases = st.aliases;
+      };
+
+      // Shows / hides the Alternate Name boxes for the active row based on its Name
+      const syncLedgerAkaPanel = () => {
+        const inp = activeNameInp();
+        const nameVal = inp ? inp.value.trim() : '';
+        const akaPanel = contentArea.querySelector('#masterLedgerAkaPanel');
+        if (!nameVal) {
+          if (akaPanel) akaPanel.style.display = 'none';
+          if (_masterLedgerAliases.every(a => a.trim() === '')) {
+            _masterLedgerAliases = [];
+            renderMasterLedgerAliases();
+          }
+          return;
+        }
+        validateMasterLedgerAliasesLive();
+        if (_masterLedgerAliases.length === 0) {
+          _masterLedgerAliases.push('');
+          renderMasterLedgerAliases();
+        } else if (akaPanel) {
+          akaPanel.style.display = 'block';
+        }
+      };
+
+      const setActiveLedgerRow = (idx) => {
+        if (idx === _masterLedgerActiveRowIdx) return;
+        captureActiveLedgerRow();
+        _masterLedgerActiveRowIdx = idx;
+        loadLedgerRowState(idx);
+        renderMasterLedgerAliases();
+        updateAdditionalInfoVisibility();
+        syncLedgerAkaPanel();
+      };
+
+      // Ledger count (1, 2, 3...) in the right corner of the Back bar
+      const renderLedgerCount = () => {
+        const countWrap = document.getElementById('masterDeskBackBarGroupCount');
+        if (!countWrap) return;
+        const count = 1 + _masterLedgerExtraRowKeys.length;
+        countWrap.innerHTML = `<span title="Ledgers in this form" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-family: var(--font-main); font-size: 12.5px; font-weight: 600;">${count}</span>`;
+      };
+
+      // Shows the "Add Another Ledger" button only when the last row's Name has a value.
+      const refreshLedgerAddRowBtn = () => {
+        renderLedgerCount();
+        if (!ledgerAddRowWrap) return;
+        const lastIdx = _masterLedgerExtraRowKeys.length ? _masterLedgerExtraRowKeys[_masterLedgerExtraRowKeys.length - 1] : 0;
+        const lastInp = ledgerRowNameInput(lastIdx);
+        ledgerAddRowWrap.style.display = lastInp && lastInp.value.trim() ? 'block' : 'none';
+      };
+
+      const wireLedgerRowRemoveBtn = (idx) => {
+        const btn = extraLedgerRowsContainer.querySelector('.master-ledger-row-remove[data-row-index="' + idx + '"]');
+        if (!btn) return;
+        btn.addEventListener('mouseenter', () => {
+          btn.style.background = '#fef2f2';
+          btn.style.color = '#dc2626';
+          btn.style.borderColor = '#fecaca';
+        });
+        btn.addEventListener('mouseleave', () => {
+          btn.style.background = '#ffffff';
+          btn.style.color = 'var(--slate-400)';
+          btn.style.borderColor = 'var(--slate-200)';
+        });
+        btn.addEventListener('click', () => {
+          const rowEl = extraLedgerRowsContainer.querySelector('.master-ledger-row[data-row-index="' + idx + '"]');
+          if (rowEl) rowEl.remove();
+          const pos = _masterLedgerExtraRowKeys.indexOf(idx);
+          const prevIdx = pos > 0 ? _masterLedgerExtraRowKeys[pos - 1] : 0;
+          _masterLedgerExtraRowKeys = _masterLedgerExtraRowKeys.filter(k => k !== idx);
+          delete _masterLedgerRowState[idx];
+          if (_masterLedgerActiveRowIdx === idx) {
+            // Removed row's values go with it — switch the side box to the row above
+            _masterLedgerActiveRowIdx = null;
+            setActiveLedgerRow(prevIdx);
+            const prevInp = ledgerRowNameInput(prevIdx);
+            if (prevInp) prevInp.focus();
+          } else {
+            validateMasterLedgerAliasesLive();
+          }
+          refreshLedgerAddRowBtn();
+        });
+      };
+
+      const wireLedgerRowInputs = (idx) => {
+        const rowNameInp = ledgerRowNameInput(idx);
+        const rowGroupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel' + (idx ? idx : ''));
+        if (rowNameInp) {
+          rowNameInp.addEventListener('focus', () => setActiveLedgerRow(idx));
+          rowNameInp.addEventListener('input', () => {
+            setActiveLedgerRow(idx);
+            validateLedgerRowNameLive(idx);
+            syncLedgerAkaPanel();
+            refreshLedgerAddRowBtn();
+          });
+        }
+        if (rowGroupSel) {
+          rowGroupSel.addEventListener('change', () => {
+            setActiveLedgerRow(idx);
+            updateAdditionalInfoVisibility();
+            openLedgerAddlModal();
+          });
+        }
+      };
+
+      const addNextLedgerRow = () => {
+        _masterLedgerExtraRowSeq++;
+        const idx = _masterLedgerExtraRowSeq;
+        // New row's Group defaults to the row above it
+        const prevIdx = _masterLedgerExtraRowKeys.length ? _masterLedgerExtraRowKeys[_masterLedgerExtraRowKeys.length - 1] : 0;
+        const prevGroupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel' + (prevIdx ? prevIdx : ''));
+        extraLedgerRowsContainer.insertAdjacentHTML('beforeend', buildLedgerExtraRowHtml(idx, ledgerGroupOptionsHtml, firstGroupLabel));
+        const newGroupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel' + idx);
+        if (prevGroupSel && newGroupSel && prevGroupSel.value) {
+          newGroupSel.value = prevGroupSel.value;
+        } else if (newGroupSel) {
+          newGroupSel.selectedIndex = -1; // nothing chosen above -> show "Select Group"
+        }
+        initSearchableSelectHelper(contentArea, 'masterLedgerGroupCombinedSel' + idx, 'Select Group');
+        _masterLedgerRowState[idx] = newLedgerRowState();
+        wireLedgerRowInputs(idx);
+        wireLedgerRowRemoveBtn(idx);
+        _masterLedgerExtraRowKeys.push(idx);
+        refreshLedgerAddRowBtn();
+        const newNameInp = ledgerRowNameInput(idx);
+        if (newNameInp) {
+          newNameInp.focus();
+          setActiveLedgerRow(idx);
+        }
+      };
+
+      if (ledgerAddRowBtn) {
+        ledgerAddRowBtn.addEventListener('mouseenter', () => { ledgerAddRowBtn.style.background = 'var(--blue-50, #eff6ff)'; });
+        ledgerAddRowBtn.addEventListener('mouseleave', () => { ledgerAddRowBtn.style.background = '#ffffff'; });
+        ledgerAddRowBtn.addEventListener('click', addNextLedgerRow);
+      }
+
+      // First row's dustbin: with more rows below, removes this ledger and moves the next
+      // row (Name, Group and its side-box values) up; on its own, just clears it.
+      const ledgerCleanBtn = contentArea.querySelector('#masterLedgerRowCleanBtn');
+      if (ledgerCleanBtn) {
+        ledgerCleanBtn.addEventListener('mouseenter', () => {
+          ledgerCleanBtn.style.background = '#fef2f2';
+          ledgerCleanBtn.style.color = '#dc2626';
+          ledgerCleanBtn.style.borderColor = '#fecaca';
+        });
+        ledgerCleanBtn.addEventListener('mouseleave', () => {
+          ledgerCleanBtn.style.background = '#ffffff';
+          ledgerCleanBtn.style.color = 'var(--slate-400)';
+          ledgerCleanBtn.style.borderColor = 'var(--slate-200)';
+        });
+        ledgerCleanBtn.addEventListener('click', () => {
+          captureActiveLedgerRow();
+          if (_masterLedgerExtraRowKeys.length > 0) {
+            const nextIdx = _masterLedgerExtraRowKeys[0];
+            const nextNameInp = ledgerRowNameInput(nextIdx);
+            const nextGroupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel' + nextIdx);
+            if (nameInp) nameInp.value = nextNameInp ? nextNameInp.value : '';
+            if (groupSel && nextGroupSel) groupSel.value = nextGroupSel.value;
+            _masterLedgerRowState[0] = _masterLedgerRowState[nextIdx] || newLedgerRowState();
+            delete _masterLedgerRowState[nextIdx];
+            const nextRowEl = extraLedgerRowsContainer.querySelector('.master-ledger-row[data-row-index="' + nextIdx + '"]');
+            if (nextRowEl) nextRowEl.remove();
+            _masterLedgerExtraRowKeys = _masterLedgerExtraRowKeys.slice(1);
+          } else {
+            if (nameInp) nameInp.value = '';
+            if (groupSel && groupSel.options.length > 0) groupSel.selectedIndex = -1;
+            _masterLedgerRowState[0] = newLedgerRowState();
+          }
+          if (searchableGroupControl && typeof searchableGroupControl.refresh === 'function') {
+            searchableGroupControl.refresh();
+          }
+          _masterLedgerActiveRowIdx = null;
+          setActiveLedgerRow(0);
+          validateLedgerRowNameLive(0);
+          refreshLedgerAddRowBtn();
+          if (nameInp) nameInp.focus();
         });
       }
 
+      _masterLedgerRowState[0] = newLedgerRowState();
+      wireLedgerRowInputs(0);
+      refreshLedgerAddRowBtn();
+
+      // Sends the user back to the voucher that opened Create Ledger (if any) with the
+      // created entry. Returns true when it navigated away.
+      const returnLedgerToVoucher = (entity, kind) => {
+        if (!_masterDeskReturnContext) return false;
+        const ctx = _masterDeskReturnContext;
+        _masterDeskReturnContext = null;
+        _masterLedgerAliases = [];
+        const goTo = (tab) => {
+          if (typeof closeTab === 'function') closeTab('master_desk', null, tab);
+          else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, tab);
+          if (typeof openTab === 'function') openTab(tab);
+          else if (typeof window.openTab === 'function') window.openTab(tab);
+        };
+        if (ctx.returnTab === 'sales_voucher') {
+          goTo('sales_voucher');
+          if (typeof window.onPartyCreatedForSales === 'function') window.onPartyCreatedForSales(entity, kind);
+          return true;
+        }
+        if (ctx.returnTab === 'purchase_voucher') {
+          goTo('purchase_voucher');
+          if (typeof window.onPartyCreatedForPurchase === 'function') window.onPartyCreatedForPurchase(entity, kind);
+          return true;
+        }
+        if (ctx.returnTab === 'journal') {
+          goTo('journal');
+          if (typeof window.onLedgerCreatedForJournal === 'function') window.onLedgerCreatedForJournal(entity, ctx.rowId);
+          return true;
+        }
+        if (ctx.returnTab === 'cashline') {
+          goTo('cashline');
+          if (typeof window.onLedgerCreatedForCashline === 'function') window.onLedgerCreatedForCashline(entity, ctx);
+          return true;
+        }
+        return false;
+      };
+
+      // Creates one row as a Customer, Supplier or CoA Ledger. Returns { entity, kind }.
+      const createLedgerRowEntry = (row, seq) => {
+        const f = row.fields;
+        const val = (id) => (f[id] || '').trim();
+        const partyCommon = {
+          name: row.name,
+          aliases: row.aliases,
+          openingBalance: row.openingBalance,
+          contactName: val('masterLedgerContactName'),
+          address: val('masterLedgerAddress'),
+          city: val('masterLedgerCity'),
+          pincode: val('masterLedgerPincode'),
+          state: val('masterLedgerState'),
+          country: val('masterLedgerCountry') || 'India',
+          bankName: val('masterLedgerBankName'),
+          accountNo: val('masterLedgerAccountNo'),
+          ifsc: val('masterLedgerIfsc'),
+          branch: val('masterLedgerBranch'),
+          gstin: val('masterLedgerGstin'),
+          pan: val('masterLedgerPan')
+        };
+
+        if (row.mode === 'customer') {
+          const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+          const newCustomer = Object.assign({ id: 'cust-' + Date.now() + (seq ? '-' + seq : '') }, partyCommon, { createdAt: Date.now() });
+          customers.push(newCustomer);
+
+          // Ensure central Trade Receivables ledger exists in CoA and update combined balance
+          if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+            let trLedger = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tr' && l.name === 'Trade Receivables');
+            if (!trLedger) {
+              trLedger = { id: 104, name: 'Trade Receivables', sgId: 'sg-tr', type: 'ledger', openingBalance: 0 };
+              coaLedgers.push(trLedger);
+            }
+            trLedger.openingBalance = customers.reduce((sum, c) => sum + (parseFloat(c.openingBalance) || 0), 0);
+          }
+          if (typeof _coaExpanded !== 'undefined') {
+            _coaExpanded.add('assets');
+            _coaExpanded.add('sg-tr');
+          }
+          return { entity: newCustomer, kind: 'customer' };
+        }
+
+        if (row.mode === 'supplier') {
+          const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+          const newSupplier = Object.assign({ id: 'supp-' + Date.now() + (seq ? '-' + seq : '') }, partyCommon, { createdAt: Date.now() });
+          suppliers.push(newSupplier);
+
+          // Ensure central Trade Payables ledger exists in CoA and update combined balance
+          if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+            let tpLedger = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tp' && l.name === 'Trade Payables');
+            if (!tpLedger) {
+              tpLedger = { id: 201, name: 'Trade Payables', sgId: 'sg-tp', type: 'ledger', openingBalance: 0 };
+              coaLedgers.push(tpLedger);
+            }
+            tpLedger.openingBalance = suppliers.reduce((sum, s) => sum + (parseFloat(s.openingBalance) || 0), 0);
+          }
+          if (typeof _coaExpanded !== 'undefined') {
+            _coaExpanded.add('equity-liabilities');
+            _coaExpanded.add('sg-tp');
+          }
+          return { entity: newSupplier, kind: 'supplier' };
+        }
+
+        // Save As "Ledger" in CoA
+        const [pType, pId] = row.groupVal.split(':');
+        let sgId = '';
+        let glId = null;
+        if (pType === 'sg') {
+          sgId = pId;
+        } else if (pType === 'gl') {
+          const parentGl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id === Number(pId)) : null;
+          if (parentGl) {
+            sgId = parentGl.sgId;
+            glId = parentGl.id;
+          } else {
+            sgId = pId;
+          }
+        }
+
+        const bankAcctInfo = isBankAccountGroup(row.groupVal) ? {
+          bankName: val('masterLedgerBankAcctBankName'),
+          accountHolder: val('masterLedgerBankAcctHolder'),
+          accountNo: val('masterLedgerBankAcctNo'),
+          ifscCode: val('masterLedgerBankAcctIfsc'),
+          branch: val('masterLedgerBankAcctBranch'),
+          qrCode: row.qr ? row.qr.fileData : '',
+          qrCodeFileName: row.qr ? row.qr.fileName : ''
+        } : null;
+
+        const sacInfo = isRevenueFromOperationsGroup(row.groupVal) ? {
+          sacCode: val('masterLedgerSacCode'),
+          sacDesc: val('masterLedgerSacDesc'),
+          rate: parseFloat(f.masterLedgerSacRate) || 0,
+          gstRate: parseFloat(f.masterLedgerSacGstSel) || 0
+        } : null;
+
+        const newLedger = Object.assign({
+          id: Date.now() + (typeof _coaLedgerCtr !== 'undefined' ? _coaLedgerCtr++ : seq),
+          sgId: sgId,
+          glId: glId,
+          code: '',
+          type: 'ledger'
+        }, partyCommon, {
+          bankAccountInfo: bankAcctInfo,
+          sacInfo: sacInfo
+        });
+
+        if (typeof coaLedgers !== 'undefined') {
+          coaLedgers.push(newLedger);
+        }
+        if (typeof _coaExpanded !== 'undefined') {
+          const sg = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS.find(s => s.id === sgId) : null;
+          if (sg) {
+            _coaExpanded.add(sg.main);
+            _coaExpanded.add(sg.id);
+            if (sg.parent) _coaExpanded.add(sg.parent);
+          }
+          if (glId) _coaExpanded.add('gl-' + glId);
+          _coaExpanded.add(newLedger.id);
+        }
+        return { entity: newLedger, kind: 'ledger' };
+      };
+
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-          const name = nameInp ? nameInp.value.trim() : '';
-          if (!name) {
-            const targetType = _masterLedgerSaveAsMode === 'customer' ? 'customer' : (_masterLedgerSaveAsMode === 'supplier' ? 'supplier' : 'ledger');
-            if (typeof showToast === 'function') showToast(`Please enter a ${targetType} name.`, 'warning');
-            else alert(`Please enter a ${targetType} name.`);
-            if (nameInp) nameInp.focus();
-            return;
-          }
-
-          const liveNameErr = validateLedgerNameInputLive();
-          if (liveNameErr) {
-            if (typeof showToast === 'function') showToast(liveNameErr, 'error');
-            else alert(liveNameErr);
-            if (nameInp) nameInp.focus();
-            return;
-          }
-
-          const aliasesValid = validateMasterLedgerAliasesLive();
-          if (!aliasesValid) {
-            const msg = 'Please fix duplicate or invalid Also Known As entries.';
-            if (typeof showToast === 'function') showToast(msg, 'error');
+          const notify = (msg, type) => {
+            if (typeof showToast === 'function') showToast(msg, type);
             else alert(msg);
-            return;
-          }
-
-          const groupVal = groupSel && groupSel.value ? groupSel.value : '';
-          if (!groupVal) {
-            if (typeof showToast === 'function') showToast('Please select a group.', 'warning');
-            else alert('Please select a group.');
-            return;
-          }
-
-          const aliases = _masterLedgerAliases.map(a => a.trim()).filter(a => a !== '');
-
-          const formNamesSet = new Set([name.toLowerCase()]);
-          for (let i = 0; i < aliases.length; i++) {
-            const al = aliases[i];
-            const alLower = al.toLowerCase();
-
-            if (formNamesSet.has(alLower)) {
-              const msg = `Duplicate entry "${al}" found in the form. Name and A.K.A must be unique.`;
-              if (typeof showToast === 'function') showToast(msg, 'error');
-              else alert(msg);
-              return;
-            }
-            formNamesSet.add(alLower);
-
-            const dupAl = findDuplicateCoaNameOrAlias(al);
-            if (dupAl) {
-              const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
-              const msg = `"${al}" already exists (${typeLabel}).`;
-              if (typeof showToast === 'function') showToast(msg, 'error');
-              else alert(msg);
-              return;
-            }
-          }
-
-          const balInp = contentArea.querySelector('#masterLedgerBalance');
-          const balVal = balInp ? balInp.value.trim() : '';
-          const openingBalance = balVal ? parseFloat(balVal) || 0 : 0;
-
-          // Additional Information fields
-          const contactName = contentArea.querySelector('#masterLedgerContactName')?.value?.trim() || '';
-          const address = contentArea.querySelector('#masterLedgerAddress')?.value?.trim() || '';
-          const city = contentArea.querySelector('#masterLedgerCity')?.value?.trim() || '';
-          const pincode = contentArea.querySelector('#masterLedgerPincode')?.value?.trim() || '';
-          const state = contentArea.querySelector('#masterLedgerState')?.value?.trim() || '';
-          const country = contentArea.querySelector('#masterLedgerCountry')?.value?.trim() || 'India';
-          const bankName = contentArea.querySelector('#masterLedgerBankName')?.value?.trim() || '';
-          const accountNo = contentArea.querySelector('#masterLedgerAccountNo')?.value?.trim() || '';
-          const ifsc = contentArea.querySelector('#masterLedgerIfsc')?.value?.trim() || '';
-          const branch = contentArea.querySelector('#masterLedgerBranch')?.value?.trim() || '';
-          const gstin = contentArea.querySelector('#masterLedgerGstin')?.value?.trim() || '';
-          const pan = contentArea.querySelector('#masterLedgerPan')?.value?.trim() || '';
-
-          // Bank Account group: Additional Information fields
-          const isBankAcctGroup = isBankAccountGroup(groupVal);
-          const bankAcctInfo = isBankAcctGroup ? {
-            bankName: contentArea.querySelector('#masterLedgerBankAcctBankName')?.value?.trim() || '',
-            accountHolder: contentArea.querySelector('#masterLedgerBankAcctHolder')?.value?.trim() || '',
-            accountNo: contentArea.querySelector('#masterLedgerBankAcctNo')?.value?.trim() || '',
-            ifscCode: contentArea.querySelector('#masterLedgerBankAcctIfsc')?.value?.trim() || '',
-            branch: contentArea.querySelector('#masterLedgerBankAcctBranch')?.value?.trim() || '',
-            qrCode: _masterLedgerBankAcctQrData ? _masterLedgerBankAcctQrData.fileData : '',
-            qrCodeFileName: _masterLedgerBankAcctQrData ? _masterLedgerBankAcctQrData.fileName : ''
-          } : null;
-
-          // Revenue from Operations group: Additional Information fields
-          const isRevenueOpsGroup = isRevenueFromOperationsGroup(groupVal);
-          const sacInfo = isRevenueOpsGroup ? {
-            sacCode: contentArea.querySelector('#masterLedgerSacCode')?.value?.trim() || '',
-            sacDesc: contentArea.querySelector('#masterLedgerSacDesc')?.value?.trim() || '',
-            rate: parseFloat(contentArea.querySelector('#masterLedgerSacRate')?.value) || 0,
-            gstRate: parseFloat(contentArea.querySelector('#masterLedgerSacGstSel')?.value) || 0
-          } : null;
-
-          // ── If Save As "Customer" is selected ──
-          if (_masterLedgerSaveAsMode === 'customer') {
-            const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-            const newCustomer = {
-              id: 'cust-' + Date.now(),
-              name: name,
-              aliases: aliases,
-              openingBalance: openingBalance,
-              contactName: contactName,
-              address: address,
-              city: city,
-              pincode: pincode,
-              state: state,
-              country: country,
-              bankName: bankName,
-              accountNo: accountNo,
-              ifsc: ifsc,
-              branch: branch,
-              gstin: gstin,
-              pan: pan,
-              createdAt: Date.now()
-            };
-
-            customers.push(newCustomer);
-
-            // Ensure central Trade Receivables ledger exists in CoA and update combined balance
-            if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
-              let trLedger = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tr' && l.name === 'Trade Receivables');
-              if (!trLedger) {
-                trLedger = { id: 104, name: 'Trade Receivables', sgId: 'sg-tr', type: 'ledger', openingBalance: 0 };
-                coaLedgers.push(trLedger);
-              }
-              const totalCustOp = customers.reduce((sum, c) => sum + (parseFloat(c.openingBalance) || 0), 0);
-              trLedger.openingBalance = totalCustOp;
-            }
-
-            if (typeof _coaExpanded !== 'undefined') {
-              _coaExpanded.add('assets');
-              _coaExpanded.add('sg-tr');
-            }
-
-            if (typeof renderChartPanel === 'function') renderChartPanel();
-            if (typeof refreshAllReports === 'function') refreshAllReports();
-            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-            if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
-
-            showToast(`Customer "${name}" created successfully (linked to Trade Receivables).`, 'success');
-
-            _masterLedgerAliases = [];
-
-            if (_masterDeskReturnContext) {
-              const ctx = _masterDeskReturnContext;
-              _masterDeskReturnContext = null;
-              _masterLedgerAliases = [];
-
-              if (ctx.returnTab === 'sales_voucher') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
-                if (typeof openTab === 'function') openTab('sales_voucher');
-                else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
-                if (typeof window.onPartyCreatedForSales === 'function') {
-                  window.onPartyCreatedForSales(newCustomer, 'customer');
-                }
-                return;
-              }
-
-              if (ctx.returnTab === 'purchase_voucher') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
-                if (typeof openTab === 'function') openTab('purchase_voucher');
-                else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
-                if (typeof window.onPartyCreatedForPurchase === 'function') {
-                  window.onPartyCreatedForPurchase(newCustomer, 'customer');
-                }
-                return;
-              }
-
-              if (ctx.returnTab === 'journal') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'journal');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'journal');
-                if (typeof openTab === 'function') openTab('journal');
-                else if (typeof window.openTab === 'function') window.openTab('journal');
-                if (typeof window.onLedgerCreatedForJournal === 'function') {
-                  window.onLedgerCreatedForJournal(newCustomer, ctx.rowId);
-                }
-                return;
-              }
-
-              if (ctx.returnTab === 'cashline') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
-                if (typeof openTab === 'function') openTab('cashline');
-                else if (typeof window.openTab === 'function') window.openTab('cashline');
-                if (typeof window.onLedgerCreatedForCashline === 'function') {
-                  window.onLedgerCreatedForCashline(newCustomer, ctx);
-                }
-                return;
-              }
-            }
-
-            updateMasterDeskContent();
-            return;
-          }
-
-          // ── If Save As "Supplier" is selected ──
-          if (_masterLedgerSaveAsMode === 'supplier') {
-            const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
-            const newSupplier = {
-              id: 'supp-' + Date.now(),
-              name: name,
-              aliases: aliases,
-              openingBalance: openingBalance,
-              contactName: contactName,
-              address: address,
-              city: city,
-              pincode: pincode,
-              state: state,
-              country: country,
-              bankName: bankName,
-              accountNo: accountNo,
-              ifsc: ifsc,
-              branch: branch,
-              gstin: gstin,
-              pan: pan,
-              createdAt: Date.now()
-            };
-
-            suppliers.push(newSupplier);
-
-            // Ensure central Trade Payables ledger exists in CoA and update combined balance
-            if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
-              let tpLedger = coaLedgers.find(l => l.type === 'ledger' && l.sgId === 'sg-tp' && l.name === 'Trade Payables');
-              if (!tpLedger) {
-                tpLedger = { id: 201, name: 'Trade Payables', sgId: 'sg-tp', type: 'ledger', openingBalance: 0 };
-                coaLedgers.push(tpLedger);
-              }
-              const totalSuppOp = suppliers.reduce((sum, s) => sum + (parseFloat(s.openingBalance) || 0), 0);
-              tpLedger.openingBalance = totalSuppOp;
-            }
-
-            if (typeof _coaExpanded !== 'undefined') {
-              _coaExpanded.add('equity-liabilities');
-              _coaExpanded.add('sg-tp');
-            }
-
-            if (typeof renderChartPanel === 'function') renderChartPanel();
-            if (typeof refreshAllReports === 'function') refreshAllReports();
-            if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-            if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
-
-            showToast(`Supplier "${name}" created successfully (linked to Trade Payables).`, 'success');
-
-            _masterLedgerAliases = [];
-
-            if (_masterDeskReturnContext) {
-              const ctx = _masterDeskReturnContext;
-              _masterDeskReturnContext = null;
-              _masterLedgerAliases = [];
-
-              if (ctx.returnTab === 'purchase_voucher') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
-                if (typeof openTab === 'function') openTab('purchase_voucher');
-                else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
-                if (typeof window.onPartyCreatedForPurchase === 'function') {
-                  window.onPartyCreatedForPurchase(newSupplier, 'supplier');
-                }
-                return;
-              }
-
-              if (ctx.returnTab === 'sales_voucher') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
-                if (typeof openTab === 'function') openTab('sales_voucher');
-                else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
-                if (typeof window.onPartyCreatedForSales === 'function') {
-                  window.onPartyCreatedForSales(newSupplier, 'supplier');
-                }
-                return;
-              }
-
-              if (ctx.returnTab === 'journal') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'journal');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'journal');
-                if (typeof openTab === 'function') openTab('journal');
-                else if (typeof window.openTab === 'function') window.openTab('journal');
-                if (typeof window.onLedgerCreatedForJournal === 'function') {
-                  window.onLedgerCreatedForJournal(newSupplier, ctx.rowId);
-                }
-                return;
-              }
-
-              if (ctx.returnTab === 'cashline') {
-                if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
-                else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
-                if (typeof openTab === 'function') openTab('cashline');
-                else if (typeof window.openTab === 'function') window.openTab('cashline');
-                if (typeof window.onLedgerCreatedForCashline === 'function') {
-                  window.onLedgerCreatedForCashline(newSupplier, ctx);
-                }
-                return;
-              }
-            }
-
-            updateMasterDeskContent();
-            return;
-          }
-
-          // ── Otherwise: Save As "Ledger" in CoA ──
-          const [pType, pId] = groupVal.split(':');
-          let sgId = '';
-          let glId = null;
-
-          if (pType === 'sg') {
-            sgId = pId;
-            glId = null;
-          } else if (pType === 'gl') {
-            const parentGl = typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id === Number(pId)) : null;
-            if (parentGl) {
-              sgId = parentGl.sgId;
-              glId = parentGl.id;
-            } else {
-              sgId = pId;
-            }
-          }
-
-          const newLedgerId = Date.now() + (typeof _coaLedgerCtr !== 'undefined' ? _coaLedgerCtr++ : 0);
-          const newLedger = {
-            id: newLedgerId,
-            sgId: sgId,
-            glId: glId,
-            name: name,
-            code: '',
-            openingBalance: openingBalance,
-            type: 'ledger',
-            aliases: aliases,
-            contactName: contactName,
-            address: address,
-            city: city,
-            pincode: pincode,
-            state: state,
-            country: country,
-            bankName: bankName,
-            accountNo: accountNo,
-            ifsc: ifsc,
-            branch: branch,
-            gstin: gstin,
-            pan: pan,
-            bankAccountInfo: bankAcctInfo,
-            sacInfo: sacInfo
           };
 
-          if (typeof coaLedgers !== 'undefined') {
-            coaLedgers.push(newLedger);
+          // Check the active row's Alternate Names (the ones currently on screen)
+          if (!validateMasterLedgerAliasesLive()) {
+            notify('Please fix duplicate or invalid Alternate Name entries.', 'error');
+            return;
           }
+          captureActiveLedgerRow();
 
-          if (typeof _coaExpanded !== 'undefined') {
-            const sg = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS.find(s => s.id === sgId) : null;
-            if (sg) {
-              _coaExpanded.add(sg.main);
-              _coaExpanded.add(sg.id);
-              if (sg.parent) _coaExpanded.add(sg.parent);
+          const rowIdxs = [0, ..._masterLedgerExtraRowKeys];
+          const formNamesSet = new Set();
+          const rows = [];
+
+          for (const idx of rowIdxs) {
+            const rowNameInp = ledgerRowNameInput(idx);
+            const rowName = rowNameInp ? rowNameInp.value.trim() : '';
+            const st = _masterLedgerRowState[idx] || newLedgerRowState();
+            const rowGroupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel' + (idx ? idx : ''));
+            const rowGroupVal = rowGroupSel && rowGroupSel.value ? rowGroupSel.value : '';
+            const isPartyGroup = isTradePartyGroup(rowGroupVal);
+            const mode = isPartyGroup && st.saveAsMode !== 'ledger'
+              ? (isTradePayableGroup(rowGroupVal) ? 'supplier' : 'customer')
+              : 'ledger';
+
+            if (!rowName) {
+              // A trailing row left empty is just unfilled — it's skipped, not an error
+              if (idx !== 0) continue;
+              notify(`Please enter a ${mode} name.`, 'warning');
+              if (rowNameInp) rowNameInp.focus();
+              return;
             }
-            if (glId) _coaExpanded.add('gl-' + glId);
-            _coaExpanded.add(newLedger.id);
+
+            const nameErrText = validateLedgerRowNameLive(idx);
+            if (nameErrText) {
+              notify(nameErrText, 'error');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+
+            const nameLower = rowName.toLowerCase();
+            if (formNamesSet.has(nameLower)) {
+              notify(`Duplicate entry "${rowName}" found in the form. Each ledger name must be unique.`, 'error');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+            formNamesSet.add(nameLower);
+
+            if (!rowGroupVal) {
+              notify(`Please select a group for "${rowName}".`, 'warning');
+              return;
+            }
+
+            const aliases = (st.aliases || []).map(a => a.trim()).filter(a => a !== '');
+            for (const al of aliases) {
+              const alLower = al.toLowerCase();
+              if (formNamesSet.has(alLower)) {
+                notify(`Duplicate entry "${al}" found in the form (Alternate Name of "${rowName}"). Names and Alternate Names must be unique.`, 'error');
+                return;
+              }
+              formNamesSet.add(alLower);
+              const dupAl = findDuplicateCoaNameOrAlias(al);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                notify(`"${al}" (Alternate Name of "${rowName}") already exists (${typeLabel}).`, 'error');
+                return;
+              }
+            }
+
+            const balVal = (st.balance || '').toString().trim();
+            rows.push({
+              name: rowName,
+              groupVal: rowGroupVal,
+              aliases: aliases,
+              openingBalance: balVal ? parseFloat(balVal) || 0 : 0,
+              fields: st.fields,
+              qr: st.qr,
+              mode: mode
+            });
           }
 
-          if (typeof renderChartPanel === 'function') {
-            renderChartPanel();
-          }
-          if (typeof refreshAllReports === 'function') {
-            refreshAllReports();
-          }
-          if (typeof triggerAutoBackup === 'function') {
-            triggerAutoBackup();
-          }
-          if (typeof populateSalesCustomers === 'function') {
-            populateSalesCustomers();
-          }
-          if (typeof populatePurchaseVendors === 'function') {
-            populatePurchaseVendors();
-          }
+          const created = rows.map((row, i) => createLedgerRowEntry(row, i));
 
-          showToast(`Ledger "${name}" created successfully.`, 'success');
+          if (typeof renderChartPanel === 'function') renderChartPanel();
+          if (typeof refreshAllReports === 'function') refreshAllReports();
+          if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+          if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
+          if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
+
+          if (created.length > 1) {
+            notify(`${created.length} ledgers created successfully.`, 'success');
+          } else {
+            const only = created[0];
+            if (only.kind === 'customer') notify(`Customer "${only.entity.name}" created successfully (linked to Trade Receivables).`, 'success');
+            else if (only.kind === 'supplier') notify(`Supplier "${only.entity.name}" created successfully (linked to Trade Payables).`, 'success');
+            else notify(`Ledger "${only.entity.name}" created successfully.`, 'success');
+          }
 
           _masterLedgerAliases = [];
-
-          if (_masterDeskReturnContext) {
-            const ctx = _masterDeskReturnContext;
-            _masterDeskReturnContext = null;
-            _masterLedgerAliases = [];
-
-            if (ctx.returnTab === 'sales_voucher') {
-              if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
-              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
-              if (typeof openTab === 'function') openTab('sales_voucher');
-              else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
-              if (typeof window.onPartyCreatedForSales === 'function') {
-                window.onPartyCreatedForSales(newLedger, 'ledger');
-              }
-              return;
-            }
-
-            if (ctx.returnTab === 'purchase_voucher') {
-              if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
-              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
-              if (typeof openTab === 'function') openTab('purchase_voucher');
-              else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
-              if (typeof window.onPartyCreatedForPurchase === 'function') {
-                window.onPartyCreatedForPurchase(newLedger, 'ledger');
-              }
-              return;
-            }
-
-            if (ctx.returnTab === 'journal') {
-              if (typeof closeTab === 'function') closeTab('master_desk', null, 'journal');
-              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'journal');
-              if (typeof openTab === 'function') openTab('journal');
-              else if (typeof window.openTab === 'function') window.openTab('journal');
-              if (typeof window.onLedgerCreatedForJournal === 'function') {
-                window.onLedgerCreatedForJournal(newLedger, ctx.rowId);
-              }
-              return;
-            }
-
-            if (ctx.returnTab === 'cashline') {
-              if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
-              else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
-              if (typeof openTab === 'function') openTab('cashline');
-              else if (typeof window.openTab === 'function') window.openTab('cashline');
-              if (typeof window.onLedgerCreatedForCashline === 'function') {
-                window.onLedgerCreatedForCashline(newLedger, ctx);
-              }
-              return;
-            }
-          }
-
+          if (returnLedgerToVoucher(created[0].entity, created[0].kind)) return;
           updateMasterDeskContent();
         });
       }
@@ -4285,150 +5368,183 @@
       }
     } else if (currentMasterDeskSubtype === 'Create' && currentMasterDeskTab === 'customers') {
       _masterCustomerAliases = [];
+      _masterCustomerRowState = {};
+      _masterCustomerActiveRowIdx = 0;
+      _masterCustomerExtraRowKeys = [];
+      _masterCustomerExtraRowSeq = 0;
+
+      const custDustbinSvg = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18"/>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>`;
+
+      // One "Name" row of the Create Customer form. idx 0 is the first row (ids without a
+      // suffix, with a "clean" dustbin); rows added with "Add Another Customer" get a
+      // numeric suffix and a "remove" dustbin — same look as Create Group / Ledger rows.
+      const buildCustomerRowHtml = (idx) => {
+        const sfx = idx ? String(idx) : '';
+        const btnClass = idx ? 'master-customer-row-remove' : 'master-customer-row-clean';
+        const btnId = idx ? '' : 'id="masterCustomerRowCleanBtn"';
+        const btnTitle = idx ? 'Remove this customer' : 'Clean this customer';
+        return `
+          <div class="master-customer-row" data-row-index="${idx}" style="display: grid; grid-template-columns: minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+            <div>
+              <label class="coa-modal-label" for="masterCustomerName${sfx}" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+              <input class="coa-modal-inp" id="masterCustomerName${sfx}" placeholder="Enter Name" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+              <div id="masterCustomerName${sfx}Error" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            </div>
+            <div>
+              <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+              <button type="button" class="${btnClass}" ${btnId} data-row-index="${idx}" title="${btnTitle}" style="width: 38px; height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #ffffff; color: var(--slate-400); cursor: pointer; transition: all 0.15s ease;">
+                ${custDustbinSvg}
+              </button>
+            </div>
+          </div>
+        `;
+      };
+
+      const custInpStyle = 'padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;';
 
       contentArea.innerHTML = `
-        <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
-          <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            Create Customer
-          </h3>
+        <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+          <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            ${buildCustomerRowHtml(0)}
 
-          <!-- Name field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" for="masterCustomerName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
-            <input class="coa-modal-inp" id="masterCustomerName" placeholder="e.g. Acme Corp / Rahul Sharma / TechNova Ltd" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
-            <div id="masterCustomerNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            <!-- Additional customers (added row-by-row via the Add button, like Create Group) -->
+            <div id="masterCustomerExtraRowsContainer"></div>
+
+            <!-- Add another customer — shown once the last row's Name is filled in -->
+            <div id="masterCustomerAddRowWrap" style="display: none; margin: -4px 0 16px 0;">
+              <button type="button" id="masterCustomerAddRowBtn" title="Add another customer" style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; color: var(--blue-600); background: #ffffff; border: 1.5px dashed var(--blue-600); border-radius: 8px; cursor: pointer; transition: all 0.15s ease;">＋ Add Another Customer</button>
+            </div>
+
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <button class="btn btn-primary" id="masterCustomerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Create Customer</button>
+              <button class="btn btn-secondary" id="masterCustomerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+            </div>
           </div>
 
-          <!-- Also Known As field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
-            <div id="masterCustomerAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
-            <button type="button" id="masterCustomerAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Add A.K.A
-            </button>
-          </div>
+          <!-- Second box: Opening Balance, Additional Details, then Alternate Names once Name is filled in -->
+          <div class="coa-modal-card" id="masterCustomerSidePanel" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            <label class="coa-modal-label" for="masterCustomerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
+            <input class="coa-modal-inp" id="masterCustomerBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
 
-          <!-- Additional Information (Party Profile) -->
-          <div id="masterCustomerAdditionalInfoWrap" style="background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px;">
-            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
-              <div style="display: flex; align-items: center; gap: 7px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span>Additional Information</span>
-              </div>
-              <span style="font-size: 11px; font-weight: 600; background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; border: 1px solid #dbeafe;">Trade Receivables</span>
-            </div>
-
-            <!-- 1. Address & Location Details -->
-            <div style="margin-bottom: 16px;">
-              <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                  <circle cx="12" cy="10" r="3"></circle>
-                </svg>
-                Name & Address
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div>
-                  <input type="text" id="masterCustomerContactName" placeholder="Contact Person / Trade Name (Optional)" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-                <div>
-                  <textarea id="masterCustomerAddress" placeholder="Street Address / Building / Area" rows="2" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; resize: vertical; font-family: inherit; outline: none; background: #fff;"></textarea>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterCustomerCity" placeholder="City / Town" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterCustomerPincode" placeholder="PIN / Postal Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterCustomerState" placeholder="State (e.g. Maharashtra)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterCustomerCountry" placeholder="Country" value="India" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-              </div>
-            </div>
-
-            <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
-
-            <!-- 2. Bank Information -->
-            <div style="margin-bottom: 16px;">
-              <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                  <line x1="2" y1="10" x2="22" y2="10"></line>
-                </svg>
-                Bank Information
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterCustomerBankName" placeholder="Bank Name (e.g. HDFC Bank)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterCustomerAccountNo" placeholder="Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterCustomerIfsc" placeholder="IFSC Code (e.g. HDFC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
-                  <input type="text" id="masterCustomerBranch" placeholder="Branch Name (Optional)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-              </div>
-            </div>
-
-            <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
-
-            <!-- 3. Tax Details (GSTIN & PAN) -->
-            <div>
-              <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div style="margin-top: 16px;">
+              <button type="button" class="btn btn-secondary" id="masterCustomerAddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                   <polyline points="14 2 14 8 20 8"></polyline>
                   <line x1="16" y1="13" x2="8" y2="13"></line>
                   <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10 9 9 9 8 9"></polyline>
                 </svg>
-                GSTIN & PAN
+                Additional Details
+              </button>
+            </div>
+
+            <!-- Alternate Name — one box per alias, auto-adding another below as you type (no limit) -->
+            <div id="masterCustomerAkaPanel" style="display: none; margin-top: 16px;">
+              <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Alternate Name</label>
+              <div id="masterCustomerAliasesContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Additional Details popup (Name & Address, Bank Information, GSTIN & PAN) -->
+        <style>
+          /* Popup fields fill their grid column instead of overflowing it on narrow screens */
+          #masterCustomerAddlModal .master-customer-addl-body input:not([type=hidden]):not([type=file]),
+          #masterCustomerAddlModal .master-customer-addl-body textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+        </style>
+        <div class="oh-modal-overlay" id="masterCustomerAddlModal" style="display: none;">
+          <div style="background: var(--white); border-radius: 14px; width: 94%; max-width: 640px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 40px 100px rgba(0,0,0,.24);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--slate-200);">
+              <div style="min-width: 0;">
+                <div style="font-size: 15px; font-weight: 700; color: var(--slate-800);">Additional Details</div>
+                <div id="masterCustomerAddlModalSub" style="font-size: 12.5px; color: var(--slate-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <input type="text" id="masterCustomerGstin" placeholder="GSTIN (e.g. 27AAAAA0000A1Z5)" maxlength="15" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
-                <input type="text" id="masterCustomerPan" placeholder="PAN (e.g. AAAAA0000A)" maxlength="10" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+              <button type="button" class="oh-modal-close" id="masterCustomerAddlCloseBtn" title="Close">✕</button>
+            </div>
+
+            <div class="master-customer-addl-body" style="padding: 20px 24px; overflow-y: auto; overflow-x: hidden;">
+              <!-- 1. Address & Location Details -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  Name & Address
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <input type="text" id="masterCustomerContactName" placeholder="Enter Contact Person" style="${custInpStyle}">
+                  <textarea id="masterCustomerAddress" placeholder="Enter Address" rows="2" style="${custInpStyle} resize: vertical; font-family: inherit;"></textarea>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterCustomerCity" placeholder="Enter City" style="${custInpStyle}">
+                    <input type="text" id="masterCustomerPincode" placeholder="Enter PIN Code" style="${custInpStyle}">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterCustomerState" placeholder="Enter State" style="${custInpStyle}">
+                    <input type="text" id="masterCustomerCountry" placeholder="Enter Country" value="India" style="${custInpStyle}">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 2. Bank Information -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                  Bank Information
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterCustomerBankName" placeholder="Enter Bank Name" style="${custInpStyle}">
+                    <input type="text" id="masterCustomerAccountNo" placeholder="Enter Account Number" style="${custInpStyle}">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterCustomerIfsc" placeholder="Enter IFSC Code" style="${custInpStyle} text-transform: uppercase;">
+                    <input type="text" id="masterCustomerBranch" placeholder="Enter Branch" style="${custInpStyle}">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 3. Tax Details (GSTIN & PAN) -->
+              <div>
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  GSTIN & PAN
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <input type="text" id="masterCustomerGstin" placeholder="Enter GSTIN" maxlength="15" style="${custInpStyle} text-transform: uppercase;">
+                  <input type="text" id="masterCustomerPan" placeholder="Enter PAN" maxlength="10" style="${custInpStyle} text-transform: uppercase;">
+                </div>
               </div>
             </div>
 
-          </div>
-
-          <!-- Opening Balance field (Optional) -->
-          <div class="coa-modal-fg" style="margin-bottom: 24px;">
-            <label class="coa-modal-label" for="masterCustomerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance (Optional)</label>
-            <input class="coa-modal-inp" id="masterCustomerBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
-          </div>
-
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <button class="btn btn-primary" id="masterCustomerSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">＋ Create Customer</button>
-            <button class="btn btn-secondary" id="masterCustomerCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--slate-200);">
+              <button type="button" class="btn btn-primary" id="masterCustomerAddlDoneBtn" style="height: 38px; padding: 8px 18px; font-size: 13px; font-weight: 600;">Done</button>
+            </div>
           </div>
         </div>
       `;
 
       renderMasterCustomerAliases();
-
-      const addAliasBtn = contentArea.querySelector('#masterCustomerAddAliasBtn');
-      if (addAliasBtn) {
-        addAliasBtn.addEventListener('click', () => {
-          _masterCustomerAliases.push('');
-          renderMasterCustomerAliases();
-          const inputs = contentArea.querySelectorAll('.master-alias-input');
-          if (inputs.length) {
-            inputs[inputs.length - 1].focus();
-          }
-        });
-      }
 
       // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
       wireGstinPanValidation(contentArea, 'masterCustomerGstin', 'masterCustomerPan');
@@ -4442,32 +5558,260 @@
       const saveBtn = contentArea.querySelector('#masterCustomerSaveBtn');
       const cancelBtn = contentArea.querySelector('#masterCustomerCancelBtn');
       const nameInp = contentArea.querySelector('#masterCustomerName');
-      const nameErr = contentArea.querySelector('#masterCustomerNameError');
+      const custBalanceInp = contentArea.querySelector('#masterCustomerBalance');
+      const extraCustRowsContainer = contentArea.querySelector('#masterCustomerExtraRowsContainer');
+      const custAddRowWrap = contentArea.querySelector('#masterCustomerAddRowWrap');
+      const custAddRowBtn = contentArea.querySelector('#masterCustomerAddRowBtn');
 
-      const validateCustomerNameInputLive = () => {
-        const val = nameInp ? nameInp.value.trim() : '';
+      const custRowNameInput = (idx) => contentArea.querySelector('#masterCustomerName' + (idx ? idx : ''));
+      const activeCustNameInp = () => custRowNameInput(_masterCustomerActiveRowIdx || 0);
+
+      // ── Additional Details popup ──
+      const custAddlModal = contentArea.querySelector('#masterCustomerAddlModal');
+      const custAddlModalSub = contentArea.querySelector('#masterCustomerAddlModalSub');
+      const openCustomerAddlModal = () => {
+        if (!custAddlModal) return;
+        if (custAddlModalSub) {
+          const inp = activeCustNameInp();
+          const nameVal = inp ? inp.value.trim() : '';
+          custAddlModalSub.textContent = nameVal ? `${nameVal} · Trade Receivables` : 'Trade Receivables';
+        }
+        custAddlModal.style.display = 'flex';
+      };
+      const closeCustomerAddlModal = () => {
+        if (custAddlModal) custAddlModal.style.display = 'none';
+      };
+      const custAddlBtn = contentArea.querySelector('#masterCustomerAddlBtn');
+      if (custAddlBtn) custAddlBtn.addEventListener('click', openCustomerAddlModal);
+      ['#masterCustomerAddlCloseBtn', '#masterCustomerAddlDoneBtn'].forEach(sel => {
+        const btn = contentArea.querySelector(sel);
+        if (btn) btn.addEventListener('click', closeCustomerAddlModal);
+      });
+      if (custAddlModal) {
+        // Click on the dimmed backdrop (outside the card) closes the popup
+        custAddlModal.addEventListener('mousedown', (e) => {
+          if (e.target === custAddlModal) closeCustomerAddlModal();
+        });
+        custAddlModal.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            closeCustomerAddlModal();
+          }
+        });
+      }
+
+      // ── Per-row state (like Create Ledger): the side box and popup always show the
+      // active row; other rows' values are parked in _masterCustomerRowState ──
+      const CUSTOMER_ADDL_FIELD_DEFAULTS = {
+        masterCustomerContactName: '', masterCustomerAddress: '', masterCustomerCity: '', masterCustomerPincode: '',
+        masterCustomerState: '', masterCustomerCountry: 'India',
+        masterCustomerBankName: '', masterCustomerAccountNo: '', masterCustomerIfsc: '', masterCustomerBranch: '',
+        masterCustomerGstin: '', masterCustomerPan: ''
+      };
+      const newCustomerRowState = () => ({
+        aliases: [],
+        balance: '',
+        fields: Object.assign({}, CUSTOMER_ADDL_FIELD_DEFAULTS)
+      });
+
+      const captureActiveCustomerRow = () => {
+        if (_masterCustomerActiveRowIdx === null) return;
+        const st = _masterCustomerRowState[_masterCustomerActiveRowIdx] || newCustomerRowState();
+        st.aliases = _masterCustomerAliases;
+        st.balance = custBalanceInp ? custBalanceInp.value : '';
+        Object.keys(CUSTOMER_ADDL_FIELD_DEFAULTS).forEach(id => {
+          const el = contentArea.querySelector('#' + id);
+          if (el) st.fields[id] = el.value;
+        });
+        _masterCustomerRowState[_masterCustomerActiveRowIdx] = st;
+      };
+
+      const loadCustomerRowState = (idx) => {
+        const st = _masterCustomerRowState[idx] || newCustomerRowState();
+        _masterCustomerRowState[idx] = st;
+        if (custBalanceInp) custBalanceInp.value = st.balance;
+        Object.keys(CUSTOMER_ADDL_FIELD_DEFAULTS).forEach(id => {
+          const el = contentArea.querySelector('#' + id);
+          if (el) el.value = st.fields[id] !== undefined ? st.fields[id] : CUSTOMER_ADDL_FIELD_DEFAULTS[id];
+        });
+        // Refresh the GSTIN / PAN validity hints for the loaded values
+        ['#masterCustomerGstin', '#masterCustomerPan'].forEach(sel => {
+          const el = contentArea.querySelector(sel);
+          if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        _masterCustomerAliases = st.aliases;
+      };
+
+      // Shows / hides the Alternate Name boxes for the active row based on its Name
+      const syncCustomerAkaPanel = () => {
+        const inp = activeCustNameInp();
+        const nameVal = inp ? inp.value.trim() : '';
+        const akaPanel = contentArea.querySelector('#masterCustomerAkaPanel');
+        if (!nameVal) {
+          if (akaPanel) akaPanel.style.display = 'none';
+          if (_masterCustomerAliases.every(a => a.trim() === '')) {
+            _masterCustomerAliases = [];
+            renderMasterCustomerAliases();
+          }
+          return;
+        }
+        validateMasterCustomerAliasesLive();
+        if (_masterCustomerAliases.length === 0) {
+          _masterCustomerAliases.push('');
+          renderMasterCustomerAliases();
+        } else if (akaPanel) {
+          akaPanel.style.display = 'block';
+        }
+      };
+
+      const setActiveCustomerRow = (idx) => {
+        if (idx === _masterCustomerActiveRowIdx) return;
+        captureActiveCustomerRow();
+        _masterCustomerActiveRowIdx = idx;
+        loadCustomerRowState(idx);
+        renderMasterCustomerAliases();
+        syncCustomerAkaPanel();
+      };
+
+      // Live "already exists" check for a row's Name (row 0 is the first row)
+      const validateCustomerRowNameLive = (idx) => {
+        const inp = custRowNameInput(idx);
+        const err = contentArea.querySelector('#masterCustomerName' + (idx ? idx : '') + 'Error');
+        const val = inp ? inp.value.trim() : '';
+        const setErr = (text) => {
+          if (err) { err.textContent = text || ''; err.style.display = text ? 'block' : 'none'; }
+          if (inp) inp.style.borderColor = text ? '#ef4444' : 'var(--slate-200)';
+        };
         if (!val) {
-          if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
-          if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+          setErr('');
           return null;
         }
-
         const dup = findDuplicateCoaNameOrAlias(val);
         if (dup) {
           const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
           const errorText = `"${val}" already exists (${typeLabel}).`;
-          if (nameErr) {
-            nameErr.textContent = errorText;
-            nameErr.style.display = 'block';
-          }
-          if (nameInp) nameInp.style.borderColor = '#ef4444';
+          setErr(errorText);
           return errorText;
-        } else {
-          if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
-          if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
-          return null;
+        }
+        setErr('');
+        return null;
+      };
+
+      // Customer count (1, 2, 3...) in the right corner of the Back bar
+      const renderCustomerCount = () => {
+        const countWrap = document.getElementById('masterDeskBackBarGroupCount');
+        if (!countWrap) return;
+        const count = 1 + _masterCustomerExtraRowKeys.length;
+        countWrap.innerHTML = `<span title="Customers in this form" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-family: var(--font-main); font-size: 12.5px; font-weight: 600;">${count}</span>`;
+      };
+
+      // Shows the "Add Another Customer" button only when the last row's Name has a value.
+      const refreshCustomerAddRowBtn = () => {
+        renderCustomerCount();
+        if (!custAddRowWrap) return;
+        const lastIdx = _masterCustomerExtraRowKeys.length ? _masterCustomerExtraRowKeys[_masterCustomerExtraRowKeys.length - 1] : 0;
+        const lastInp = custRowNameInput(lastIdx);
+        custAddRowWrap.style.display = lastInp && lastInp.value.trim() ? 'block' : 'none';
+      };
+
+      const wireCustomerDustbinHover = (btn) => {
+        btn.addEventListener('mouseenter', () => {
+          btn.style.background = '#fef2f2';
+          btn.style.color = '#dc2626';
+          btn.style.borderColor = '#fecaca';
+        });
+        btn.addEventListener('mouseleave', () => {
+          btn.style.background = '#ffffff';
+          btn.style.color = 'var(--slate-400)';
+          btn.style.borderColor = 'var(--slate-200)';
+        });
+      };
+
+      const wireCustomerRowRemoveBtn = (idx) => {
+        const btn = extraCustRowsContainer.querySelector('.master-customer-row-remove[data-row-index="' + idx + '"]');
+        if (!btn) return;
+        wireCustomerDustbinHover(btn);
+        btn.addEventListener('click', () => {
+          const rowEl = extraCustRowsContainer.querySelector('.master-customer-row[data-row-index="' + idx + '"]');
+          if (rowEl) rowEl.remove();
+          const pos = _masterCustomerExtraRowKeys.indexOf(idx);
+          const prevIdx = pos > 0 ? _masterCustomerExtraRowKeys[pos - 1] : 0;
+          _masterCustomerExtraRowKeys = _masterCustomerExtraRowKeys.filter(k => k !== idx);
+          delete _masterCustomerRowState[idx];
+          if (_masterCustomerActiveRowIdx === idx) {
+            // Removed row's values go with it — switch the side box to the row above
+            _masterCustomerActiveRowIdx = null;
+            setActiveCustomerRow(prevIdx);
+            const prevInp = custRowNameInput(prevIdx);
+            if (prevInp) prevInp.focus();
+          } else {
+            validateMasterCustomerAliasesLive();
+          }
+          refreshCustomerAddRowBtn();
+        });
+      };
+
+      const wireCustomerRowInputs = (idx) => {
+        const rowNameInp = custRowNameInput(idx);
+        if (!rowNameInp) return;
+        rowNameInp.addEventListener('focus', () => setActiveCustomerRow(idx));
+        rowNameInp.addEventListener('input', () => {
+          setActiveCustomerRow(idx);
+          validateCustomerRowNameLive(idx);
+          syncCustomerAkaPanel();
+          refreshCustomerAddRowBtn();
+        });
+      };
+
+      const addNextCustomerRow = () => {
+        _masterCustomerExtraRowSeq++;
+        const idx = _masterCustomerExtraRowSeq;
+        extraCustRowsContainer.insertAdjacentHTML('beforeend', buildCustomerRowHtml(idx));
+        _masterCustomerRowState[idx] = newCustomerRowState();
+        wireCustomerRowInputs(idx);
+        wireCustomerRowRemoveBtn(idx);
+        _masterCustomerExtraRowKeys.push(idx);
+        refreshCustomerAddRowBtn();
+        const newNameInp = custRowNameInput(idx);
+        if (newNameInp) {
+          newNameInp.focus();
+          setActiveCustomerRow(idx);
         }
       };
+
+      if (custAddRowBtn) {
+        custAddRowBtn.addEventListener('mouseenter', () => { custAddRowBtn.style.background = 'var(--blue-50, #eff6ff)'; });
+        custAddRowBtn.addEventListener('mouseleave', () => { custAddRowBtn.style.background = '#ffffff'; });
+        custAddRowBtn.addEventListener('click', addNextCustomerRow);
+      }
+
+      // First row's dustbin: with more rows below, removes this customer and moves the next
+      // row (Name and its side-box values) up; on its own, just clears it.
+      const custCleanBtn = contentArea.querySelector('#masterCustomerRowCleanBtn');
+      if (custCleanBtn) {
+        wireCustomerDustbinHover(custCleanBtn);
+        custCleanBtn.addEventListener('click', () => {
+          captureActiveCustomerRow();
+          if (_masterCustomerExtraRowKeys.length > 0) {
+            const nextIdx = _masterCustomerExtraRowKeys[0];
+            const nextNameInp = custRowNameInput(nextIdx);
+            if (nameInp) nameInp.value = nextNameInp ? nextNameInp.value : '';
+            _masterCustomerRowState[0] = _masterCustomerRowState[nextIdx] || newCustomerRowState();
+            delete _masterCustomerRowState[nextIdx];
+            const nextRowEl = extraCustRowsContainer.querySelector('.master-customer-row[data-row-index="' + nextIdx + '"]');
+            if (nextRowEl) nextRowEl.remove();
+            _masterCustomerExtraRowKeys = _masterCustomerExtraRowKeys.slice(1);
+          } else {
+            if (nameInp) nameInp.value = '';
+            _masterCustomerRowState[0] = newCustomerRowState();
+          }
+          _masterCustomerActiveRowIdx = null;
+          setActiveCustomerRow(0);
+          validateCustomerRowNameLive(0);
+          refreshCustomerAddRowBtn();
+          if (nameInp) nameInp.focus();
+        });
+      }
 
       if (nameInp) {
         nameInp.addEventListener('keydown', (e) => {
@@ -4485,104 +5829,104 @@
             }
           }
         });
-        nameInp.addEventListener('input', () => {
-          validateCustomerNameInputLive();
-          validateMasterCustomerAliasesLive();
-        });
       }
+
+      _masterCustomerRowState[0] = newCustomerRowState();
+      wireCustomerRowInputs(0);
+      refreshCustomerAddRowBtn();
 
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-          const name = nameInp ? nameInp.value.trim() : '';
-          if (!name) {
-            if (typeof showToast === 'function') showToast('Please enter a customer name.', 'warning');
-            else alert('Please enter a customer name.');
-            if (nameInp) nameInp.focus();
-            return;
-          }
-
-          const liveNameErr = validateCustomerNameInputLive();
-          if (liveNameErr) {
-            if (typeof showToast === 'function') showToast(liveNameErr, 'error');
-            else alert(liveNameErr);
-            if (nameInp) nameInp.focus();
-            return;
-          }
-
-          const aliasesValid = validateMasterCustomerAliasesLive();
-          if (!aliasesValid) {
-            const msg = 'Please fix duplicate or invalid Also Known As entries.';
-            if (typeof showToast === 'function') showToast(msg, 'error');
+          const notify = (msg, type) => {
+            if (typeof showToast === 'function') showToast(msg, type);
             else alert(msg);
-            return;
-          }
-
-          const aliases = _masterCustomerAliases.map(a => a.trim()).filter(a => a !== '');
-
-          const formNamesSet = new Set([name.toLowerCase()]);
-          for (let i = 0; i < aliases.length; i++) {
-            const al = aliases[i];
-            const alLower = al.toLowerCase();
-
-            if (formNamesSet.has(alLower)) {
-              const msg = `Duplicate entry "${al}" found in the form. Name and A.K.A must be unique.`;
-              if (typeof showToast === 'function') showToast(msg, 'error');
-              else alert(msg);
-              return;
-            }
-            formNamesSet.add(alLower);
-
-            const dupAl = findDuplicateCoaNameOrAlias(al);
-            if (dupAl) {
-              const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
-              const msg = `"${al}" already exists (${typeLabel}).`;
-              if (typeof showToast === 'function') showToast(msg, 'error');
-              else alert(msg);
-              return;
-            }
-          }
-
-          const balInp = contentArea.querySelector('#masterCustomerBalance');
-          const balVal = balInp ? balInp.value.trim() : '';
-          const openingBalance = balVal ? parseFloat(balVal) || 0 : 0;
-
-          // Additional Information fields
-          const contactName = contentArea.querySelector('#masterCustomerContactName')?.value?.trim() || '';
-          const address = contentArea.querySelector('#masterCustomerAddress')?.value?.trim() || '';
-          const city = contentArea.querySelector('#masterCustomerCity')?.value?.trim() || '';
-          const pincode = contentArea.querySelector('#masterCustomerPincode')?.value?.trim() || '';
-          const state = contentArea.querySelector('#masterCustomerState')?.value?.trim() || '';
-          const country = contentArea.querySelector('#masterCustomerCountry')?.value?.trim() || '';
-          const bankName = contentArea.querySelector('#masterCustomerBankName')?.value?.trim() || '';
-          const accountNo = contentArea.querySelector('#masterCustomerAccountNo')?.value?.trim() || '';
-          const ifsc = contentArea.querySelector('#masterCustomerIfsc')?.value?.trim() || '';
-          const branch = contentArea.querySelector('#masterCustomerBranch')?.value?.trim() || '';
-          const gstin = contentArea.querySelector('#masterCustomerGstin')?.value?.trim() || '';
-          const pan = contentArea.querySelector('#masterCustomerPan')?.value?.trim() || '';
-
-          // Save into Customer Directory (does NOT create separate CoA ledger)
-          const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-          const newCustomer = {
-            id: 'cust-' + Date.now(),
-            name: name,
-            aliases: aliases,
-            openingBalance: openingBalance,
-            contactName: contactName,
-            address: address,
-            city: city,
-            pincode: pincode,
-            state: state,
-            country: country,
-            bankName: bankName,
-            accountNo: accountNo,
-            ifsc: ifsc,
-            branch: branch,
-            gstin: gstin,
-            pan: pan,
-            createdAt: Date.now()
           };
 
-          customers.push(newCustomer);
+          // Check the active row's Alternate Names (the ones currently on screen)
+          if (!validateMasterCustomerAliasesLive()) {
+            notify('Please fix duplicate or invalid Alternate Name entries.', 'error');
+            return;
+          }
+          captureActiveCustomerRow();
+
+          const rowIdxs = [0, ..._masterCustomerExtraRowKeys];
+          const formNamesSet = new Set();
+          const rows = [];
+
+          for (const idx of rowIdxs) {
+            const rowNameInp = custRowNameInput(idx);
+            const rowName = rowNameInp ? rowNameInp.value.trim() : '';
+            const st = _masterCustomerRowState[idx] || newCustomerRowState();
+
+            if (!rowName) {
+              // A trailing row left empty is just unfilled — it's skipped, not an error
+              if (idx !== 0) continue;
+              notify('Please enter a customer name.', 'warning');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+
+            const nameErrText = validateCustomerRowNameLive(idx);
+            if (nameErrText) {
+              notify(nameErrText, 'error');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+
+            const nameLower = rowName.toLowerCase();
+            if (formNamesSet.has(nameLower)) {
+              notify(`Duplicate entry "${rowName}" found in the form. Each customer name must be unique.`, 'error');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+            formNamesSet.add(nameLower);
+
+            const aliases = (st.aliases || []).map(a => a.trim()).filter(a => a !== '');
+            for (const al of aliases) {
+              const alLower = al.toLowerCase();
+              if (formNamesSet.has(alLower)) {
+                notify(`Duplicate entry "${al}" found in the form (Alternate Name of "${rowName}"). Names and Alternate Names must be unique.`, 'error');
+                return;
+              }
+              formNamesSet.add(alLower);
+              const dupAl = findDuplicateCoaNameOrAlias(al);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                notify(`"${al}" (Alternate Name of "${rowName}") already exists (${typeLabel}).`, 'error');
+                return;
+              }
+            }
+
+            const balVal = (st.balance || '').toString().trim();
+            rows.push({ name: rowName, aliases: aliases, openingBalance: balVal ? parseFloat(balVal) || 0 : 0, fields: st.fields });
+          }
+
+          // Save into Customer Directory (does NOT create separate CoA ledgers)
+          const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+          const created = rows.map((row, i) => {
+            const val = (id) => (row.fields[id] || '').trim();
+            const newCustomer = {
+              id: 'cust-' + Date.now() + (i ? '-' + i : ''),
+              name: row.name,
+              aliases: row.aliases,
+              openingBalance: row.openingBalance,
+              contactName: val('masterCustomerContactName'),
+              address: val('masterCustomerAddress'),
+              city: val('masterCustomerCity'),
+              pincode: val('masterCustomerPincode'),
+              state: val('masterCustomerState'),
+              country: val('masterCustomerCountry'),
+              bankName: val('masterCustomerBankName'),
+              accountNo: val('masterCustomerAccountNo'),
+              ifsc: val('masterCustomerIfsc'),
+              branch: val('masterCustomerBranch'),
+              gstin: val('masterCustomerGstin'),
+              pan: val('masterCustomerPan'),
+              createdAt: Date.now()
+            };
+            customers.push(newCustomer);
+            return newCustomer;
+          });
 
           // Ensure central Trade Receivables ledger exists in CoA and update combined balance
           if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
@@ -4591,8 +5935,7 @@
               trLedger = { id: 104, name: 'Trade Receivables', sgId: 'sg-tr', type: 'ledger', openingBalance: 0 };
               coaLedgers.push(trLedger);
             }
-            const totalCustOp = customers.reduce((sum, c) => sum + (parseFloat(c.openingBalance) || 0), 0);
-            trLedger.openingBalance = totalCustOp;
+            trLedger.openingBalance = customers.reduce((sum, c) => sum + (parseFloat(c.openingBalance) || 0), 0);
           }
 
           if (typeof _coaExpanded !== 'undefined') {
@@ -4605,22 +5948,23 @@
           if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
           if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
 
-          showToast(`Customer "${name}" created successfully (linked to Trade Receivables).`, 'success');
+          if (created.length > 1) {
+            notify(`${created.length} customers created successfully (linked to Trade Receivables).`, 'success');
+          } else {
+            notify(`Customer "${created[0].name}" created successfully (linked to Trade Receivables).`, 'success');
+          }
 
           _masterCustomerAliases = [];
+          const firstCustomer = created[0];
 
           if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'sales_voucher') {
-            const ctx = _masterDeskReturnContext;
             _masterDeskReturnContext = null;
-            _masterCustomerAliases = [];
-
             if (typeof closeTab === 'function') closeTab('master_desk', null, 'sales_voucher');
             else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'sales_voucher');
             if (typeof openTab === 'function') openTab('sales_voucher');
             else if (typeof window.openTab === 'function') window.openTab('sales_voucher');
-
             if (typeof window.onPartyCreatedForSales === 'function') {
-              window.onPartyCreatedForSales(newCustomer, 'customer');
+              window.onPartyCreatedForSales(firstCustomer, 'customer');
             }
             return;
           }
@@ -4628,15 +5972,12 @@
           if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'cashline') {
             const ctx = _masterDeskReturnContext;
             _masterDeskReturnContext = null;
-            _masterCustomerAliases = [];
-
             if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
             else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
             if (typeof openTab === 'function') openTab('cashline');
             else if (typeof window.openTab === 'function') window.openTab('cashline');
-
             if (typeof window.onPartyCreatedForCashline === 'function') {
-              window.onPartyCreatedForCashline(newCustomer, 'customer', ctx);
+              window.onPartyCreatedForCashline(firstCustomer, 'customer', ctx);
             }
             return;
           }
@@ -4654,150 +5995,183 @@
       }
     } else if (currentMasterDeskSubtype === 'Create' && currentMasterDeskTab === 'suppliers') {
       _masterSupplierAliases = [];
+      _masterSupplierRowState = {};
+      _masterSupplierActiveRowIdx = 0;
+      _masterSupplierExtraRowKeys = [];
+      _masterSupplierExtraRowSeq = 0;
+
+      const suppDustbinSvg = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18"/>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>`;
+
+      // One "Name" row of the Create Supplier form. idx 0 is the first row (ids without a
+      // suffix, with a "clean" dustbin); rows added with "Add Another Supplier" get a
+      // numeric suffix and a "remove" dustbin — same look as Create Group / Ledger rows.
+      const buildSupplierRowHtml = (idx) => {
+        const sfx = idx ? String(idx) : '';
+        const btnClass = idx ? 'master-supplier-row-remove' : 'master-supplier-row-clean';
+        const btnId = idx ? '' : 'id="masterSupplierRowCleanBtn"';
+        const btnTitle = idx ? 'Remove this supplier' : 'Clean this supplier';
+        return `
+          <div class="master-supplier-row" data-row-index="${idx}" style="display: grid; grid-template-columns: minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+            <div>
+              <label class="coa-modal-label" for="masterSupplierName${sfx}" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
+              <input class="coa-modal-inp" id="masterSupplierName${sfx}" placeholder="Enter Name" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
+              <div id="masterSupplierName${sfx}Error" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            </div>
+            <div>
+              <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+              <button type="button" class="${btnClass}" ${btnId} data-row-index="${idx}" title="${btnTitle}" style="width: 38px; height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #ffffff; color: var(--slate-400); cursor: pointer; transition: all 0.15s ease;">
+                ${suppDustbinSvg}
+              </button>
+            </div>
+          </div>
+        `;
+      };
+
+      const suppInpStyle = 'padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;';
 
       contentArea.innerHTML = `
-        <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
-          <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 18px 0; display: flex; align-items: center; gap: 8px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="1" y="3" width="15" height="13"></rect>
-              <polygon points="16 8 20 8 23 11 23 16 16 8"></polygon>
-              <circle cx="5.5" cy="18.5" r="2.5"></circle>
-              <circle cx="18.5" cy="18.5" r="2.5"></circle>
-            </svg>
-            Create Supplier / Vendor
-          </h3>
+        <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+          <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            ${buildSupplierRowHtml(0)}
 
-          <!-- Name field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" for="masterSupplierName" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Name *</label>
-            <input class="coa-modal-inp" id="masterSupplierName" placeholder="e.g. Apex Industries / Global Supplies Ltd" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
-            <div id="masterSupplierNameError" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+            <!-- Additional suppliers (added row-by-row via the Add button, like Create Group) -->
+            <div id="masterSupplierExtraRowsContainer"></div>
+
+            <!-- Add another supplier — shown once the last row's Name is filled in -->
+            <div id="masterSupplierAddRowWrap" style="display: none; margin: -4px 0 16px 0;">
+              <button type="button" id="masterSupplierAddRowBtn" title="Add another supplier" style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; color: var(--blue-600); background: #ffffff; border: 1.5px dashed var(--blue-600); border-radius: 8px; cursor: pointer; transition: all 0.15s ease;">＋ Add Another Supplier</button>
+            </div>
+
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <button class="btn btn-primary" id="masterSupplierSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Create Supplier</button>
+              <button class="btn btn-secondary" id="masterSupplierCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+            </div>
           </div>
 
-          <!-- Also Known As field -->
-          <div class="coa-modal-fg" style="margin-bottom: 16px;">
-            <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Also Known As</label>
-            <div id="masterSupplierAliasesContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;"></div>
-            <button type="button" id="masterSupplierAddAliasBtn" style="padding: 7px 14px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--slate-300); border-radius: 8px; background: #f8fafc; cursor: pointer; color: var(--slate-600); transition: all 0.15s ease;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Add A.K.A
-            </button>
-          </div>
+          <!-- Second box: Opening Balance, Additional Details, then Alternate Names once Name is filled in -->
+          <div class="coa-modal-card" id="masterSupplierSidePanel" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+            <label class="coa-modal-label" for="masterSupplierBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
+            <input class="coa-modal-inp" id="masterSupplierBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
 
-          <!-- Additional Information (Party Profile) -->
-          <div id="masterSupplierAdditionalInfoWrap" style="background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px;">
-            <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
-              <div style="display: flex; align-items: center; gap: 7px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span>Additional Information</span>
-              </div>
-              <span style="font-size: 11px; font-weight: 600; background: #f0fdf4; color: #15803d; padding: 2px 8px; border-radius: 12px; border: 1px solid #bbf7d0;">Trade Payables</span>
-            </div>
-
-            <!-- 1. Address & Location Details -->
-            <div style="margin-bottom: 16px;">
-              <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                  <circle cx="12" cy="10" r="3"></circle>
-                </svg>
-                Name & Address
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div>
-                  <input type="text" id="masterSupplierContactName" placeholder="Contact Person / Trade Name (Optional)" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-                <div>
-                  <textarea id="masterSupplierAddress" placeholder="Street Address / Building / Area" rows="2" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; resize: vertical; font-family: inherit; outline: none; background: #fff;"></textarea>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterSupplierCity" placeholder="City / Town" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterSupplierPincode" placeholder="PIN / Postal Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterSupplierState" placeholder="State (e.g. Maharashtra)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterSupplierCountry" placeholder="Country" value="India" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-              </div>
-            </div>
-
-            <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
-
-            <!-- 2. Bank Information -->
-            <div style="margin-bottom: 16px;">
-              <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                  <line x1="2" y1="10" x2="22" y2="10"></line>
-                </svg>
-                Bank Information
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterSupplierBankName" placeholder="Bank Name (e.g. ICICI Bank)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <input type="text" id="masterSupplierAccountNo" placeholder="Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                  <input type="text" id="masterSupplierIfsc" placeholder="IFSC Code (e.g. ICIC0001234)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
-                  <input type="text" id="masterSupplierBranch" placeholder="Branch Name (Optional)" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                </div>
-              </div>
-            </div>
-
-            <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
-
-            <!-- 3. Tax Details (GSTIN & PAN) -->
-            <div>
-              <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <div style="margin-top: 16px;">
+              <button type="button" class="btn btn-secondary" id="masterSupplierAddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                   <polyline points="14 2 14 8 20 8"></polyline>
                   <line x1="16" y1="13" x2="8" y2="13"></line>
                   <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10 9 9 9 8 9"></polyline>
                 </svg>
-                GSTIN & PAN
+                Additional Details
+              </button>
+            </div>
+
+            <!-- Alternate Name — one box per alias, auto-adding another below as you type (no limit) -->
+            <div id="masterSupplierAkaPanel" style="display: none; margin-top: 16px;">
+              <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Alternate Name</label>
+              <div id="masterSupplierAliasesContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Additional Details popup (Name & Address, Bank Information, GSTIN & PAN) -->
+        <style>
+          /* Popup fields fill their grid column instead of overflowing it on narrow screens */
+          #masterSupplierAddlModal .master-supplier-addl-body input:not([type=hidden]):not([type=file]),
+          #masterSupplierAddlModal .master-supplier-addl-body textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+        </style>
+        <div class="oh-modal-overlay" id="masterSupplierAddlModal" style="display: none;">
+          <div style="background: var(--white); border-radius: 14px; width: 94%; max-width: 640px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 40px 100px rgba(0,0,0,.24);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--slate-200);">
+              <div style="min-width: 0;">
+                <div style="font-size: 15px; font-weight: 700; color: var(--slate-800);">Additional Details</div>
+                <div id="masterSupplierAddlModalSub" style="font-size: 12.5px; color: var(--slate-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <input type="text" id="masterSupplierGstin" placeholder="GSTIN (e.g. 27AAAAA0000A1Z5)" maxlength="15" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
-                <input type="text" id="masterSupplierPan" placeholder="PAN (e.g. AAAAA0000A)" maxlength="10" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+              <button type="button" class="oh-modal-close" id="masterSupplierAddlCloseBtn" title="Close">✕</button>
+            </div>
+
+            <div class="master-supplier-addl-body" style="padding: 20px 24px; overflow-y: auto; overflow-x: hidden;">
+              <!-- 1. Address & Location Details -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  Name & Address
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <input type="text" id="masterSupplierContactName" placeholder="Enter Contact Person" style="${suppInpStyle}">
+                  <textarea id="masterSupplierAddress" placeholder="Enter Address" rows="2" style="${suppInpStyle} resize: vertical; font-family: inherit;"></textarea>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterSupplierCity" placeholder="Enter City" style="${suppInpStyle}">
+                    <input type="text" id="masterSupplierPincode" placeholder="Enter PIN Code" style="${suppInpStyle}">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterSupplierState" placeholder="Enter State" style="${suppInpStyle}">
+                    <input type="text" id="masterSupplierCountry" placeholder="Enter Country" value="India" style="${suppInpStyle}">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 2. Bank Information -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                  Bank Information
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterSupplierBankName" placeholder="Enter Bank Name" style="${suppInpStyle}">
+                    <input type="text" id="masterSupplierAccountNo" placeholder="Enter Account Number" style="${suppInpStyle}">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="masterSupplierIfsc" placeholder="Enter IFSC Code" style="${suppInpStyle} text-transform: uppercase;">
+                    <input type="text" id="masterSupplierBranch" placeholder="Enter Branch" style="${suppInpStyle}">
+                  </div>
+                </div>
+              </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+
+              <!-- 3. Tax Details (GSTIN & PAN) -->
+              <div>
+                <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  GSTIN & PAN
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <input type="text" id="masterSupplierGstin" placeholder="Enter GSTIN" maxlength="15" style="${suppInpStyle} text-transform: uppercase;">
+                  <input type="text" id="masterSupplierPan" placeholder="Enter PAN" maxlength="10" style="${suppInpStyle} text-transform: uppercase;">
+                </div>
               </div>
             </div>
 
-          </div>
-
-          <!-- Opening Balance field (Optional) -->
-          <div class="coa-modal-fg" style="margin-bottom: 24px;">
-            <label class="coa-modal-label" for="masterSupplierBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance (Optional)</label>
-            <input class="coa-modal-inp" id="masterSupplierBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
-          </div>
-
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <button class="btn btn-primary" id="masterSupplierSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">＋ Create Supplier</button>
-            <button class="btn btn-secondary" id="masterSupplierCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--slate-200);">
+              <button type="button" class="btn btn-primary" id="masterSupplierAddlDoneBtn" style="height: 38px; padding: 8px 18px; font-size: 13px; font-weight: 600;">Done</button>
+            </div>
           </div>
         </div>
       `;
 
       renderMasterSupplierAliases();
-
-      const addAliasBtn = contentArea.querySelector('#masterSupplierAddAliasBtn');
-      if (addAliasBtn) {
-        addAliasBtn.addEventListener('click', () => {
-          _masterSupplierAliases.push('');
-          renderMasterSupplierAliases();
-          const inputs = contentArea.querySelectorAll('.master-alias-input');
-          if (inputs.length) {
-            inputs[inputs.length - 1].focus();
-          }
-        });
-      }
 
       // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
       wireGstinPanValidation(contentArea, 'masterSupplierGstin', 'masterSupplierPan');
@@ -4811,32 +6185,260 @@
       const saveBtn = contentArea.querySelector('#masterSupplierSaveBtn');
       const cancelBtn = contentArea.querySelector('#masterSupplierCancelBtn');
       const nameInp = contentArea.querySelector('#masterSupplierName');
-      const nameErr = contentArea.querySelector('#masterSupplierNameError');
+      const suppBalanceInp = contentArea.querySelector('#masterSupplierBalance');
+      const extraCustRowsContainer = contentArea.querySelector('#masterSupplierExtraRowsContainer');
+      const suppAddRowWrap = contentArea.querySelector('#masterSupplierAddRowWrap');
+      const suppAddRowBtn = contentArea.querySelector('#masterSupplierAddRowBtn');
 
-      const validateSupplierNameInputLive = () => {
-        const val = nameInp ? nameInp.value.trim() : '';
+      const suppRowNameInput = (idx) => contentArea.querySelector('#masterSupplierName' + (idx ? idx : ''));
+      const activeCustNameInp = () => suppRowNameInput(_masterSupplierActiveRowIdx || 0);
+
+      // ── Additional Details popup ──
+      const suppAddlModal = contentArea.querySelector('#masterSupplierAddlModal');
+      const suppAddlModalSub = contentArea.querySelector('#masterSupplierAddlModalSub');
+      const openSupplierAddlModal = () => {
+        if (!suppAddlModal) return;
+        if (suppAddlModalSub) {
+          const inp = activeCustNameInp();
+          const nameVal = inp ? inp.value.trim() : '';
+          suppAddlModalSub.textContent = nameVal ? `${nameVal} · Trade Payables` : 'Trade Payables';
+        }
+        suppAddlModal.style.display = 'flex';
+      };
+      const closeSupplierAddlModal = () => {
+        if (suppAddlModal) suppAddlModal.style.display = 'none';
+      };
+      const suppAddlBtn = contentArea.querySelector('#masterSupplierAddlBtn');
+      if (suppAddlBtn) suppAddlBtn.addEventListener('click', openSupplierAddlModal);
+      ['#masterSupplierAddlCloseBtn', '#masterSupplierAddlDoneBtn'].forEach(sel => {
+        const btn = contentArea.querySelector(sel);
+        if (btn) btn.addEventListener('click', closeSupplierAddlModal);
+      });
+      if (suppAddlModal) {
+        // Click on the dimmed backdrop (outside the card) closes the popup
+        suppAddlModal.addEventListener('mousedown', (e) => {
+          if (e.target === suppAddlModal) closeSupplierAddlModal();
+        });
+        suppAddlModal.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            closeSupplierAddlModal();
+          }
+        });
+      }
+
+      // ── Per-row state (like Create Ledger): the side box and popup always show the
+      // active row; other rows' values are parked in _masterSupplierRowState ──
+      const SUPPLIER_ADDL_FIELD_DEFAULTS = {
+        masterSupplierContactName: '', masterSupplierAddress: '', masterSupplierCity: '', masterSupplierPincode: '',
+        masterSupplierState: '', masterSupplierCountry: 'India',
+        masterSupplierBankName: '', masterSupplierAccountNo: '', masterSupplierIfsc: '', masterSupplierBranch: '',
+        masterSupplierGstin: '', masterSupplierPan: ''
+      };
+      const newSupplierRowState = () => ({
+        aliases: [],
+        balance: '',
+        fields: Object.assign({}, SUPPLIER_ADDL_FIELD_DEFAULTS)
+      });
+
+      const captureActiveSupplierRow = () => {
+        if (_masterSupplierActiveRowIdx === null) return;
+        const st = _masterSupplierRowState[_masterSupplierActiveRowIdx] || newSupplierRowState();
+        st.aliases = _masterSupplierAliases;
+        st.balance = suppBalanceInp ? suppBalanceInp.value : '';
+        Object.keys(SUPPLIER_ADDL_FIELD_DEFAULTS).forEach(id => {
+          const el = contentArea.querySelector('#' + id);
+          if (el) st.fields[id] = el.value;
+        });
+        _masterSupplierRowState[_masterSupplierActiveRowIdx] = st;
+      };
+
+      const loadSupplierRowState = (idx) => {
+        const st = _masterSupplierRowState[idx] || newSupplierRowState();
+        _masterSupplierRowState[idx] = st;
+        if (suppBalanceInp) suppBalanceInp.value = st.balance;
+        Object.keys(SUPPLIER_ADDL_FIELD_DEFAULTS).forEach(id => {
+          const el = contentArea.querySelector('#' + id);
+          if (el) el.value = st.fields[id] !== undefined ? st.fields[id] : SUPPLIER_ADDL_FIELD_DEFAULTS[id];
+        });
+        // Refresh the GSTIN / PAN validity hints for the loaded values
+        ['#masterSupplierGstin', '#masterSupplierPan'].forEach(sel => {
+          const el = contentArea.querySelector(sel);
+          if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        _masterSupplierAliases = st.aliases;
+      };
+
+      // Shows / hides the Alternate Name boxes for the active row based on its Name
+      const syncSupplierAkaPanel = () => {
+        const inp = activeCustNameInp();
+        const nameVal = inp ? inp.value.trim() : '';
+        const akaPanel = contentArea.querySelector('#masterSupplierAkaPanel');
+        if (!nameVal) {
+          if (akaPanel) akaPanel.style.display = 'none';
+          if (_masterSupplierAliases.every(a => a.trim() === '')) {
+            _masterSupplierAliases = [];
+            renderMasterSupplierAliases();
+          }
+          return;
+        }
+        validateMasterSupplierAliasesLive();
+        if (_masterSupplierAliases.length === 0) {
+          _masterSupplierAliases.push('');
+          renderMasterSupplierAliases();
+        } else if (akaPanel) {
+          akaPanel.style.display = 'block';
+        }
+      };
+
+      const setActiveSupplierRow = (idx) => {
+        if (idx === _masterSupplierActiveRowIdx) return;
+        captureActiveSupplierRow();
+        _masterSupplierActiveRowIdx = idx;
+        loadSupplierRowState(idx);
+        renderMasterSupplierAliases();
+        syncSupplierAkaPanel();
+      };
+
+      // Live "already exists" check for a row's Name (row 0 is the first row)
+      const validateSupplierRowNameLive = (idx) => {
+        const inp = suppRowNameInput(idx);
+        const err = contentArea.querySelector('#masterSupplierName' + (idx ? idx : '') + 'Error');
+        const val = inp ? inp.value.trim() : '';
+        const setErr = (text) => {
+          if (err) { err.textContent = text || ''; err.style.display = text ? 'block' : 'none'; }
+          if (inp) inp.style.borderColor = text ? '#ef4444' : 'var(--slate-200)';
+        };
         if (!val) {
-          if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
-          if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
+          setErr('');
           return null;
         }
-
         const dup = findDuplicateCoaNameOrAlias(val);
         if (dup) {
           const typeLabel = dup.parentName ? `Alias of "${dup.parentName}"` : dup.type;
           const errorText = `"${val}" already exists (${typeLabel}).`;
-          if (nameErr) {
-            nameErr.textContent = errorText;
-            nameErr.style.display = 'block';
-          }
-          if (nameInp) nameInp.style.borderColor = '#ef4444';
+          setErr(errorText);
           return errorText;
-        } else {
-          if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
-          if (nameInp) nameInp.style.borderColor = 'var(--slate-200)';
-          return null;
+        }
+        setErr('');
+        return null;
+      };
+
+      // Supplier count (1, 2, 3...) in the right corner of the Back bar
+      const renderSupplierCount = () => {
+        const countWrap = document.getElementById('masterDeskBackBarGroupCount');
+        if (!countWrap) return;
+        const count = 1 + _masterSupplierExtraRowKeys.length;
+        countWrap.innerHTML = `<span title="Suppliers in this form" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-family: var(--font-main); font-size: 12.5px; font-weight: 600;">${count}</span>`;
+      };
+
+      // Shows the "Add Another Supplier" button only when the last row's Name has a value.
+      const refreshSupplierAddRowBtn = () => {
+        renderSupplierCount();
+        if (!suppAddRowWrap) return;
+        const lastIdx = _masterSupplierExtraRowKeys.length ? _masterSupplierExtraRowKeys[_masterSupplierExtraRowKeys.length - 1] : 0;
+        const lastInp = suppRowNameInput(lastIdx);
+        suppAddRowWrap.style.display = lastInp && lastInp.value.trim() ? 'block' : 'none';
+      };
+
+      const wireSupplierDustbinHover = (btn) => {
+        btn.addEventListener('mouseenter', () => {
+          btn.style.background = '#fef2f2';
+          btn.style.color = '#dc2626';
+          btn.style.borderColor = '#fecaca';
+        });
+        btn.addEventListener('mouseleave', () => {
+          btn.style.background = '#ffffff';
+          btn.style.color = 'var(--slate-400)';
+          btn.style.borderColor = 'var(--slate-200)';
+        });
+      };
+
+      const wireSupplierRowRemoveBtn = (idx) => {
+        const btn = extraCustRowsContainer.querySelector('.master-supplier-row-remove[data-row-index="' + idx + '"]');
+        if (!btn) return;
+        wireSupplierDustbinHover(btn);
+        btn.addEventListener('click', () => {
+          const rowEl = extraCustRowsContainer.querySelector('.master-supplier-row[data-row-index="' + idx + '"]');
+          if (rowEl) rowEl.remove();
+          const pos = _masterSupplierExtraRowKeys.indexOf(idx);
+          const prevIdx = pos > 0 ? _masterSupplierExtraRowKeys[pos - 1] : 0;
+          _masterSupplierExtraRowKeys = _masterSupplierExtraRowKeys.filter(k => k !== idx);
+          delete _masterSupplierRowState[idx];
+          if (_masterSupplierActiveRowIdx === idx) {
+            // Removed row's values go with it — switch the side box to the row above
+            _masterSupplierActiveRowIdx = null;
+            setActiveSupplierRow(prevIdx);
+            const prevInp = suppRowNameInput(prevIdx);
+            if (prevInp) prevInp.focus();
+          } else {
+            validateMasterSupplierAliasesLive();
+          }
+          refreshSupplierAddRowBtn();
+        });
+      };
+
+      const wireSupplierRowInputs = (idx) => {
+        const rowNameInp = suppRowNameInput(idx);
+        if (!rowNameInp) return;
+        rowNameInp.addEventListener('focus', () => setActiveSupplierRow(idx));
+        rowNameInp.addEventListener('input', () => {
+          setActiveSupplierRow(idx);
+          validateSupplierRowNameLive(idx);
+          syncSupplierAkaPanel();
+          refreshSupplierAddRowBtn();
+        });
+      };
+
+      const addNextSupplierRow = () => {
+        _masterSupplierExtraRowSeq++;
+        const idx = _masterSupplierExtraRowSeq;
+        extraCustRowsContainer.insertAdjacentHTML('beforeend', buildSupplierRowHtml(idx));
+        _masterSupplierRowState[idx] = newSupplierRowState();
+        wireSupplierRowInputs(idx);
+        wireSupplierRowRemoveBtn(idx);
+        _masterSupplierExtraRowKeys.push(idx);
+        refreshSupplierAddRowBtn();
+        const newNameInp = suppRowNameInput(idx);
+        if (newNameInp) {
+          newNameInp.focus();
+          setActiveSupplierRow(idx);
         }
       };
+
+      if (suppAddRowBtn) {
+        suppAddRowBtn.addEventListener('mouseenter', () => { suppAddRowBtn.style.background = 'var(--blue-50, #eff6ff)'; });
+        suppAddRowBtn.addEventListener('mouseleave', () => { suppAddRowBtn.style.background = '#ffffff'; });
+        suppAddRowBtn.addEventListener('click', addNextSupplierRow);
+      }
+
+      // First row's dustbin: with more rows below, removes this supplier and moves the next
+      // row (Name and its side-box values) up; on its own, just clears it.
+      const suppCleanBtn = contentArea.querySelector('#masterSupplierRowCleanBtn');
+      if (suppCleanBtn) {
+        wireSupplierDustbinHover(suppCleanBtn);
+        suppCleanBtn.addEventListener('click', () => {
+          captureActiveSupplierRow();
+          if (_masterSupplierExtraRowKeys.length > 0) {
+            const nextIdx = _masterSupplierExtraRowKeys[0];
+            const nextNameInp = suppRowNameInput(nextIdx);
+            if (nameInp) nameInp.value = nextNameInp ? nextNameInp.value : '';
+            _masterSupplierRowState[0] = _masterSupplierRowState[nextIdx] || newSupplierRowState();
+            delete _masterSupplierRowState[nextIdx];
+            const nextRowEl = extraCustRowsContainer.querySelector('.master-supplier-row[data-row-index="' + nextIdx + '"]');
+            if (nextRowEl) nextRowEl.remove();
+            _masterSupplierExtraRowKeys = _masterSupplierExtraRowKeys.slice(1);
+          } else {
+            if (nameInp) nameInp.value = '';
+            _masterSupplierRowState[0] = newSupplierRowState();
+          }
+          _masterSupplierActiveRowIdx = null;
+          setActiveSupplierRow(0);
+          validateSupplierRowNameLive(0);
+          refreshSupplierAddRowBtn();
+          if (nameInp) nameInp.focus();
+        });
+      }
 
       if (nameInp) {
         nameInp.addEventListener('keydown', (e) => {
@@ -4854,104 +6456,104 @@
             }
           }
         });
-        nameInp.addEventListener('input', () => {
-          validateSupplierNameInputLive();
-          validateMasterSupplierAliasesLive();
-        });
       }
+
+      _masterSupplierRowState[0] = newSupplierRowState();
+      wireSupplierRowInputs(0);
+      refreshSupplierAddRowBtn();
 
       if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-          const name = nameInp ? nameInp.value.trim() : '';
-          if (!name) {
-            if (typeof showToast === 'function') showToast('Please enter a supplier name.', 'warning');
-            else alert('Please enter a supplier name.');
-            if (nameInp) nameInp.focus();
-            return;
-          }
-
-          const liveNameErr = validateSupplierNameInputLive();
-          if (liveNameErr) {
-            if (typeof showToast === 'function') showToast(liveNameErr, 'error');
-            else alert(liveNameErr);
-            if (nameInp) nameInp.focus();
-            return;
-          }
-
-          const aliasesValid = validateMasterSupplierAliasesLive();
-          if (!aliasesValid) {
-            const msg = 'Please fix duplicate or invalid Also Known As entries.';
-            if (typeof showToast === 'function') showToast(msg, 'error');
+          const notify = (msg, type) => {
+            if (typeof showToast === 'function') showToast(msg, type);
             else alert(msg);
-            return;
-          }
-
-          const aliases = _masterSupplierAliases.map(a => a.trim()).filter(a => a !== '');
-
-          const formNamesSet = new Set([name.toLowerCase()]);
-          for (let i = 0; i < aliases.length; i++) {
-            const al = aliases[i];
-            const alLower = al.toLowerCase();
-
-            if (formNamesSet.has(alLower)) {
-              const msg = `Duplicate entry "${al}" found in the form. Name and A.K.A must be unique.`;
-              if (typeof showToast === 'function') showToast(msg, 'error');
-              else alert(msg);
-              return;
-            }
-            formNamesSet.add(alLower);
-
-            const dupAl = findDuplicateCoaNameOrAlias(al);
-            if (dupAl) {
-              const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
-              const msg = `"${al}" already exists (${typeLabel}).`;
-              if (typeof showToast === 'function') showToast(msg, 'error');
-              else alert(msg);
-              return;
-            }
-          }
-
-          const balInp = contentArea.querySelector('#masterSupplierBalance');
-          const balVal = balInp ? balInp.value.trim() : '';
-          const openingBalance = balVal ? parseFloat(balVal) || 0 : 0;
-
-          // Additional Information fields
-          const contactName = contentArea.querySelector('#masterSupplierContactName')?.value?.trim() || '';
-          const address = contentArea.querySelector('#masterSupplierAddress')?.value?.trim() || '';
-          const city = contentArea.querySelector('#masterSupplierCity')?.value?.trim() || '';
-          const pincode = contentArea.querySelector('#masterSupplierPincode')?.value?.trim() || '';
-          const state = contentArea.querySelector('#masterSupplierState')?.value?.trim() || '';
-          const country = contentArea.querySelector('#masterSupplierCountry')?.value?.trim() || '';
-          const bankName = contentArea.querySelector('#masterSupplierBankName')?.value?.trim() || '';
-          const accountNo = contentArea.querySelector('#masterSupplierAccountNo')?.value?.trim() || '';
-          const ifsc = contentArea.querySelector('#masterSupplierIfsc')?.value?.trim() || '';
-          const branch = contentArea.querySelector('#masterSupplierBranch')?.value?.trim() || '';
-          const gstin = contentArea.querySelector('#masterSupplierGstin')?.value?.trim() || '';
-          const pan = contentArea.querySelector('#masterSupplierPan')?.value?.trim() || '';
-
-          // Save into Supplier Directory (does NOT create separate CoA ledger)
-          const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
-          const newSupplier = {
-            id: 'supp-' + Date.now(),
-            name: name,
-            aliases: aliases,
-            openingBalance: openingBalance,
-            contactName: contactName,
-            address: address,
-            city: city,
-            pincode: pincode,
-            state: state,
-            country: country,
-            bankName: bankName,
-            accountNo: accountNo,
-            ifsc: ifsc,
-            branch: branch,
-            gstin: gstin,
-            pan: pan,
-            createdAt: Date.now()
           };
 
-          suppliers.push(newSupplier);
+          // Check the active row's Alternate Names (the ones currently on screen)
+          if (!validateMasterSupplierAliasesLive()) {
+            notify('Please fix duplicate or invalid Alternate Name entries.', 'error');
+            return;
+          }
+          captureActiveSupplierRow();
+
+          const rowIdxs = [0, ..._masterSupplierExtraRowKeys];
+          const formNamesSet = new Set();
+          const rows = [];
+
+          for (const idx of rowIdxs) {
+            const rowNameInp = suppRowNameInput(idx);
+            const rowName = rowNameInp ? rowNameInp.value.trim() : '';
+            const st = _masterSupplierRowState[idx] || newSupplierRowState();
+
+            if (!rowName) {
+              // A trailing row left empty is just unfilled — it's skipped, not an error
+              if (idx !== 0) continue;
+              notify('Please enter a supplier name.', 'warning');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+
+            const nameErrText = validateSupplierRowNameLive(idx);
+            if (nameErrText) {
+              notify(nameErrText, 'error');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+
+            const nameLower = rowName.toLowerCase();
+            if (formNamesSet.has(nameLower)) {
+              notify(`Duplicate entry "${rowName}" found in the form. Each supplier name must be unique.`, 'error');
+              if (rowNameInp) rowNameInp.focus();
+              return;
+            }
+            formNamesSet.add(nameLower);
+
+            const aliases = (st.aliases || []).map(a => a.trim()).filter(a => a !== '');
+            for (const al of aliases) {
+              const alLower = al.toLowerCase();
+              if (formNamesSet.has(alLower)) {
+                notify(`Duplicate entry "${al}" found in the form (Alternate Name of "${rowName}"). Names and Alternate Names must be unique.`, 'error');
+                return;
+              }
+              formNamesSet.add(alLower);
+              const dupAl = findDuplicateCoaNameOrAlias(al);
+              if (dupAl) {
+                const typeLabel = dupAl.parentName ? `Alias of "${dupAl.parentName}"` : dupAl.type;
+                notify(`"${al}" (Alternate Name of "${rowName}") already exists (${typeLabel}).`, 'error');
+                return;
+              }
+            }
+
+            const balVal = (st.balance || '').toString().trim();
+            rows.push({ name: rowName, aliases: aliases, openingBalance: balVal ? parseFloat(balVal) || 0 : 0, fields: st.fields });
+          }
+
+          // Save into Supplier Directory (does NOT create separate CoA ledgers)
+          const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+          const created = rows.map((row, i) => {
+            const val = (id) => (row.fields[id] || '').trim();
+            const newSupplier = {
+              id: 'supp-' + Date.now() + (i ? '-' + i : ''),
+              name: row.name,
+              aliases: row.aliases,
+              openingBalance: row.openingBalance,
+              contactName: val('masterSupplierContactName'),
+              address: val('masterSupplierAddress'),
+              city: val('masterSupplierCity'),
+              pincode: val('masterSupplierPincode'),
+              state: val('masterSupplierState'),
+              country: val('masterSupplierCountry'),
+              bankName: val('masterSupplierBankName'),
+              accountNo: val('masterSupplierAccountNo'),
+              ifsc: val('masterSupplierIfsc'),
+              branch: val('masterSupplierBranch'),
+              gstin: val('masterSupplierGstin'),
+              pan: val('masterSupplierPan'),
+              createdAt: Date.now()
+            };
+            suppliers.push(newSupplier);
+            return newSupplier;
+          });
 
           // Ensure central Trade Payables ledger exists in CoA and update combined balance
           if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
@@ -4960,8 +6562,7 @@
               tpLedger = { id: 125, name: 'Trade Payables', sgId: 'sg-tp', type: 'ledger', openingBalance: 0 };
               coaLedgers.push(tpLedger);
             }
-            const totalSuppOp = suppliers.reduce((sum, s) => sum + (parseFloat(s.openingBalance) || 0), 0);
-            tpLedger.openingBalance = totalSuppOp;
+            tpLedger.openingBalance = suppliers.reduce((sum, c) => sum + (parseFloat(c.openingBalance) || 0), 0);
           }
 
           if (typeof _coaExpanded !== 'undefined') {
@@ -4974,22 +6575,23 @@
           if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
           if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
 
-          showToast(`Supplier "${name}" created successfully (linked to Trade Payables).`, 'success');
+          if (created.length > 1) {
+            notify(`${created.length} suppliers created successfully (linked to Trade Payables).`, 'success');
+          } else {
+            notify(`Supplier "${created[0].name}" created successfully (linked to Trade Payables).`, 'success');
+          }
 
           _masterSupplierAliases = [];
+          const firstSupplier = created[0];
 
           if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'purchase_voucher') {
-            const ctx = _masterDeskReturnContext;
             _masterDeskReturnContext = null;
-            _masterSupplierAliases = [];
-
             if (typeof closeTab === 'function') closeTab('master_desk', null, 'purchase_voucher');
             else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'purchase_voucher');
             if (typeof openTab === 'function') openTab('purchase_voucher');
             else if (typeof window.openTab === 'function') window.openTab('purchase_voucher');
-
             if (typeof window.onPartyCreatedForPurchase === 'function') {
-              window.onPartyCreatedForPurchase(newSupplier, 'supplier');
+              window.onPartyCreatedForPurchase(firstSupplier, 'supplier');
             }
             return;
           }
@@ -4997,15 +6599,12 @@
           if (_masterDeskReturnContext && _masterDeskReturnContext.returnTab === 'cashline') {
             const ctx = _masterDeskReturnContext;
             _masterDeskReturnContext = null;
-            _masterSupplierAliases = [];
-
             if (typeof closeTab === 'function') closeTab('master_desk', null, 'cashline');
             else if (typeof window.closeTab === 'function') window.closeTab('master_desk', null, 'cashline');
             if (typeof openTab === 'function') openTab('cashline');
             else if (typeof window.openTab === 'function') window.openTab('cashline');
-
             if (typeof window.onPartyCreatedForCashline === 'function') {
-              window.onPartyCreatedForCashline(newSupplier, 'supplier', ctx);
+              window.onPartyCreatedForCashline(firstSupplier, 'supplier', ctx);
             }
             return;
           }
@@ -9111,12 +10710,24 @@
           </div>
         </div>
 
-        <div class="oh-layout">
+        <div class="oh-layout" id="masterDeskLayoutContainer">
           <!-- Sub-tabs (Left side options cards) -->
-          <div class="oh-sub-tabs" role="tablist" aria-label="Master Desk sections">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); padding: 4px 12px 6px 12px; margin-bottom: 2px;">Accounting Masters</div>
+          <div class="oh-sub-tabs" id="masterDeskSidebar" role="tablist" aria-label="Master Desk sections">
+            <button class="oh-sub-tab active" id="masterTabOverview" role="tab" aria-selected="true">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                  <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                  <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                  <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Overview</span>
+            </button>
 
-            <button class="oh-sub-tab active" id="masterTabGroup" role="tab" aria-selected="true">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); padding: 14px 12px 6px 12px; margin-top: 6px; border-top: 1px solid var(--slate-100);">Accounting Masters</div>
+
+            <button class="oh-sub-tab" id="masterTabGroup" role="tab" aria-selected="false">
               <div class="oh-tab-icon-wrap">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/>
@@ -9144,7 +10755,7 @@
                   <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
               </div>
-              <span class="oh-tab-text">Customers</span>
+              <span class="oh-tab-text">Customer</span>
             </button>
 
             <button class="oh-sub-tab" id="masterTabSuppliers" role="tab" aria-selected="false">
@@ -9156,7 +10767,7 @@
                   <circle cx="18.5" cy="18.5" r="2.5"></circle>
                 </svg>
               </div>
-              <span class="oh-tab-text">Suppliers</span>
+              <span class="oh-tab-text">Supplier</span>
             </button>
 
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); padding: 14px 12px 6px 12px; margin-top: 6px; border-top: 1px solid var(--slate-100);">Inventory Masters</div>
@@ -9218,7 +10829,20 @@
           </div>
 
           <!-- Right Content View Area -->
-          <div class="oh-content-area" id="masterDeskContentArea">
+          <div class="oh-content-area">
+            <div id="masterDeskBackBar" style="display: none; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--slate-50); border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 12px 16px;">
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn btn-secondary" id="masterDeskBackBtn" type="button" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+                  ← Back
+                </button>
+                <button class="btn btn-secondary master-back-bar-nav" type="button" data-tab="group" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Group</button>
+                <button class="btn btn-secondary master-back-bar-nav" type="button" data-tab="ledger" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Ledger</button>
+                <button class="btn btn-secondary master-back-bar-nav" type="button" data-tab="customers" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Customer</button>
+                <button class="btn btn-secondary master-back-bar-nav" type="button" data-tab="suppliers" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Supplier</button>
+              </div>
+              <div id="masterDeskBackBarGroupCount" style="display: flex; align-items: center;"></div>
+            </div>
+            <div id="masterDeskContentArea"></div>
           </div>
         </div>
       </div>
@@ -9226,6 +10850,7 @@
 
     const btnCreate = container.querySelector('#btnMasterCreate');
     const btnAlter = container.querySelector('#btnMasterAlter');
+    const btnOverview = container.querySelector('#masterTabOverview');
     const btnGroup = container.querySelector('#masterTabGroup');
     const btnLedger = container.querySelector('#masterTabLedger');
     const btnCustomers = container.querySelector('#masterTabCustomers');
@@ -9242,9 +10867,20 @@
     if (btnAlter) {
       btnAlter.addEventListener('click', () => setMasterDeskSubtype('Alter'));
     }
+    if (btnOverview) {
+      btnOverview.addEventListener('click', () => setMasterDeskTab('overview'));
+    }
     if (btnGroup) {
       btnGroup.addEventListener('click', () => setMasterDeskTab('group'));
     }
+    const backBtn = container.querySelector('#masterDeskBackBtn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => setMasterDeskTab('overview'));
+    }
+    // Quick jumps to other Accounting Masters from the Back bar
+    container.querySelectorAll('#masterDeskBackBar .master-back-bar-nav').forEach(btn => {
+      btn.addEventListener('click', () => setMasterDeskTab(btn.getAttribute('data-tab')));
+    });
     if (btnLedger) {
       btnLedger.addEventListener('click', () => setMasterDeskTab('ledger'));
     }
