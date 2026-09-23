@@ -4631,7 +4631,7 @@
     const saveBtn = cfg.saveBtnId ? contentArea.querySelector('#' + cfg.saveBtnId) : null;
     if (saveBtn && filledRows.length > 1) {
       const clone = saveBtn.cloneNode(true); // drops the single-record click handler
-      clone.textContent = 'Save Changes';
+      clone.textContent = 'Save Changes (' + filledRows.length + ')';
       saveBtn.parentNode.replaceChild(clone, saveBtn);
       clone.addEventListener('click', () => {
         captureActive();
@@ -5148,20 +5148,13 @@
     }
     if (backBar) {
       backBar.style.display = isFullScreenTab ? 'flex' : 'none';
-      // Quick-jump buttons: all masters of the current section (Accounting or Inventory)
-      // stay visible, and the screen you are on is highlighted in blue
+      // Quick-jump buttons: show the masters of the current section (Accounting or
+      // Inventory), except the screen we're already on
       const inventoryTabs = ['stock_group', 'stock_item', 'stock_category', 'unit', 'warehouse'];
       const currentSection = inventoryTabs.includes(currentMasterDeskTab) ? 'inventory' : 'accounting';
       backBar.querySelectorAll('.master-back-bar-nav').forEach(btn => {
-        const inSection = btn.getAttribute('data-section') === currentSection;
-        btn.style.display = inSection ? 'inline-flex' : 'none';
-        const isCurrent = btn.getAttribute('data-tab') === currentMasterDeskTab;
-        btn.classList.toggle('btn-primary', isCurrent);
-        btn.classList.toggle('btn-secondary', !isCurrent);
-        btn.style.background = isCurrent ? 'var(--blue-600)' : '';
-        btn.style.color = isCurrent ? '#ffffff' : '';
-        btn.style.borderColor = isCurrent ? 'var(--blue-600)' : '';
-        btn.setAttribute('aria-current', isCurrent ? 'page' : 'false');
+        const show = btn.getAttribute('data-section') === currentSection && btn.getAttribute('data-tab') !== currentMasterDeskTab;
+        btn.style.display = show ? 'inline-flex' : 'none';
       });
     }
     // Group count lives in the back bar; the Group form re-renders it as needed
@@ -11192,7 +11185,7 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Group', `Are you sure you want to delete group "${currentGroup.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete group "${currentGroup.name}"?`)) {
               if (currentGroup.isSysSg) {
                 if (typeof COA_SYS_SGS !== 'undefined') {
                   COA_SYS_SGS = COA_SYS_SGS.filter(s => s.id !== currentGroup.rawId && s.parent !== currentGroup.rawId);
@@ -11213,9 +11206,8 @@
 
               showToast(`Group "${currentGroup.name}" deleted.`, 'info');
               _masterAlterSelectedGroupId = null;
-              markMasterAlterUnpicked('group'); // back to "Select ..." after a delete
               updateMasterDeskContent();
-            });
+            }
           });
         }
 
@@ -11787,7 +11779,7 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Ledger', `Are you sure you want to delete ledger "${currentLedger.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete ledger "${currentLedger.name}"?`)) {
               if (typeof coaLedgers !== 'undefined') {
                 const idx = coaLedgers.findIndex(l => l.id === currentLedger.id);
                 if (idx >= 0) coaLedgers.splice(idx, 1);
@@ -11801,9 +11793,8 @@
 
               showToast(`Ledger "${currentLedger.name}" deleted.`, 'info');
               _masterAlterSelectedLedgerId = null;
-              markMasterAlterUnpicked('ledger'); // back to "Select ..." after a delete
               updateMasterDeskContent();
-            });
+            }
           });
         }
 
@@ -12204,7 +12195,7 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Customer', `Are you sure you want to delete customer "${currentCustomer.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete customer "${currentCustomer.name}"?`)) {
               const idx = customers.findIndex(item => item.id === currentCustomer.id);
               if (idx >= 0) {
                 customers.splice(idx, 1);
@@ -12218,10 +12209,9 @@
 
                 showToast(`Customer "${currentCustomer.name}" deleted.`, 'info');
                 _masterAlterSelectedCustomerId = null;
-                markMasterAlterUnpicked('customers'); // back to "Select ..." after a delete
                 updateMasterDeskContent();
               }
-            });
+            }
           });
         }
 
@@ -12622,7 +12612,7 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Supplier', `Are you sure you want to delete supplier "${currentSupplier.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete supplier "${currentSupplier.name}"?`)) {
               const idx = suppliers.findIndex(item => item.id === currentSupplier.id);
               if (idx >= 0) {
                 suppliers.splice(idx, 1);
@@ -12636,10 +12626,9 @@
 
                 showToast(`Supplier "${currentSupplier.name}" deleted.`, 'info');
                 _masterAlterSelectedSupplierId = null;
-                markMasterAlterUnpicked('suppliers'); // back to "Select ..." after a delete
                 updateMasterDeskContent();
               }
-            });
+            }
           });
         }
 
@@ -12862,7 +12851,7 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Stock Group', `Are you sure you want to delete stock group "${currentGroup.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete stock group "${currentGroup.name}"?`)) {
               const deletedId = currentGroup.id;
               const deletedName = currentGroup.name;
               const idx = _masterStockGroups.findIndex(g => g.id === deletedId);
@@ -12897,10 +12886,9 @@
 
                 showToast(`Stock Group "${deletedName}" deleted.`, 'info');
                 _masterAlterSelectedStockGroupId = null;
-                markMasterAlterUnpicked('stock_group'); // back to "Select ..." after a delete
                 updateMasterDeskContent();
               }
-            });
+            }
           });
         }
 
@@ -13331,17 +13319,16 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Stock Item', `Are you sure you want to delete stock item "${currentItem.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete stock item "${currentItem.name}"?`)) {
               const idx = _masterStockItems.findIndex(i => i.id === currentItem.id);
               if (idx >= 0) {
                 _masterStockItems.splice(idx, 1);
                 persistMasterStockItems();
                 showToast(`Stock Item "${currentItem.name}" deleted.`, 'info');
                 _masterAlterSelectedStockItemId = null;
-                markMasterAlterUnpicked('stock_item'); // back to "Select ..." after a delete
                 updateMasterDeskContent();
               }
-            });
+            }
           });
         }
 
@@ -13525,17 +13512,16 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Stock Category', `Are you sure you want to delete stock category "${currentCat.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete stock category "${currentCat.name}"?`)) {
               const idx = _masterStockCategories.findIndex(c => c.id === currentCat.id);
               if (idx >= 0) {
                 _masterStockCategories.splice(idx, 1);
                 persistMasterStockCategories();
                 showToast(`Stock Category "${currentCat.name}" deleted.`, 'info');
                 _masterAlterSelectedStockCategoryId = null;
-                markMasterAlterUnpicked('stock_category'); // back to "Select ..." after a delete
                 updateMasterDeskContent();
               }
-            });
+            }
           });
         }
 
@@ -13778,17 +13764,16 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Unit', `Are you sure you want to delete unit "${currentUnit.symbol}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete unit "${currentUnit.symbol}"?`)) {
               const idx = _masterUnits.findIndex(u => u.id === currentUnit.id);
               if (idx >= 0) {
                 _masterUnits.splice(idx, 1);
                 persistMasterUnits();
                 showToast(`Unit "${currentUnit.symbol}" deleted.`, 'info');
                 _masterAlterSelectedUnitId = null;
-                markMasterAlterUnpicked('unit'); // back to "Select ..." after a delete
                 updateMasterDeskContent();
               }
-            });
+            }
           });
         }
 
@@ -14047,17 +14032,16 @@
 
         if (delBtn) {
           delBtn.addEventListener('click', () => {
-            masterConfirmDelete('Delete Warehouse', `Are you sure you want to delete warehouse "${currentWh.name}"? This cannot be undone.`, () => {
+            if (confirm(`Are you sure you want to delete warehouse "${currentWh.name}"?`)) {
               const idx = _masterWarehouses.findIndex(w => w.id === currentWh.id);
               if (idx >= 0) {
                 _masterWarehouses.splice(idx, 1);
                 persistMasterWarehouses();
                 showToast(`Warehouse "${currentWh.name}" deleted.`, 'info');
                 _masterAlterSelectedWarehouseId = null;
-                markMasterAlterUnpicked('warehouse'); // back to "Select ..." after a delete
                 updateMasterDeskContent();
               }
-            });
+            }
           });
         }
 

@@ -449,27 +449,49 @@
       ? `<th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Tax</th>`
       : (taxMode === 'igst' ? `<th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Tax</th>` : '');
 
+    const siDash = '<span style="color:#94a3b8; font-size:10px; font-weight:400;">-</span>';
+
     const itemRowsHtml = rows.map((r, i) => {
       // The tax columns carry the rate only; the amounts are in the totals block.
-      const halfPct = r.taxPct ? (Math.round((r.taxPct / 2) * 100) / 100) + '%' : '&mdash;';
-      const fullPct = r.taxPct ? r.taxPct + '%' : '&mdash;';
-      const taxCells = taxMode === 'split'
-        ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${fullPct}</td>`
-        : (taxMode === 'igst'
-          ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${fullPct}</td>`
-          : '');
+      const taxPct = parseFloat(r.taxPct) || 0;
+      const taxVal = Math.abs(taxPct) > 0.0001 ? (taxPct + '%') : siDash;
+      const taxCells = (taxMode === 'split' || taxMode === 'igst')
+        ? `<td class="si-nowrap" style="padding:5px 6px; text-align:right;">${taxVal}</td>`
+        : '';
+
+      const hsnStr = String(r.hsn || '').trim();
+      const hsnVal = (hsnStr && hsnStr !== '-' && hsnStr !== '0') ? siEsc(hsnStr) : siDash;
+
+      const qtyNum = parseFloat(r.qty) || 0;
+      const qtyVal = Math.abs(qtyNum) > 0.0001 ? r.qty : siDash;
+
+      const unitStr = String(r.unit || '').trim();
+      const unitVal = (unitStr && unitStr !== '-' && unitStr !== '0') ? siEsc(unitStr) : siDash;
+
+      const rateNum = parseFloat(r.rate) || 0;
+      const rateVal = Math.abs(rateNum) > 0.0001 ? siNum(rateNum) : siDash;
+
+      const discNum = parseFloat(r.discAmt) || 0;
+      const discVal = Math.abs(discNum) > 0.0001 ? siNum(discNum) : siDash;
+
+      const taxableNum = parseFloat(r.taxable) || 0;
+      const valVal = Math.abs(taxableNum) > 0.0001 ? siNum(taxableNum) : siDash;
+
+      const totalNum = parseFloat(r.total) || 0;
+      const totalVal = Math.abs(totalNum) > 0.0001 ? siNum(totalNum) : siDash;
+
       return `
         <tr>
           <td class="si-nowrap" style="padding:5px 6px; text-align:center; color:#64748b;">${i + 1}</td>
           <td class="si-desc" style="padding:5px 6px; color:#0f172a;">${siEsc(r.name)}</td>
-          <td class="si-nowrap" style="padding:5px 6px; color:#475569;">${siEsc(r.hsn) || '&mdash;'}</td>
-          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.qty}</td>
-          <td class="si-nowrap" style="padding:5px 6px; text-align:center; text-transform:uppercase; color:#475569;">${siEsc(r.unit) || '&mdash;'}</td>
-          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${siNum(r.rate)}</td>
-          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${r.discAmt ? siNum(r.discAmt) : '&mdash;'}</td>
-          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${siNum(r.taxable)}</td>
+          <td class="si-nowrap" style="padding:5px 6px; color:#475569;">${hsnVal}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:center;">${qtyVal}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:center; text-transform:uppercase; color:#475569;">${unitVal}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${rateVal}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${discVal}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right;">${valVal}</td>
           ${taxCells}
-          <td class="si-nowrap" style="padding:5px 6px; text-align:right; color:#0f172a;">${siNum(r.total)}</td>
+          <td class="si-nowrap" style="padding:5px 6px; text-align:right; color:#0f172a;">${totalVal}</td>
         </tr>`;
     }).join('');
 
@@ -587,10 +609,10 @@
           <div style="text-align:right; flex-shrink:0;">
             <div style="font-size:22px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; color:#1d4ed8;">${docTitle}</div>
             <div style="font-size:${FS.note}; color:#64748b; font-weight:600; margin-top:2px;">${isReturn ? 'Against Invoice ' + siEsc(inv.returnAgainstInvoice || '') : 'Original for Recipient'}</div>
-            <div style="margin-top:8px; font-size:${FS.body}; color:#334155; line-height:1.7;">
-              <div><span style="color:#94a3b8;">Invoice No.:</span> <strong>${siEsc(inv.invoiceNo)}</strong></div>
-              <div><span style="color:#94a3b8;">Date:</span> <strong>${siEsc(siDate(inv.date))}</strong></div>
-              ${placeOfSupply ? `<div><span style="color:#94a3b8;">Place of Supply:</span> <strong>${siEsc(placeOfSupply)}</strong></div>` : ''}
+            <div style="margin-top:8px; font-size:${FS.body}; color:#0f172a; line-height:1.7;">
+              <div><span style="color:#64748b; font-weight:600;">Invoice No.:</span> <strong>${siEsc(inv.invoiceNo)}</strong></div>
+              <div><span style="color:#64748b; font-weight:600;">Date:</span> <strong>${siEsc(siDate(inv.date))}</strong></div>
+              ${placeOfSupply ? `<div><span style="color:#64748b; font-weight:600;">Place of Supply:</span> <strong>${siEsc(placeOfSupply)}</strong></div>` : ''}
             </div>
           </div>
         </div>
@@ -608,7 +630,7 @@
               <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Sl No.</th>
               <th class="si-desc" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Item Description</th>
               <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:left; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">HSN/SAC</th>
-              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Qty</th>
+              <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:center; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Qty</th>
               <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:center; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Unit</th>
               <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Rate</th>
               <th class="si-nowrap" style="padding:9px 8px; font-size:10.5px; font-weight:700; text-align:right; background-color:var(--blue-600,#2563eb); color:#ffffff; border:1px solid #1d4ed8;">Discount</th>
