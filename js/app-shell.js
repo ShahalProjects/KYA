@@ -640,6 +640,7 @@
     company: document.getElementById('panel-company'),
     cashline: document.getElementById('panel-cashline'),
     stock_hub: document.getElementById('panel-stock-hub'),
+    reports: document.getElementById('panel-reports'),
     master_desk: document.getElementById('panel-master-desk'),
   };
 
@@ -742,6 +743,13 @@
       navId: 'nav-stock-hub',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M10 2.5L3.5 6.25V13.75L10 17.5L16.5 13.75V6.25L10 2.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 2.5V17.5" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 6.25L10 10L16.5 6.25" stroke="currentColor" stroke-width="1.4"/></svg>`
     },
+    reports: {
+      id: 'reports',
+      label: 'Reports',
+      panelId: 'panel-reports',
+      navId: 'nav-reports',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M5 2.5h7l3.5 3.5v11.5H5V2.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 2.5V6h3.5" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 10h5M8 13h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`
+    },
   };
 
   let openTabs = [];
@@ -759,7 +767,7 @@
     ledger:    { tabId: 'chart' },
     balance:   { tabId: 'balance' },
     pnl:       { tabId: 'pnl' },
-    reports:   { tabId: 'pnl' },
+    reports:   { tabId: 'reports' },
     trial:     { tabId: 'trial' },
     onehub:    { tabId: 'onehub' },
     settings:  { tabId: 'settings' },
@@ -778,6 +786,7 @@
     'nav-master-desk': 'master_desk',
     'nav-voucher-desk': 'voucher_desk',
     'nav-chart': 'chart',
+    'nav-reports': 'reports',
     'nav-trial': 'trial',
     'nav-pnl': 'pnl',
     'nav-balance': 'balance',
@@ -1029,6 +1038,7 @@
       if (activeTabId === 'company'       && typeof renderCompanyPanel      === 'function') renderCompanyPanel();
       if (activeTabId === 'cashline'      && typeof renderCashlinePanel     === 'function') renderCashlinePanel();
       if (activeTabId === 'stock_hub'     && typeof renderStockHubPanel     === 'function') renderStockHubPanel();
+      if (activeTabId === 'reports'       && typeof renderReportsHubPanel   === 'function') renderReportsHubPanel();
 
       // Highlight sidebar nav item
       const navEl = document.getElementById(def.navId);
