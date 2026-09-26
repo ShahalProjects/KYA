@@ -459,6 +459,15 @@
       invNoEl.addEventListener('input', () => {
         const fallback = currentSalesVoucherSubtype === 'Return' ? 'REV-XXXX' : 'INV-XXXX';
         chipEl.textContent = invNoEl.value.trim() || fallback;
+        if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
+      });
+    }
+
+    const invNoFormatBtn = document.getElementById('btnSalesInvoiceNoFormat');
+    if (invNoFormatBtn) {
+      invNoFormatBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (typeof openSalesInvoiceNumberingModal === 'function') openSalesInvoiceNumberingModal();
       });
     }
     
@@ -585,6 +594,10 @@
     
     const dateEl = document.getElementById('salesDate');
     const dueEl = document.getElementById('salesDueDate');
+    // Typeable DD-MM-YYYY box + calendar for the invoice Date
+    if (dateEl && typeof window.attachKyaDatePicker === 'function') {
+      window.attachKyaDatePicker(dateEl, document.getElementById('salesDateDisplay'));
+    }
     if (dateEl && dueEl) {
       dateEl.addEventListener('change', () => {
         dueEl.value = dateEl.value;
@@ -769,7 +782,10 @@
         if (tdsTcsTcsBtn) tdsTcsTcsBtn.classList.remove('active');
         if (tdsTcsBg) tdsTcsBg.className = 'sales-tdstcs-bg none-active';
         if (tdsTcsAmountRow) tdsTcsAmountRow.style.display = 'none';
-        if (tdsTcsAmountInput) tdsTcsAmountInput.value = '';
+        if (tdsTcsAmountInput) {
+          tdsTcsAmountInput.value = '';
+          delete tdsTcsAmountInput.dataset.manual;
+        }
         recalculateSalesTotals();
       });
     }
@@ -800,6 +816,7 @@
 
     if (tdsTcsRateSelect) {
       tdsTcsRateSelect.addEventListener('change', () => {
+        if (tdsTcsAmountInput) delete tdsTcsAmountInput.dataset.manual;
         if (tdsTcsRateSelect.value === 'custom') {
           if (tdsTcsRateCustomWrap) tdsTcsRateCustomWrap.style.display = 'flex';
           if (tdsTcsRateCustom) tdsTcsRateCustom.focus();
@@ -812,12 +829,18 @@
 
     if (tdsTcsRateCustom) {
       tdsTcsRateCustom.addEventListener('input', () => {
+        // Typing a percentage makes the rate the source again
+        if (tdsTcsAmountInput) delete tdsTcsAmountInput.dataset.manual;
         recalculateSalesTotals();
       });
     }
 
     if (tdsTcsAmountInput) {
       tdsTcsAmountInput.addEventListener('input', () => {
+        if (tdsTcsRateSelect && tdsTcsRateSelect.value === 'custom') {
+          if (tdsTcsAmountInput.value.trim() !== '') tdsTcsAmountInput.dataset.manual = '1';
+          else delete tdsTcsAmountInput.dataset.manual;
+        }
         recalculateSalesTotals();
       });
     }
@@ -854,6 +877,16 @@
       newSalesBtn.addEventListener('click', (e) => {
         e.preventDefault();
         currentSalesVoucherSubtype = 'Invoice';
+        window._editingSalesInvoice = null;
+        initSalesForm();
+      });
+    }
+
+    // Clear — reset every field of the current voucher (keeps Invoice/Return mode)
+    const clearSalesBtn = document.getElementById('btnClearSales');
+    if (clearSalesBtn) {
+      clearSalesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
         window._editingSalesInvoice = null;
         initSalesForm();
       });

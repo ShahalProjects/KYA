@@ -6744,6 +6744,12 @@
           if (typeof openTab === 'function') openTab(tab);
           else if (typeof window.openTab === 'function') window.openTab(tab);
         };
+        // A service created from a voucher row's Description picker
+        if (ctx.purpose === 'voucherItem') {
+          goTo(ctx.returnTab || 'sales_voucher');
+          if (typeof window.onVoucherItemCreated === 'function') window.onVoucherItemCreated(entity, 'Service');
+          return true;
+        }
         if (ctx.returnTab === 'sales_voucher') {
           goTo('sales_voucher');
           if (typeof window.onPartyCreatedForSales === 'function') window.onPartyCreatedForSales(entity, kind);
@@ -9372,10 +9378,11 @@
           }
 
           const now = Date.now();
+          const createdItems = [];
           rows.forEach((row, i) => {
             const f = row.fields;
             const sku = (f.masterStockItemSku || '').trim();
-            _masterStockItems.push({
+            createdItems.push({
               id: 'item-' + now + (i ? '-' + i : ''),
               name: row.name,
               sku: sku || ('SKU-' + (now + i).toString().slice(-4)),
@@ -9393,11 +9400,23 @@
               aliases: row.aliases
             });
           });
+          _masterStockItems.push(...createdItems);
           persistMasterStockItems();
 
           if (rows.length > 1) notify(`${rows.length} stock items created successfully.`, 'success');
           else notify(`Stock Item "${rows[0].name}" created successfully.`, 'success');
           _masterStockItemAliases = [];
+
+          // Opened from a voucher row's Description picker: go back with the new item
+          if (_masterDeskReturnContext && _masterDeskReturnContext.purpose === 'voucherItem') {
+            const ctx = _masterDeskReturnContext;
+            _masterDeskReturnContext = null;
+            const tab = ctx.returnTab || 'sales_voucher';
+            if (typeof closeTab === 'function') closeTab('master_desk', null, tab);
+            if (typeof openTab === 'function') openTab(tab);
+            if (typeof window.onVoucherItemCreated === 'function') window.onVoucherItemCreated(createdItems[0], 'Product');
+            return;
+          }
           updateMasterDeskContent();
         });
       }
@@ -9405,7 +9424,18 @@
       if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
           _masterStockItemAliases = [];
+          if (cancelMasterDeskReturn()) return;
           updateMasterDeskContent();
+        });
+      }
+
+      if (nameInp) {
+        nameInp.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && _masterDeskReturnContext) {
+            e.preventDefault();
+            e.stopPropagation();
+            cancelMasterDeskReturn();
+          }
         });
       }
     } else if (currentMasterDeskSubtype === 'Create' && currentMasterDeskTab === 'stock_category') {
@@ -10289,6 +10319,18 @@
           if (rows.length > 1) notify(`${rows.length} units created successfully.`, 'success');
           else notify(`Unit "${rows[0].symbol}" created successfully.`, 'success');
           _masterUnitAliases = [];
+
+          // Opened from a voucher row's Unit picker: go back with the new unit
+          if (_masterDeskReturnContext && _masterDeskReturnContext.purpose === 'voucherUnit') {
+            const ctx = _masterDeskReturnContext;
+            _masterDeskReturnContext = null;
+            const tab = ctx.returnTab || 'sales_voucher';
+            const created = _masterUnits[_masterUnits.length - rows.length];
+            if (typeof closeTab === 'function') closeTab('master_desk', null, tab);
+            if (typeof openTab === 'function') openTab(tab);
+            if (typeof window.onVoucherUnitCreated === 'function') window.onVoucherUnitCreated(created);
+            return;
+          }
           updateMasterDeskContent();
         });
       }
@@ -10296,7 +10338,18 @@
       if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
           _masterUnitAliases = [];
+          if (cancelMasterDeskReturn()) return;
           updateMasterDeskContent();
+        });
+      }
+
+      if (symbolInp) {
+        symbolInp.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && _masterDeskReturnContext) {
+            e.preventDefault();
+            e.stopPropagation();
+            cancelMasterDeskReturn();
+          }
         });
       }
     } else if (currentMasterDeskSubtype === 'Create' && currentMasterDeskTab === 'warehouse') {
@@ -11248,6 +11301,8 @@
         }
 
         _masterAlterLedgerAliases = currentLedger.aliases ? [...currentLedger.aliases] : [];
+        // Bank Account group details already saved on this ledger (shown in the popup)
+        const curBankAcct = currentLedger.bankAccountInfo || {};
 
         const excludeObj = {
           id: currentLedger.id,
@@ -11496,6 +11551,88 @@
               </div>
 
             </div>
+          <!-- Additional Information (Dynamic for Bank Account group) -->
+          <div id="masterAlterLedgerBankAcctWrap" style="display: none; margin: 0; transition: all 0.2s ease;">
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="kya-searchable-select-wrap" id="masterAlterLedgerBankAcctBankNameWrap" style="position: relative; width: 100%;">
+                  <input type="hidden" id="masterAlterLedgerBankAcctBankName" value="${escapeHtml(curBankAcct.bankName || '')}">
+                  <div class="kya-searchable-select-trigger" id="masterAlterLedgerBankAcctBankNameTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--slate-400);">
+                    <span id="masterAlterLedgerBankAcctBankNameTriggerText">${curBankAcct.bankName ? escapeHtml(curBankAcct.bankName) : 'Select Bank'}</span>
+                    <span style="font-size: 10px; color: var(--slate-400);">▼</span>
+                  </div>
+                  <div class="kya-searchable-select-dropdown" id="masterAlterLedgerBankAcctBankNameDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                    <input type="text" id="masterAlterLedgerBankAcctBankNameSearch" placeholder="Search bank name..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                    <div id="masterAlterLedgerBankAcctBankNameOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                  </div>
+                </div>
+                <input type="text" id="masterAlterLedgerBankAcctHolder" value="${escapeHtml(curBankAcct.accountHolder || '')}" placeholder="Enter Account Holder Name" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="text" id="masterAlterLedgerBankAcctNo" value="${escapeHtml(curBankAcct.accountNo || '')}" placeholder="Enter Account Number" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                <input type="text" id="masterAlterLedgerBankAcctIfsc" value="${escapeHtml(curBankAcct.ifscCode || '')}" placeholder="Enter IFSC Code" style="padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff; text-transform: uppercase;">
+              </div>
+              <div>
+                <input type="text" id="masterAlterLedgerBankAcctBranch" value="${escapeHtml(curBankAcct.branch || '')}" placeholder="Enter Branch" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+              </div>
+            </div>
+
+            <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 14px;"></div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="font-size: 10.5px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; gap: 5px; margin: 0;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                  &nbsp;Upload QR Code (Image Only)
+                </label>
+                <span id="masterAlterLedgerBankAcctQrStatusBadge" style="display: none; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: #ecfdf5; color: #059669; text-transform: uppercase;">Attached</span>
+              </div>
+
+              <input type="file" id="masterAlterLedgerBankAcctQrInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" style="display: none;">
+
+              <div id="masterAlterLedgerBankAcctQrDropzone" style="border: 1.5px dashed var(--slate-300); border-radius: 10px; padding: 12px 14px; text-align: center; background: #fff; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'; this.style.background='#eff6ff';" onmouseout="this.style.borderColor='var(--slate-300)'; this.style.background='#fff';">
+
+                <!-- Empty State -->
+                <div id="masterAlterLedgerBankAcctQrEmptyState" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                  <div style="width: 28px; height: 28px; border-radius: 50%; background: #f8fafc; border: 1px solid var(--slate-200); display: flex; align-items: center; justify-content: center; color: #2563eb; flex-shrink: 0;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                  </div>
+                  <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;">
+                    <span style="font-size: 12.5px; font-weight: 600; color: var(--slate-700);">Click or Drag to Upload QR Code</span>
+                    <span style="font-size: 10.5px; color: var(--slate-400);">PNG, JPG, WEBP, SVG (Max 5MB)</span>
+                  </div>
+                </div>
+
+                <!-- Selected State -->
+                <div id="masterAlterLedgerBankAcctQrSelectedState" style="display: none; align-items: center; justify-content: space-between; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                    <img id="masterAlterLedgerBankAcctQrPreviewImg" src="" alt="QR Code" style="width: 34px; height: 34px; object-fit: contain; border-radius: 6px; border: 1px solid var(--slate-200); background: #fff; flex-shrink: 0;">
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; text-align: left;">
+                      <span id="masterAlterLedgerBankAcctQrFileName" style="font-size: 12.5px; font-weight: 700; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;"></span>
+                      <span id="masterAlterLedgerBankAcctQrFileSize" style="font-size: 10.5px; color: var(--slate-500); font-weight: 500;"></span>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                    <a id="masterAlterLedgerBankAcctQrPreviewBtn" href="#" target="_blank" style="padding: 4px 9px; font-size: 11.5px; font-weight: 600; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; text-decoration: none;" title="View full image">View</a>
+                    <button id="masterAlterLedgerBankAcctQrRemoveBtn" type="button" style="background: none; border: none; color: #dc2626; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center;" title="Remove QR code">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
             <!-- Additional Information (Dynamic for Revenue from Operations group) -->
             <div id="masterAlterLedgerSacWrap" style="display: none; background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 24px; transition: all 0.2s ease;">
               <div style="font-size: 13.5px; font-weight: 700; color: var(--slate-800); margin-bottom: 14px; display: flex; align-items: center; gap: 7px;">
@@ -11577,10 +11714,15 @@
         const groupSel = contentArea.querySelector('#masterAlterLedgerGroupCombinedSel');
         const addInfoWrap = contentArea.querySelector('#masterAlterLedgerAdditionalInfoWrap');
         const sacWrap = contentArea.querySelector('#masterAlterLedgerSacWrap');
+        const bankAcctWrap = contentArea.querySelector('#masterAlterLedgerBankAcctWrap');
         const updateAdditionalInfoVisibility = () => {
           if (!groupSel || !addInfoWrap) return;
           const isParty = isTradePartyGroup(groupSel.value);
           addInfoWrap.style.display = isParty ? 'block' : 'none';
+
+          if (bankAcctWrap) {
+            bankAcctWrap.style.display = isBankAccountGroup(groupSel.value) ? 'block' : 'none';
+          }
 
           if (sacWrap) {
             sacWrap.style.display = isRevenueFromOperationsGroup(groupSel.value) ? 'block' : 'none';
@@ -11602,11 +11744,190 @@
 
         // Revenue from Operations group: searchable SAC Code -> Description
         wireSacCodeDescFields(contentArea, 'masterAlterLedgerSacCode', 'masterAlterLedgerSacDesc');
+      // Bank Account group: searchable Bank Name field (matches Group field's
+      // trigger + caret + in-dropdown search box pattern)
+      const bankNameHidden = contentArea.querySelector('#masterAlterLedgerBankAcctBankName');
+      const bankNameTrigger = contentArea.querySelector('#masterAlterLedgerBankAcctBankNameTrigger');
+      const bankNameTriggerText = contentArea.querySelector('#masterAlterLedgerBankAcctBankNameTriggerText');
+      const bankNameDropdown = contentArea.querySelector('#masterAlterLedgerBankAcctBankNameDropdown');
+      const bankNameSearch = contentArea.querySelector('#masterAlterLedgerBankAcctBankNameSearch');
+      const bankNameOptionsList = contentArea.querySelector('#masterAlterLedgerBankAcctBankNameOptionsList');
+
+      if (bankNameHidden && bankNameTrigger && bankNameTriggerText && bankNameDropdown && bankNameSearch && bankNameOptionsList) {
+        const setBankName = (val) => {
+          bankNameHidden.value = val;
+          bankNameTriggerText.textContent = val || 'Select Bank';
+          bankNameTriggerText.style.color = val ? 'var(--slate-700)' : 'var(--slate-400)';
+        };
+
+        const renderBankOptions = (filter = '') => {
+          bankNameOptionsList.innerHTML = '';
+          const query = filter.toLowerCase().trim();
+          const matches = query ? INDIAN_BANKS_LIST.filter(b => b.toLowerCase().includes(query)) : INDIAN_BANKS_LIST;
+
+          const renderRow = (label, value, isSelected) => {
+            const item = document.createElement('div');
+            item.textContent = label;
+            item.style.padding = '8.5px 12px';
+            item.style.fontSize = '13.5px';
+            item.style.borderRadius = '6px';
+            item.style.cursor = 'pointer';
+            item.style.fontWeight = isSelected ? '700' : '500';
+            item.style.background = isSelected ? 'var(--blue-50)' : 'transparent';
+            item.style.color = isSelected ? 'var(--blue-700)' : 'var(--slate-700)';
+
+            item.addEventListener('mouseover', () => {
+              if (!isSelected) item.style.background = 'var(--slate-50)';
+            });
+            item.addEventListener('mouseout', () => {
+              if (!isSelected) item.style.background = 'transparent';
+            });
+            item.addEventListener('click', () => {
+              setBankName(value);
+              bankNameDropdown.style.display = 'none';
+            });
+
+            bankNameOptionsList.appendChild(item);
+          };
+
+          matches.forEach(bankName => renderRow(bankName, bankName, bankNameHidden.value === bankName));
+
+          if (matches.length === 0 && query) {
+            const emptyState = document.createElement('div');
+            emptyState.style.padding = '10px 12px';
+            emptyState.style.fontSize = '12px';
+            emptyState.style.color = 'var(--slate-400)';
+            emptyState.textContent = 'No matching bank found';
+            bankNameOptionsList.appendChild(emptyState);
+            renderRow(`Use "${filter.trim()}"`, filter.trim(), false);
+          }
+        };
+
+        bankNameTrigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isOpen = bankNameDropdown.style.display === 'flex';
+          if (!isOpen) {
+            document.querySelectorAll('.kya-searchable-select-dropdown').forEach(dd => {
+              if (dd !== bankNameDropdown) dd.style.display = 'none';
+            });
+            bankNameDropdown.style.display = 'flex';
+            bankNameSearch.value = '';
+            renderBankOptions('');
+            setTimeout(() => bankNameSearch.focus(), 50);
+          } else {
+            bankNameDropdown.style.display = 'none';
+          }
+        });
+
+        bankNameSearch.addEventListener('input', (e) => renderBankOptions(e.target.value));
+
+        document.addEventListener('click', (e) => {
+          if (!bankNameDropdown.contains(e.target) && !bankNameTrigger.contains(e.target)) {
+            bankNameDropdown.style.display = 'none';
+          }
+        });
+      }
+
+      let _masterAlterLedgerBankAcctQrData = null;
+      const bankAcctQrInput = contentArea.querySelector('#masterAlterLedgerBankAcctQrInput');
+      const bankAcctQrDropzone = contentArea.querySelector('#masterAlterLedgerBankAcctQrDropzone');
+      const bankAcctQrEmptyState = contentArea.querySelector('#masterAlterLedgerBankAcctQrEmptyState');
+      const bankAcctQrSelectedState = contentArea.querySelector('#masterAlterLedgerBankAcctQrSelectedState');
+      const bankAcctQrStatusBadge = contentArea.querySelector('#masterAlterLedgerBankAcctQrStatusBadge');
+      const bankAcctQrPreviewImg = contentArea.querySelector('#masterAlterLedgerBankAcctQrPreviewImg');
+      const bankAcctQrFileNameEl = contentArea.querySelector('#masterAlterLedgerBankAcctQrFileName');
+      const bankAcctQrFileSizeEl = contentArea.querySelector('#masterAlterLedgerBankAcctQrFileSize');
+      const bankAcctQrPreviewBtn = contentArea.querySelector('#masterAlterLedgerBankAcctQrPreviewBtn');
+      const bankAcctQrRemoveBtn = contentArea.querySelector('#masterAlterLedgerBankAcctQrRemoveBtn');
+
+      const formatQrBytes = (bytes) => {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      };
+
+      const updateQrUI = (doc) => {
+        _masterAlterLedgerBankAcctQrData = doc;
+
+        if (!doc || !doc.fileData) {
+          if (bankAcctQrEmptyState) bankAcctQrEmptyState.style.display = 'flex';
+          if (bankAcctQrSelectedState) bankAcctQrSelectedState.style.display = 'none';
+          if (bankAcctQrStatusBadge) bankAcctQrStatusBadge.style.display = 'none';
+          if (bankAcctQrInput) bankAcctQrInput.value = '';
+          if (bankAcctQrPreviewImg) bankAcctQrPreviewImg.src = '';
+          return;
+        }
+
+        if (bankAcctQrEmptyState) bankAcctQrEmptyState.style.display = 'none';
+        if (bankAcctQrSelectedState) bankAcctQrSelectedState.style.display = 'flex';
+        if (bankAcctQrStatusBadge) bankAcctQrStatusBadge.style.display = 'inline-block';
+        if (bankAcctQrPreviewImg) bankAcctQrPreviewImg.src = doc.fileData;
+        if (bankAcctQrFileNameEl) bankAcctQrFileNameEl.textContent = doc.fileName || 'QR Code';
+        if (bankAcctQrFileSizeEl) bankAcctQrFileSizeEl.textContent = doc.fileSize || formatQrBytes(doc.fileBytes || 0);
+        if (bankAcctQrPreviewBtn) bankAcctQrPreviewBtn.href = doc.fileData;
+      };
+
+      const handleQrUpload = (file) => {
+        if (!file) return;
+        if (!file.type || !file.type.startsWith('image/')) {
+          if (typeof showToast === 'function') showToast('Only image files are supported for the QR code.', 'error');
+          else alert('Only image files are supported for the QR code.');
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          if (typeof showToast === 'function') showToast('Image size exceeds 5MB limit.', 'error');
+          else alert('Image size exceeds 5MB limit.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          updateQrUI({
+            fileName: file.name,
+            fileSize: formatQrBytes(file.size),
+            fileBytes: file.size,
+            fileData: ev.target.result
+          });
+        };
+        reader.readAsDataURL(file);
+      };
+
+      if (bankAcctQrDropzone && bankAcctQrInput) {
+        bankAcctQrDropzone.addEventListener('click', (e) => {
+          if (e.target.closest('#masterAlterLedgerBankAcctQrPreviewBtn') || e.target.closest('#masterAlterLedgerBankAcctQrRemoveBtn')) return;
+          bankAcctQrInput.click();
+        });
+        bankAcctQrInput.addEventListener('change', (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) handleQrUpload(file);
+        });
+        bankAcctQrDropzone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); bankAcctQrDropzone.style.borderColor = '#2563eb'; bankAcctQrDropzone.style.background = '#eff6ff'; });
+        bankAcctQrDropzone.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); bankAcctQrDropzone.style.borderColor = 'var(--slate-300)'; bankAcctQrDropzone.style.background = '#fff'; });
+        bankAcctQrDropzone.addEventListener('drop', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          bankAcctQrDropzone.style.borderColor = 'var(--slate-300)'; bankAcctQrDropzone.style.background = '#fff';
+          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file) handleQrUpload(file);
+        });
+      }
+
+      if (bankAcctQrRemoveBtn) {
+        bankAcctQrRemoveBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          updateQrUI(null);
+        });
+      }
+
+      // Show the QR code this ledger already has
+      if (curBankAcct.qrCode) {
+        updateQrUI({ fileName: curBankAcct.qrCodeFileName || 'QR Code', fileData: curBankAcct.qrCode, fileSize: '' });
+      }
 
         // Additional Details popup (Trade Receivables / Payables, Revenue from Operations) —
         // opens when such a group is selected, like the Create form
         wireAlterAddlPopup(contentArea, 'masterAlterLedger', {
-          wrapIds: ['masterAlterLedgerAdditionalInfoWrap', 'masterAlterLedgerSacWrap'],
+          wrapIds: ['masterAlterLedgerAdditionalInfoWrap', 'masterAlterLedgerBankAcctWrap', 'masterAlterLedgerSacWrap'],
           watchSelectId: 'masterAlterLedgerGroupCombinedSel',
           subtitle: () => {
             const nm = contentArea.querySelector('#masterAlterLedgerName');
@@ -11762,6 +12083,19 @@
             }
             currentLedger.sacInfo = sacInfo;
 
+            // Bank Account group: the details from the Additional Details popup
+            if (isBankAccountGroup(groupVal)) {
+              currentLedger.bankAccountInfo = {
+                bankName: contentArea.querySelector('#masterAlterLedgerBankAcctBankName')?.value?.trim() || '',
+                accountHolder: contentArea.querySelector('#masterAlterLedgerBankAcctHolder')?.value?.trim() || '',
+                accountNo: contentArea.querySelector('#masterAlterLedgerBankAcctNo')?.value?.trim() || '',
+                ifscCode: contentArea.querySelector('#masterAlterLedgerBankAcctIfsc')?.value?.trim() || '',
+                branch: contentArea.querySelector('#masterAlterLedgerBankAcctBranch')?.value?.trim() || '',
+                qrCode: _masterAlterLedgerBankAcctQrData ? _masterAlterLedgerBankAcctQrData.fileData : '',
+                qrCodeFileName: _masterAlterLedgerBankAcctQrData ? _masterAlterLedgerBankAcctQrData.fileName : ''
+              };
+            }
+
             if (typeof renderChartPanel === 'function') renderChartPanel();
             if (typeof refreshAllReports === 'function') refreshAllReports();
             if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
@@ -11770,6 +12104,7 @@
 
             showToast(`Ledger "${name}" updated successfully.`, 'success');
             _masterAlterSelectedLedgerId = currentLedger.id;
+            if (returnAlterToVoucher('ledger', currentLedger)) return;
             updateMasterDeskContent();
         };
         if (saveBtn) saveBtn.addEventListener('click', applyAlterCurrent);
@@ -11809,6 +12144,7 @@
 
         if (cancelBtn) {
           cancelBtn.addEventListener('click', () => {
+            if (cancelMasterDeskReturn()) return;
             updateMasterDeskContent();
           });
         }
@@ -12187,6 +12523,7 @@
 
             showToast(`Customer "${name}" updated successfully.`, 'success');
             _masterAlterSelectedCustomerId = currentCustomer.id;
+            if (returnAlterToVoucher('customers', currentCustomer)) return;
             updateMasterDeskContent();
         };
         if (saveBtn) saveBtn.addEventListener('click', applyAlterCurrent);
@@ -12227,6 +12564,7 @@
 
         if (cancelBtn) {
           cancelBtn.addEventListener('click', () => {
+            if (cancelMasterDeskReturn()) return;
             updateMasterDeskContent();
           });
         }
@@ -13314,6 +13652,7 @@
 
             persistMasterStockItems();
             showToast(`Stock Item "${name}" updated successfully.`, 'success');
+            if (returnAlterToVoucher('stock_item', currentItem)) return;
             updateMasterDeskContent();
         };
         if (saveBtn) saveBtn.addEventListener('click', applyAlterCurrent);
@@ -13347,6 +13686,7 @@
 
         if (cancelBtn) {
           cancelBtn.addEventListener('click', () => {
+            if (cancelMasterDeskReturn()) return;
             updateMasterDeskContent();
           });
         }
@@ -13761,6 +14101,7 @@
 
             persistMasterUnits();
             showToast(`Unit "${symbol}" updated successfully.`, 'success');
+            if (returnAlterToVoucher('unit', currentUnit)) return;
             updateMasterDeskContent();
         };
         if (saveBtn) saveBtn.addEventListener('click', applyAlterCurrent);
@@ -13794,6 +14135,7 @@
 
         if (cancelBtn) {
           cancelBtn.addEventListener('click', () => {
+            if (cancelMasterDeskReturn()) return;
             updateMasterDeskContent();
           });
         }
@@ -14555,6 +14897,116 @@
     }, 60);
   }
 
+  // Opens Create Stock Item; used by voucher rows to add a missing product and come back.
+  function openMasterDeskCreateStockItem(options = {}) {
+    _masterDeskReturnContext = options;
+
+    if (typeof openTab === 'function') {
+      openTab('master_desk');
+    } else if (typeof window.openTab === 'function') {
+      window.openTab('master_desk');
+    } else {
+      window.location.hash = '#master_desk';
+    }
+
+    const wrap = document.getElementById('panel-master-desk');
+    if (wrap && (!_masterDeskInitialized || !wrap.children.length)) {
+      initMasterDesk(wrap);
+      _masterDeskInitialized = true;
+    }
+
+    setMasterDeskSubtype('Create');
+    setMasterDeskTab('stock_item');
+
+    setTimeout(() => {
+      const nameInp = document.getElementById('masterStockItemName');
+      if (!nameInp) return;
+      if (options.initialName) {
+        nameInp.value = options.initialName;
+        nameInp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      nameInp.focus();
+      if (options.initialName) nameInp.select();
+    }, 60);
+  }
+
+  // Opens Alter on one record (customers / ledger / stock_item / unit); used by the
+  // voucher's pencil icons. Saving that record returns to the voucher.
+  function openMasterDeskAlter(options = {}) {
+    const setSelected = {
+      customers: (id) => { _masterAlterSelectedCustomerId = id; },
+      ledger: (id) => { _masterAlterSelectedLedgerId = id; },
+      stock_item: (id) => { _masterAlterSelectedStockItemId = id; },
+      unit: (id) => { _masterAlterSelectedUnitId = id; }
+    }[options.tab];
+    if (!setSelected) return;
+    _masterDeskReturnContext = Object.assign({ purpose: 'voucherAlter' }, options);
+
+    if (typeof openTab === 'function') openTab('master_desk');
+    else if (typeof window.openTab === 'function') window.openTab('master_desk');
+    else window.location.hash = '#master_desk';
+
+    const wrap = document.getElementById('panel-master-desk');
+    if (wrap && (!_masterDeskInitialized || !wrap.children.length)) {
+      initMasterDesk(wrap);
+      _masterDeskInitialized = true;
+    }
+
+    setMasterDeskSubtype('Alter');
+    setMasterDeskTab(options.tab);          // opens with nothing picked…
+    setSelected(options.id);                // …so pick the record afterwards
+    _masterAlterNothingPicked[options.tab] = false;
+    resetMasterAlterRows(options.tab);
+    updateMasterDeskContent();
+  }
+
+  // After an Alter save: if this record was opened from a voucher pencil, go back.
+  function returnAlterToVoucher(tab, record) {
+    const ctx = _masterDeskReturnContext;
+    if (!ctx || ctx.purpose !== 'voucherAlter' || _masterAlterSuppressRender) return false;
+    if (ctx.tab !== tab || !record || String(ctx.id) !== String(record.id)) return false;
+    _masterDeskReturnContext = null;
+    resetMasterAlterRows(tab);
+    const target = ctx.returnTab || 'sales_voucher';
+    if (typeof closeTab === 'function') closeTab('master_desk', null, target);
+    if (typeof openTab === 'function') openTab(target);
+    if (typeof window.onVoucherMasterAltered === 'function') window.onVoucherMasterAltered(tab, record);
+    return true;
+  }
+
+  // Opens Create Unit; used by voucher rows to add a missing unit and come back.
+  function openMasterDeskCreateUnit(options = {}) {
+    _masterDeskReturnContext = options;
+
+    if (typeof openTab === 'function') {
+      openTab('master_desk');
+    } else if (typeof window.openTab === 'function') {
+      window.openTab('master_desk');
+    } else {
+      window.location.hash = '#master_desk';
+    }
+
+    const wrap = document.getElementById('panel-master-desk');
+    if (wrap && (!_masterDeskInitialized || !wrap.children.length)) {
+      initMasterDesk(wrap);
+      _masterDeskInitialized = true;
+    }
+
+    setMasterDeskSubtype('Create');
+    setMasterDeskTab('unit');
+
+    setTimeout(() => {
+      const symbolInp = document.getElementById('masterUnitSymbol');
+      if (!symbolInp) return;
+      if (options.initialName) {
+        symbolInp.value = options.initialName;
+        symbolInp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      symbolInp.focus();
+      if (options.initialName) symbolInp.select();
+    }, 60);
+  }
+
   function cancelMasterDeskReturn() {
     if (_masterDeskReturnContext) {
       const ctx = _masterDeskReturnContext;
@@ -14562,6 +15014,8 @@
       _masterLedgerAliases = [];
       _masterCustomerAliases = [];
       _masterSupplierAliases = [];
+      _masterStockItemAliases = [];
+      _masterUnitAliases = [];
 
       const targetTab = ctx.returnTab || 'journal';
 
@@ -14579,7 +15033,19 @@
         navigateTo(targetTab);
       }
 
-      if (targetTab === 'sales_voucher') {
+      if (ctx.purpose === 'voucherItem') {
+        if (typeof window.onVoucherItemCreationCancelled === 'function') {
+          window.onVoucherItemCreationCancelled();
+        }
+      } else if (ctx.purpose === 'voucherUnit') {
+        if (typeof window.onVoucherUnitCreationCancelled === 'function') {
+          window.onVoucherUnitCreationCancelled();
+        }
+      } else if (ctx.purpose === 'voucherAlter') {
+        if (typeof window.onVoucherMasterAlterCancelled === 'function') {
+          window.onVoucherMasterAlterCancelled(ctx);
+        }
+      } else if (targetTab === 'sales_voucher') {
         if (typeof window.onPartyCreationCancelledForSales === 'function') {
           window.onPartyCreationCancelledForSales(ctx.initialName);
         }
@@ -14614,6 +15080,9 @@
   window.initMasterDesk = initMasterDesk;
   window.openMasterDeskCreateLedger = openMasterDeskCreateLedger;
   window.openMasterDeskCreateParty = openMasterDeskCreateParty;
+  window.openMasterDeskCreateStockItem = openMasterDeskCreateStockItem;
+  window.openMasterDeskCreateUnit = openMasterDeskCreateUnit;
+  window.openMasterDeskAlter = openMasterDeskAlter;
   window.handleMasterDeskClosed = handleMasterDeskClosed;
   window.checkAndRestorePendingJournalState = checkAndRestorePendingJournalState;
   window._masterStockGroups = _masterStockGroups;

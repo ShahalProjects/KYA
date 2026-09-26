@@ -111,8 +111,8 @@
 
     // Products come from the Stock Item master (Master Desk / Stock Hub), carrying their
     // HSN code, GST rate, unit and selling price so the row can fill itself in.
-    function getProductsList() {
-      return getMasterStockItemList().map(it => ({
+    function toProductPick(it) {
+      return {
         name: it.name || 'Unnamed Item',
         type: 'Product',
         id: it.id || '',
@@ -124,22 +124,104 @@
         hsnDesc: it.hsnDesc || '',
         gst: (typeof it.gst === 'number') ? it.gst : 18,
         aliases: Array.isArray(it.aliases) ? it.aliases : []
-      }));
+      };
+    }
+    function getProductsList() {
+      return getMasterStockItemList().map(toProductPick);
     }
 
     // Services come from the Revenue from Operations ledgers, carrying their SAC code
     // and GST rate.
-    function getServicesList() {
-      return getRevenueFromOperationsLedgers().map(l => ({
+    function toServicePick(l) {
+      return {
         name: l.name,
         type: 'Service',
         id: l.id,
-        aliases: l.aliases,
+        aliases: Array.isArray(l.aliases) ? l.aliases : [],
         code: l.code,
         sac: (l.sacInfo && l.sacInfo.sacCode) || '',
         sacDesc: (l.sacInfo && l.sacInfo.sacDesc) || '',
         gst: (l.sacInfo && typeof l.sacInfo.gstRate === 'number') ? l.sacInfo.gstRate : undefined
-      }));
+      };
+    }
+    function getServicesList() {
+      return getRevenueFromOperationsLedgers().map(toServicePick);
+    }
+
+    // ── Create a missing Stock Item / Service in Master Desk, then come back ──
+    // The row that asked is remembered here; Master Desk calls back via
+    // window.onVoucherItemCreated / onVoucherItemCreationCancelled.
+    let _pendingCreate = null;
+
+    function _startCreate(kind, name) {
+      _pendingCreate = { cb: _activeCb, inp: _activeInp };
+      close();
+      const ctx = { initialName: name, returnTab: 'sales_voucher', purpose: 'voucherItem' };
+      if (kind === 'Product') {
+        if (typeof window.openMasterDeskCreateStockItem === 'function') window.openMasterDeskCreateStockItem(ctx);
+      } else if (typeof window.openMasterDeskCreateLedger === 'function') {
+        window.openMasterDeskCreateLedger(Object.assign(ctx, { groupVal: 'sg:sg-rfo' }));
+      }
+    }
+
+    window.onVoucherItemCreated = function (entity, kind) {
+      const pending = _pendingCreate;
+      _pendingCreate = null;
+      if (!pending || !entity) return;
+      const sel = kind === 'Service' ? toServicePick(entity) : toProductPick(entity);
+      // Let the voucher tab finish showing before filling the row
+      setTimeout(() => {
+        if (typeof pending.cb === 'function') pending.cb(sel);
+        const tr = pending.inp && pending.inp.closest('tr');
+        const next = tr && tr.querySelector('.sales-row-qty:not([readonly])');
+        if (next) { next.focus(); next.select(); }
+      }, 0);
+    };
+
+    window.onVoucherItemCreationCancelled = function () {
+      const pending = _pendingCreate;
+      _pendingCreate = null;
+      if (pending && pending.inp) setTimeout(() => pending.inp.focus(), 0);
+    };
+
+    function _renderCreateOptions(rawQuery) {
+      const showProduct = _activeFilter !== 'service' && typeof window.openMasterDeskCreateStockItem === 'function';
+      const showService = _activeFilter !== 'product' && typeof window.openMasterDeskCreateLedger === 'function';
+      if (!showProduct && !showService) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'je-drop-create-wrap';
+      wrap.style.cssText = `
+        position: sticky; bottom: 0; z-index: 10; background: #ffffff;
+        border-top: 1px solid #e2e8f0; padding: 8px 10px 10px;
+        border-radius: 0 0 12px 12px;
+      `;
+      const label = document.createElement('div');
+      label.style.cssText = 'font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+      label.textContent = rawQuery ? `Create "${rawQuery}" as` : 'Create new';
+      wrap.appendChild(label);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display: flex; gap: 6px;';
+      const plusSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+      const addBtn = (kind, text) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'je-drop-create-item';
+        btn.style.cssText = 'padding: 7px 10px; font-size: 12px;';
+        btn.innerHTML = `${plusSvg}<span>${text}</span>`;
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          _startCreate(kind, rawQuery);
+        });
+        btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+        btnRow.appendChild(btn);
+      };
+      if (showProduct) addBtn('Product', 'Stock Item');
+      if (showService) addBtn('Service', 'Service');
+      wrap.appendChild(btnRow);
+      el.appendChild(wrap);
     }
 
     function open(inp, query, onSelect) {
@@ -225,7 +307,7 @@
             <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
           <span class="je-drop-empty-txt">No stock item or service found</span>
-          <span class="je-drop-empty-sub">Create them in Master Desk (Stock Item / Revenue from Operations), or type a description directly</span>
+          <span class="je-drop-empty-sub">Create one below, or type a description directly</span>
         `;
         el.appendChild(emptyDiv);
       } else {
@@ -290,6 +372,11 @@
           });
         }
       }
+
+      // Offer to create the item unless the typed name already exists exactly
+      const rawQuery = (query || '').trim();
+      const exactMatch = q && products.concat(services).some(x => (x.name || '').toLowerCase() === q);
+      if (!exactMatch) _renderCreateOptions(rawQuery);
     }
 
     function close() {
@@ -319,7 +406,20 @@
       if (_open && !el.contains(e.target) && e.target !== _activeInp) close();
     });
 
-    return { open, close, isOpen, moveHighlight, selectHighlighted };
+    // Applies a master record to the row behind `inp` through that voucher's own
+    // select handler (the one its focus listener hands to open()).
+    function pickFor(inp, sel) {
+      if (!inp || !sel) return;
+      inp.dispatchEvent(new Event('focus'));
+      const cb = _activeCb;
+      close();
+      if (typeof cb === 'function') cb(sel);
+    }
+    function toPick(entity, kind) {
+      return kind === 'Service' ? toServicePick(entity) : toProductPick(entity);
+    }
+
+    return { open, close, isOpen, moveHighlight, selectHighlighted, pickFor, toPick };
   })();
 
   const _salesItemPortal = _salesRevPortal;
@@ -520,6 +620,468 @@
   window._salesCodePortal = _salesCodePortal;
 
   // ══════════════════════════════════════════════════════════════════
+  //  UNIT PICKER — row Unit cell lists the Master Desk Unit master. A unit that
+  //  isn't in the master can still be typed; the cell is then flagged so it's clear
+  //  it was used without being created. "Create Unit" opens Master Desk and returns.
+  // ══════════════════════════════════════════════════════════════════
+  function getMasterUnitList() {
+    if (Array.isArray(window._masterUnits)) return window._masterUnits;
+    try {
+      const parsed = JSON.parse(localStorage.getItem('kya_master_units') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+
+  // Returns the master unit matching a typed value (symbol, formal name or alias).
+  function findMasterUnit(value) {
+    const v = (value || '').trim().toLowerCase();
+    if (!v) return null;
+    return getMasterUnitList().find(u =>
+      (u.symbol || '').toLowerCase() === v ||
+      (u.formalName || '').toLowerCase() === v ||
+      (Array.isArray(u.aliases) && u.aliases.some(a => (a || '').toLowerCase() === v))
+    ) || null;
+  }
+
+  // Flags a Unit input whose value is not in the Unit master, and shows its Alter
+  // pencil only when it is a master unit.
+  function markVoucherRowUnit(unitInp) {
+    if (!unitInp) return;
+    const val = unitInp.value.trim();
+    const master = val ? findMasterUnit(val) : null;
+    const unlisted = !!val && !master;
+    unitInp.classList.toggle('kya-unit-unlisted', unlisted);
+    unitInp.title = unlisted ? `"${val}" is not in the Unit master — used as typed` : '';
+    const pencil = unitInp.parentElement && unitInp.parentElement.querySelector('.kya-alter-pencil[data-alter="unit"]');
+    if (pencil) pencil.hidden = !master;
+  }
+  window.markVoucherRowUnit = markVoucherRowUnit;
+
+  // ══════════════════════════════════════════════════════════════════
+  //  ALTER PENCILS — Customer, row Description and row Unit open the record in
+  //  Master Desk → Alter; saving it returns here and refreshes the voucher.
+  // ══════════════════════════════════════════════════════════════════
+  const ALTER_PENCIL_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+  let _pendingAlter = null;
+
+  function makeAlterPencil(kind, label) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'kya-alter-pencil';
+    btn.dataset.alter = kind;
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.tabIndex = -1;
+    btn.innerHTML = ALTER_PENCIL_SVG;
+    // Keep focus (and any open picker) where it is until the click lands
+    btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+    return btn;
+  }
+
+  function goAlter(tab, id, pending) {
+    if (typeof window.openMasterDeskAlter !== 'function') return;
+    _pendingAlter = pending;
+    window.openMasterDeskAlter({ tab: tab, id: id, returnTab: 'sales_voucher' });
+  }
+
+  // The master record a row's Description is linked to, if it still exists.
+  function getRowLinkedMaster(row) {
+    if (!row) return null;
+    if (row.stockItemId) {
+      const it = getMasterStockItemList().find(x => String(x.id) === String(row.stockItemId));
+      if (it) return { tab: 'stock_item', id: it.id, entity: it, kind: 'Product' };
+    }
+    if (row.revenueLedgerId && typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      const l = coaLedgers.find(x => String(x.id) === String(row.revenueLedgerId));
+      if (l) return { tab: 'ledger', id: l.id, entity: l, kind: 'Service' };
+    }
+    return null;
+  }
+
+  // Adds the Description and Unit pencils to one voucher row. `getRow` returns that
+  // row's data object (each voucher keeps its own rows array).
+  function attachVoucherRowAlterButtons(tr, getRow) {
+    if (!tr || tr._alterPencilsWired) return;
+    tr._alterPencilsWired = true;
+
+    const itemInp = tr.querySelector('.sales-row-item');
+    if (itemInp && !itemInp.readOnly && itemInp.parentElement) {
+      const btn = makeAlterPencil('item', 'Alter this item in Master Desk');
+      btn.style.right = '16px';
+      itemInp.style.paddingRight = '36px';
+      itemInp.parentElement.appendChild(btn);
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const linked = getRowLinkedMaster(getRow());
+        if (!linked) return;
+        _salesItemPortal.close();
+        goAlter(linked.tab, linked.id, { type: 'item', inp: itemInp, kind: linked.kind, tr: tr });
+      });
+    }
+
+    const unitInp = tr.querySelector('.sales-row-unit');
+    if (unitInp && !unitInp.readOnly && unitInp.parentElement) {
+      const cell = unitInp.parentElement;
+      if (getComputedStyle(cell).position === 'static') cell.style.position = 'relative';
+      const btn = makeAlterPencil('unit', 'Alter this unit in Master Desk');
+      btn.style.right = '0';
+      cell.appendChild(btn);
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const unit = findMasterUnit(unitInp.value);
+        if (!unit) return;
+        _salesUnitPortal.close();
+        goAlter('unit', unit.id, { type: 'unit', inp: unitInp });
+      });
+      markVoucherRowUnit(unitInp);
+    }
+
+    tr._refreshAlterPencils = () => {
+      const itemBtn = tr.querySelector('.kya-alter-pencil[data-alter="item"]');
+      if (itemBtn) itemBtn.hidden = !getRowLinkedMaster(getRow());
+      markVoucherRowUnit(tr.querySelector('.sales-row-unit'));
+    };
+    tr._refreshAlterPencils();
+  }
+  window.attachVoucherRowAlterButtons = attachVoucherRowAlterButtons;
+
+  // Customer box pencil: shown once a customer (or Trade Receivables ledger) is picked.
+  function getSalesCustomerMaster() {
+    const val = (document.getElementById('salesCustomer') || {}).value;
+    if (!val) return null;
+    const cust = (typeof getKyaCustomers === 'function' ? getKyaCustomers() : []).find(c => String(c.id) === String(val));
+    if (cust) return { tab: 'customers', id: cust.id };
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      const l = coaLedgers.find(x => String(x.id) === String(val));
+      if (l) return { tab: 'ledger', id: l.id };
+    }
+    return null;
+  }
+
+  function refreshSalesCustomerAlterPencil() {
+    const btn = document.getElementById('btnSalesCustomerAlter');
+    const text = document.getElementById('salesCustomerSelectTriggerText');
+    const show = !!getSalesCustomerMaster();
+    if (btn) btn.hidden = !show;
+    // Keep a long name clear of the pencil
+    if (text) {
+      text.style.paddingRight = show ? '26px' : '';
+      text.style.overflow = 'hidden';
+      text.style.textOverflow = 'ellipsis';
+      text.style.whiteSpace = 'nowrap';
+    }
+  }
+  window.refreshSalesCustomerAlterPencil = refreshSalesCustomerAlterPencil;
+
+  (function wireSalesCustomerAlterPencil() {
+    const btn = document.getElementById('btnSalesCustomerAlter');
+    const sel = document.getElementById('salesCustomer');
+    if (!btn || btn._wired) return;
+    btn._wired = true;
+    btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const m = getSalesCustomerMaster();
+      if (m) goAlter(m.tab, m.id, { type: 'customer' });
+    });
+    if (sel) sel.addEventListener('change', refreshSalesCustomerAlterPencil);
+    refreshSalesCustomerAlterPencil();
+  })();
+
+  window.onVoucherMasterAltered = function (tab, record) {
+    const pending = _pendingAlter;
+    _pendingAlter = null;
+    if (!pending || !record) return;
+    setTimeout(() => {
+      if (pending.type === 'customer') {
+        // Same customer, refreshed name/details. The voucher's cached copy of the party is
+        // dropped so it rebuilds from the altered master — unless it was edited for this
+        // invoice on purpose.
+        const ov = window._salesPartyOverride;
+        if (ov && String(ov.partyId) === String(record.id) && !ov.isOverridden) window._salesPartyOverride = null;
+        populateSalesCustomers(record.id);
+        const sel = document.getElementById('salesCustomer');
+        if (sel) {
+          sel.value = record.id;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        refreshSalesCustomerAlterPencil();
+      } else if (pending.type === 'item') {
+        // Re-apply the altered item to its row (name, HSN/SAC, unit, price, GST)
+        _salesItemPortal.pickFor(pending.inp, _salesItemPortal.toPick(record, pending.kind));
+        if (pending.tr && pending.tr._refreshAlterPencils) pending.tr._refreshAlterPencils();
+      } else if (pending.type === 'unit') {
+        const inp = pending.inp;
+        if (inp) {
+          inp.value = record.symbol || inp.value;
+          inp._unitSilent = true;
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+          inp._unitSilent = false;
+          markVoucherRowUnit(inp);
+        }
+      }
+    }, 0);
+  };
+
+  window.onVoucherMasterAlterCancelled = function () {
+    const pending = _pendingAlter;
+    _pendingAlter = null;
+    if (pending && pending.type === 'unit') setTimeout(() => markVoucherRowUnit(pending.inp), 0);
+  };
+
+  const _salesUnitPortal = (() => {
+    let el = document.getElementById('sales-unit-portal-dropdown');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sales-unit-portal-dropdown';
+      el.style.cssText = `
+        position: fixed; z-index: 99999; background: #ffffff;
+        border: 1.5px solid #e2e8f0; border-radius: 14px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,.06), 0 12px 32px -4px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.02);
+        max-height: 320px; overflow-y: auto; overflow-x: hidden; display: none;
+        font-family: Inter, sans-serif; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
+      `;
+      document.body.appendChild(el);
+    }
+    if (!document.getElementById('sales-unit-portal-styles')) {
+      const style = document.createElement('style');
+      style.id = 'sales-unit-portal-styles';
+      style.textContent = `
+        #sales-unit-portal-dropdown.open { display: block !important; animation: jeDropIn .14s cubic-bezier(.2,0,.2,1); }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const WIDTH = 260;
+    let _activeInp = null;
+    let _highlightIdx = -1;
+    let _open = false;
+    let _pendingCreate = null;
+
+    function _items() { return el.querySelectorAll('.je-drop-item'); }
+    function _setHL(idx) {
+      const items = _items();
+      items.forEach(it => it.classList.remove('highlighted'));
+      _highlightIdx = idx;
+      if (idx >= 0 && idx < items.length) {
+        items[idx].classList.add('highlighted');
+        items[idx].scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    function _position(inp) {
+      const r = inp.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - r.bottom - 8;
+      const spaceAbove = r.top - 8;
+      el.style.maxHeight = Math.min(320, Math.max(spaceBelow, spaceAbove) - 8) + 'px';
+      el.style.width = WIDTH + 'px';
+      el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - WIDTH - 8)) + 'px';
+      if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+        el.style.top = (r.bottom + 6) + 'px';
+        el.style.bottom = 'auto';
+      } else {
+        el.style.top = 'auto';
+        el.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+      }
+    }
+
+    // Writes a unit into the input and lets the voucher's own row listener pick it up.
+    function _apply(inp, value) {
+      if (!inp) return;
+      inp.value = value;
+      inp._unitSilent = true;
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+      inp._unitSilent = false;
+      markVoucherRowUnit(inp);
+    }
+
+    function open(inp) {
+      _activeInp = inp;
+      _highlightIdx = -1;
+      _position(inp);
+      _render(inp.value);
+      el.classList.add('open');
+      _open = true;
+    }
+
+    function _render(query) {
+      const raw = (query || '').trim();
+      const q = raw.toLowerCase();
+      el.innerHTML = '';
+
+      const all = getMasterUnitList();
+      const matches = q
+        ? all.filter(u => (u.symbol || '').toLowerCase().includes(q) ||
+                          (u.formalName || '').toLowerCase().includes(q) ||
+                          (Array.isArray(u.aliases) && u.aliases.some(a => (a || '').toLowerCase().includes(q))))
+        : all;
+
+      if (matches.length) {
+        const hdr = document.createElement('div');
+        hdr.className = 'je-drop-header';
+        hdr.textContent = 'Units';
+        el.appendChild(hdr);
+        matches.forEach(u => {
+          const item = document.createElement('div');
+          item.className = 'je-drop-item';
+          const meta = [u.formalName, u.uqc].filter(Boolean).join(' · ');
+          item.innerHTML = `
+            <span style="font-weight: 800; color: #1d4ed8; min-width: 48px;">${ohEsc(u.symbol || '')}</span>
+            <span class="je-drop-name" style="flex:1; font-size: 12px; color: #64748b;">${ohEsc(meta)}</span>
+          `;
+          item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const inp = _activeInp;
+            close();
+            _apply(inp, u.symbol || '');
+          });
+          item.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+          el.appendChild(item);
+        });
+      } else {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'je-drop-empty';
+        emptyDiv.style.padding = '16px 14px';
+        emptyDiv.innerHTML = `
+          <span class="je-drop-empty-txt">${all.length ? 'No unit found' : 'No units in Master Desk yet'}</span>
+        `;
+        el.appendChild(emptyDiv);
+      }
+
+      // Typed text that isn't a master unit: offer to create it, or use it as typed
+      if (raw && !findMasterUnit(raw)) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = `
+          position: sticky; bottom: 0; z-index: 10; background: #ffffff;
+          border-top: 1px solid #e2e8f0; padding: 8px 10px 10px; border-radius: 0 0 12px 12px;
+        `;
+        const note = document.createElement('div');
+        note.style.cssText = 'font-size: 11px; font-weight: 600; color: #b45309; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+        note.textContent = `"${raw}" is not in the Unit master`;
+        wrap.appendChild(note);
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display: flex; gap: 6px;';
+        const addBtn = (text, onPick, primary) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'je-drop-create-item';
+          btn.style.cssText = 'padding: 7px 10px; font-size: 12px;' + (primary ? '' : ' color: #475569; background: #f8fafc; border-color: #e2e8f0;');
+          btn.innerHTML = primary
+            ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>${text}</span>`
+            : `<span>${text}</span>`;
+          btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onPick(); });
+          btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+          btnRow.appendChild(btn);
+        };
+        if (typeof window.openMasterDeskCreateUnit === 'function') {
+          addBtn('Create Unit', () => _startCreate(raw), true);
+        }
+        addBtn('Use as typed', () => {
+          const inp = _activeInp;
+          close();
+          markVoucherRowUnit(inp);
+        }, false);
+        wrap.appendChild(btnRow);
+        el.appendChild(wrap);
+      }
+    }
+
+    function _startCreate(name) {
+      _pendingCreate = { inp: _activeInp };
+      close();
+      window.openMasterDeskCreateUnit({ initialName: name, returnTab: 'sales_voucher', purpose: 'voucherUnit' });
+    }
+
+    window.onVoucherUnitCreated = function (unit) {
+      const pending = _pendingCreate;
+      _pendingCreate = null;
+      if (!pending || !unit) return;
+      setTimeout(() => {
+        _apply(pending.inp, unit.symbol || '');
+        const tr = pending.inp && pending.inp.closest('tr');
+        const next = tr && tr.querySelector('.sales-row-rate:not([readonly])');
+        if (next) { next.focus(); next.select(); }
+      }, 0);
+    };
+
+    window.onVoucherUnitCreationCancelled = function () {
+      const pending = _pendingCreate;
+      _pendingCreate = null;
+      if (pending && pending.inp) setTimeout(() => pending.inp.focus(), 0);
+    };
+
+    function close() {
+      el.classList.remove('open');
+      _open = false;
+      _highlightIdx = -1;
+      _activeInp = null;
+    }
+
+    function isOpen() { return _open; }
+    function moveHighlight(d) {
+      const items = _items();
+      if (!items.length) return;
+      _setHL(Math.max(0, Math.min(_highlightIdx + d, items.length - 1)));
+    }
+    // Enter picks only an explicitly highlighted unit — otherwise the typed text stays.
+    function selectHighlighted() {
+      const items = _items();
+      if (_highlightIdx >= 0 && items[_highlightIdx]) {
+        items[_highlightIdx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      } else {
+        const inp = _activeInp;
+        close();
+        markVoucherRowUnit(inp);
+      }
+    }
+
+    function _reposition() { if (_open && _activeInp) _position(_activeInp); }
+    window.addEventListener('scroll', _reposition, true);
+    window.addEventListener('resize', _reposition);
+    document.addEventListener('mousedown', e => {
+      if (_open && !el.contains(e.target) && e.target !== _activeInp) close();
+    });
+
+    return { open, close, isOpen, moveHighlight, selectHighlighted };
+  })();
+
+  // Turns a row's Unit cell into the Unit-master picker. Typing a unit's symbol, formal
+  // name or alias snaps to the master symbol on leaving the cell.
+  function attachVoucherRowUnitPicker(unitInp) {
+    if (!unitInp || unitInp._unitPickerWired) return;
+    unitInp._unitPickerWired = true;
+    markVoucherRowUnit(unitInp);
+    if (unitInp.readOnly) return;
+
+    unitInp.addEventListener('focus', () => _salesUnitPortal.open(unitInp));
+    unitInp.addEventListener('click', () => _salesUnitPortal.open(unitInp));
+    unitInp.addEventListener('input', () => {
+      if (!unitInp._unitSilent) _salesUnitPortal.open(unitInp);
+      markVoucherRowUnit(unitInp);
+    });
+    unitInp.addEventListener('keydown', e => {
+      if (e.key === 'Tab' && _salesUnitPortal.isOpen()) _salesUnitPortal.close();
+      else handlePortalKeydown(e, _salesUnitPortal);
+    });
+    unitInp.addEventListener('blur', () => {
+      const match = findMasterUnit(unitInp.value);
+      if (match && match.symbol && match.symbol !== unitInp.value.trim()) {
+        unitInp.value = match.symbol;
+        unitInp._unitSilent = true;
+        unitInp.dispatchEvent(new Event('input', { bubbles: true }));
+        unitInp._unitSilent = false;
+      }
+      markVoucherRowUnit(unitInp);
+    });
+  }
+  window.attachVoucherRowUnitPicker = attachVoucherRowUnitPicker;
+
+  // ══════════════════════════════════════════════════════════════════
   //  SALES FORM — Row rendering, totals calculation, invoice/order autofill, form init
   //  (Split from sales.js for maintainability)
   // ══════════════════════════════════════════════════════════════════
@@ -650,27 +1212,218 @@
     }
   }
 
-  function getNextAutoInvoiceNumber() {
-    const year = new Date().getFullYear();
-    window.KYA_STORE = window.KYA_STORE || {};
-    if (currentSalesVoucherSubtype === 'Return') {
-      let ctr = window.KYA_STORE.salesReturnCtr || 1;
-      const existing = (window.KYA_STORE.salesVouchers || []).filter(v => v.isReturn).map(v => (v.invoiceNo || '').toLowerCase());
-      while (existing.includes(`rev-${year}-${String(ctr).padStart(3, '0')}`.toLowerCase())) {
-        ctr++;
-      }
-      window.KYA_STORE.salesReturnCtr = ctr;
-      return `REV-${year}-${String(ctr).padStart(3, '0')}`;
-    } else {
-      let ctr = window.KYA_STORE.salesInvoiceCtr || 1;
-      const existing = (window.KYA_STORE.salesVouchers || []).filter(v => !v.isReturn).map(v => (v.invoiceNo || '').toLowerCase());
-      while (existing.includes(`inv-${year}-${String(ctr).padStart(3, '0')}`.toLowerCase())) {
-        ctr++;
-      }
-      window.KYA_STORE.salesInvoiceCtr = ctr;
-      return `INV-${year}-${String(ctr).padStart(3, '0')}`;
-    }
+  // ══════════════════════════════════════════════════════════════════
+  //  INVOICE NUMBERING — prefix / start / digits per kind ('invoice' | 'return'),
+  //  and a permanent register of numbers already used. A number stays used after
+  //  its invoice is deleted, so it can never be issued again.
+  // ══════════════════════════════════════════════════════════════════
+  function getSalesNumberKind() {
+    return currentSalesVoucherSubtype === 'Return' ? 'return' : 'invoice';
   }
+
+  function getSalesNumberingSettings(kind) {
+    const year = new Date().getFullYear();
+    const defaults = kind === 'return'
+      ? { prefix: `REV-${year}-`, start: 1, digits: 3 }
+      : { prefix: `INV-${year}-`, start: 1, digits: 3 };
+    const saved = ((window.KYA_STORE || {}).salesNumbering || {})[kind];
+    if (!saved) return defaults;
+    return {
+      prefix: typeof saved.prefix === 'string' ? saved.prefix : defaults.prefix,
+      start: Math.max(1, parseInt(saved.start, 10) || 1),
+      digits: Math.min(10, Math.max(1, parseInt(saved.digits, 10) || defaults.digits))
+    };
+  }
+
+  function saveSalesNumberingSettings(kind, settings) {
+    window.KYA_STORE = window.KYA_STORE || {};
+    window.KYA_STORE.salesNumbering = window.KYA_STORE.salesNumbering || {};
+    window.KYA_STORE.salesNumbering[kind] = settings;
+    if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+  }
+
+  function formatSalesInvoiceNo(settings, n) {
+    return settings.prefix + String(n).padStart(settings.digits, '0');
+  }
+
+  // Every number ever posted for this kind: the register plus the invoices on file.
+  function getUsedSalesInvoiceNos(kind) {
+    const store = window.KYA_STORE || {};
+    const used = new Set(((store.salesUsedInvoiceNos || {})[kind] || []).map(n => String(n).toLowerCase()));
+    (store.salesVouchers || []).forEach(v => {
+      if (!v.invoiceNo) return;
+      if ((kind === 'return') === !!v.isReturn) used.add(v.invoiceNo.trim().toLowerCase());
+    });
+    return used;
+  }
+
+  function registerUsedSalesInvoiceNo(kind, invoiceNo) {
+    const no = (invoiceNo || '').trim().toLowerCase();
+    if (!no) return;
+    window.KYA_STORE = window.KYA_STORE || {};
+    const reg = window.KYA_STORE.salesUsedInvoiceNos = window.KYA_STORE.salesUsedInvoiceNos || {};
+    reg[kind] = reg[kind] || [];
+    if (!reg[kind].includes(no)) reg[kind].push(no);
+  }
+  window.registerUsedSalesInvoiceNo = registerUsedSalesInvoiceNo;
+
+  // True when the number was already issued. A posted invoice being edited may keep
+  // its own number.
+  function isSalesInvoiceNoUsed(invoiceNo, kind) {
+    const no = (invoiceNo || '').trim().toLowerCase();
+    if (!no) return false;
+    const editing = window._editingSalesInvoice;
+    if (editing && !editing.isDraft) {
+      const orig = ((window.KYA_STORE || {}).salesVouchers || []).find(v => v.id === editing.id);
+      if (orig && (orig.invoiceNo || '').trim().toLowerCase() === no) return false;
+    }
+    return getUsedSalesInvoiceNos(kind || getSalesNumberKind()).has(no);
+  }
+  window.isSalesInvoiceNoUsed = isSalesInvoiceNoUsed;
+
+  function getNextAutoInvoiceNumber(kind) {
+    const k = kind || getSalesNumberKind();
+    const s = getSalesNumberingSettings(k);
+    const used = getUsedSalesInvoiceNos(k);
+    let n = s.start;
+    while (used.has(formatSalesInvoiceNo(s, n).toLowerCase())) n++;
+    return formatSalesInvoiceNo(s, n);
+  }
+
+  // Shows or clears the "already used" message under the Invoice No. field.
+  function validateSalesInvoiceNoField() {
+    const inp = document.getElementById('salesInvoiceNo');
+    const err = document.getElementById('salesInvoiceNoError');
+    if (!inp) return true;
+    const used = currentSalesVoucherSubtype !== 'Return' && isSalesInvoiceNoUsed(inp.value, 'invoice');
+    const no = inp.value.trim();
+    inp.style.borderColor = used ? '#ef4444' : '';
+    // Short line under the box; the full explanation shows when hovering the box
+    const wrap = inp.parentElement;
+    if (wrap) {
+      wrap.classList.toggle('has-invno-error', used);
+      if (used) wrap.setAttribute('data-error-full', `"${no}" is already used. Invoice numbers can't be reused, even after deletion.`);
+      else wrap.removeAttribute('data-error-full');
+    }
+    if (err) {
+      err.textContent = used ? `"${no}" is already used` : '';
+      err.style.display = used ? 'block' : 'none';
+    }
+    return !used;
+  }
+  window.validateSalesInvoiceNoField = validateSalesInvoiceNoField;
+
+  // Pencil popup: set the invoice number prefix, starting number and digits.
+  function openSalesInvoiceNumberingModal() {
+    const kind = 'invoice';
+    const s = getSalesNumberingSettings(kind);
+    document.getElementById('salesNumberingOverlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'salesNumberingOverlay';
+    overlay.style.cssText = `
+      position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center;
+      background: rgba(15,23,42,0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 16px;
+    `;
+    const lbl = 'display:block; font-size:13px; font-weight:600; color:var(--slate-700); margin-bottom:6px;';
+    const inpStyle = 'width:100%; padding:10px 14px; font-size:13.5px; border-radius:8px; border:1.5px solid var(--slate-200); box-sizing:border-box; outline:none; font-family:inherit;';
+    overlay.innerHTML = `
+      <div role="dialog" aria-modal="true" aria-labelledby="salesNumberingTitle" style="background:#fff; border-radius:16px; width:100%; max-width:440px; box-shadow:0 24px 48px -12px rgba(0,0,0,.35); font-family:var(--font-main, Inter, sans-serif); overflow:hidden;">
+        <div style="padding:20px 22px 6px;">
+          <div id="salesNumberingTitle" style="font-size:16px; font-weight:700; color:var(--slate-900);">Invoice Number Format</div>
+          <div style="font-size:12.5px; color:var(--slate-500); margin-top:3px;">New invoices are numbered from this prefix. Numbers already used are skipped automatically.</div>
+        </div>
+        <div style="padding:14px 22px 4px;">
+          <label for="salesNumPrefix" style="${lbl}">Prefix</label>
+          <input id="salesNumPrefix" type="text" maxlength="30" style="${inpStyle}" placeholder="e.g. INV-2026-" />
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
+            <div>
+              <label for="salesNumStart" style="${lbl}">Starting Number</label>
+              <input id="salesNumStart" type="number" min="1" step="1" style="${inpStyle}" />
+            </div>
+            <div>
+              <label for="salesNumDigits" style="${lbl}">Digits</label>
+              <select id="salesNumDigits" style="${inpStyle} background:#fff;">
+                ${[1,2,3,4,5,6].map(d => `<option value="${d}">${d} (${String(1).padStart(d, '0')})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:16px; padding:12px 14px; background:var(--slate-50, #f8fafc); border:1.5px dashed var(--slate-200); border-radius:10px;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--slate-500);">Next invoice number</div>
+            <div id="salesNumPreview" style="font-size:17px; font-weight:800; color:var(--blue-700, #1d4ed8); margin-top:4px; word-break:break-all;"></div>
+            <div id="salesNumPreviewNote" style="font-size:11.5px; color:#b45309; margin-top:4px; display:none;"></div>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; padding:18px 22px 20px;">
+          <button type="button" class="btn btn-secondary" id="salesNumCancel" style="height:38px; padding:8px 16px; font-size:13px; font-weight:600;">Cancel</button>
+          <button type="button" class="btn btn-primary" id="salesNumSave" style="height:38px; padding:8px 16px; font-size:13px; font-weight:600;">Save &amp; Apply</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const prefixInp = overlay.querySelector('#salesNumPrefix');
+    const startInp = overlay.querySelector('#salesNumStart');
+    const digitsSel = overlay.querySelector('#salesNumDigits');
+    const preview = overlay.querySelector('#salesNumPreview');
+    const previewNote = overlay.querySelector('#salesNumPreviewNote');
+    prefixInp.value = s.prefix;
+    startInp.value = s.start;
+    digitsSel.value = String(Math.min(6, s.digits));
+
+    const readForm = () => ({
+      prefix: prefixInp.value.trim(),
+      start: Math.max(1, parseInt(startInp.value, 10) || 1),
+      digits: parseInt(digitsSel.value, 10) || 3
+    });
+    const refreshPreview = () => {
+      const f = readForm();
+      const used = getUsedSalesInvoiceNos(kind);
+      let n = f.start;
+      while (used.has(formatSalesInvoiceNo(f, n).toLowerCase())) n++;
+      preview.textContent = formatSalesInvoiceNo(f, n);
+      const skipped = n - f.start;
+      previewNote.style.display = skipped ? 'block' : 'none';
+      previewNote.textContent = skipped ? `${skipped} number${skipped > 1 ? 's' : ''} from ${formatSalesInvoiceNo(f, f.start)} already used — skipped.` : '';
+    };
+    [prefixInp, startInp, digitsSel].forEach(el => el.addEventListener('input', refreshPreview));
+    digitsSel.addEventListener('change', refreshPreview);
+    refreshPreview();
+
+    const close = () => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const save = () => {
+      saveSalesNumberingSettings(kind, readForm());
+      close();
+      // Re-number the open voucher unless it's a posted invoice being edited
+      const editing = window._editingSalesInvoice;
+      const invNoEl = document.getElementById('salesInvoiceNo');
+      const chipEl = document.getElementById('salesVoucherChipDisplay');
+      if (invNoEl) {
+        const saved = getSalesNumberingSettings(kind);
+        invNoEl.placeholder = formatSalesInvoiceNo(saved, saved.start);
+      }
+      if (invNoEl && !(editing && !editing.isDraft)) {
+        invNoEl.value = getNextAutoInvoiceNumber(kind);
+        if (chipEl) chipEl.textContent = invNoEl.value;
+      }
+      validateSalesInvoiceNoField();
+      if (typeof showToast === 'function') showToast('Invoice number format saved.', 'success');
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); save(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#salesNumCancel').addEventListener('click', close);
+    overlay.querySelector('#salesNumSave').addEventListener('click', save);
+    prefixInp.focus();
+    prefixInp.select();
+  }
+  window.openSalesInvoiceNumberingModal = openSalesInvoiceNumberingModal;
 
   function setInvoiceNoMode(mode) {
     currentSalesInvoiceMode = 'Auto';
@@ -685,11 +1438,11 @@
     }
     
     if (invNoEl) {
-      let ph = 'INV-2026-001';
-      if (currentSalesVoucherSubtype === 'Return') ph = 'REV-2026-001';
-      invNoEl.placeholder = ph;
+      const s = getSalesNumberingSettings(getSalesNumberKind());
+      invNoEl.placeholder = formatSalesInvoiceNo(s, s.start);
     }
-    
+    validateSalesInvoiceNoField();
+
     invNoEl.removeAttribute('readonly');
     invNoEl.style.background = '#fff';
     invNoEl.style.color = 'var(--slate-900)';
@@ -745,6 +1498,7 @@
 
     const control = getSalesCustSearchControl();
     if (control) control.refresh();
+    refreshSalesCustomerAlterPencil();
   }
 
   window.onPartyCreatedForSales = function(newParty, partySource) {
@@ -1465,6 +2219,8 @@
       if (hsnInp && !isLocked) {
         attachVoucherRowCodePicker(hsnInp, () => salesRows[index]);
       }
+      attachVoucherRowUnitPicker(tr.querySelector('.sales-row-unit'));
+      attachVoucherRowAlterButtons(tr, () => salesRows[index]);
     });
   }
 
@@ -1564,7 +2320,10 @@
       hsnEl.title = row.hsnDesc || '';
     }
     const unitEl = tr.querySelector('.sales-row-unit');
-    if (unitEl) unitEl.value = row.unit || '';
+    if (unitEl) {
+      unitEl.value = row.unit || '';
+      markVoucherRowUnit(unitEl);
+    }
     const rateEl = tr.querySelector('.sales-row-rate');
     if (rateEl) rateEl.value = row.rate ? Number(row.rate).toFixed(2) : '';
     const taxEl = tr.querySelector('.sales-row-tax');
@@ -1578,6 +2337,7 @@
       }
       taxEl.value = taxVal;
     }
+    if (tr._refreshAlterPencils) tr._refreshAlterPencils();
   }
   window.refreshVoucherRowInputs = refreshVoucherRowInputs;
 
@@ -1907,8 +2667,24 @@
     }
     
     const amountInput = document.getElementById('salesTdsTcsAmount');
-    
-    if (amountInput && document.activeElement !== amountInput) {
+    // Amount is editable only for a Custom rate; preset rates derive it from the subtotal.
+    const isCustomRate = !!rateSelect && rateSelect.value === 'custom';
+    if (amountInput) {
+      amountInput.readOnly = !isCustomRate;
+      amountInput.title = isCustomRate ? '' : 'Select "Custom" rate to edit the amount';
+    }
+
+    // Custom rate with a typed amount: the amount drives the percentage instead.
+    const isManualAmount = isCustomRate && !!amountInput && amountInput.dataset.manual === '1';
+    if (isManualAmount && tdsTcsMode !== 'None') {
+      const customInput = document.getElementById('salesTdsTcsRateCustom');
+      const manualAmt = parseFloat(amountInput.value) || 0;
+      if (customInput && subTotal > 0) {
+        rate = Math.round((manualAmt / subTotal) * 100 * 100) / 100;
+        customInput.value = rate ? String(rate) : '';
+        if (rateLabel) rateLabel.textContent = rate + '%';
+      }
+    } else if (amountInput && !(isCustomRate && document.activeElement === amountInput)) {
       if (tdsTcsMode !== 'None') {
         const calculatedAmt = subTotal * (rate / 100);
         amountInput.value = calculatedAmt.toFixed(2);
@@ -1980,6 +2756,7 @@
     const cardSubtitle = document.querySelector('#salesVoucherFormCard .je-card-subtitle-text') || document.querySelector('#panel-sales-voucher .je-card-subtitle-text');
     const invoiceNoLabel = document.getElementById('lblSalesInvoiceNo');
     const invoiceNoInput = document.getElementById('salesInvoiceNo');
+    const invoiceNoInputWrap = document.getElementById('salesInvoiceNoInputWrap');
     const selectWrap = document.getElementById('salesInvoiceSelectWrap');
     const invoiceNoContainer = document.getElementById('salesInvoiceNoContainer');
     const postSalesBtn = document.getElementById('btnPostSales');
@@ -2040,7 +2817,8 @@
         if (cardSubtitle) cardSubtitle.textContent = 'Record sales reversals and customer credits';
         if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
         if (invoiceNoLabel) invoiceNoLabel.textContent = 'Original Doc';
-        if (invoiceNoInput) invoiceNoInput.style.display = 'none';
+        if (invoiceNoInputWrap) invoiceNoInputWrap.style.display = 'none';
+        else if (invoiceNoInput) invoiceNoInput.style.display = 'none';
         if (selectWrap) {
           selectWrap.style.display = 'block';
           refreshSalesInvoiceDropdownOptions();
@@ -2053,9 +2831,11 @@
         if (cardTitle) cardTitle.textContent = 'Sales Invoice';
         if (cardSubtitle) cardSubtitle.textContent = 'Record sales transactions and customer receivables';
         if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
+        if (invoiceNoInputWrap) invoiceNoInputWrap.style.display = 'block';
         if (invoiceNoInput) {
           invoiceNoInput.style.display = 'block';
-          invoiceNoInput.placeholder = 'INV-2026-001';
+          const s = getSalesNumberingSettings('invoice');
+          invoiceNoInput.placeholder = formatSalesInvoiceNo(s, s.start);
         }
         if (selectWrap) selectWrap.style.display = 'none';
         if (postSalesBtn) {
@@ -2230,8 +3010,11 @@
   function initSalesForm() {
     window._pendingConvertQuotationId = null;
     window._pendingConvertProformaId = null;
+    window._salesPartyOverride = null;
     updateVoucherSubtypeUI();
-    const today = new Date().toISOString().split('T')[0];
+    // Local date — toISOString() is UTC and gives yesterday before 05:30 IST
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const dateEl = document.getElementById('salesDate');
     const dueEl = document.getElementById('salesDueDate');
     if (dateEl) dateEl.value = today;
@@ -2284,6 +3067,8 @@
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
     if (triggerText) triggerText.textContent = 'Select Invoice';
 
+    _salesCodePortal.close();
+    _salesUnitPortal.close();
     salesRows = [];
     addSalesRow();
     updateSalesReturnLockState();

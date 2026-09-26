@@ -456,6 +456,12 @@
       if (hsnInp && typeof window.attachVoucherRowCodePicker === 'function') {
         window.attachVoucherRowCodePicker(hsnInp, () => quoteRows[index]);
       }
+      if (typeof window.attachVoucherRowUnitPicker === 'function') {
+        window.attachVoucherRowUnitPicker(tr.querySelector('.sales-row-unit'));
+      }
+      if (typeof window.attachVoucherRowAlterButtons === 'function') {
+        window.attachVoucherRowAlterButtons(tr, () => quoteRows[index]);
+      }
     });
   }
 
@@ -809,6 +815,11 @@
       return;
     }
 
+    if (!isDraft && !(data.total > 0)) {
+      showToast('Quotation total must be greater than zero. Please enter rates / amounts for the line items.', 'warning');
+      return;
+    }
+
     window.KYA_STORE.quotations = window.KYA_STORE.quotations || [];
     window.KYA_STORE.quotationsDrafts = window.KYA_STORE.quotationsDrafts || [];
 
@@ -837,7 +848,17 @@
     }
 
     if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-    closeQuotationForm();
+
+    // Editing an existing quotation: return to where it was opened from
+    if (_editingQuote) {
+      closeQuotationForm();
+      return;
+    }
+
+    // New quotation: stay on the form and start a fresh blank one with the next number
+    initQuotationForm(null);
+    const formCard = document.getElementById('salesQuotationFormCard');
+    if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── Setup Event Listeners ──
@@ -1131,6 +1152,7 @@
       });
     }
 
+
     const saveDraftBtn = document.getElementById('btnSaveQuoteDraft');
     if (saveDraftBtn) {
       saveDraftBtn.addEventListener('click', () => {
@@ -1191,6 +1213,11 @@
       return;
     }
 
+    if (quote.status === 'Completed' && newStatus === 'Active') {
+      showToast('Completed quotations cannot be reopened.', 'warning');
+      return;
+    }
+
     quote.status = newStatus;
     quote.updatedAt = Date.now();
 
@@ -1221,6 +1248,11 @@
 
     const qNo = quote ? (quote.quoteNo || 'quotation') : 'quotation';
 
+    if (quote && quote.status === 'Completed') {
+      showToast('Completed quotations cannot be deleted.', 'warning');
+      return;
+    }
+
     showKyaConfirm({
       title: 'Delete Quotation?',
       message: `Permanently delete quotation <strong>${safeEsc(qNo)}</strong>?<br>This action cannot be undone.`,
@@ -1248,6 +1280,10 @@
     const quote = all.find(q => String(q.id) === String(id));
     if (!quote) {
       showToast('Quotation not found.', 'error');
+      return;
+    }
+    if (quote.status === 'Completed') {
+      showToast('Completed quotations cannot be edited.', 'warning');
       return;
     }
     openQuotationForm(quote, 'quotelist');
@@ -1322,7 +1358,7 @@
         invNoEl.value = genNo;
         if (chipEl) chipEl.textContent = genNo || 'INV-XXXX';
       }
-      showToast(`Quotation ${quote.quoteNo} converted! Post the invoice to mark it as completed.`, 'info');
+      showToast(`Quotation ${quote.quoteNo} loaded into Sales Invoice. Click Post Invoice to complete the conversion.`, 'info');
     }
   }
 
@@ -1416,30 +1452,18 @@
     const isAct = quote.status === 'Active' || !quote.status;
     const isDrf = quote.status === 'Draft' || quote.isDraft;
 
+    const actBtnStyle = 'padding: 8px 16px;';
     let statusActionsHtml = '';
     if (isAct || isDrf) {
       statusActionsHtml = `
-        <button type="button" id="btnPreviewToInvoice" class="btn btn-sm" title="Convert to Invoice" aria-label="Convert to Invoice" style="background: #10b981; color: #fff; border: 1.5px solid #059669; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: all 0.15s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        </button>
-        <button type="button" id="btnPreviewEditQuote" class="btn btn-sm" title="Edit Quotation" aria-label="Edit Quotation" style="background: #fff; color: var(--blue-700); border: 1.5px solid var(--slate-300); width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='var(--slate-100)'; this.style.borderColor='var(--blue-400)'" onmouseout="this.style.background='#fff'; this.style.borderColor='var(--slate-300)'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button type="button" id="btnPreviewComplete" class="btn btn-sm" title="Mark Completed" aria-label="Mark Completed" style="background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#dbeafe'; this.style.borderColor='#93c5fd'" onmouseout="this.style.background='#eff6ff'; this.style.borderColor='#bfdbfe'">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-        <button type="button" id="btnPreviewCancel" class="btn btn-sm" title="Mark Cancelled" aria-label="Mark Cancelled" style="background: #fff1f2; color: #be123c; border: 1.5px solid #fecdd3; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#ffe4e6'; this.style.borderColor='#fda4af'" onmouseout="this.style.background='#fff1f2'; this.style.borderColor='#fecdd3'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <button type="button" id="btnPreviewToInvoice" class="btn btn-secondary" style="${actBtnStyle}">Convert to Sale</button>
+        <button type="button" id="btnPreviewComplete" class="btn btn-secondary" style="${actBtnStyle}">Mark Completed</button>
+        <button type="button" id="btnPreviewCancel" class="btn btn-secondary" style="${actBtnStyle}">Mark Cancelled</button>
       `;
-    } else {
+    } else if (quote.status === 'Cancelled') {
+      // Only cancelled quotations can be reopened; completed ones are final
       statusActionsHtml = `
-        <button type="button" id="btnPreviewReopen" class="btn btn-sm" title="Reopen as Active" aria-label="Reopen as Active" style="background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#d1fae5'; this.style.borderColor='#6ee7b7'" onmouseout="this.style.background='#ecfdf5'; this.style.borderColor='#a7f3d0'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        </button>
-        <button type="button" id="btnPreviewEditQuote" class="btn btn-sm" title="Edit Quotation" aria-label="Edit Quotation" style="background: #fff; color: var(--blue-700); border: 1.5px solid var(--slate-300); width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='var(--slate-100)'; this.style.borderColor='var(--blue-400)'" onmouseout="this.style.background='#fff'; this.style.borderColor='var(--slate-300)'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
+        <button type="button" id="btnPreviewReopen" class="btn btn-secondary" style="${actBtnStyle}">Reopen</button>
       `;
     }
 
@@ -1450,7 +1474,7 @@
 
     overlay.innerHTML = `
       <div class="inv-modal-card">
-        <div class="inv-modal-hdr" style="background: linear-gradient(90deg, #1d4ed8, #2563eb);">
+        <div class="inv-modal-hdr" style="background: linear-gradient(90deg, #1d4ed8, #2563eb); flex-wrap: wrap; gap: 10px;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">
               <path d="M4 4h12v12H4z"/>
@@ -1461,7 +1485,7 @@
               <span style="margin-left: 8px; font-family: monospace; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 6px; font-size: 13px;">${safeEsc(quote.quoteNo || 'QT-XXXX')}</span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
             <!-- Export Dropdown (PDF & Excel) -->
             <div class="rpt-more-wrap" style="position: relative;">
               <button class="btn btn-secondary" id="btnExportQuoteAction" type="button" style="background: rgba(255,255,255,0.18); color: #fff; border: 1.5px solid rgba(255,255,255,0.35); font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; height: 36px; transition: all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
@@ -1496,17 +1520,29 @@
                 </button>
               </div>
             </div>
+            <!-- Edit / Delete (same icons as Voucher Desk journal voucher); completed quotations are locked -->
+            ${quote.status === 'Completed' ? '' : `
+            <button type="button" id="btnPreviewEditQuote" title="Edit Quotation" aria-label="Edit Quotation" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button type="button" id="btnPreviewDeleteQuote" title="Delete Quotation" aria-label="Delete Quotation" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>`}
             <button id="btnCloseQuoteModal" style="background: rgba(255,255,255,0.18); border: none; color: #fff; font-size: 18px; cursor: pointer; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; line-height: 1; transition: all 0.15s;" type="button" title="Close Preview" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">✕</button>
           </div>
         </div>
 
-        <!-- Action Bar: Inside the quote preview with all actions aligned to the right side -->
-        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+        <!-- Action Bar: status actions aligned to the left side (hidden when none apply) -->
+        ${statusActionsHtml ? `
+        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap;">
           ${statusActionsHtml}
-          <button type="button" id="btnPreviewDeleteQuote" class="btn btn-sm" title="Delete Quotation" aria-label="Delete Quotation" style="background: #fee2e2; color: #dc2626; border: 1.5px solid #fca5a5; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#fecdd3'; this.style.borderColor='#f87171'" onmouseout="this.style.background='#fee2e2'; this.style.borderColor='#fca5a5'">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-          </button>
-        </div>
+        </div>` : ''}
 
         <div class="inv-modal-body">
           <div class="inv-paper">
@@ -1660,17 +1696,45 @@
       overlay.remove();
       editQuotationItem(quote.id);
     });
+    const qNoHtml = `<strong>${safeEsc(quote.quoteNo || 'this quotation')}</strong>`;
     overlay.querySelector('#btnPreviewToInvoice')?.addEventListener('click', () => {
-      overlay.remove();
-      convertQuotationToInvoice(quote.id);
+      showKyaConfirm({
+        title: 'Convert to Sale?',
+        message: `Convert quotation ${qNoHtml} to a Sales Invoice?<br>It will be marked Completed once the invoice is posted.`,
+        confirmLabel: 'Convert to Sale',
+        okBg: '#2563eb',
+        iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14h8M13 11l3 3-3 3"/></svg>',
+        onConfirm: () => {
+          overlay.remove();
+          convertQuotationToInvoice(quote.id);
+        }
+      });
     });
     overlay.querySelector('#btnPreviewComplete')?.addEventListener('click', () => {
-      overlay.remove();
-      setQuotationStatus(quote.id, 'Completed');
+      showKyaConfirm({
+        title: 'Mark as Completed?',
+        message: `Mark quotation ${qNoHtml} as Completed?<br>Completed quotations cannot be reopened.`,
+        confirmLabel: 'Mark Completed',
+        okBg: '#2563eb',
+        iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+        onConfirm: () => {
+          overlay.remove();
+          setQuotationStatus(quote.id, 'Completed');
+        }
+      });
     });
     overlay.querySelector('#btnPreviewCancel')?.addEventListener('click', () => {
-      overlay.remove();
-      setQuotationStatus(quote.id, 'Cancelled');
+      showKyaConfirm({
+        title: 'Mark as Cancelled?',
+        message: `Mark quotation ${qNoHtml} as Cancelled?<br>You can reopen it later if needed.`,
+        confirmLabel: 'Mark Cancelled',
+        okBg: '#dc2626',
+        iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+        onConfirm: () => {
+          overlay.remove();
+          setQuotationStatus(quote.id, 'Cancelled');
+        }
+      });
     });
     overlay.querySelector('#btnPreviewReopen')?.addEventListener('click', () => {
       overlay.remove();

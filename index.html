@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=20260904_2" />
+  <link rel="stylesheet" href="css/styles.css?v=20260927_3" />
 </head>
 <body>
 
@@ -2658,13 +2658,25 @@
           <!-- Header fields -->
           <div class="je-fields-bar">
             <div class="je-field">
-              <label for="salesDate">Date</label>
-              <input type="date" id="salesDate" class="je-input" aria-label="Invoice date" />
+              <label for="salesDateDisplay">Date</label>
+              <input type="hidden" id="salesDate" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="salesDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Invoice date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field" id="salesInvoiceNoContainer">
               <label for="salesInvoiceNo" id="lblSalesInvoiceNo">Invoice No.</label>
-              <input type="text" id="salesInvoiceNo" class="je-input" placeholder="INV-2026-001" aria-label="Invoice number" />
-              
+              <div id="salesInvoiceNoInputWrap" style="position: relative; width: 100%;">
+                <input type="text" id="salesInvoiceNo" class="je-input" placeholder="INV-2026-001" aria-label="Invoice number" aria-describedby="salesInvoiceNoError" style="padding-right: 38px;" />
+                <button type="button" id="btnSalesInvoiceNoFormat" class="sales-invno-edit-btn" title="Set invoice number prefix" aria-label="Set invoice number prefix">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <div id="salesInvoiceNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
+              </div>
+
               <!-- Searchable Select for returns -->
               <div class="kya-searchable-select-wrap" id="salesInvoiceSelectWrap" style="display: none; position: relative; width: 100%;">
                 <div class="kya-searchable-select-trigger" id="salesInvoiceSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
@@ -2683,10 +2695,13 @@
                 <option value="">&mdash; Select Customer &mdash;</option>
               </select>
               <div class="kya-searchable-select-wrap" id="salesCustomerSelectWrap" style="position: relative; width: 100%;">
-                <div class="kya-searchable-select-trigger" id="salesCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                <div class="kya-searchable-select-trigger" id="salesCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-900); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color var(--duration), box-shadow var(--duration);">
                   <span id="salesCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
                   <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
+                <button type="button" id="btnSalesCustomerAlter" class="kya-alter-pencil kya-alter-pencil-field" title="Alter this customer in Master Desk" aria-label="Alter this customer in Master Desk" hidden>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
                 <div class="kya-searchable-select-dropdown" id="salesCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
                   <input type="text" id="salesCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
                   <div id="salesCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
@@ -2914,7 +2929,7 @@
               </button>
             </div>
             <div class="je-actions-right">
-              <button class="btn btn-secondary" id="btnSaveSalesDraft" onclick="saveSalesDraft()" aria-label="Save as draft">
+              <button class="btn btn-secondary" id="btnSaveSalesDraft" aria-label="Save as draft">
                 <svg viewBox="0 0 15 15" fill="none">
                   <rect x="2" y="2" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/>
                   <path d="M5 2v4h5V2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -2922,7 +2937,7 @@
                 </svg>
                 Save Draft
               </button>
-              <button class="btn btn-success" id="btnPostSales" onclick="postSalesInvoice()" aria-label="Post invoice">
+              <button class="btn btn-success" id="btnPostSales" aria-label="Post invoice">
                 <svg viewBox="0 0 15 15" fill="none">
                   <path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -3042,12 +3057,6 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage customer quotations and price proposals</div>
               </div>
             </div>
-            <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
-              <button type="button" class="btn" id="btnQuoteListNewQuoteTop" onclick="openQuotationForm(null, 'quotelist')" style="background: #fff; color: var(--blue-700); font-weight: 700; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); transition: transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                New Quotation
-              </button>
-            </div>
           </div>
 
           <!-- Navigation row between header and content -->
@@ -3113,7 +3122,7 @@
 
           <!-- Navigation row between title card and fields -->
           <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <button type="button" class="btn" id="btnQuotationBack" title="Back" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M19 12H5M12 19l-7-7 7-7"/>
@@ -4707,7 +4716,7 @@
 <script src="js/app-shell.js?v=20260825_1"></script>
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
-<script src="js/master-desk.js"></script>
+<script src="js/master-desk.js?v=20260926_9"></script>
 <script src="js/journal.js?v=20260905_1"></script>
 <script src="js/coa.js"></script>
 <script src="js/reports.js"></script>
@@ -4721,18 +4730,19 @@
 <script src="js/onehub-reminders-view.js"></script>
 <script src="js/vault-core.js"></script>
 <script src="js/ledgers.js"></script>
-<script src="js/vault-settings.js?v=20260825_7"></script>
-<script src="js/sales-form.js?v=20260905_4"></script>
-<script src="js/sales-posting.js?v=20260905_4"></script>
+<script src="js/vault-settings.js?v=20260926_7"></script>
+<script src="js/kya-datepicker.js?v=20260927_3"></script>
+<script src="js/sales-form.js?v=20260927_1"></script>
+<script src="js/sales-posting.js?v=20260926_7"></script>
 <script src="js/sales-helpers.js?v=20260902_4"></script>
 <script src="js/sales-records.js?v=20260905_1"></script>
-<script src="js/sales-print-events.js?v=20260905_3"></script>
+<script src="js/sales-print-events.js?v=20260927_1"></script>
 <script src="js/sales-invoice-print.js?v=20260918_6"></script>
 <script src="js/sales-invoice-export.js?v=20260918_21"></script>
-<script src="js/quotation.js?v=20260905_7"></script>
-<script src="js/proforma.js?v=20260905_4"></script>
-<script src="js/sales-order.js?v=20260905_1"></script>
-<script src="js/delivery-challan.js?v=20260905_1"></script>
+<script src="js/quotation.js?v=20260926_9"></script>
+<script src="js/proforma.js?v=20260926_9"></script>
+<script src="js/sales-order.js?v=20260926_9"></script>
+<script src="js/delivery-challan.js?v=20260926_9"></script>
 <script src="js/purchase-form.js?v=20260830_2"></script>
 <script src="js/company-profile.js?v=20260912_2"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>

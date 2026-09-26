@@ -117,6 +117,16 @@
       window.KYA_STORE.customers = window.KYA_STORE.customers || [];
       window.KYA_STORE.suppliers = window.KYA_STORE.suppliers || [];
 
+      // Register every posted sales number as used, so deleting an invoice never frees it
+      const usedReg = window.KYA_STORE.salesUsedInvoiceNos = window.KYA_STORE.salesUsedInvoiceNos || {};
+      window.KYA_STORE.salesVouchers.forEach(v => {
+        const no = (v.invoiceNo || '').trim().toLowerCase();
+        if (!no) return;
+        const kind = v.isReturn ? 'return' : 'invoice';
+        usedReg[kind] = usedReg[kind] || [];
+        if (!usedReg[kind].includes(no)) usedReg[kind].push(no);
+      });
+
       if (!quiet) {
         showToast('Data restored successfully.', 'success');
         updateVaultUI();

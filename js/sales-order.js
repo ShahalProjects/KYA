@@ -506,6 +506,12 @@
       if (hsnInp && typeof window.attachVoucherRowCodePicker === 'function') {
         window.attachVoucherRowCodePicker(hsnInp, () => orderRows[index]);
       }
+      if (typeof window.attachVoucherRowUnitPicker === 'function') {
+        window.attachVoucherRowUnitPicker(tr.querySelector('.sales-row-unit'));
+      }
+      if (typeof window.attachVoucherRowAlterButtons === 'function') {
+        window.attachVoucherRowAlterButtons(tr, () => orderRows[index]);
+      }
     });
   }
 

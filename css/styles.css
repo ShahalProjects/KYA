@@ -5106,6 +5106,180 @@
       box-sizing: border-box;
       min-width: 0;
     }
+    /* Pencil inside the Sales Invoice No. field — opens the number-format popup */
+    .sales-invno-edit-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--slate-400, #94a3b8);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .sales-invno-edit-btn:hover,
+    .sales-invno-edit-btn:focus-visible {
+      background: var(--blue-50, #eff6ff);
+      color: var(--blue-600, #2563eb);
+      outline: none;
+    }
+    /* ── KYA date picker: typeable DD-MM-YYYY box + calendar popup ── */
+    .kya-dp-wrap { position: relative; width: 100%; }
+    .kya-dp-wrap .je-input { padding-right: 40px; letter-spacing: .02em; }
+    .kya-dp-wrap .je-input.kya-dp-invalid,
+    .kya-dp-wrap .je-input.kya-dp-invalid:focus {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.15);
+    }
+    .kya-dp-icon {
+      position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+      width: 30px; height: 30px; padding: 0; border: none; border-radius: 6px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent; color: var(--slate-500, #64748b); cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .kya-dp-icon:hover { background: var(--blue-50, #eff6ff); color: var(--blue-600, #2563eb); }
+    .kya-dp-pop {
+      position: fixed; z-index: 99999; width: 232px; box-sizing: border-box;
+      padding: 9px; background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,.06), 0 12px 32px -4px rgba(0,0,0,.14);
+      font-family: var(--font-main, Inter, sans-serif);
+      animation: jeDropIn .14s cubic-bezier(.2,0,.2,1);
+    }
+    .kya-dp-pop[hidden] { display: none; }
+    .kya-dp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .kya-dp-title { font-size: 12.5px; font-weight: 700; color: var(--slate-900, #0f172a); }
+    .kya-dp-nav {
+      width: 24px; height: 24px; border: none; border-radius: 6px; background: transparent;
+      font-size: 17px; line-height: 1; color: var(--slate-600, #475569); cursor: pointer;
+    }
+    .kya-dp-nav:hover { background: var(--slate-100, #f1f5f9); color: var(--slate-900, #0f172a); }
+    .kya-dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+    .kya-dp-wd {
+      text-align: center; font-size: 9.5px; font-weight: 700; color: var(--slate-400, #94a3b8);
+      padding: 2px 0; text-transform: uppercase; letter-spacing: .04em;
+    }
+    .kya-dp-day {
+      height: 26px; border: 1.5px solid transparent; border-radius: 6px; background: transparent;
+      font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--slate-800, #1e293b);
+      cursor: pointer; font-variant-numeric: tabular-nums; padding: 0;
+    }
+    .kya-dp-day:hover { background: var(--blue-50, #eff6ff); color: var(--blue-700, #1d4ed8); }
+    .kya-dp-day.is-other { color: var(--slate-300, #cbd5e1); }
+    .kya-dp-day.is-today { border-color: var(--blue-200, #bfdbfe); }
+    .kya-dp-day.is-typed { border-color: var(--blue-500, #3b82f6); background: var(--blue-50, #eff6ff); color: var(--blue-700, #1d4ed8); }
+    .kya-dp-day.is-selected { background: var(--blue-600, #2563eb); border-color: var(--blue-600, #2563eb); color: #ffffff; }
+    .kya-dp-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9;
+    }
+    .kya-dp-hint { font-size: 10.5px; color: var(--slate-400, #94a3b8); }
+    .kya-dp-bad { color: #dc2626; font-weight: 600; }
+    .kya-dp-today {
+      height: 24px; padding: 0 10px; border: 1.5px solid var(--blue-200, #bfdbfe); border-radius: 6px;
+      background: var(--blue-50, #eff6ff); color: var(--blue-700, #1d4ed8);
+      font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .kya-dp-today:hover { background: var(--blue-600, #2563eb); border-color: var(--blue-600, #2563eb); color: #ffffff; }
+
+    /* Sales Customer box: same hover / open states as the .je-input boxes beside it */
+    #salesCustomerSelectTrigger:hover { border-color: var(--slate-400) !important; }
+    #salesCustomerSelectWrap:has(#salesCustomerSelectDropdown[style*="display: flex"]) #salesCustomerSelectTrigger {
+      border-color: var(--blue-500) !important;
+      box-shadow: 0 0 0 3px rgba(59,130,246,.18), 0 1px 2px rgba(0,0,0,.04) !important;
+    }
+    /* Small pencil that opens a record in Master Desk → Alter (Customer, row Description, row Unit) */
+    .kya-alter-pencil {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--slate-400, #94a3b8);
+      cursor: pointer;
+      z-index: 2;
+      transition: background .15s, color .15s;
+    }
+    .kya-alter-pencil[hidden] { display: none; }
+    .kya-alter-pencil:hover,
+    .kya-alter-pencil:focus-visible {
+      background: var(--blue-50, #eff6ff);
+      color: var(--blue-600, #2563eb);
+      outline: none;
+    }
+    /* Customer box: just left of the dropdown arrow */
+    .kya-alter-pencil-field {
+      right: 32px;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+    }
+    /* "Already used" line: overlays the gap under the box so nothing below shifts */
+    .sales-invno-error {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 3px;
+      font-size: 11.5px;
+      font-weight: 600;
+      line-height: 1.3;
+      color: #dc2626;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+    /* Full message on hovering the Invoice No. box */
+    #salesInvoiceNoInputWrap.has-invno-error::after {
+      content: attr(data-error-full);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 50;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.4;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .12s ease;
+      pointer-events: none;
+    }
+    #salesInvoiceNoInputWrap.has-invno-error:hover::after {
+      opacity: 1;
+      visibility: visible;
+    }
+    /* Voucher row unit typed without being in the Master Desk Unit master */
+    .sales-row-unit.kya-unit-unlisted {
+      color: #b45309 !important;
+      background: #fffbeb !important;
+      box-shadow: inset 0 -1.5px 0 #f59e0b !important;
+      border-radius: 4px;
+    }
+    .sales-roundoff-field[readonly] {
+      cursor: not-allowed;
+      color: var(--slate-500, #64748b);
+    }
     /* ── TDS/TCS inline amount row (mirrors Round-Off row) ── */
     .sales-tdstcs-amount-group {
       gap: 0;

@@ -21,7 +21,7 @@
     }
     const chipEl = document.getElementById('salesVoucherChipDisplay');
     if (chipEl) chipEl.textContent = (invNoEl && invNoEl.value) || inv.invoiceNo || 'INV-XXXX';
-    
+
     const returnTriggerText = document.getElementById('salesInvoiceSelectTriggerText');
     if (returnTriggerText) {
       if (inv.isReturn && inv.returnAgainstInvoice) {
@@ -65,9 +65,15 @@
         rateSelect.value = 'custom';
         if (customInput) customInput.value = rateVal;
         if (customWrap) customWrap.style.display = 'flex';
+        // Keep the exact saved amount for custom rates (the stored % is rounded)
+        const amtEl = document.getElementById('salesTdsTcsAmount');
+        if (amtEl && parseFloat(inv.tdsTcsAmount) > 0) {
+          amtEl.value = parseFloat(inv.tdsTcsAmount).toFixed(2);
+          amtEl.dataset.manual = '1';
+        }
       }
     }
-    
+
     populateSalesCustomers(inv.customerId);
     populateSalesExecutives(inv.salesExecutiveId);
     const supplyTypeEl = document.getElementById('salesSupplyType');
@@ -155,6 +161,8 @@
     } else {
       window._editingSalesInvoice = { id: inv.id, isDraft: isDraft };
     }
+    // Now that the edit context is known, flag a number that's already used
+    if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
     updateSalesDocUI(inv.uploadedDoc || null);
     
     openTab('sales_voucher');
@@ -307,22 +315,13 @@
     }
     
     window.KYA_STORE.salesVouchers = window.KYA_STORE.salesVouchers || [];
-    const dup = window.KYA_STORE.salesVouchers.some(v => {
-      if (v.invoiceNo.toLowerCase() !== invoiceNo.toLowerCase()) return false;
-      const isVReturn = !!v.isReturn;
-      const isVInvoice = !v.isReturn;
-      const isCurrentReturn = currentSalesVoucherSubtype === 'Return';
-      const isCurrentInvoice = currentSalesVoucherSubtype === 'Invoice';
-      if (isCurrentReturn !== isVReturn) return false;
-      if (isCurrentInvoice !== isVInvoice) return false;
-      if (window._editingSalesInvoice && !window._editingSalesInvoice.isDraft && v.id === window._editingSalesInvoice.id) {
-        return false;
-      }
-      return true;
-    });
-    if (dup) {
+    // Numbers used by any invoice — including deleted ones — can't be issued again
+    const numberKind = currentSalesVoucherSubtype === 'Return' ? 'return' : 'invoice';
+    if (typeof isSalesInvoiceNoUsed === 'function' && isSalesInvoiceNoUsed(invoiceNo, numberKind)) {
       let typeLabel = currentSalesVoucherSubtype === 'Return' ? 'Reversal' : 'Invoice';
-      showToast(`${typeLabel} No. "${invoiceNo}" has already been posted. Please use a unique number.`, 'danger');
+      showToast(`${typeLabel} No. "${invoiceNo}" is already used (even deleted numbers can't be reused). Please use another number.`, 'danger');
+      if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
+      document.getElementById('salesInvoiceNo')?.focus();
       return;
     }
     
@@ -572,18 +571,22 @@
       window.KYA_STORE.salesVouchers.push(invoiceData);
     }
     
-    if (currentSalesInvoiceMode === 'Auto' && !isEditPosted) {
-      if (currentSalesVoucherSubtype === 'Return') {
-        window.KYA_STORE.salesReturnCtr = (window.KYA_STORE.salesReturnCtr || 1) + 1;
-      } else {
-        window.KYA_STORE.salesInvoiceCtr = (window.KYA_STORE.salesInvoiceCtr || 1) + 1;
-      }
+    // Once posted, a number is used for good — deleting the invoice won't free it
+    if (typeof registerUsedSalesInvoiceNo === 'function') {
+      registerUsedSalesInvoiceNo(currentSalesVoucherSubtype === 'Return' ? 'return' : 'invoice', invoiceNo);
     }
     
     let successMsg = `Invoice "${invoiceNo}" posted successfully.`;
     const _subtypeSnapshot = currentSalesVoucherSubtype;
     if (_subtypeSnapshot === 'Return') {
       successMsg = `Sales Reversal "${invoiceNo}" posted successfully.`;
+    } else {
+      const srcQuoteId = window._pendingConvertQuotationId || invoiceData.convertedFromQuotationId;
+      const srcQuote = srcQuoteId && (window.KYA_STORE.quotations || []).concat(window.KYA_STORE.quotationsDrafts || [])
+        .find(q => String(q.id) === String(srcQuoteId));
+      if (srcQuote) {
+        successMsg = `Invoice "${invoiceNo}" posted. Quotation ${srcQuote.quoteNo} conversion completed.`;
+      }
     }
     showToast(successMsg, 'success');
     showInvoicePostedModal(invoiceNo, _subtypeSnapshot);
