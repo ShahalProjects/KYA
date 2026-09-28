@@ -909,3 +909,5 @@
   window.siAmountInWords = siAmountInWords;
   window.getSalesInvoiceExportData = getSalesInvoiceExportData;
   window.SALES_INVOICE_SHEET_ID = SALES_INVOICE_SHEET_ID;
+  window.GST_STATE_CODES = GST_STATE_CODES;   // Reports (GSTR-1 invoice POS)
+  window.getGstStateCode = getGstStateCode;

@@ -10,7 +10,24 @@
   let _gstCycle = 'monthly';            // monthly | quarterly
   let _gstFyStart = null;               // start year of the selected financial year (Apr–Mar)
   let _gstPeriodIdx = null;             // index into the year's months / quarters
-  let _gstView = 'dashboard';           // dashboard | gstr1 (GSTR-1 section tiles)
+  let _gstView = 'dashboard';           // dashboard | gstr1 | gstr1-b2b | gstr1-b2b-docs | gstr1-b2b-invoice | gstr3b
+  let _b2bInvoiceId = null;             // invoice opened from the document wise details
+
+  // B2B document wise details (invoices of one recipient)
+  let _b2bDocsGstin = '';
+  let _b2bDocsSearch = '';
+  let _b2bDocsPageSize = 10;
+  let _b2bDocsPage = 0;
+  const _b2bDocsHiddenCols = new Set();
+
+  // Where the Back button goes from each GST view
+  const GST_VIEW_PARENT = { gstr1: 'dashboard', gstr3b: 'dashboard', 'gstr1-b2b': 'gstr1', 'gstr1-b2b-docs': 'gstr1-b2b', 'gstr1-b2b-invoice': 'gstr1-b2b-docs', 'gstr1-b2cs': 'gstr1' };
+
+  // GSTR-1 tiles that open a detail view when clicked
+  const GSTR1_SECTION_VIEWS = {
+    '4A, 4B, 6B, 6C - B2B, SEZ, DE Invoices': 'gstr1-b2b',
+    '7 - B2C (Others)': 'gstr1-b2cs',
+  };
 
   // GSTR-1 sections, in GST portal order
   const GSTR1_SECTIONS = [
@@ -272,6 +289,150 @@
       .gst-activity-table tr:last-child td { border-bottom: none; }
       .gst-activity-table td.gst-ret { font-weight: 700; color: var(--slate-800); }
 
+      .gst-activity-table th.num, .gst-activity-table td.num { text-align: right; }
+      .gst-activity-table td.num, .gst-activity-table td.nowrap { white-space: nowrap; }
+
+      /* B2B document wise details */
+      .b2b-docs-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .b2b-docs-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .b2b-docs-chip {
+        display: inline-flex;
+        align-items: center;
+        height: 30px;
+        padding: 0 14px;
+        border-radius: 15px;
+        background: var(--slate-100);
+        color: var(--slate-700);
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+      .b2b-docs-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+      .b2b-docs-controls .btn { height: 34px; padding: 0 12px; font-size: 12.5px; font-weight: 600; border-radius: 6px; cursor: pointer; }
+      .b2b-docs-cols-wrap { position: relative; }
+      .b2b-docs-cols-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        z-index: 20;
+        min-width: 220px;
+        padding: 8px;
+        background: var(--white);
+        border: 1px solid var(--slate-200);
+        border-radius: 10px;
+        box-shadow: 0 10px 28px rgba(15,23,42,.14);
+      }
+      .b2b-docs-cols-menu label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        font-size: 12.5px;
+        color: var(--slate-700);
+        cursor: pointer;
+      }
+      .b2b-docs-cols-menu label:hover { background: var(--slate-50); }
+      .b2b-docs-search {
+        height: 34px;
+        width: 200px;
+        padding: 0 12px;
+        font-size: 12.5px;
+        font-family: inherit;
+        color: var(--slate-700);
+        background: var(--white);
+        border: 1px solid var(--slate-200);
+        border-radius: 6px;
+        box-sizing: border-box;
+      }
+      .b2b-docs-search:focus { outline: none; border-color: var(--blue-400); box-shadow: 0 0 0 3px rgba(96,165,250,.15); }
+      .b2b-docs-pager {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+        font-size: 12.5px;
+        color: var(--slate-500);
+      }
+      .b2b-docs-pager .btn { height: 32px; padding: 0 12px; font-size: 12.5px; font-weight: 600; border-radius: 6px; cursor: pointer; }
+      .b2b-docs-pager .btn:disabled { opacity: .45; cursor: default; }
+
+      .b2b-doc-row { cursor: pointer; }
+      .b2b-doc-row:hover td { background: var(--blue-50); }
+      .b2b-doc-row:focus-visible { outline: 2px solid var(--blue-500); outline-offset: -2px; }
+
+      /* B2B invoice detail (read-only) */
+      .gst-inv-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px 24px;
+        padding: 12px 14px;
+        border-radius: 10px;
+      }
+      .gst-inv-grid.band { background: var(--slate-50); }
+      .gst-inv-field { min-width: 0; }
+      .gst-inv-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--slate-600);
+        margin-bottom: 6px;
+      }
+      .gst-inv-box {
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 13px;
+        color: var(--slate-700);
+        background: var(--slate-100);
+        border: 1px solid var(--slate-200);
+        border-radius: 7px;
+        box-sizing: border-box;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .gst-inv-box.num { justify-content: flex-end; }
+      .gst-inv-section-title {
+        margin: 22px 0 12px;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--slate-800);
+      }
+      .gst-activity-table.gst-inv-items td { padding: 8px 10px; }
+      .gst-activity-table.gst-inv-items th { color: var(--slate-600); }
+
+      /* Disclaimer under every GST screen */
+      .gst-disclaimer {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 18px;
+        padding: 12px 14px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #92400e;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 10px;
+      }
+      .gst-disclaimer svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; color: #d97706; }
+      .gst-disclaimer strong { font-weight: 700; }
+
+      /* Full grid lines (GSTR-1 section tables) */
+      .gst-activity-table.gst-grid-table th,
+      .gst-activity-table.gst-grid-table td,
+      .gst-activity-table.gst-grid-table tr:last-child td {
+        border: 1px solid var(--slate-200);
+      }
+
       /* GSTR-1 section tiles */
       .gstr1-sec-grid {
         display: grid;
@@ -314,6 +475,19 @@
         color: var(--emerald-700);
       }
       .gstr1-sec-body svg { width: 18px; height: 18px; color: var(--emerald-600); }
+      .gstr1-sec-tile.is-link { cursor: pointer; transition: box-shadow .18s ease, transform .18s ease; }
+      .gstr1-sec-tile.is-link:hover { box-shadow: 0 6px 18px rgba(15,23,42,.10); transform: translateY(-2px); }
+      .gstr1-sec-tile.is-link:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
+
+      .gst-gstin {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        color: #047857;
+        background: #ecfdf5;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
 
       /* GSTR-3B section tables */
       .gstr3b-sec-grid {
@@ -377,6 +551,8 @@
         .gst-metric:nth-child(even) { padding-left: 10px; }
         .gstr1-sec-grid { gap: 12px; }
         .gstr1-sec-head { padding: 10px; font-size: 12px; }
+        .gst-activity-table.gst-grid-table th,
+        .gst-activity-table.gst-grid-table td { padding: 10px 6px; font-size: 12.5px; }
         .gstr3b-sec-grid { gap: 12px; }
         .gstr3b-sec-head { padding: 12px; font-size: 12.5px; min-height: calc(2 * 1.35em + 24px); }
         .gstr3b-sec-body { gap: 12px 10px; padding: 12px; }
@@ -392,6 +568,19 @@
         .gst-metric:last-child { border-bottom: none; }
       }
       .gst-metric-value:not(.sm), .gst-summary-value { font-size: clamp(12px, 1.55cqi, 20px); }
+
+      /* Shadow on every GST box (KYA shadow tokens); clickable ones lift further on hover */
+      .gst-return-card,
+      .gst-summary-tile,
+      .gst-activity-card,
+      .gstr1-sec-tile,
+      .gstr3b-sec-tile {
+        box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,.08));
+      }
+      .gst-return-card:hover,
+      .gstr1-sec-tile.is-link:hover {
+        box-shadow: var(--shadow-lg, 0 8px 30px rgba(0,0,0,.12));
+      }
     `;
     document.head.appendChild(style);
   }
@@ -813,17 +1002,494 @@
   }
 
   // GSTR-1 section tiles (opened from the GSTR-1 card's View Details)
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function findCustomer(inv) {
+    return (typeof findPartyById === 'function' ? findPartyById(inv.customerId, 'Customer') : null)
+      || ((typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => String(l.id) === String(inv.customerId)))
+      || null;
+  }
+
+  // Taxpayer type = the customer's GST Registration Type from Master Desk → Additional Details
+  function taxpayerTypeOf(party) {
+    const value = (party && party.gstRegType) || '';
+    const opt = (window.GST_REGISTRATION_TYPES || []).find(o => o.value === value);
+    return value && opt ? opt.label : 'Not Specified';
+  }
+
+  // 4A, 4B, 6B, 6C: invoices (not returns / exports) to customers with a GSTIN
+  function getGstr1B2bInvoices(period) {
+    const list = [];
+    getSalesVouchers().forEach(inv => {
+      if (inv.isReturn || !inPeriod(inv.date, period)) return;
+      if (inv.salesSupplyType === 'Export (Zero-Rated / LUT)') return;
+      const party = findCustomer(inv);
+      const gstin = String((party && party.gstin) || '').trim().toUpperCase();
+      if (gstin) list.push({ inv, party, gstin });
+    });
+    return list;
+  }
+
+  // Recipient wise count
+  function computeGstr1B2bRecipients(period) {
+    const byGstin = new Map();
+    getGstr1B2bInvoices(period).forEach(({ inv, party, gstin }) => {
+      if (!byGstin.has(gstin)) {
+        byGstin.set(gstin, { gstin, name: (party && party.name) || inv.customerName || '', taxpayerType: taxpayerTypeOf(party), records: 0 });
+      }
+      byGstin.get(gstin).records += 1;
+    });
+    return Array.from(byGstin.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Document wise details: one row per B2B invoice of the selected recipient
+  const B2B_DOC_COLUMNS = [
+    { key: 'no', label: 'Invoice no.' },
+    { key: 'date', label: 'Invoice date' },
+    { key: 'value', label: 'Total invoice value (₹)', num: true },
+    { key: 'taxable', label: 'Total taxable value (₹)', num: true },
+    { key: 'igst', label: 'Integrated tax (₹)', num: true },
+    { key: 'cgst', label: 'Central tax (₹)', num: true },
+    { key: 'sgst', label: 'State/UT tax (₹)', num: true },
+    { key: 'cess', label: 'Cess (₹)', num: true },
+  ];
+
+  function computeB2bDocuments(period, gstin) {
+    return getGstr1B2bInvoices(period)
+      .filter(x => x.gstin === gstin)
+      .map(({ inv }) => {
+        let taxable = 0, gst = 0;
+        (inv.rows || []).forEach(r => {
+          const t = rowTaxableAndGst(r, inv.type === 'Product');
+          taxable += t.taxable;
+          gst += t.gst;
+        });
+        const split = gstSplit(gst, inv.salesSupplyType);
+        return {
+          id: inv.id,
+          no: inv.invoiceNo || '',
+          dateObj: parseVoucherDate(inv.date),
+          taxable,
+          igst: split.igst,
+          cgst: split.cgst,
+          sgst: split.sgst,
+          cess: 0,
+          value: taxable + split.igst + split.cgst + split.sgst,
+        };
+      })
+      .sort((a, b) => ((b.dateObj || 0) - (a.dateObj || 0)) || String(b.no).localeCompare(String(a.no)));
+  }
+
+  function fmtAmt(n) {
+    return (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtDateSlash(d) {
+    if (!d) return '';
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  }
+
+  function b2bDocCell(doc, key) {
+    if (key === 'no') return escHtml(doc.no);
+    if (key === 'date') return fmtDateSlash(doc.dateObj);
+    return fmtAmt(doc[key]);
+  }
+
+  // Table + pager only, so typing in Search doesn't rebuild (and blur) the search box
+  function renderB2bDocsTable() {
+    const { period } = getGstSelection();
+    const q = _b2bDocsSearch.trim().toLowerCase();
+    const docs = computeB2bDocuments(period, _b2bDocsGstin)
+      .filter(d => !q || B2B_DOC_COLUMNS.some(c => String(b2bDocCell(d, c.key)).toLowerCase().includes(q)));
+    const pages = Math.max(1, Math.ceil(docs.length / _b2bDocsPageSize));
+    if (_b2bDocsPage >= pages) _b2bDocsPage = pages - 1;
+    const start = _b2bDocsPage * _b2bDocsPageSize;
+    const pageDocs = docs.slice(start, start + _b2bDocsPageSize);
+    const cols = B2B_DOC_COLUMNS.filter(c => !_b2bDocsHiddenCols.has(c.key));
+    return `
+      <div class="gst-activity-scroll">
+        <table class="gst-activity-table gst-grid-table">
+          <thead>
+            <tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}">${c.label}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${pageDocs.length ? pageDocs.map(d => `
+              <tr class="b2b-doc-row" data-inv-id="${escHtml(d.id)}" tabindex="0" title="Open invoice ${escHtml(d.no)}">${cols.map(c => `<td class="${c.num ? 'num' : 'nowrap'} ${c.key === 'no' ? 'gst-ret' : ''}">${b2bDocCell(d, c.key)}</td>`).join('')}</tr>
+            `).join('') : `
+              <tr><td colspan="${cols.length || 1}" style="text-align: center; padding: 28px 14px; color: var(--slate-400);">${q ? 'No invoices match your search.' : 'No invoices for this recipient in this period.'}</td></tr>
+            `}
+          </tbody>
+        </table>
+      </div>
+      <div class="b2b-docs-pager">
+        <span>${docs.length ? `Showing ${start + 1}–${start + pageDocs.length} of ${docs.length}` : ''}</span>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary b2b-docs-page-btn" type="button" data-page="${_b2bDocsPage - 1}" ${_b2bDocsPage <= 0 ? 'disabled' : ''}>‹ Prev</button>
+          <button class="btn btn-secondary b2b-docs-page-btn" type="button" data-page="${_b2bDocsPage + 1}" ${_b2bDocsPage >= pages - 1 ? 'disabled' : ''}>Next ›</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderGstr1B2bDocsView() {
+    const { period } = getGstSelection();
+    const recipient = computeGstr1B2bRecipients(period).find(r => r.gstin === _b2bDocsGstin);
+    const name = recipient ? recipient.name : '';
+    return `
+      <div class="gst-dash">
+        <div class="gst-activity-card" style="padding: 18px;">
+          <div class="b2b-docs-toolbar">
+            <div class="b2b-docs-chips">
+              <span class="b2b-docs-chip">${escHtml(_b2bDocsGstin)}</span>
+              ${name ? `<span class="b2b-docs-chip">${escHtml(name)}</span>` : ''}
+            </div>
+            <div class="b2b-docs-controls">
+              <div class="b2b-docs-cols-wrap">
+                <button class="btn btn-secondary b2b-docs-cols-btn" type="button" aria-haspopup="true" aria-expanded="false">Display/Hide Columns ▾</button>
+                <div class="b2b-docs-cols-menu" hidden>
+                  ${B2B_DOC_COLUMNS.map(c => `
+                    <label><input type="checkbox" data-col="${c.key}" ${_b2bDocsHiddenCols.has(c.key) ? '' : 'checked'}> ${c.label}</label>
+                  `).join('')}
+                </div>
+              </div>
+              <span class="rpt-filter-select-wrap">
+                <select class="rpt-filter-select" id="b2bDocsPageSize" aria-label="Records per page">
+                  ${[10, 25, 50, 100].map(n => `<option value="${n}" ${n === _b2bDocsPageSize ? 'selected' : ''}>${n} per page</option>`).join('')}
+                </select>
+                ${CARET_ICON}
+              </span>
+              <input type="search" class="b2b-docs-search" id="b2bDocsSearch" placeholder="Search..." value="${escHtml(_b2bDocsSearch)}" aria-label="Search invoices">
+            </div>
+          </div>
+          <div id="b2bDocsTableWrap">${renderB2bDocsTable()}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireB2bDocsView(container) {
+    const wrap = container.querySelector('#b2bDocsTableWrap');
+    if (!wrap) return;
+    const refreshTable = () => { wrap.innerHTML = renderB2bDocsTable(); wirePager(); };
+    const wirePager = () => {
+      wrap.querySelectorAll('.b2b-doc-row[data-inv-id]').forEach(tr => {
+        const open = () => {
+          _b2bInvoiceId = tr.dataset.invId;
+          _gstView = 'gstr1-b2b-invoice';
+          renderReportsHubPanel();
+          container.scrollIntoView({ block: 'start' });
+        };
+        tr.addEventListener('click', open);
+        tr.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
+      });
+      wrap.querySelectorAll('.b2b-docs-page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          _b2bDocsPage = parseInt(btn.dataset.page, 10) || 0;
+          refreshTable();
+        });
+      });
+    };
+    wirePager();
+
+    const search = container.querySelector('#b2bDocsSearch');
+    if (search) {
+      search.addEventListener('input', () => {
+        _b2bDocsSearch = search.value;
+        _b2bDocsPage = 0;
+        refreshTable();
+      });
+    }
+
+    const pageSize = container.querySelector('#b2bDocsPageSize');
+    if (pageSize) {
+      pageSize.addEventListener('change', () => {
+        _b2bDocsPageSize = parseInt(pageSize.value, 10) || 10;
+        _b2bDocsPage = 0;
+        refreshTable();
+      });
+    }
+
+    const colsBtn = container.querySelector('.b2b-docs-cols-btn');
+    const colsMenu = container.querySelector('.b2b-docs-cols-menu');
+    if (colsBtn && colsMenu) {
+      colsBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        colsMenu.hidden = !colsMenu.hidden;
+        colsBtn.setAttribute('aria-expanded', String(!colsMenu.hidden));
+      });
+      colsMenu.addEventListener('click', e => e.stopPropagation());
+      colsMenu.querySelectorAll('input[data-col]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) _b2bDocsHiddenCols.delete(cb.dataset.col);
+          else _b2bDocsHiddenCols.add(cb.dataset.col);
+          refreshTable();
+        });
+      });
+    }
+  }
+
+  // ── B2B invoice detail (read-only, GST portal layout) ─────────────────
+
+  const GST_RATE_SLABS = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 7.5, 12, 18, 28, 40];
+
+  function titleCase(s) {
+    return String(s || '').replace(/\b[a-z]/g, ch => ch.toUpperCase());
+  }
+
+  // Place of supply as "32-Kerala" — same source as the printed invoice: customer's state, else the company's
+  function placeOfSupplyOf(party) {
+    const co = typeof getInvoiceCompany === 'function' ? (getInvoiceCompany() || {}) : {};
+    const fromParty = !!(party && (party.state || party.country));
+    const state = fromParty ? (party.state || '') : (co.state || '');
+    const country = fromParty ? (party.country || '') : '';
+    const gstin = fromParty ? (party && party.gstin) : co.gstin;
+    let code = typeof getGstStateCode === 'function' ? getGstStateCode(state, country, gstin) : '';
+    if (!code && party && /^\d{2}/.test(String(party.gstin || ''))) code = String(party.gstin).slice(0, 2);
+    let name = state;
+    if (!name && code) {
+      const entry = Object.entries(window.GST_STATE_CODES || {}).find(([, c]) => c === code);
+      name = entry ? titleCase(entry[0]) : '';
+    }
+    return [code, name].filter(Boolean).join('-');
+  }
+
+  function renderReadonlyField(label, value, opts = {}) {
+    return `
+      <div class="gst-inv-field">
+        <div class="gst-inv-label">${label}</div>
+        <div class="gst-inv-box ${opts.num ? 'num' : ''}" title="${escHtml(value)}">${escHtml(value)}</div>
+      </div>
+    `;
+  }
+
+  function renderGstr1B2bInvoiceView() {
+    const found = getSalesVouchers().find(v => String(v.id) === String(_b2bInvoiceId));
+    if (!found) {
+      return `<div class="oh-empty"><div class="oh-empty-title">Invoice not found</div></div>`;
+    }
+    const inv = found;
+    const party = findCustomer(inv) || {};
+    const isIntra = isIntraStateSupply(inv.salesSupplyType);
+
+    // Rate-wise taxable value and tax
+    const byRate = new Map();
+    (inv.rows || []).forEach(r => {
+      const rate = parseFloat(r.tax) || 0;
+      const t = rowTaxableAndGst(r, inv.type === 'Product');
+      const split = gstSplit(t.gst, inv.salesSupplyType);
+      const acc = byRate.get(rate) || { taxable: 0, igst: 0, cgst: 0, sgst: 0 };
+      acc.taxable += t.taxable;
+      acc.igst += split.igst;
+      acc.cgst += split.cgst;
+      acc.sgst += split.sgst;
+      byRate.set(rate, acc);
+    });
+    const rates = Array.from(new Set(GST_RATE_SLABS.concat(Array.from(byRate.keys())))).sort((a, b) => a - b);
+    let total = 0;
+    byRate.forEach(v => { total += v.taxable + v.igst + v.cgst + v.sgst; });
+
+    const taxCols = isIntra
+      ? [['cgst', 'Central tax (₹)'], ['sgst', 'State/UT tax (₹)'], ['cess', 'Cess (₹)']]
+      : [['igst', 'Integrated tax (₹)'], ['cess', 'Cess (₹)']];
+    const box = v => `<div class="gst-inv-box num">${v === null ? '' : fmtAmt(v)}</div>`;
+
+    return `
+      <div class="gst-dash">
+        <div class="gst-activity-card" style="padding: 18px;">
+          <div class="gst-inv-grid">
+            ${renderReadonlyField('Recipient GSTIN/UIN', String(party.gstin || '').toUpperCase())}
+            ${renderReadonlyField('Recipient Name', inv.customerName || party.name || '')}
+            ${renderReadonlyField('Name as in Master', party.name || '')}
+          </div>
+          <div class="gst-inv-grid band">
+            ${renderReadonlyField('Invoice no.', inv.invoiceNo || '')}
+            ${renderReadonlyField('Invoice date', fmtDateSlash(parseVoucherDate(inv.date)))}
+            ${renderReadonlyField('Total invoice value (₹)', fmtAmt(total), { num: true })}
+          </div>
+          <div class="gst-inv-grid">
+            ${renderReadonlyField('POS', placeOfSupplyOf(party))}
+            ${renderReadonlyField('Supply Type', isIntra ? 'Intra-State' : 'Inter-State')}
+          </div>
+          <div class="gst-inv-grid band">
+            ${renderReadonlyField('Source', '')}
+            ${renderReadonlyField('IRN', '')}
+            ${renderReadonlyField('IRN date', '')}
+          </div>
+
+          <div class="gst-inv-section-title">Item details</div>
+          <div class="gst-activity-scroll">
+            <table class="gst-activity-table gst-grid-table gst-inv-items">
+              <thead>
+                <tr>
+                  <th rowspan="2" style="text-align: center;">Rate (%)</th>
+                  <th rowspan="2" style="text-align: center;">Taxable value (₹)</th>
+                  <th colspan="${taxCols.length}" style="text-align: center;">Amount of Tax</th>
+                </tr>
+                <tr>${taxCols.map(([, label]) => `<th style="text-align: center;">${label}</th>`).join('')}</tr>
+              </thead>
+              <tbody>
+                ${rates.map(rate => {
+                  const v = byRate.get(rate);
+                  return `
+                    <tr>
+                      <td style="text-align: center; white-space: nowrap;">${rate}%</td>
+                      <td>${box(v ? v.taxable : null)}</td>
+                      ${taxCols.map(([key]) => `<td>${box(v && key !== 'cess' ? v[key] : null)}</td>`).join('')}
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── 7 - B2C (Others): place of supply × rate summary ────────────────
+
+  // Inter-state invoices to unregistered persons above this value are B2C (Large), section 5
+  const B2CL_INVOICE_LIMIT = 100000;
+
+  function computeGstr1B2csRows(period) {
+    const groups = new Map();
+    getSalesVouchers().forEach(inv => {
+      if (!inPeriod(inv.date, period)) return;
+      const t = inv.salesSupplyType || DEFAULT_SUPPLY_TYPE;
+      if (t !== DEFAULT_SUPPLY_TYPE && t !== 'Inter-State (IGST)') return; // exports, SEZ, deemed exports
+      const party = findCustomer(inv);
+      if (String((party && party.gstin) || '').trim()) return;            // registered → B2B
+
+      const lines = (inv.rows || []).map(r => ({ rate: parseFloat(r.tax) || 0, ...rowTaxableAndGst(r, inv.type === 'Product') }));
+      const invoiceValue = lines.reduce((s, l) => s + l.taxable + l.gst, 0);
+      if (t === 'Inter-State (IGST)' && invoiceValue > B2CL_INVOICE_LIMIT) return; // B2C (Large)
+
+      const pos = placeOfSupplyOf(party).replace(/^\d{2}-/, '') || 'Not Specified';
+      const sign = inv.isReturn ? -1 : 1;
+      lines.forEach(l => {
+        if (!(l.rate > 0)) return; // 0% lines are nil rated (section 8)
+        const key = pos + '|' + l.rate;
+        const g = groups.get(key) || { pos, rate: l.rate, taxable: 0, igst: 0, cgst: 0, sgst: 0 };
+        const split = gstSplit(l.gst, t);
+        g.taxable += sign * l.taxable;
+        g.igst += sign * split.igst;
+        g.cgst += sign * split.cgst;
+        g.sgst += sign * split.sgst;
+        groups.set(key, g);
+      });
+    });
+    return Array.from(groups.values())
+      .filter(g => Math.abs(g.taxable) >= 0.005)
+      .sort((a, b) => a.pos.localeCompare(b.pos) || b.rate - a.rate);
+  }
+
+  function renderGstr1B2csView() {
+    const { period } = getGstSelection();
+    const rows = computeGstr1B2csRows(period);
+    return `
+      <div class="gst-dash">
+        <div class="gst-activity-card" style="padding: 18px;">
+          <div class="gst-activity-scroll">
+            <table class="gst-activity-table gst-grid-table">
+              <thead>
+                <tr>
+                  <th>Place of Supply (Name of State)</th>
+                  <th class="num" style="text-align: center;">Rate (%)</th>
+                  <th class="num">Total Taxable Value</th>
+                  <th class="num">Integrated tax (₹)</th>
+                  <th class="num">Central tax (₹)</th>
+                  <th class="num">State/UT tax (₹)</th>
+                  <th class="num">Cess (₹)</th>
+                  <th class="num">Applicable percentage(%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.length ? rows.map(r => `
+                  <tr>
+                    <td class="nowrap">${escHtml(r.pos)}</td>
+                    <td class="num" style="text-align: center;">${r.rate}</td>
+                    <td class="num">${fmtAmt(r.taxable)}</td>
+                    <td class="num">${fmtAmt(r.igst)}</td>
+                    <td class="num">${fmtAmt(r.cgst)}</td>
+                    <td class="num">${fmtAmt(r.sgst)}</td>
+                    <td class="num">-</td>
+                    <td class="num">-</td>
+                  </tr>
+                `).join('') : `
+                  <tr><td colspan="8" style="text-align: center; padding: 28px 14px; color: var(--slate-400);">No B2C (Others) supplies in this period.</td></tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Close the Display/Hide Columns menu on any outside click
+  document.addEventListener('click', () => {
+    document.querySelectorAll('#panel-reports .b2b-docs-cols-menu').forEach(m => { m.hidden = true; });
+    document.querySelectorAll('#panel-reports .b2b-docs-cols-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+  });
+
   function renderGstr1SectionsView() {
     const CHECK_ICON = `<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.6"/><path d="M6.8 10.2l2.2 2.2 4.2-4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const { period } = getGstSelection();
+    const b2bCount = computeGstr1B2bRecipients(period).reduce((sum, r) => sum + r.records, 0);
+    const b2csCount = computeGstr1B2csRows(period).length;
     return `
       <div class="gst-dash">
         <div class="gstr1-sec-grid">
-          ${GSTR1_SECTIONS.map(title => `
-            <div class="gstr1-sec-tile">
-              <div class="gstr1-sec-head">${title}</div>
-              <div class="gstr1-sec-body">${CHECK_ICON}<span>0</span></div>
-            </div>
-          `).join('')}
+          ${GSTR1_SECTIONS.map(title => {
+            const view = GSTR1_SECTION_VIEWS[title];
+            const count = view === 'gstr1-b2b' ? b2bCount : view === 'gstr1-b2cs' ? b2csCount : 0;
+            return `
+              <div class="gstr1-sec-tile ${view ? 'is-link' : ''}" ${view ? `data-section-view="${view}" role="button" tabindex="0"` : ''}>
+                <div class="gstr1-sec-head">${title}</div>
+                <div class="gstr1-sec-body">${CHECK_ICON}<span>${fmtCount(count)}</span></div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Inside "4A, 4B, 6B, 6C - B2B, SEZ, DE Invoices": one row per recipient
+  function renderGstr1B2bView() {
+    const { period } = getGstSelection();
+    const rows = computeGstr1B2bRecipients(period);
+    return `
+      <div class="gst-dash">
+        <div class="gst-activity-card" style="padding: 18px;">
+          <div class="gst-activity-scroll">
+            <table class="gst-activity-table gst-grid-table">
+              <thead>
+                <tr>
+                  <th>Recipient Details</th>
+                  <th>Trade/Legal Name</th>
+                  <th>Taxpayer Type</th>
+                  <th>Processed Records</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.length ? rows.map(r => `
+                  <tr class="b2b-doc-row gst-recipient-row" data-gstin="${escHtml(r.gstin)}" tabindex="0" title="Open invoices of ${escHtml(r.name)}">
+                    <td><span class="gst-gstin">${escHtml(r.gstin)}</span></td>
+                    <td class="gst-ret">${escHtml(r.name)}</td>
+                    <td>${escHtml(r.taxpayerType)}</td>
+                    <td>${fmtCount(r.records)}</td>
+                  </tr>
+                `).join('') : `
+                  <tr><td colspan="4" style="text-align: center; padding: 28px 14px; color: var(--slate-400);">No B2B invoices in this period.</td></tr>
+                `}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     `;
@@ -867,12 +1533,35 @@
     `;
   }
 
+  // Shown under every GST screen
+  function renderGstDisclaimer() {
+    return `
+      <div class="gst-disclaimer" role="note">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M10 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="6.3" r="1.1" fill="currentColor"/></svg>
+        <div>
+          <strong>Disclaimer:</strong> KYA is not affiliated with, endorsed by or connected to the GST Network (GSTN) or any
+          government authority. These reports are prepared only from the data entered in KYA and are for reference. They are
+          not auto-filled or fetched from the GST portal and are not an official GST return. Any mistake or omission in the
+          entered data will be reflected here. Please verify all figures with the GST portal and your tax professional before
+          filing. KYA is not responsible for errors arising from incorrect or incomplete data, or for any return filed based
+          on these reports.
+        </div>
+      </div>
+    `;
+  }
+
+  function renderGstContent() {
+    if (_gstView === 'gstr1') return renderGstr1SectionsView();
+    if (_gstView === 'gstr1-b2b') return renderGstr1B2bView();
+    if (_gstView === 'gstr1-b2cs') return renderGstr1B2csView();
+    if (_gstView === 'gstr1-b2b-docs') return renderGstr1B2bDocsView();
+    if (_gstView === 'gstr1-b2b-invoice') return renderGstr1B2bInvoiceView();
+    if (_gstView === 'gstr3b') return renderGstr3bSectionsView();
+    return renderGstView();
+  }
+
   function renderReportsContent() {
-    if (_activeReportsTab === 'gst') {
-      if (_gstView === 'gstr1') return renderGstr1SectionsView();
-      if (_gstView === 'gstr3b') return renderGstr3bSectionsView();
-      return renderGstView();
-    }
+    if (_activeReportsTab === 'gst') return renderGstContent() + renderGstDisclaimer();
     return `
       <div class="oh-empty">
         <div class="oh-empty-title">${TAB_TITLES[_activeReportsTab] || ''}</div>
@@ -956,7 +1645,7 @@
       backBtn.addEventListener('click', () => {
         // GSTR-1 sections → GST dashboard → Reports overview
         if (_activeReportsTab === 'gst' && _gstView !== 'dashboard') {
-          _gstView = 'dashboard';
+          _gstView = GST_VIEW_PARENT[_gstView] || 'dashboard';
         } else {
           _activeReportsTab = 'overview';
         }
@@ -992,6 +1681,35 @@
         renderReportsHubPanel();
       });
     }
+
+    container.querySelectorAll('.gstr1-sec-tile[data-section-view]').forEach(tile => {
+      const open = () => {
+        _gstView = tile.dataset.sectionView;
+        renderReportsHubPanel();
+        container.scrollIntoView({ block: 'start' });
+      };
+      tile.addEventListener('click', open);
+      tile.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    });
+
+    container.querySelectorAll('.gst-recipient-row[data-gstin]').forEach(row => {
+      const open = () => {
+        _b2bDocsGstin = row.dataset.gstin;
+        _b2bDocsSearch = '';
+        _b2bDocsPage = 0;
+        _gstView = 'gstr1-b2b-docs';
+        renderReportsHubPanel();
+        container.scrollIntoView({ block: 'start' });
+      };
+      row.addEventListener('click', open);
+      row.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    });
+
+    wireB2bDocsView(container);
 
     container.querySelectorAll('.gst-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {

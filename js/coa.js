@@ -2999,6 +2999,5 @@
   //  BALANCE SHEET
   // ══════════════════════════════════════════════════════════════════
   let _bsStyleDone = false;
-  let _bsExpanded = new Set();
-  let _bsLayoutMode = 'Vertical';
+  let _bsLayoutMode = 'Schedule'; // 'Schedule' | 'Notes' | 'Ppe'
 

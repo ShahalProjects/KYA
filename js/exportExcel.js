@@ -386,7 +386,7 @@
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // 2. BALANCE SHEET STATEMENT EXCEL EXPORT
+  // 2. BALANCE SHEET EXCEL EXPORT (Balance Sheet + Notes + PPE Schedule)
   // ════════════════════════════════════════════════════════════════════
   async function exportBalanceSheetToExcel(data) {
     try {
@@ -400,162 +400,248 @@
       workbook.creator = 'KYA Accounting';
       workbook.created = new Date();
 
-      const sheet = workbook.addWorksheet('Balance Sheet', {
+      const compName = (data.companyName || 'KYA Accounting').toUpperCase();
+      const col1Title = data.col1Title || 'Current Period';
+      const col2Title = data.col2Title || 'Previous Period';
+      const allBorders = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+
+      function addTitleBlock(sheet, lastCol, title, subtitle) {
+        const r1 = sheet.addRow([compName]);
+        r1.height = 24;
+        sheet.mergeCells(`A1:${lastCol}1`);
+        sheet.getCell('A1').font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF1E3A8A' } };
+        sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
+
+        const r2 = sheet.addRow([title]);
+        r2.height = 20;
+        sheet.mergeCells(`A2:${lastCol}2`);
+        sheet.getCell('A2').font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF0F172A' } };
+        sheet.getCell('A2').alignment = { vertical: 'middle', horizontal: 'left' };
+
+        const r3 = sheet.addRow([subtitle]);
+        r3.height = 18;
+        sheet.mergeCells(`A3:${lastCol}3`);
+        sheet.getCell('A3').font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } };
+        sheet.getCell('A3').alignment = { vertical: 'middle', horizontal: 'left' };
+
+        sheet.addRow([]).height = 8;
+      }
+
+      function styleHeaderCell(cell, horizontal) {
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+        cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
+        cell.alignment = { vertical: 'middle', horizontal, indent: horizontal === 'left' ? 1 : 0, wrapText: true };
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      // SHEET 1: Balance Sheet (Schedule III)
+      // ────────────────────────────────────────────────────────────────
+      const sheet1 = workbook.addWorksheet('Balance Sheet', {
         views: [{ state: 'frozen', ySplit: 5, showGridLines: true }]
       });
+      sheet1.getColumn(1).width = 62;
+      sheet1.getColumn(2).width = 12;
+      sheet1.getColumn(3).width = 24;
+      sheet1.getColumn(4).width = 24;
 
-      const isCompare = !!data.isCompare;
-      const maxCols = isCompare ? 3 : 2;
-      const lastColLetter = isCompare ? 'C' : 'B';
+      addTitleBlock(sheet1, 'D', 'BALANCE SHEET', `Balance Sheet: ${col1Title} vs ${col2Title}`);
 
-      sheet.getColumn(1).width = 48;
-      sheet.getColumn(2).width = 24;
-      if (isCompare) {
-        sheet.getColumn(3).width = 24;
-      }
+      const h1 = sheet1.addRow(['Particulars', 'Note No.', col1Title, col2Title]);
+      h1.height = 26;
+      for (let c = 1; c <= 4; c++) styleHeaderCell(h1.getCell(c), c === 1 ? 'left' : (c === 2 ? 'center' : 'right'));
 
-      const compName = (data.companyName || 'KYA Accounting').toUpperCase();
-      const r1 = sheet.addRow([compName]);
-      r1.height = 24;
-      sheet.mergeCells(`A1:${lastColLetter}1`);
-      const cA1 = sheet.getCell('A1');
-      cA1.font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF1E3A8A' } };
-      cA1.alignment = { vertical: 'middle', horizontal: 'left' };
-
-      const r2 = sheet.addRow(['BALANCE SHEET']);
-      r2.height = 20;
-      sheet.mergeCells(`A2:${lastColLetter}2`);
-      const cA2 = sheet.getCell('A2');
-      cA2.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF0F172A' } };
-      cA2.alignment = { vertical: 'middle', horizontal: 'left' };
-
-      let periodText = 'Statement of Financial Position';
-      if (data.dateTo) {
-        periodText = `As of: ${formatRptDate(data.dateTo)}`;
-      }
-      if (isCompare && data.compareDateTo) {
-        periodText += `  |  Compare: As of ${formatRptDate(data.compareDateTo)}`;
-      }
-      const r3 = sheet.addRow([periodText]);
-      r3.height = 18;
-      sheet.mergeCells(`A3:${lastColLetter}3`);
-      const cA3 = sheet.getCell('A3');
-      cA3.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } };
-      cA3.alignment = { vertical: 'middle', horizontal: 'left' };
-
-      const r4 = sheet.addRow([]);
-      r4.height = 10;
-
-      const col1Title = data.dateTo ? `As of ${formatRptDate(data.dateTo)}` : 'Amount (INR)';
-      const col2Title = data.compareDateTo ? `As of ${formatRptDate(data.compareDateTo)}` : 'Compare (INR)';
-      const headerValues = isCompare ? ['Particulars', col1Title, col2Title] : ['Particulars', col1Title];
-      const r5 = sheet.addRow(headerValues);
-      r5.height = 24;
-
-      for (let c = 1; c <= maxCols; c++) {
-        const cell = r5.getCell(c);
-        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FF1E3A8A' }
-        };
-        cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
-        cell.alignment = {
-          vertical: 'middle',
-          horizontal: c === 1 ? 'left' : 'right',
-          indent: c === 1 ? 1 : 0
-        };
-      }
-
-      function appendRow(particulars, val1, val2, type = 'item') {
-        const rowVals = isCompare ? [particulars, val1, val2] : [particulars, val1];
-        const row = sheet.addRow(rowVals);
-        row.height = 20;
-
-        const c1 = row.getCell(1);
-        c1.alignment = { vertical: 'middle', horizontal: 'left' };
-
-        if (typeof val1 === 'number') {
-          const c2 = row.getCell(2);
-          c2.numFmt = numFormat;
-          c2.alignment = { vertical: 'middle', horizontal: 'right' };
-        }
-        if (isCompare && typeof val2 === 'number') {
-          const c3 = row.getCell(3);
-          c3.numFmt = numFormat;
-          c3.alignment = { vertical: 'middle', horizontal: 'right' };
+      (data.scheduleRows || []).forEach(sr => {
+        if (sr.type === 'sec-hdr') {
+          const row = sheet1.addRow([sr.particular, '', '', '']);
+          row.height = 22;
+          sheet1.mergeCells(`A${row.number}:D${row.number}`);
+          const cell = row.getCell(1);
+          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E3A8A' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+          cell.border = { top: mediumBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
+          cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+          return;
         }
 
-        for (let c = 1; c <= maxCols; c++) {
+        const hasAmt = typeof sr.amount1 === 'number';
+        const row = sheet1.addRow([sr.particular, sr.noteNo || '', hasAmt ? sr.amount1 : '', hasAmt ? sr.amount2 : '']);
+        row.height = sr.type === 'grandtotal' ? 22 : 20;
+
+        const indent = { sub: 2, 'sub-hdr': 2, sub2: 4 }[sr.type] || 0;
+        row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent, wrapText: true };
+        row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(3).alignment = { vertical: 'middle', horizontal: 'right' };
+        row.getCell(4).alignment = { vertical: 'middle', horizontal: 'right' };
+        if (hasAmt) {
+          row.getCell(3).numFmt = numFormat;
+          row.getCell(4).numFmt = numFormat;
+        }
+
+        for (let c = 1; c <= 4; c++) {
           const cell = row.getCell(c);
-          cell.border = {
-            top: thinBorder,
-            bottom: thinBorder,
-            left: thinBorder,
-            right: thinBorder
-          };
-
-          if (type === 'section-hdr') {
-            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E3A8A' } };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-            cell.border = { top: mediumBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
-          } else if (type === 'subgroup') {
+          cell.border = allBorders;
+          if (sr.type === 'grandtotal') {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+            cell.border = { top: mediumBorder, bottom: doubleBorder, left: thinBorder, right: thinBorder };
+          } else if (sr.type === 'group' || sr.type === 'main') {
             cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
-          } else if (type === 'subgroup-l2') {
-            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF334155' } };
-          } else if (type === 'group-ledger') {
-            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFB45309' } };
-          } else if (type === 'child-ledger' || type === 'ledger') {
-            cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF475569' } };
-          } else if (type === 'subtotal-mg') {
-            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF166534' } };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
-            cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
+          } else if (sr.type === 'sub-hdr') {
+            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1E293B' } };
+          } else {
+            cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF334155' } };
           }
         }
-      }
 
-      function appendBlankRow() {
-        const emptyVals = isCompare ? ['', '', ''] : ['', ''];
-        const r = sheet.addRow(emptyVals);
-        r.height = 8;
-      }
-
-      function appendItems(items, indentLevel = 1) {
-        const pad = '    '.repeat(indentLevel);
-        (items || []).forEach(item => {
-          if (item.isGroup) {
-            appendRow(`${pad}📁 ${item.name}`, item.amount1, item.amount2, 'group-ledger');
-            (item.children || []).forEach(ch => {
-              appendRow(`${pad}    ${ch.name}`, ch.amount1, ch.amount2, 'child-ledger');
-            });
-          } else {
-            appendRow(`${pad}${item.name}`, item.amount1, item.amount2, 'ledger');
-          }
-        });
-      }
-
-      (data.mainGroups || []).forEach((mg, mgIdx) => {
-        if (mgIdx > 0) appendBlankRow();
-
-        appendRow(mg.name.toUpperCase(), mg.total1, mg.total2, 'section-hdr');
-
-        (mg.subgroups || []).forEach(sg => {
-          appendRow(`  ${sg.name}`, sg.amount1, sg.amount2, 'subgroup');
-          if (sg.hasChildren && sg.l2Subgroups) {
-            sg.l2Subgroups.forEach(l2 => {
-              appendRow(`    ${l2.name}`, l2.amount1, l2.amount2, 'subgroup-l2');
-              appendItems(l2.items, 3);
-            });
-          } else {
-            appendItems(sg.items, 2);
-          }
-        });
-
-        appendRow(`Total ${mg.name}`, mg.total1, mg.total2, 'subtotal-mg');
+        if (sr.noteNo && sr.type !== 'grandtotal') {
+          row.getCell(2).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1D4ED8' } };
+        }
       });
 
+      // ────────────────────────────────────────────────────────────────
+      // SHEET 2: Notes to Accounts
+      // ────────────────────────────────────────────────────────────────
+      const sheet2 = workbook.addWorksheet('Notes to Accounts', {
+        views: [{ state: 'frozen', ySplit: 5, showGridLines: true }]
+      });
+      sheet2.getColumn(1).width = 62;
+      sheet2.getColumn(2).width = 24;
+      sheet2.getColumn(3).width = 24;
+
+      addTitleBlock(sheet2, 'C', 'NOTES FORMING PART OF THE FINANCIAL STATEMENTS', `Notes to the Balance Sheet: ${col1Title} vs ${col2Title}`);
+
+      const h2 = sheet2.addRow(['Particulars / Account Name', col1Title, col2Title]);
+      h2.height = 26;
+      for (let c = 1; c <= 3; c++) styleHeaderCell(h2.getCell(c), c === 1 ? 'left' : 'right');
+
+      function addNoteLine(label, v1, v2, font, indent) {
+        const r = sheet2.addRow([label, v1, v2]);
+        r.height = 19;
+        r.getCell(1).font = font;
+        r.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent };
+        r.getCell(2).numFmt = numFormat;
+        r.getCell(3).numFmt = numFormat;
+        for (let c = 1; c <= 3; c++) r.getCell(c).border = allBorders;
+        return r;
+      }
+
+      (data.notesData || []).forEach(note => {
+        const hdr = sheet2.addRow([`Note ${note.noteNo}: ${note.title}`, '', '']);
+        hdr.height = 24;
+        sheet2.mergeCells(`A${hdr.number}:C${hdr.number}`);
+        const hc = hdr.getCell(1);
+        hc.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E3A8A' } };
+        hc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+        hc.border = { top: mediumBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+        hc.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+        (note.items || []).forEach(item => {
+          const codeStr = item.code ? ` (${item.code})` : '';
+          if (item.isGroup) {
+            addNoteLine(`📁 ${item.name}${codeStr}`, item.amount1, item.amount2,
+              { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFB45309' } }, 1);
+            (item.children || []).forEach(child => {
+              const cCodeStr = child.code ? ` (${child.code})` : '';
+              addNoteLine(`${child.name}${cCodeStr}`, child.amount1, child.amount2,
+                { name: 'Calibri', size: 9.5, color: { argb: 'FF475569' } }, 3);
+            });
+          } else {
+            addNoteLine(`${item.name}${codeStr}`, item.amount1, item.amount2,
+              { name: 'Calibri', size: 10, color: { argb: 'FF334155' } }, 1);
+          }
+        });
+
+        if (!(note.items || []).length) {
+          addNoteLine('No specific accounts recorded under this note', 0, 0,
+            { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } }, 1);
+        }
+
+        const tot = sheet2.addRow([`Total ${note.title} (Note ${note.noteNo})`, note.total1, note.total2]);
+        tot.height = 22;
+        for (let c = 1; c <= 3; c++) {
+          const cell = tot.getCell(c);
+          cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+          cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
+        }
+        tot.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        tot.getCell(2).numFmt = numFormat;
+        tot.getCell(3).numFmt = numFormat;
+
+        sheet2.addRow([]).height = 10;
+      });
+
+      // ────────────────────────────────────────────────────────────────
+      // SHEET 3: Property, Plant and Equipment Schedule
+      // ────────────────────────────────────────────────────────────────
+      const ppe = data.ppe;
+      if (ppe && (ppe.tables || []).length) {
+        const sheet3 = workbook.addWorksheet('PPE Schedule', {
+          views: [{ showGridLines: true }]
+        });
+        sheet3.getColumn(1).width = 36;
+        for (let c = 2; c <= 11; c++) sheet3.getColumn(c).width = 17;
+
+        addTitleBlock(sheet3, 'K', 'PROPERTY, PLANT AND EQUIPMENT AND INTANGIBLE ASSETS',
+          `Movement for ${ppe.periodLabel} · Net block compared with ${ppe.prevLabel}`);
+
+        const fields = ['grossOpen', 'additions', 'disposals', 'grossClose', 'accOpen', 'accCharge', 'accDisposal', 'accClose', 'netClose', 'netPrev'];
+
+        ppe.tables.forEach(t => {
+          const title = sheet3.addRow([`Note ${t.noteNo}: ${t.title}`]);
+          title.height = 22;
+          sheet3.mergeCells(`A${title.number}:K${title.number}`);
+          title.getCell(1).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E3A8A' } };
+          title.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+          title.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+
+          const band = sheet3.addRow(['Particulars', 'Gross Block', '', '', '', t.depLabel, '', '', '', 'Net Block', '']);
+          const sub = sheet3.addRow(['', `As at ${ppe.startLabel}`, 'Additions', 'Deductions / Disposals', `As at ${ppe.endLabel}`,
+            `Up to ${ppe.startLabel}`, 'For the period', 'On disposals', `Up to ${ppe.endLabel}`,
+            `As at ${ppe.endLabel}`, `As at ${ppe.prevLabel}`]);
+          sheet3.mergeCells(`A${band.number}:A${sub.number}`);
+          sheet3.mergeCells(`B${band.number}:E${band.number}`);
+          sheet3.mergeCells(`F${band.number}:I${band.number}`);
+          sheet3.mergeCells(`J${band.number}:K${band.number}`);
+          band.height = 22;
+          sub.height = 32;
+          for (let c = 1; c <= 11; c++) {
+            styleHeaderCell(band.getCell(c), c === 1 ? 'left' : 'center');
+            styleHeaderCell(sub.getCell(c), c === 1 ? 'left' : 'right');
+          }
+
+          if (!t.rows.length) {
+            const empty = sheet3.addRow([`No ${t.title.toLowerCase()} ledgers recorded for this period`]);
+            sheet3.mergeCells(`A${empty.number}:K${empty.number}`);
+            empty.getCell(1).font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
+          }
+
+          [...t.rows, Object.assign({ isTotal: true }, t.totals)].forEach(r => {
+            const row = sheet3.addRow([r.isTotal ? 'Total' : r.name, ...fields.map(f => r[f])]);
+            row.height = r.isTotal ? 22 : 19;
+            for (let c = 1; c <= 11; c++) {
+              const cell = row.getCell(c);
+              cell.border = r.isTotal ? { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder } : allBorders;
+              if (c > 1) {
+                cell.numFmt = numFormat;
+                cell.alignment = { vertical: 'middle', horizontal: 'right' };
+              } else {
+                cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+              }
+              const isNet = c >= 10;
+              cell.font = { name: 'Calibri', size: 10, bold: r.isTotal || isNet || c === 1, color: { argb: isNet ? 'FF1E3A8A' : 'FF0F172A' } };
+              if (r.isTotal) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+            }
+          });
+
+          sheet3.addRow([]).height = 12;
+        });
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      // Download Workbook
+      // ────────────────────────────────────────────────────────────────
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -563,11 +649,9 @@
 
       const sDate = data.dateFrom || 'Start';
       const eDate = data.dateTo || 'End';
-      const fileName = `BalanceSheet_${sDate}_${eDate}.xlsx`;
-
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = fileName;
+      link.download = `Balance_Sheet_Schedule_III_${sDate}_${eDate}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

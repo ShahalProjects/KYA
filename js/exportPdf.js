@@ -487,7 +487,7 @@
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // 2. BALANCE SHEET STATEMENT PDF EXPORT
+  // 2. BALANCE SHEET PDF EXPORT (Schedule III + Notes + PPE Schedule)
   // ════════════════════════════════════════════════════════════════════
   async function exportBalanceSheetToPDF(data) {
     try {
@@ -504,119 +504,83 @@
         format: 'a4'
       });
 
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const isCompare = !!data.isCompare;
-
-      // ── Branded Header Bar ──────────────────────────────────────────
-      doc.setFillColor(30, 58, 138); // Navy Blue
-      doc.rect(0, 0, pageWidth, 5, 'F');
-
-      // ── Company & Document Titles ────────────────────────────────────
       const compName = (data.companyName || 'KYA Accounting').toUpperCase();
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor(30, 58, 138);
-      doc.text(compName, 14, 16);
-
-      doc.setFontSize(12);
-      doc.setTextColor(15, 23, 42); // Slate 900
-      doc.text('BALANCE SHEET', 14, 23);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(100, 116, 139); // Slate 500
-
-      let periodText = 'Statement of Financial Position';
-      if (data.dateTo) {
-        periodText = `As of: ${formatRptDate(data.dateTo)}`;
-      }
-      if (isCompare && data.compareDateTo) {
-        periodText += `  |  Compare: As of ${formatRptDate(data.compareDateTo)}`;
-      }
-      doc.text(periodText, 14, 29);
-
+      const col1Title = data.col1Title || 'Current Period';
+      const col2Title = data.col2Title || 'Previous Period';
+      const col1Hdr = `${col1Title} (INR)`;
+      const col2Hdr = `${col2Title} (INR)`;
       const genDateStr = `Generated on: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
-      doc.text(genDateStr, pageWidth - 14, 29, { align: 'right' });
 
-      // ── Divider ─────────────────────────────────────────────────────
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.5);
-      doc.line(14, 32, pageWidth - 14, 32);
-
-      // ── Build Table Headers & Columns ───────────────────────────────
-      const col1Title = data.dateTo ? `As of ${formatRptDate(data.dateTo)}` : 'Amount (INR)';
-      const col2Title = data.compareDateTo ? `As of ${formatRptDate(data.compareDateTo)}` : 'Compare (INR)';
-
-      let tableHeaders = [];
-      if (isCompare) {
-        tableHeaders = [['Particulars', col1Title, col2Title]];
-      } else {
-        tableHeaders = [['Particulars', col1Title]];
+      function sanitizePdfText(str) {
+        if (!str) return '';
+        return String(str)
+          .replace(/₹\s?/g, 'INR ')
+          .replace(/\s+/g, ' ')
+          .trim();
       }
 
-      // ── Build Table Rows ────────────────────────────────────────────
-      const tableBody = [];
-      const rowMeta = [];
-
-      function addRow(particulars, amt1, amt2, type = 'item', level = 0, isGroup = false) {
-        const row = [particulars, typeof amt1 === 'number' ? fmtNum(amt1) : (amt1 || '')];
-        if (isCompare) {
-          row.push(typeof amt2 === 'number' ? fmtNum(amt2) : (amt2 || ''));
+      function runAutoTable(docInstance, config) {
+        if (typeof docInstance.autoTable === 'function') {
+          docInstance.autoTable(config);
+        } else if (global.jspdf && typeof global.jspdf.autoTable === 'function') {
+          global.jspdf.autoTable(docInstance, config);
+        } else if (typeof global.autoTable === 'function') {
+          global.autoTable(docInstance, config);
+        } else if (global.jsPDF && global.jsPDF.API && typeof global.jsPDF.API.autoTable === 'function') {
+          global.jsPDF.API.autoTable.call(docInstance, config);
+        } else {
+          throw new Error('jspdf-autotable plugin is not available on jsPDF instance.');
         }
-        tableBody.push(row);
-        rowMeta.push({ type, level, isGroup });
       }
 
-      function addEmptyRow() {
-        const row = isCompare ? ['', '', ''] : ['', ''];
-        tableBody.push(row);
-        rowMeta.push({ type: 'empty', level: 0, isGroup: false });
+      function drawPageHeader(title, subtitle) {
+        const pw = doc.internal.pageSize.getWidth();
+        doc.setFillColor(30, 58, 138); // Navy Blue
+        doc.rect(0, 0, pw, 5, 'F');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(30, 58, 138);
+        doc.text(compName, 14, 15);
+
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42); // Slate 900
+        doc.text(title, 14, 21);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139); // Slate 500
+        doc.text(sanitizePdfText(subtitle), 14, 26);
+        doc.text(genDateStr, pw - 14, 26, { align: 'right' });
+
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.4);
+        doc.line(14, 29, pw - 14, 29);
       }
 
-      function renderItems(items, indentLevel = 1) {
-        (items || []).forEach(item => {
-          if (item.isGroup) {
-            addRow(`      ${item.name}`, item.amount1, item.amount2, 'group-ledger', indentLevel, true);
-            (item.children || []).forEach(ch => {
-              addRow(`          ${ch.name}`, ch.amount1, ch.amount2, 'child-ledger', indentLevel + 1, false);
-            });
-          } else {
-            addRow(`      ${item.name}`, item.amount1, item.amount2, 'ledger', indentLevel, false);
-          }
-        });
-      }
+      // ────────────────────────────────────────────────────────────────
+      // SECTION 1: Balance Sheet (Schedule III)
+      // ────────────────────────────────────────────────────────────────
+      drawPageHeader('BALANCE SHEET', `Balance Sheet: ${col1Title} vs ${col2Title}`);
 
-      (data.mainGroups || []).forEach((mg, mgIdx) => {
-        if (mgIdx > 0) addEmptyRow();
-
-        // Main group header
-        addRow(mg.name.toUpperCase(), mg.total1, mg.total2, 'section-hdr', 0, false);
-
-        (mg.subgroups || []).forEach(sg => {
-          addRow(`  ${sg.name}`, sg.amount1, sg.amount2, 'subgroup', 0, false);
-          if (sg.hasChildren && sg.l2Subgroups) {
-            sg.l2Subgroups.forEach(l2 => {
-              addRow(`    ${l2.name}`, l2.amount1, l2.amount2, 'subgroup-l2', 1, false);
-              renderItems(l2.items, 2);
-            });
-          } else {
-            renderItems(sg.items, 1);
-          }
-        });
-
-        addRow(`Total ${mg.name}`, mg.total1, mg.total2, 'subtotal-mg', 0, false);
+      const bsBody = [];
+      const bsMeta = [];
+      (data.scheduleRows || []).forEach(sr => {
+        const amt1 = typeof sr.amount1 === 'number' ? fmtNum(sr.amount1) : '';
+        const amt2 = typeof sr.amount2 === 'number' ? fmtNum(sr.amount2) : '';
+        bsBody.push([sanitizePdfText(sr.particular), sr.noteNo || '', amt1, amt2]);
+        bsMeta.push({ type: sr.type, noteNo: sr.noteNo });
       });
 
-      // ── AutoTable Generation ────────────────────────────────────────
-      const autoTableConfig = {
-        startY: 36,
-        head: tableHeaders,
-        body: tableBody,
+      runAutoTable(doc, {
+        startY: 32,
+        head: [['Particulars', 'Note No.', col1Hdr, col2Hdr]],
+        body: bsBody,
         theme: 'plain',
         styles: {
           font: 'helvetica',
-          fontSize: 8.5,
-          cellPadding: { top: 2.2, bottom: 2.2, left: 3, right: 3 },
+          fontSize: 8,
+          cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
           textColor: [51, 65, 85],
           lineColor: [241, 245, 249],
           lineWidth: 0.2
@@ -625,56 +589,174 @@
           fillColor: [30, 58, 138],
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 9,
+          fontSize: 8.5,
           halign: 'left'
         },
-        columnStyles: isCompare ? {
+        columnStyles: {
           0: { cellWidth: 'auto', halign: 'left' },
-          1: { cellWidth: 44, halign: 'right', fontStyle: 'bold' },
-          2: { cellWidth: 44, halign: 'right', fontStyle: 'bold' }
-        } : {
-          0: { cellWidth: 'auto', halign: 'left' },
-          1: { cellWidth: 50, halign: 'right', fontStyle: 'bold' }
+          1: { cellWidth: 20, halign: 'center' },
+          2: { cellWidth: 38, halign: 'right', fontStyle: 'bold' },
+          3: { cellWidth: 38, halign: 'right', fontStyle: 'bold' }
         },
         didParseCell: function (hookData) {
           if (hookData.section === 'head') {
-            if (hookData.column.index > 0) {
-              hookData.cell.styles.halign = 'right';
-            }
+            if (hookData.column.index === 1) hookData.cell.styles.halign = 'center';
+            if (hookData.column.index > 1) hookData.cell.styles.halign = 'right';
             return;
           }
 
-          const meta = rowMeta[hookData.row.index];
+          const meta = bsMeta[hookData.row.index];
           if (!meta) return;
+          const indent = { sub: 6, 'sub-hdr': 6, sub2: 11 }[meta.type];
 
-          if (meta.type === 'section-hdr') {
+          if (meta.type === 'sec-hdr') {
             hookData.cell.styles.fillColor = [226, 232, 240];
             hookData.cell.styles.textColor = [30, 58, 138];
             hookData.cell.styles.fontStyle = 'bold';
+            hookData.cell.styles.fontSize = 8.5;
+          } else if (meta.type === 'grandtotal') {
+            hookData.cell.styles.fillColor = [30, 58, 138];
+            hookData.cell.styles.textColor = [255, 255, 255];
+            hookData.cell.styles.fontStyle = 'bold';
             hookData.cell.styles.fontSize = 9;
-          } else if (meta.type === 'subgroup') {
+          } else if (meta.type === 'group' || meta.type === 'main') {
             hookData.cell.styles.fontStyle = 'bold';
             hookData.cell.styles.textColor = [15, 23, 42];
-          } else if (meta.type === 'subgroup-l2') {
+          } else {
+            hookData.cell.styles.textColor = meta.type === 'sub-hdr' ? [30, 41, 59] : [51, 65, 85];
+          }
+
+          if (hookData.column.index === 0 && indent) {
+            hookData.cell.styles.cellPadding = { top: 2, bottom: 2, left: indent, right: 3 };
+          }
+
+          if (hookData.column.index === 1) {
+            hookData.cell.styles.halign = 'center';
+            if (meta.noteNo && meta.type !== 'grandtotal') {
+              hookData.cell.styles.textColor = [29, 78, 216];
+              hookData.cell.styles.fontStyle = 'bold';
+            }
+          } else if (hookData.column.index > 1) {
+            hookData.cell.styles.halign = 'right';
+          }
+        },
+        margin: { left: 14, right: 14, bottom: 16 }
+      });
+
+      // ────────────────────────────────────────────────────────────────
+      // SECTION 2: Notes to Accounts (On Fresh Page)
+      // ────────────────────────────────────────────────────────────────
+      doc.addPage();
+      drawPageHeader('NOTES FORMING PART OF THE FINANCIAL STATEMENTS', `Notes to the Balance Sheet: ${col1Title} vs ${col2Title}`);
+
+      const notesBody = [];
+      const notesMeta = [];
+      (data.notesData || []).forEach((note, noteIdx, allNotes) => {
+        notesBody.push([`Note ${note.noteNo}: ${sanitizePdfText(note.title)}`, '', '']);
+        notesMeta.push({ type: 'note-hdr' });
+
+        (note.items || []).forEach(item => {
+          const codeStr = item.code ? ` (${item.code})` : '';
+          if (item.isGroup) {
+            notesBody.push([`${sanitizePdfText(item.name)}${codeStr}`, fmtNum(item.amount1), fmtNum(item.amount2)]);
+            notesMeta.push({ type: 'group-ledger' });
+            (item.children || []).forEach(child => {
+              const cCodeStr = child.code ? ` (${child.code})` : '';
+              notesBody.push([`${sanitizePdfText(child.name)}${cCodeStr}`, fmtNum(child.amount1), fmtNum(child.amount2)]);
+              notesMeta.push({ type: 'child-ledger' });
+            });
+          } else {
+            notesBody.push([`${sanitizePdfText(item.name)}${codeStr}`, fmtNum(item.amount1), fmtNum(item.amount2)]);
+            notesMeta.push({ type: 'ledger' });
+          }
+        });
+
+        if (!(note.items || []).length) {
+          notesBody.push(['No specific accounts recorded under this note', fmtNum(0), fmtNum(0)]);
+          notesMeta.push({ type: 'empty-note' });
+        }
+
+        notesBody.push([`Total ${sanitizePdfText(note.title)} (Note ${note.noteNo})`, fmtNum(note.total1), fmtNum(note.total2)]);
+        notesMeta.push({ type: 'note-total' });
+
+        // Spacer between notes only, so a trailing blank row never spills onto its own page
+        if (noteIdx < allNotes.length - 1) {
+          notesBody.push(['', '', '']);
+          notesMeta.push({ type: 'empty' });
+        }
+      });
+
+      runAutoTable(doc, {
+        startY: 32,
+        head: [['Particulars / Account Name', col1Hdr, col2Hdr]],
+        body: notesBody,
+        theme: 'plain',
+        styles: {
+          font: 'helvetica',
+          fontSize: 8,
+          cellPadding: { top: 1.8, bottom: 1.8, left: 3, right: 3 },
+          textColor: [51, 65, 85],
+          lineColor: [241, 245, 249],
+          lineWidth: 0.2
+        },
+        headStyles: {
+          fillColor: [30, 58, 138],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8.5,
+          halign: 'left'
+        },
+        columnStyles: {
+          0: { cellWidth: 'auto', halign: 'left' },
+          1: { cellWidth: 40, halign: 'right', fontStyle: 'bold' },
+          2: { cellWidth: 40, halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: function (hookData) {
+          if (hookData.section === 'head') {
+            if (hookData.column.index > 0) hookData.cell.styles.halign = 'right';
+            return;
+          }
+
+          const meta = notesMeta[hookData.row.index];
+          if (!meta) return;
+
+          if (meta.type === 'note-hdr') {
+            hookData.cell.styles.fillColor = [219, 234, 254];
+            hookData.cell.styles.textColor = [30, 58, 138];
             hookData.cell.styles.fontStyle = 'bold';
-            hookData.cell.styles.textColor = [51, 65, 85];
+            hookData.cell.styles.fontSize = 8.5;
+            hookData.cell.styles.cellPadding = { top: 2.2, bottom: 2.2, left: 3, right: 3 };
           } else if (meta.type === 'group-ledger') {
             hookData.cell.styles.fontStyle = 'bold';
             hookData.cell.styles.textColor = [180, 83, 9];
-          } else if (meta.type === 'child-ledger' || meta.type === 'ledger') {
+            if (hookData.column.index === 0) {
+              hookData.cell.styles.cellPadding = { top: 2, bottom: 2, left: 10, right: 3 };
+            }
+          } else if (meta.type === 'child-ledger') {
             hookData.cell.styles.textColor = [100, 116, 139];
             if (hookData.column.index === 0) {
               hookData.cell.styles.fontStyle = 'normal';
+              hookData.cell.styles.cellPadding = { top: 2, bottom: 2, left: 14, right: 3 };
             }
-          } else if (meta.type === 'subtotal-mg') {
-            hookData.cell.styles.fillColor = [240, 253, 244];
-            hookData.cell.styles.textColor = [22, 101, 52];
+          } else if (meta.type === 'ledger') {
+            hookData.cell.styles.textColor = [51, 65, 85];
+            if (hookData.column.index === 0) {
+              hookData.cell.styles.cellPadding = { top: 2, bottom: 2, left: 6, right: 3 };
+            }
+          } else if (meta.type === 'empty-note') {
+            hookData.cell.styles.textColor = [148, 163, 184];
+            hookData.cell.styles.fontStyle = 'italic';
+            if (hookData.column.index === 0) {
+              hookData.cell.styles.cellPadding = { top: 2, bottom: 2, left: 6, right: 3 };
+            }
+          } else if (meta.type === 'note-total') {
+            hookData.cell.styles.fillColor = [248, 250, 252];
             hookData.cell.styles.fontStyle = 'bold';
-            hookData.cell.styles.fontSize = 9;
-            hookData.cell.styles.lineWidth = { top: 0.5, bottom: 0.5 };
-            hookData.cell.styles.lineColor = [187, 247, 208];
+            hookData.cell.styles.textColor = [15, 23, 42];
+            hookData.cell.styles.lineWidth = { top: 0.4, bottom: 0.4 };
+            hookData.cell.styles.lineColor = [203, 213, 225];
           } else if (meta.type === 'empty') {
-            hookData.cell.styles.cellPadding = 1;
+            hookData.cell.styles.cellPadding = 0.8;
           }
 
           if (hookData.column.index > 0) {
@@ -683,40 +765,121 @@
         },
         didDrawCell: function (hookData) {
           if (hookData.section !== 'body' || hookData.column.index !== 0) return;
-          const meta = rowMeta[hookData.row.index];
-          if (!meta || !meta.isGroup) return;
-
-          const iconX = hookData.cell.x + 3.5 + (meta.level || 1) * 3.5;
-          const iconY = hookData.cell.y + (hookData.cell.height / 2) - 1.4;
-          drawPdfFolderIcon(doc, iconX, iconY);
-        },
-        didDrawPage: function (pageData) {
-          const str = `Page ${doc.internal.getNumberOfPages()}`;
-          doc.setFontSize(8);
-          doc.setTextColor(148, 163, 184);
-          doc.text(str, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
-          doc.text('KYA Accounting • Confidential', 14, doc.internal.pageSize.getHeight() - 8);
+          const meta = notesMeta[hookData.row.index];
+          if (!meta || meta.type !== 'group-ledger') return;
+          drawPdfFolderIcon(doc, hookData.cell.x + 4.5, hookData.cell.y + (hookData.cell.height / 2) - 1.4);
         },
         margin: { left: 14, right: 14, bottom: 16 }
-      };
+      });
 
-      if (typeof doc.autoTable === 'function') {
-        doc.autoTable(autoTableConfig);
-      } else if (global.jspdf && typeof global.jspdf.autoTable === 'function') {
-        global.jspdf.autoTable(doc, autoTableConfig);
-      } else if (typeof global.autoTable === 'function') {
-        global.autoTable(doc, autoTableConfig);
-      } else if (global.jsPDF && global.jsPDF.API && typeof global.jsPDF.API.autoTable === 'function') {
-        global.jsPDF.API.autoTable.call(doc, autoTableConfig);
-      } else {
-        throw new Error('jspdf-autotable plugin is not available on jsPDF instance.');
+      // ────────────────────────────────────────────────────────────────
+      // SECTION 3: Property, Plant and Equipment Schedule (Landscape)
+      // ────────────────────────────────────────────────────────────────
+      const ppe = data.ppe;
+      if (ppe && (ppe.tables || []).length) {
+        doc.addPage('a4', 'landscape');
+        drawPageHeader('PROPERTY, PLANT AND EQUIPMENT AND INTANGIBLE ASSETS', `Movement for ${ppe.periodLabel} · Net block compared with ${ppe.prevLabel}`);
+
+        const fields = ['grossOpen', 'additions', 'disposals', 'grossClose', 'accOpen', 'accCharge', 'accDisposal', 'accClose', 'netClose', 'netPrev'];
+        let nextY = 32;
+
+        ppe.tables.forEach(t => {
+          const pageH = doc.internal.pageSize.getHeight();
+          if (nextY > pageH - 40) {
+            doc.addPage('a4', 'landscape');
+            nextY = 14;
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9.5);
+          doc.setTextColor(30, 58, 138);
+          doc.text(`Note ${t.noteNo}: ${sanitizePdfText(t.title)}`, 14, nextY + 3);
+
+          const body = t.rows.map(r => [sanitizePdfText(r.name), ...fields.map(f => fmtNum(r[f]))]);
+          if (!body.length) {
+            body.push([`No ${t.title.toLowerCase()} ledgers recorded for this period`, ...fields.map(() => '')]);
+          }
+          body.push(['Total', ...fields.map(f => fmtNum(t.totals[f]))]);
+          const totalIdx = body.length - 1;
+
+          runAutoTable(doc, {
+            startY: nextY + 6,
+            head: [
+              [
+                { content: 'Particulars', rowSpan: 2, styles: { valign: 'middle', halign: 'left' } },
+                { content: 'Gross Block', colSpan: 4, styles: { halign: 'center' } },
+                { content: t.depLabel, colSpan: 4, styles: { halign: 'center' } },
+                { content: 'Net Block', colSpan: 2, styles: { halign: 'center' } }
+              ],
+              [
+                `As at ${ppe.startLabel}`, 'Additions', 'Deductions / Disposals', `As at ${ppe.endLabel}`,
+                `Up to ${ppe.startLabel}`, 'For the period', 'On disposals', `Up to ${ppe.endLabel}`,
+                `As at ${ppe.endLabel}`, `As at ${ppe.prevLabel}`
+              ]
+            ],
+            body,
+            theme: 'plain',
+            styles: {
+              font: 'helvetica',
+              fontSize: 7.5,
+              cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
+              textColor: [51, 65, 85],
+              lineColor: [226, 232, 240],
+              lineWidth: 0.2,
+              halign: 'right'
+            },
+            headStyles: {
+              fillColor: [30, 58, 138],
+              textColor: [255, 255, 255],
+              fontStyle: 'bold',
+              fontSize: 7.5,
+              halign: 'right',
+              valign: 'middle'
+            },
+            columnStyles: {
+              0: { cellWidth: 'auto', halign: 'left', fontStyle: 'bold' },
+              9: { fontStyle: 'bold', textColor: [30, 58, 138] },
+              10: { fontStyle: 'bold', textColor: [30, 58, 138] }
+            },
+            didParseCell: function (hookData) {
+              if (hookData.section !== 'body') return;
+              if (hookData.row.index === totalIdx) {
+                hookData.cell.styles.fillColor = [248, 250, 252];
+                hookData.cell.styles.fontStyle = 'bold';
+                hookData.cell.styles.textColor = [15, 23, 42];
+                hookData.cell.styles.lineWidth = { top: 0.4, bottom: 0.4 };
+                hookData.cell.styles.lineColor = [203, 213, 225];
+              } else if (!t.rows.length && hookData.column.index === 0) {
+                hookData.cell.styles.fontStyle = 'italic';
+                hookData.cell.styles.textColor = [148, 163, 184];
+              }
+            },
+            margin: { left: 14, right: 14, bottom: 16 }
+          });
+
+          nextY = (doc.lastAutoTable && doc.lastAutoTable.finalY ? doc.lastAutoTable.finalY : nextY + 40) + 10;
+        });
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      // Add Consistent Footers across all pages
+      // ────────────────────────────────────────────────────────────────
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        const pw = doc.internal.pageSize.getWidth();
+        const ph = doc.internal.pageSize.getHeight();
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text('KYA Accounting • Schedule III Financial Statements • Confidential', 14, ph - 8);
+        doc.text(`Page ${i} of ${totalPages}`, pw - 14, ph - 8, { align: 'right' });
       }
 
       // ── Download PDF ────────────────────────────────────────────────
       const sDate = data.dateFrom || 'Start';
       const eDate = data.dateTo || 'End';
-      const fileName = `BalanceSheet_${sDate}_${eDate}.pdf`;
-      doc.save(fileName);
+      doc.save(`Balance_Sheet_Schedule_III_${sDate}_${eDate}.pdf`);
       return true;
     } catch (err) {
       console.error('Failed to export Balance Sheet to PDF:', err);

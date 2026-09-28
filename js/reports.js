@@ -3,57 +3,63 @@
     _bsStyleDone = true;
     const s = document.createElement('style');
     s.textContent = `
-      .bs-tree { font-family: var(--font-main); display: flex; flex-direction: column; gap: 20px; }
-      .bs-mg-card { border: 1.5px solid var(--slate-200); border-radius: 16px; overflow: hidden; background: var(--white); box-shadow: var(--shadow-sm); }
-      
-      .bs-row {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 12px 20px; border-bottom: 1.5px solid var(--slate-100);
-        transition: background var(--duration); cursor: pointer; user-select: none;
+      /* Schedule III Balance Sheet — builds on the .pnl-sch-* statement styles */
+      .bs-sch-group td { cursor: default; }
+      .bs-sch-group:hover { background: transparent; }
+      .bs-sch-subhdr { font-weight: 600; color: var(--slate-800); cursor: default; }
+      .bs-sch-subhdr:hover { background: transparent; }
+      .bs-sch-subhdr[data-bs-goto-note] { cursor: pointer; }
+      .bs-sch-subhdr[data-bs-goto-note]:hover { background: var(--slate-50); }
+      .bs-sch-row-sub2 { font-weight: 500; color: var(--slate-700); }
+      .pnl-sch-row-sub.bs-sch-row-sub2 .pnl-sch-name { padding-left: 44px; }
+
+      .bs-sch-alert {
+        display: flex; align-items: center; gap: 8px;
+        margin-bottom: 14px; padding: 10px 14px;
+        border: 1.5px solid #fecaca; border-radius: 10px;
+        background: #fef2f2; color: #b91c1c;
+        font-size: 13px; font-weight: 600;
       }
-      .bs-row:hover { background: var(--slate-50); }
-      .bs-row:last-child { border-bottom: none; }
-      
-      .bs-name-col { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-      .bs-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
-      .bs-amt-col { font-weight: 700; text-align: right; min-width: 150px; flex-shrink: 0; font-family: var(--font-main); font-size: 13.5px; }
-      
-      /* Level styles */
-      .bs-row-l0 { background: var(--blue-50); font-weight: 800; font-size: 15px; color: var(--blue-900); text-transform: uppercase; }
-      .bs-row-l0:hover { background: var(--blue-100); }
-      .bs-row-l1 { font-weight: 700; font-size: 14px; color: var(--slate-800); text-transform: uppercase; border-top: 1px solid var(--slate-200); }
-      .bs-row-l2 { font-weight: 600; font-size: 13.5px; color: var(--slate-700); }
-      .bs-row-l3 { font-weight: 600; font-size: 13px; color: #b45309; background: #fffdf5; }
-      .bs-row-l4 { font-weight: 400; font-size: 13px; color: var(--slate-500); cursor: default; }
-      .bs-row-l4:hover { background: transparent; }
-      
-      /* Indent widths */
-      .bs-indent-l0 { padding-left: 20px; }
-      .bs-indent-l1 { padding-left: 36px; }
-      .bs-indent-l2 { padding-left: 56px; }
-      .bs-indent-l3 { padding-left: 76px; }
-      .bs-indent-l4 { padding-left: 96px; }
-      
-      .bs-subtotal { border-top: 1.5px dashed var(--slate-300); font-weight: 700; }
-      .bs-grandtotal {
-        background: var(--blue-100) !important; font-weight: 900; font-size: 15px;
-        border-top: 1.5px solid var(--blue-400); border-bottom: 4px double var(--blue-800) !important;
-        color: var(--blue-950); cursor: default;
+
+      .bs-ppe-open-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        height: 30px; padding: 0 12px; border-radius: 8px;
+        border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8;
+        font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+        transition: all .15s ease;
       }
-      .bs-grandtotal:hover { background: var(--blue-100) !important; }
-      .bs-caret {
-        width: 12px; height: 12px; transition: transform .18s; color: var(--slate-400);
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      .bs-ppe-open-btn:hover { background: #1d4ed8; border-color: #1d4ed8; color: #ffffff; }
+
+      /* Property, Plant and Equipment schedule */
+      .bs-ppe-table-wrap { width: 100%; overflow-x: auto; }
+      .bs-ppe-table { width: 100%; border-collapse: collapse; min-width: 960px; font-family: var(--font-main); }
+      .bs-ppe-table th {
+        padding: 9px 8px; font-size: 10.5px; font-weight: 700; color: var(--slate-600);
+        background: #fafafa; border-bottom: 1px solid var(--slate-200);
+        text-transform: uppercase; letter-spacing: 0.03em; text-align: right; vertical-align: middle;
       }
-      .bs-caret.open { transform: rotate(90deg); }
-      .bs-caret-empty { width: 12px; flex-shrink: 0; }
-      .bs-chevron {
-        width: 16px; height: 16px; transition: transform .18s; color: var(--slate-500);
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      .bs-ppe-table th.bs-ppe-th-part { text-align: left; }
+      .bs-ppe-table th.bs-ppe-th-band {
+        text-align: center; color: var(--blue-900); background: var(--blue-50);
+        border-left: 1.5px solid var(--slate-200); font-size: 11.5px;
       }
-      .bs-chevron.open { transform: rotate(180deg); }
-      
-      .bs-code { font-size: 11px; color: var(--slate-400); font-weight: 700; font-family: monospace; margin-left: 8px; }
+      .bs-ppe-table th.bs-ppe-band-start,
+      .bs-ppe-table td.bs-ppe-band-start { border-left: 1.5px solid var(--slate-200); }
+      .bs-ppe-table td {
+        padding: 9px 8px; font-size: 12.5px; border-bottom: 1px solid var(--slate-100);
+        text-align: right; white-space: nowrap; font-weight: 600; color: var(--slate-800);
+      }
+      .bs-ppe-table td.bs-ppe-td-part { text-align: left; font-weight: 600; color: var(--slate-700); white-space: normal; min-width: 170px; }
+      .bs-ppe-table tbody tr:hover td { background: var(--slate-50); }
+      .bs-ppe-table .pnl-note-total-row:hover td { background: #f8fafc; }
+      .bs-ppe-table td.bs-ppe-net { color: var(--blue-900); font-weight: 700; }
+      .bs-ppe-foot {
+        padding: 10px 18px; font-size: 11.5px; color: var(--slate-500);
+        border-top: 1px solid var(--slate-100); background: #fcfcfd; line-height: 1.5;
+      }
+      .bs-ppe-tie { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+      .bs-ppe-tie-ok { color: #15803d; }
+      .bs-ppe-tie-bad { color: #b91c1c; }
     `;
     document.head.appendChild(s);
   }
@@ -334,7 +340,12 @@
     return false;
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  BALANCE SHEET — Schedule III (Division I) format
+  //  Views: Balance Sheet · Notes to Accounts · Property, Plant & Equipment
+  // ══════════════════════════════════════════════════════════════════
   function renderBalanceSheetPanel() {
+    injectPnlStyles();
     injectBalanceSheetStyles();
     const wrap = document.getElementById('balanceSheetWrap');
     if (!wrap) return;
@@ -344,376 +355,510 @@
     if (fromInp && !fromInp.value) fromInp.value = _globalDateFrom;
     if (toInp   && !toInp.value)   toInp.value   = _globalDateTo;
 
-    const dateFrom = fromInp ? fromInp.value : '';
-    const dateTo   = toInp ? toInp.value : '';
-
-    const isCompare = document.getElementById('bsCompareCheck')?.checked || false;
-    const compFromInp = document.getElementById('bsCompareDateFrom');
-    const compToInp   = document.getElementById('bsCompareDateTo');
-    const compareDateFrom = (isCompare && compFromInp) ? compFromInp.value : '';
-    const compareDateTo   = (isCompare && compToInp) ? compToInp.value : '';
-
-    if (_bsExpanded.size === 0) {
-      _bsExpanded.add('mg-assets');
-      _bsExpanded.add('mg-equity-liabilities');
-      COA_SYS_SGS.forEach(sg => {
-        _bsExpanded.add('sg-' + sg.id);
-      });
-    }
-
-    // 1. Primary Period Trial Balance
-    const pnlBalances1 = computeTrialBalanceBalances(dateFrom, dateTo);
-    const profitAmt1   = calculatePnlProfitFromTrialBalances(pnlBalances1);
-    const ledgerBalances1 = computeTrialBalanceBalances('', dateTo);
-    const cumulativeProfit1 = calculatePnlProfitFromTrialBalances(ledgerBalances1);
-    const priorProfit1 = cumulativeProfit1 - profitAmt1;
-    const openingDiff1 = calculateOpeningDifferenceFromTrial(ledgerBalances1);
-
-    // 2. Comparison Period Trial Balance (if enabled)
-    let pnlBalances2 = {};
-    let profitAmt2 = 0;
-    let ledgerBalances2 = {};
-    let priorProfit2 = 0;
-    let openingDiff2 = 0;
-
-    if (isCompare) {
-      pnlBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
-      profitAmt2 = calculatePnlProfitFromTrialBalances(pnlBalances2);
-      ledgerBalances2 = computeTrialBalanceBalances('', compareDateTo);
-      const cumulativeProfit2 = calculatePnlProfitFromTrialBalances(ledgerBalances2);
-      priorProfit2 = cumulativeProfit2 - profitAmt2;
-      openingDiff2 = calculateOpeningDifferenceFromTrial(ledgerBalances2);
-    }
-
-    const col1Title = dateTo ? `As of ${formatRptDate(dateTo)}` : 'Current (₹)';
-    const col2Title = compareDateTo ? `As of ${formatRptDate(compareDateTo)}` : 'Compare (₹)';
-
-    function getBsAmtHtml(bal1, bal2) {
-      if (isCompare) {
-        return `<div class="bs-amt-pair"><span class="amt-col-primary">₹ ${fmtNum(bal1)}</span><span class="amt-col-compare">₹ ${fmtNum(bal2)}</span></div>`;
-      }
-      return `<div class="bs-amt-col">₹ ${fmtNum(bal1)}</div>`;
-    }
-
-    const btnVert = document.getElementById('bsLayoutVertical');
-    const btnHoriz = document.getElementById('bsLayoutHorizontal');
-    if (btnVert && btnHoriz) {
-      if (_bsLayoutMode === 'Vertical') {
-        btnVert.className = 'btn btn-primary';
-        btnVert.style.background = 'var(--blue-700)';
-        btnVert.style.color = '#fff';
-        btnVert.style.borderColor = 'var(--blue-700)';
-        
-        btnHoriz.className = 'btn-sales-action';
-        btnHoriz.style.background = 'var(--white)';
-        btnHoriz.style.color = 'var(--slate-600)';
-        btnHoriz.style.borderColor = 'var(--slate-200)';
-      } else {
-        btnHoriz.className = 'btn btn-primary';
-        btnHoriz.style.background = 'var(--blue-700)';
-        btnHoriz.style.color = '#fff';
-        btnHoriz.style.borderColor = 'var(--blue-700)';
-        
-        btnVert.className = 'btn-sales-action';
-        btnVert.style.background = 'var(--white)';
-        btnVert.style.color = 'var(--slate-600)';
-        btnVert.style.borderColor = 'var(--slate-200)';
-      }
-    }
-
-    let treeHtml = '';
-    if (_bsLayoutMode === 'Horizontal') {
-      treeHtml = '<div class="bs-tree horizontal-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; align-items: stretch;">';
-    } else {
-      treeHtml = '<div class="bs-tree">';
-    }
-
-    const mainGroupsToRender = _bsLayoutMode === 'Horizontal'
-      ? [COA_MAIN_GROUPS.find(mg => mg.id === 'equity-liabilities'), COA_MAIN_GROUPS.find(mg => mg.id === 'assets')]
-      : [COA_MAIN_GROUPS.find(mg => mg.id === 'assets'), COA_MAIN_GROUPS.find(mg => mg.id === 'equity-liabilities')];
-
-    mainGroupsToRender.forEach(mg => {
-      if (!mg) return;
-
-      const mgBal1 = getNodeBalance(mg.id, 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-      const mgBal2 = isCompare ? getNodeBalance(mg.id, 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-      const isMgOpen = _bsExpanded.has('mg-' + mg.id);
-
-      treeHtml += `
-        <div class="bs-mg-card" style="${_bsLayoutMode === 'Horizontal' ? 'display: flex; flex-direction: column; height: 100%;' : ''}">
-          <div class="bs-row bs-row-l0 bs-indent-l0" data-bs-toggle="mg-${mg.id}">
-            <div class="bs-name-col">
-              <svg class="bs-chevron${isMgOpen ? ' open' : ''}" width="16" height="16" viewBox="0 0 18 18" fill="none">
-                <path d="M4 6l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span class="bs-name-text">${mg.name}</span>
-            </div>
-            ${getBsAmtHtml(mgBal1, mgBal2)}
-          </div>
-          ${isCompare ? `
-            <div class="bs-col-hdrs">
-              <span>Particulars</span>
-              <div class="bs-amt-pair">
-                <span class="amt-col-primary">${col1Title}</span>
-                <span class="amt-col-compare">${col2Title}</span>
-              </div>
-            </div>
-          ` : ''}
-          <div id="bsBody-mg-${mg.id}" style="${isMgOpen ? '' : 'display:none'} ${(_bsLayoutMode === 'Horizontal' && isMgOpen) ? '; display: flex; flex-direction: column; flex-grow: 1;' : ''}">
-      `;
-
-      const l1Sgs = COA_SYS_SGS.filter(s => s.main === mg.id && s.parent === null);
-      l1Sgs.forEach(l1Sg => {
-        const hasTx1 = subgroupHasTransactions(l1Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
-        const hasTx2 = isCompare && subgroupHasTransactions(l1Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
-        if (!hasTx1 && !hasTx2) return;
-
-        const l1Bal1 = getNodeBalance(l1Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-        const l1Bal2 = isCompare ? getNodeBalance(l1Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-        const isL1Open = _bsExpanded.has('sg-' + l1Sg.id);
-        const hasChildrenSg = COA_SYS_SGS.some(s => s.parent === l1Sg.id);
-
-        let bodyHtml = '';
-
-        if (hasChildrenSg) {
-          const l2Sgs = COA_SYS_SGS.filter(s => s.parent === l1Sg.id);
-          l2Sgs.forEach(l2Sg => {
-            const hasL2Tx1 = subgroupHasTransactions(l2Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
-            const hasL2Tx2 = isCompare && subgroupHasTransactions(l2Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
-            if (!hasL2Tx1 && !hasL2Tx2) return;
-
-            const l2Bal1 = getNodeBalance(l2Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-            const l2Bal2 = isCompare ? getNodeBalance(l2Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-            const isL2Open = _bsExpanded.has('sg-' + l2Sg.id);
-
-            bodyHtml += `
-              <div class="bs-row bs-row-l2 bs-indent-l2" data-bs-toggle="sg-${l2Sg.id}">
-                <div class="bs-name-col">
-                  <svg class="bs-caret${isL2Open ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
-                    <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span class="bs-name-text">${l2Sg.name}</span>
-                </div>
-                ${getBsAmtHtml(l2Bal1, l2Bal2)}
-              </div>
-              <div id="bsBody-sg-${l2Sg.id}" style="${isL2Open ? '' : 'display:none'}">
-                ${renderSubgroupLeafs(l2Sg.id, ledgerBalances1, profitAmt1, openingDiff1, 'bs-indent-l3', 'bs-indent-l4', priorProfit1, dateFrom, dateTo, isCompare, ledgerBalances2, profitAmt2, openingDiff2, priorProfit2, compareDateFrom, compareDateTo)}
-              </div>
-            `;
-          });
-        } else {
-          bodyHtml += renderSubgroupLeafs(l1Sg.id, ledgerBalances1, profitAmt1, openingDiff1, 'bs-indent-l2', 'bs-indent-l3', priorProfit1, dateFrom, dateTo, isCompare, ledgerBalances2, profitAmt2, openingDiff2, priorProfit2, compareDateFrom, compareDateTo);
-        }
-
-        treeHtml += `
-          <div class="bs-row bs-row-l1 bs-indent-l1" data-bs-toggle="sg-${l1Sg.id}">
-            <div class="bs-name-col">
-              <svg class="bs-caret${isL1Open ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span class="bs-name-text">${l1Sg.name}</span>
-            </div>
-            ${getBsAmtHtml(l1Bal1, l1Bal2)}
-          </div>
-          <div id="bsBody-sg-${l1Sg.id}" style="${isL1Open ? '' : 'display:none'}">
-            ${bodyHtml}
-          </div>
-        `;
-      });
-
-      treeHtml += `
-            <div class="bs-row bs-grandtotal bs-indent-l0" style="${_bsLayoutMode === 'Horizontal' ? 'margin-top: auto;' : ''}">
-              <span style="text-transform: uppercase;">Total ${mg.name}</span>
-              ${getBsAmtHtml(mgBal1, mgBal2)}
-            </div>
-          </div>
-        </div>
-      `;
+    const layoutBtns = { Schedule: 'bsLayoutSchedule', Notes: 'bsLayoutNotes', Ppe: 'bsLayoutPpe' };
+    Object.keys(layoutBtns).forEach(mode => {
+      const btn = document.getElementById(layoutBtns[mode]);
+      if (!btn) return;
+      const isActive = _bsLayoutMode === mode;
+      btn.className = isActive ? 'btn btn-primary' : 'btn-sales-action';
+      btn.style.background = isActive ? 'var(--blue-700)' : 'var(--white)';
+      btn.style.color = isActive ? '#fff' : 'var(--slate-600)';
+      btn.style.borderColor = isActive ? 'var(--blue-700)' : 'var(--slate-200)';
     });
 
-    treeHtml += '</div>';
-    wrap.innerHTML = treeHtml;
-
-    // Validation Status Badge for Primary Period
-    const badgeWrap = document.getElementById('bsStatusBadgeWrap');
-    if (badgeWrap) {
-      const totAssets = getNodeBalance('assets', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-      const totLiab   = getNodeBalance('equity-liabilities', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-      const isBalanced = Math.abs(totAssets - totLiab) < 0.01;
-
-      if (isBalanced) {
-        badgeWrap.innerHTML = `
-          <span class="tb-badge tb-badge-success">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;">
-              <path d="M13.485 1.929a.75.75 0 0 1 .06 1.057l-7.25 8a.75.75 0 0 1-1.083.03l-3.25-3.5a.75.75 0 1 1 1.096-1.024l2.673 2.879 6.704-7.39a.75.75 0 0 1 1.05-.052z"/>
-            </svg>
-            Balanced
-          </span>
-        `;
-      } else {
-        const diff = Math.abs(totAssets - totLiab);
-        badgeWrap.innerHTML = `
-          <span class="tb-badge tb-badge-danger" title="Total Assets must equal Total Liabilities and Equity. Difference: ₹ ${fmtNum(diff)}">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;">
-              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM8 4a.75.75 0 0 1 .75.75v5a.75.75 0 0 1-1.5 0v-5A.75.75 0 0 1 8 4zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
-            </svg>
-            Mismatched (Diff: ₹ ${fmtNum(diff)})
-          </span>
-        `;
-      }
+    const data = getBalanceSheetReportData();
+    if (_bsLayoutMode === 'Notes') {
+      wrap.innerHTML = renderBsNotesMode(data);
+    } else if (_bsLayoutMode === 'Ppe') {
+      wrap.innerHTML = renderBsPpeMode(data);
+    } else {
+      wrap.innerHTML = renderBsScheduleMode(data);
     }
 
-    wrap.querySelectorAll('[data-bs-toggle]').forEach(el => {
+    function flash(targetEl) {
+      if (!targetEl) return;
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      targetEl.classList.add('pnl-note-target-highlight');
+      setTimeout(() => targetEl.classList.remove('pnl-note-target-highlight'), 2500);
+    }
+
+    function openView(mode, targetId) {
+      _bsLayoutMode = mode;
+      renderBalanceSheetPanel();
+      setTimeout(() => flash(document.getElementById(targetId)), 60);
+    }
+
+    wrap.querySelectorAll('[data-bs-goto-note]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        const id = el.dataset.bsToggle;
-        if (_bsExpanded.has(id)) _bsExpanded.delete(id);
-        else _bsExpanded.add(id);
+        const noteNo = el.dataset.bsGotoNote;
+        if (!noteNo) return;
+        if (el.dataset.bsPpe) openView('Ppe', `bs-ppe-${noteNo}`);
+        else openView('Notes', `bs-note-${noteNo}`);
+      });
+    });
+
+    wrap.querySelectorAll('[data-bs-open-ppe]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openView('Ppe', `bs-ppe-${el.dataset.bsOpenPpe}`);
+      });
+    });
+
+    wrap.querySelectorAll('[data-bs-pill]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        flash(document.getElementById(el.dataset.bsPill));
+      });
+    });
+
+    wrap.querySelectorAll('[data-bs-back]').forEach(el => {
+      el.addEventListener('click', () => {
+        _bsLayoutMode = 'Schedule';
         renderBalanceSheetPanel();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
   }
 
-  function renderSubgroupLeafs(sgId, ledgerBalances1, profitAmt1, openingDiff1, indentClassL3, indentClassL4, priorProfit1 = 0, dateFrom = '', dateTo = '', isCompare = false, ledgerBalances2 = {}, profitAmt2 = 0, openingDiff2 = 0, priorProfit2 = 0, compareDateFrom = '', compareDateTo = '') {
-    let html = '';
-    const hideZero = document.getElementById('bsHideZero')?.checked || false;
+  function fmtBsSchAmt(val) {
+    if (typeof val !== 'number' || isNaN(val)) return '₹ 0.00';
+    if (val < 0) {
+      return `<span style="color: #dc2626;">(₹ ${fmtNum(Math.abs(val))})</span>`;
+    }
+    return `₹ ${fmtNum(val)}`;
+  }
 
-    function getBsAmtHtml(bal1, bal2) {
-      if (isCompare) {
-        return `<div class="bs-amt-pair"><span class="amt-col-primary">₹ ${fmtNum(bal1)}</span><span class="amt-col-compare">₹ ${fmtNum(bal2)}</span></div>`;
-      }
-      return `<div class="bs-amt-col">₹ ${fmtNum(bal1)}</div>`;
+  function escBsHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderBsScheduleMode(data) {
+    function noteBadge(r) {
+      if (!r.noteNo) return `<span class="pnl-note-empty">-</span>`;
+      const where = r.isPpe ? 'Property, Plant &amp; Equipment schedule' : 'Notes to Accounts';
+      return `<span class="pnl-note-badge pnl-note-link" data-bs-goto-note="${r.noteNo}"${r.isPpe ? ' data-bs-ppe="1"' : ''} title="Click to view Note ${r.noteNo} in ${where}">${r.noteNo}</span>`;
     }
 
-    if (sgId === 'sg-rs') {
-      const hasPnl1 = (profitAmt1 !== 0 || hasAnyPnlTransactions(dateFrom, dateTo));
-      const hasPnl2 = isCompare && (profitAmt2 !== 0 || hasAnyPnlTransactions(compareDateFrom, compareDateTo));
-      if ((hasPnl1 || hasPnl2) && (!hideZero || profitAmt1 !== 0 || (isCompare && profitAmt2 !== 0))) {
-        html += `
-          <div class="bs-row bs-row-l4 ${indentClassL3}">
-            <div class="bs-name-col">
-              <span class="bs-caret-empty"></span>
-              <span class="bs-name-text">Profit & Loss A/c (Current Year)</span>
-            </div>
-            ${getBsAmtHtml(profitAmt1, profitAmt2)}
-          </div>
-        `;
+    let rowsHtml = '';
+    data.scheduleRows.forEach(r => {
+      if (r.type === 'sec-hdr') {
+        rowsHtml += `
+              <tr class="pnl-sch-sec-hdr">
+                <td colspan="4">${escBsHtml(r.particular)}</td>
+              </tr>`;
+        return;
       }
-      const hasPrior1 = priorProfit1 !== 0 || hasAnyPnlTransactions('', dateFrom);
-      const hasPrior2 = isCompare && (priorProfit2 !== 0 || hasAnyPnlTransactions('', compareDateFrom));
-      if ((!hideZero && (hasPrior1 || hasPrior2)) || (hideZero && (priorProfit1 !== 0 || (isCompare && priorProfit2 !== 0)))) {
-        html += `
-          <div class="bs-row bs-row-l4 ${indentClassL3}">
-            <div class="bs-name-col">
-              <span class="bs-caret-empty"></span>
-              <span class="bs-name-text">Retained Earnings (Prior to filter)</span>
-            </div>
-            ${getBsAmtHtml(priorProfit1, priorProfit2)}
-          </div>
-        `;
+
+      const rowClass = {
+        'group': 'pnl-sch-row-main bs-sch-group',
+        'main': 'pnl-sch-row-main',
+        'sub': 'pnl-sch-row-sub',
+        'sub-hdr': 'pnl-sch-row-sub bs-sch-subhdr',
+        'sub2': 'pnl-sch-row-sub bs-sch-row-sub2',
+        'grandtotal': 'pnl-sch-grandtotal'
+      }[r.type] || 'pnl-sch-row-main';
+
+      const linkNote = r.noteNo || r.linkNote || '';
+      const linkAttr = (linkNote && r.type !== 'grandtotal')
+        ? ` data-bs-goto-note="${linkNote}"${r.isPpe ? ' data-bs-ppe="1"' : ''} style="cursor: pointer;" title="Click to view Note ${linkNote}${r.isPpe ? ' in the Property, Plant &amp; Equipment schedule' : ' in Notes to Accounts'}"`
+        : '';
+      const hasAmt = typeof r.amount1 === 'number';
+
+      rowsHtml += `
+              <tr class="${rowClass}"${linkAttr}>
+                <td>
+                  <div class="pnl-sch-name">
+                    <span>${escBsHtml(r.particular)}</span>
+                  </div>
+                </td>
+                <td class="pnl-sch-note-cell">${noteBadge(r)}</td>
+                <td class="pnl-sch-amt">${hasAmt ? fmtBsSchAmt(r.amount1) : ''}</td>
+                <td class="pnl-sch-amt">${hasAmt ? fmtBsSchAmt(r.amount2) : ''}</td>
+              </tr>`;
+    });
+
+    const alertHtml = data.isBalanced ? '' : `
+      <div class="bs-sch-alert" role="alert">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;">
+          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM8 4a.75.75 0 0 1 .75.75v5a.75.75 0 0 1-1.5 0v-5A.75.75 0 0 1 8 4zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+        </svg>
+        Total Equity and Liabilities does not equal Total Assets (difference ₹ ${fmtNum(Math.abs(data.totEL1 - data.totAssets1))}).
+      </div>`;
+
+    return `
+      ${alertHtml}
+      <div class="pnl-sch-card">
+        <div class="pnl-sch-table-wrap">
+          <table class="pnl-sch-table">
+            <thead>
+              <tr>
+                <th class="pnl-sch-th-part">Particulars</th>
+                <th class="pnl-sch-th-note">Note No.</th>
+                <th class="pnl-sch-th-amt">
+                  <div class="pnl-sch-th-title">Current Period</div>
+                  <div class="pnl-sch-th-sub">${escBsHtml(data.col1Title)}</div>
+                </th>
+                <th class="pnl-sch-th-amt">
+                  <div class="pnl-sch-th-title">Previous Period</div>
+                  <div class="pnl-sch-th-sub">${escBsHtml(data.col2Title)}</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBsNotesMode(data) {
+    function itemRows(note) {
+      let html = '';
+      (note.items || []).forEach(item => {
+        if (item.isGroup) {
+          html += `
+            <tr style="background: #fdfefe; font-weight: 600;">
+              <td style="padding-left: 20px; color: #b45309;">📁 ${escBsHtml(item.name)} ${item.code ? `<span class="pnl-code">${escBsHtml(item.code)}</span>` : ''}</td>
+              <td class="pnl-sch-amt">${fmtBsSchAmt(item.amount1)}</td>
+              <td class="pnl-sch-amt">${fmtBsSchAmt(item.amount2)}</td>
+            </tr>`;
+          (item.children || []).forEach(ch => {
+            html += `
+            <tr>
+              <td style="padding-left: 38px; color: var(--slate-600);">• ${escBsHtml(ch.name)} ${ch.code ? `<span class="pnl-code">${escBsHtml(ch.code)}</span>` : ''}</td>
+              <td class="pnl-sch-amt">${fmtBsSchAmt(ch.amount1)}</td>
+              <td class="pnl-sch-amt">${fmtBsSchAmt(ch.amount2)}</td>
+            </tr>`;
+          });
+        } else {
+          html += `
+            <tr>
+              <td style="padding-left: 20px; color: var(--slate-700);">• ${escBsHtml(item.name)} ${item.code ? `<span class="pnl-code">${escBsHtml(item.code)}</span>` : ''}</td>
+              <td class="pnl-sch-amt">${fmtBsSchAmt(item.amount1)}</td>
+              <td class="pnl-sch-amt">${fmtBsSchAmt(item.amount2)}</td>
+            </tr>`;
+        }
+      });
+      if (!html) {
+        html = `
+            <tr>
+              <td style="padding-left: 20px; color: var(--slate-400); font-style: italic;">No specific accounts recorded under this note</td>
+              <td class="pnl-sch-amt">₹ 0.00</td>
+              <td class="pnl-sch-amt">₹ 0.00</td>
+            </tr>`;
       }
-      if (openingDiff1 !== 0 || (isCompare && openingDiff2 !== 0)) {
-        html += `
-          <div class="bs-row bs-row-l4 ${indentClassL3}">
-            <div class="bs-name-col">
-              <span class="bs-caret-empty"></span>
-              <span class="bs-name-text">Difference in Opening Balances</span>
-            </div>
-            ${getBsAmtHtml(openingDiff1, openingDiff2)}
-          </div>
-        `;
-      }
+      return html;
     }
 
-    const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
-    groupLdgs.forEach(gl => {
-      const sg = COA_SYS_SGS.find(s => s.id === gl.sgId);
+    const pillsHtml = data.notesData.map(n =>
+      `<a class="pnl-note-pill" href="#bs-note-${n.noteNo}" data-bs-pill="bs-note-${n.noteNo}">Note ${n.noteNo}: ${escBsHtml(n.shortTitle || n.title)}</a>`
+    ).join('\n            ');
+
+    const cardsHtml = data.notesData.map(note => `
+        <div class="pnl-note-card" id="bs-note-${note.noteNo}">
+          <div class="pnl-note-header">
+            <div class="pnl-note-header-left">
+              <span class="pnl-note-badge-lg">Note ${note.noteNo}</span>
+              <span class="pnl-note-title">${escBsHtml(note.title)}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              ${note.ppeLink ? `
+              <button class="bs-ppe-open-btn" type="button" data-bs-open-ppe="${note.noteNo}">
+                View full schedule
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>` : ''}
+              <div style="font-size: 13.5px; font-weight: 700; color: var(--blue-900);">
+                Total: ${fmtBsSchAmt(note.total1)}
+              </div>
+            </div>
+          </div>
+          <table class="pnl-note-table">
+            <thead>
+              <tr>
+                <th style="text-align: left;">Particulars</th>
+                <th style="text-align: right; width: 170px;">${escBsHtml(data.col1Title)} (₹)</th>
+                <th style="text-align: right; width: 170px;">${escBsHtml(data.col2Title)} (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemRows(note)}
+              <tr class="pnl-note-total-row">
+                <td>Total ${escBsHtml(note.title)}</td>
+                <td class="pnl-sch-amt">${fmtBsSchAmt(note.total1)}</td>
+                <td class="pnl-sch-amt">${fmtBsSchAmt(note.total2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`).join('');
+
+    return `
+      <div class="pnl-notes-container">
+        <!-- Notes Hero Banner -->
+        <div class="pnl-notes-hero">
+          <div class="pnl-notes-hero-top">
+            <div>
+              <div class="pnl-notes-hero-title">Notes to Financial Statements (Balance Sheet)</div>
+              <div class="pnl-notes-hero-sub">Schedule III Disclosures &middot; ${escBsHtml(data.col1Title)} vs ${escBsHtml(data.col2Title)}</div>
+            </div>
+            <button class="btn btn-sales-action" data-bs-back type="button" style="height: 34px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Back to Balance Sheet
+            </button>
+          </div>
+          <div class="pnl-notes-pills-wrap">
+            ${pillsHtml}
+          </div>
+        </div>
+
+        <!-- Note Cards -->
+        ${cardsHtml}
+      </div>
+    `;
+  }
+
+  function renderBsPpeMode(data) {
+    const ppe = data.ppe;
+
+    function tableHtml(t) {
+      const cols = ['grossOpen', 'additions', 'disposals', 'grossClose', 'accOpen', 'accCharge', 'accDisposal', 'accClose', 'netClose', 'netPrev'];
+      const bandStart = new Set(['grossOpen', 'accOpen', 'netClose']);
+
+      // Grid cells carry no ₹ symbol (the schedule is stated "Amount in ₹") so ten columns fit
+      function fmtCell(val) {
+        if (typeof val !== 'number' || isNaN(val)) return '0.00';
+        return val < 0 ? `<span style="color: #dc2626;">(${fmtNum(Math.abs(val))})</span>` : fmtNum(val);
+      }
+
+      function cells(r) {
+        return cols.map(c => {
+          const cls = [bandStart.has(c) ? 'bs-ppe-band-start' : '', (c === 'netClose' || c === 'netPrev') ? 'bs-ppe-net' : ''].filter(Boolean).join(' ');
+          return `<td${cls ? ` class="${cls}"` : ''}>${fmtCell(r[c])}</td>`;
+        }).join('');
+      }
+
+      const bodyRows = t.rows.length
+        ? t.rows.map(r => `
+              <tr>
+                <td class="bs-ppe-td-part">${escBsHtml(r.name)}${r.code ? ` <span class="pnl-code">${escBsHtml(r.code)}</span>` : ''}</td>
+                ${cells(r)}
+              </tr>`).join('')
+        : `
+              <tr>
+                <td class="bs-ppe-td-part" colspan="11" style="text-align: left; color: var(--slate-400); font-style: italic; font-weight: 400;">No ${escBsHtml(t.title.toLowerCase())} ledgers recorded for this period</td>
+              </tr>`;
+
+      const tieOk = Math.abs(t.totals.netClose - t.lineTotal1) < 0.01;
+      const tieHtml = tieOk
+        ? `<span class="bs-ppe-tie bs-ppe-tie-ok">✓ Net block agrees with the Balance Sheet (Note ${t.noteNo}: ${fmtBsSchAmt(t.lineTotal1)})</span>`
+        : `<span class="bs-ppe-tie bs-ppe-tie-bad">Net block differs from the Balance Sheet (Note ${t.noteNo}: ${fmtBsSchAmt(t.lineTotal1)})</span>`;
+
+      return `
+        <div class="pnl-note-card" id="bs-ppe-${t.noteNo}">
+          <div class="pnl-note-header">
+            <div class="pnl-note-header-left">
+              <span class="pnl-note-badge-lg">Note ${t.noteNo}</span>
+              <span class="pnl-note-title">${escBsHtml(t.title)}</span>
+            </div>
+            <div style="font-size: 13.5px; font-weight: 700; color: var(--blue-900);">
+              Net Block: ${fmtBsSchAmt(t.totals.netClose)}
+            </div>
+          </div>
+          <div class="bs-ppe-table-wrap">
+            <table class="bs-ppe-table">
+              <thead>
+                <tr>
+                  <th class="bs-ppe-th-part" rowspan="2">Particulars</th>
+                  <th class="bs-ppe-th-band" colspan="4">Gross Block</th>
+                  <th class="bs-ppe-th-band" colspan="4">${escBsHtml(t.depLabel)}</th>
+                  <th class="bs-ppe-th-band" colspan="2">Net Block</th>
+                </tr>
+                <tr>
+                  <th class="bs-ppe-band-start">As at ${escBsHtml(ppe.startLabel)}</th>
+                  <th>Additions</th>
+                  <th>Deductions / Disposals</th>
+                  <th>As at ${escBsHtml(ppe.endLabel)}</th>
+                  <th class="bs-ppe-band-start">Up to ${escBsHtml(ppe.startLabel)}</th>
+                  <th>For the period</th>
+                  <th>On disposals</th>
+                  <th>Up to ${escBsHtml(ppe.endLabel)}</th>
+                  <th class="bs-ppe-band-start">As at ${escBsHtml(ppe.endLabel)}</th>
+                  <th>As at ${escBsHtml(ppe.prevLabel)}</th>
+                </tr>
+              </thead>
+              <tbody>${bodyRows}
+                <tr class="pnl-note-total-row">
+                  <td class="bs-ppe-td-part">Total</td>
+                  ${cells(t.totals)}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="bs-ppe-foot">${tieHtml}</div>
+        </div>`;
+    }
+
+    return `
+      <div class="pnl-notes-container">
+        <div class="pnl-notes-hero">
+          <div class="pnl-notes-hero-top">
+            <div>
+              <div class="pnl-notes-hero-title">Property, Plant and Equipment &amp; Intangible Assets</div>
+              <div class="pnl-notes-hero-sub">Schedule III &middot; Movement for ${escBsHtml(ppe.periodLabel)} &middot; Net block compared with ${escBsHtml(ppe.prevLabel)} &middot; Amount in ₹</div>
+            </div>
+            <button class="btn btn-sales-action" data-bs-back type="button" style="height: 34px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Back to Balance Sheet
+            </button>
+          </div>
+          <div class="pnl-notes-pills-wrap">
+            ${ppe.tables.map(t => `<a class="pnl-note-pill" href="#bs-ppe-${t.noteNo}" data-bs-pill="bs-ppe-${t.noteNo}">Note ${t.noteNo}: ${escBsHtml(t.title)}</a>`).join('\n            ')}
+          </div>
+        </div>
+        ${ppe.tables.map(tableHtml).join('')}
+        <div style="font-size: 12px; color: var(--slate-500); line-height: 1.6; padding: 0 4px;">
+          Additions are debits to the asset ledger during the period; deductions are credits other than depreciation.
+          Accumulated depreciation ledgers (names containing "Depreciation" or "Amortisation") are matched to the asset they name.
+          Depreciation posted directly against an asset ledger (Dr Depreciation, Cr Asset) is shown under accumulated depreciation, with the gross block restated to match.
+        </div>
+      </div>
+    `;
+  }
+
+  // Schedule III Balance Sheet layout: sections, lines and note numbers (1–26 fixed, custom
+  // sub-groups from 27). The P&L notes continue from `lastNote`, so both are built here.
+  function getBsScheduleLayout() {
+    const sgById = {};
+    COA_SYS_SGS.forEach(s => { sgById[s.id] = s; });
+    const ledgerById = {};
+    coaLedgers.forEach(l => { ledgerById[l.id] = l; });
+
+    // Sub-group of a ledger, following group ledgers up to the top-level one
+    function resolveSgId(l) {
+      let cur = l;
+      const seen = new Set();
+      while (cur && cur.glId && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        const parent = ledgerById[cur.glId];
+        if (!parent) break;
+        cur = parent;
+      }
+      let sgId = (cur && cur.sgId) || l.sgId || null;
+      if (sgId && !sgById[sgId] && ledgerById[sgId]) sgId = ledgerById[sgId].sgId || null;
+      return sgId;
+    }
+
+    const bsLedgers = [];
+    coaLedgers.forEach(l => {
+      if (l.type !== 'ledger') return;
+      const sg = sgById[resolveSgId(l)];
       if (!sg || (sg.main !== 'assets' && sg.main !== 'equity-liabilities')) return;
-
-      const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, true);
-      const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, true);
-      if (!hasGlTx1 && !hasGlTx2) return;
-
-      const glBal1 = getNodeBalance(gl.id, 'group-ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-      const glBal2 = isCompare ? getNodeBalance(gl.id, 'group-ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-      if (hideZero && glBal1 === 0 && (!isCompare || glBal2 === 0)) return;
-
-      const isGlOpen = _bsExpanded.has('gl-' + gl.id);
-
-      let childHtml = '';
-      const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
-      childLdgs.forEach(l => {
-        const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
-        if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
-
-        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
-        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
-        if (!hasLTx1 && !hasLTx2) return;
-
-        const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-        const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-        if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
-
-        childHtml += `
-          <div class="bs-row bs-row-l4 ${indentClassL4}">
-            <div class="bs-name-col">
-              <span class="bs-caret-empty"></span>
-              <span class="bs-name-text">${l.name}</span>
-              ${l.code ? `<span class="bs-code">${l.code}</span>` : ''}
-            </div>
-            ${getBsAmtHtml(bal1, bal2)}
-          </div>
-        `;
-      });
-
-      if (hideZero && glBal1 === 0 && (!isCompare || glBal2 === 0) && childHtml === '') return;
-
-      html += `
-        <div class="bs-row bs-row-l3 ${indentClassL3}" data-bs-toggle="gl-${gl.id}">
-          <div class="bs-name-col">
-            <svg class="bs-caret${isGlOpen ? ' open' : ''}" width="12" height="12" viewBox="0 0 14 14" fill="none">
-              <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="bs-name-text">📁 ${gl.name}</span>
-            ${gl.code ? `<span class="bs-code">${gl.code}</span>` : ''}
-          </div>
-          ${getBsAmtHtml(glBal1, glBal2)}
-        </div>
-        <div id="bsBody-gl-${gl.id}" style="${isGlOpen ? '' : 'display:none'}">
-          ${childHtml}
-        </div>
-      `;
+      bsLedgers.push({ l, sg });
     });
 
-    const directLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'ledger' && !l.glId);
-    directLdgs.forEach(l => {
-      const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
-      if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
+    // ── Schedule III layout (fixed note numbers, custom sub-groups numbered from 27) ──
+    const line = (key, label, note, extra) => Object.assign({ key, label, note: String(note) }, extra || {});
+    const elGroups = [
+      { label: "Shareholders' funds", parent: 'sg-shf', lines: [
+        line('sg-sc', 'Share capital', 1),
+        line('sg-rs', 'Reserves and surplus', 2),
+        line('sg-mrsw', 'Money received against share warrants', 3)
+      ] },
+      { label: 'Share application money pending allotment', single: line('samp', 'Share application money pending allotment', 4) },
+      { label: 'Non-current liabilities', parent: 'sg-ncl', lines: [
+        line('sg-ltb', 'Long-term borrowings', 5),
+        line('sg-dtl', 'Deferred tax liabilities (Net)', 6),
+        line('sg-oll', 'Other Long term liabilities', 7),
+        line('sg-ltp', 'Long-term provisions', 8)
+      ] },
+      { label: 'Current liabilities', parent: 'sg-cl', lines: [
+        line('sg-stb', 'Short-term borrowings', 9),
+        line('tp', 'Trade payables', 10, { split: [
+          { key: 'tp-msme', label: '(A) total outstanding dues of micro enterprises and small enterprises' },
+          { key: 'tp-other', label: '(B) total outstanding dues of creditors other than micro enterprises and small enterprises' }
+        ] }),
+        line('sg-ocl', 'Other current liabilities', 11),
+        line('sg-stp', 'Short-term provisions', 12)
+      ] }
+    ];
+    const asGroups = [
+      { label: 'Non-current assets', parent: 'sg-nca', lines: [
+        { key: 'ppe-ia', label: 'Property, Plant and Equipment and Intangible assets', children: [
+          line('sg-ppe', 'Property, Plant and Equipment', 13, { ppe: true }),
+          line('sg-ia', 'Intangible assets', 14, { ppe: true }),
+          line('sg-cwip', 'Capital work-in-progress', 15),
+          line('sg-iaud', 'Intangible assets under development', 16)
+        ] },
+        line('sg-nci', 'Non-current investments', 17),
+        line('dta', 'Deferred tax assets (net)', 18),
+        line('sg-ltla', 'Long-term loans and advances', 19),
+        line('sg-onca', 'Other non-current assets', 20)
+      ] },
+      { label: 'Current assets', parent: 'sg-ca', lines: [
+        line('sg-ci', 'Current investments', 21),
+        line('sg-inv', 'Inventories', 22),
+        line('sg-tr', 'Trade receivables', 23),
+        line('sg-cce', 'Cash and cash equivalents', 24),
+        line('sg-stla', 'Short-term loans and advances', 25),
+        line('sg-oca', 'Other current assets', 26)
+      ] }
+    ];
 
-      const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
-      const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
-      if (!hasLTx1 && !hasLTx2) return;
+    // Direct ledgers under a top-level sub-group fall into that section's "other" line
+    const L1_FALLBACK = { 'sg-shf': 'sg-rs', 'sg-ncl': 'sg-oll', 'sg-cl': 'sg-ocl', 'sg-nca': 'sg-onca', 'sg-ca': 'sg-oca' };
+    const stdSgIds = new Set(['sg-tp', ...Object.keys(L1_FALLBACK)]);
+    [...elGroups, ...asGroups].forEach(g => (g.lines || []).forEach(ln => {
+      stdSgIds.add(ln.key);
+      (ln.children || []).forEach(ch => stdSgIds.add(ch.key));
+    }));
 
-      const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-      const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-      if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
-
-      html += `
-        <div class="bs-row bs-row-l4 ${indentClassL3}">
-          <div class="bs-name-col">
-            <span class="bs-caret-empty"></span>
-            <span class="bs-name-text">${l.name}</span>
-            ${l.code ? `<span class="bs-code">${l.code}</span>` : ''}
-          </div>
-          ${getBsAmtHtml(bal1, bal2)}
-        </div>
-      `;
+    let nextNote = 27;
+    const customSgs = COA_SYS_SGS.filter(s => (s.main === 'assets' || s.main === 'equity-liabilities') && !stdSgIds.has(s.id));
+    // Custom sub-groups inside a standard section
+    customSgs.filter(s => s.parent && L1_FALLBACK[s.parent]).forEach(s => {
+      const g = [...elGroups, ...asGroups].find(grp => grp.parent === s.parent);
+      if (g) g.lines.push(line(s.id, s.name, nextNote++));
+    });
+    // Custom top-level sub-groups become their own section
+    customSgs.filter(s => !s.parent).forEach(s => {
+      const children = customSgs.filter(c => c.parent === s.id);
+      const hasDirect = bsLedgers.some(x => x.sg.id === s.id);
+      const g = { label: s.name, parent: s.id, lines: [] };
+      children.forEach(c => g.lines.push(line(c.id, c.name, nextNote++)));
+      if (hasDirect || !children.length) g.lines.push(line(s.id, s.name, nextNote++));
+      (s.main === 'assets' ? asGroups : elGroups).push(g);
     });
 
-    return html;
+    return { sgById, ledgerById, resolveSgId, bsLedgers, elGroups, asGroups, L1_FALLBACK, lastNote: nextNote - 1 };
   }
 
-  // Helper to compile structured Balance Sheet Report Data for Export
+  // Note numbers of the Statement of Profit and Loss, continuing after the last Balance Sheet note
+  // (face order: revenue, expenses incl. custom expense sub-groups, exceptional, tax, discontinued, EPS)
+  function getPnlNoteMap(customExpSgs) {
+    let n = getBsScheduleLayout().lastNote + 1;
+    const next = () => String(n++);
+    const map = {
+      rfo: next(), oi: next(), cmc: next(), pst: next(), cinv: next(),
+      ebe: next(), fc: next(), da: next(), oe: next(), custom: {}
+    };
+    (customExpSgs || []).forEach(sg => { map.custom[sg.id] = next(); });
+    map.exc = next();
+    map.curTax = next();
+    map.defTax = next();
+    map.disc = next();
+    map.discTax = next();
+    map.eps = next();
+    return map;
+  }
+
+  // Builds the complete Schedule III Balance Sheet model (face, notes and PPE schedule).
+  // Shared by the on-screen views and the PDF / Excel exports.
   function getBalanceSheetReportData() {
     const fromInp = document.getElementById('bsDateFrom');
     const toInp   = document.getElementById('bsDateTo');
@@ -721,190 +866,417 @@
     const dateTo   = toInp ? toInp.value : (_globalDateTo || '');
 
     const isCompare = document.getElementById('bsCompareCheck')?.checked || false;
-    const compFromInp = document.getElementById('bsCompareDateFrom');
-    const compToInp   = document.getElementById('bsCompareDateTo');
-    const compareDateFrom = (isCompare && compFromInp) ? compFromInp.value : '';
-    const compareDateTo   = (isCompare && compToInp) ? compToInp.value : '';
-
+    const compareDateFrom = isCompare ? (document.getElementById('bsCompareDateFrom')?.value || '') : '';
+    const compareDateTo   = isCompare ? (document.getElementById('bsCompareDateTo')?.value || '') : '';
     const hideZero = document.getElementById('bsHideZero')?.checked || false;
 
-    // 1. Primary Period Trial Balance
-    const pnlBalances1 = computeTrialBalanceBalances(dateFrom, dateTo);
-    const profitAmt1   = calculatePnlProfitFromTrialBalances(pnlBalances1);
-    const ledgerBalances1 = computeTrialBalanceBalances('', dateTo);
-    const cumulativeProfit1 = calculatePnlProfitFromTrialBalances(ledgerBalances1);
-    const priorProfit1 = cumulativeProfit1 - profitAmt1;
-    const openingDiff1 = calculateOpeningDifferenceFromTrial(ledgerBalances1);
-
-    // 2. Comparison Period Trial Balance
-    let pnlBalances2 = {};
-    let profitAmt2 = 0;
-    let ledgerBalances2 = {};
-    let priorProfit2 = 0;
-    let openingDiff2 = 0;
-
-    if (isCompare) {
-      pnlBalances2 = computeTrialBalanceBalances(compareDateFrom, compareDateTo);
-      profitAmt2 = calculatePnlProfitFromTrialBalances(pnlBalances2);
-      ledgerBalances2 = computeTrialBalanceBalances('', compareDateTo);
-      const cumulativeProfit2 = calculatePnlProfitFromTrialBalances(ledgerBalances2);
-      priorProfit2 = cumulativeProfit2 - profitAmt2;
-      openingDiff2 = calculateOpeningDifferenceFromTrial(ledgerBalances2);
+    // Previous-period column: the comparison dates when enabled, otherwise the same dates a year earlier (as the P&L does)
+    let prevPeriodFrom = compareDateFrom;
+    let prevPeriodTo = compareDateTo;
+    if (!isCompare) {
+      const prevDates = getPreviousPeriodDates(dateFrom, dateTo);
+      prevPeriodFrom = prevDates.prevFrom;
+      prevPeriodTo = prevDates.prevTo;
     }
+    const hasPrev = isCompare || !!(prevPeriodFrom || prevPeriodTo);
+
+    function periodCtx(from, to, enabled) {
+      if (!enabled) return { from, to, enabled: false, bal: {}, profit: 0, prior: 0, diff: 0 };
+      const bal = computeTrialBalanceBalances('', to);
+      const profit = calculatePnlProfitFromTrialBalances(computeTrialBalanceBalances(from, to));
+      const cumulative = calculatePnlProfitFromTrialBalances(bal);
+      return { from, to, enabled: true, bal, profit, prior: cumulative - profit, diff: calculateOpeningDifferenceFromTrial(bal) };
+    }
+    const p1 = periodCtx(dateFrom, dateTo, true);
+    const p2 = periodCtx(prevPeriodFrom, prevPeriodTo, hasPrev);
+
+    const col1Title = dateTo ? `As at ${formatRptDate(dateTo)}` : 'Current Period';
+    const col2Title = prevPeriodTo ? `As at ${formatRptDate(prevPeriodTo)}` : 'Previous Period';
 
     const co = (typeof getCompanyDetails === 'function') ? getCompanyDetails() : {};
     const companyName = co.name || 'KYA Accounting';
 
-    function getSubgroupItems(sgId) {
-      const items = [];
+    const isNil = (a, b) => Math.abs(a || 0) < 0.005 && Math.abs(b || 0) < 0.005;
+    const { sgById, ledgerById, resolveSgId, bsLedgers, elGroups, asGroups, L1_FALLBACK } = getBsScheduleLayout();
 
-      if (sgId === 'sg-rs') {
-        const hasPnl1 = (profitAmt1 !== 0 || hasAnyPnlTransactions(dateFrom, dateTo));
-        const hasPnl2 = isCompare && (profitAmt2 !== 0 || hasAnyPnlTransactions(compareDateFrom, compareDateTo));
-        if ((hasPnl1 || hasPnl2) && (!hideZero || profitAmt1 !== 0 || (isCompare && profitAmt2 !== 0))) {
-          items.push({ name: 'Profit & Loss A/c (Current Year)', code: '', isGroup: false, amount1: profitAmt1, amount2: profitAmt2 });
-        }
-
-        const hasPrior1 = priorProfit1 !== 0 || hasAnyPnlTransactions('', dateFrom);
-        const hasPrior2 = isCompare && (priorProfit2 !== 0 || hasAnyPnlTransactions('', compareDateFrom));
-        if ((!hideZero && (hasPrior1 || hasPrior2)) || (hideZero && (priorProfit1 !== 0 || (isCompare && priorProfit2 !== 0)))) {
-          items.push({ name: 'Retained Earnings (Prior to filter)', code: '', isGroup: false, amount1: priorProfit1, amount2: priorProfit2 });
-        }
-
-        if (openingDiff1 !== 0 || (isCompare && openingDiff2 !== 0)) {
-          items.push({ name: 'Difference in Opening Balances', code: '', isGroup: false, amount1: openingDiff1, amount2: openingDiff2 });
-        }
+    function topGroupLedger(l) {
+      let cur = l, top = null;
+      const seen = new Set();
+      while (cur && cur.glId && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        const parent = ledgerById[cur.glId];
+        if (!parent) break;
+        top = parent;
+        cur = parent;
       }
-
-      const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
-      groupLdgs.forEach(gl => {
-        const sg = COA_SYS_SGS.find(s => s.id === gl.sgId);
-        if (!sg || (sg.main !== 'assets' && sg.main !== 'equity-liabilities')) return;
-
-        const hasGlTx1 = groupLedgerHasTransactions(gl.id, dateFrom, dateTo, true);
-        const hasGlTx2 = isCompare && groupLedgerHasTransactions(gl.id, compareDateFrom, compareDateTo, true);
-        if (!hasGlTx1 && !hasGlTx2) return;
-
-        const glBal1 = getNodeBalance(gl.id, 'group-ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-        const glBal2 = isCompare ? getNodeBalance(gl.id, 'group-ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-        if (hideZero && glBal1 === 0 && (!isCompare || glBal2 === 0)) return;
-
-        const children = [];
-        const childLdgs = coaLedgers.filter(l => l.glId === gl.id && l.type === 'ledger');
-        childLdgs.forEach(l => {
-          const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
-          if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
-
-          const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
-          const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
-          if (!hasLTx1 && !hasLTx2) return;
-
-          const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-          const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-          if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
-
-          children.push({ name: l.name, code: l.code || '', amount1: bal1, amount2: bal2 });
-        });
-
-        items.push({ name: gl.name, code: gl.code || '', isGroup: true, amount1: glBal1, amount2: glBal2, children });
-      });
-
-      const directLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'ledger' && !l.glId);
-      directLdgs.forEach(l => {
-        const lSg = COA_SYS_SGS.find(s => s.id === l.sgId);
-        if (!lSg || (lSg.main !== 'assets' && lSg.main !== 'equity-liabilities')) return;
-
-        const hasLTx1 = ledgerHasTransactions(l, dateFrom, dateTo, true);
-        const hasLTx2 = isCompare && ledgerHasTransactions(l, compareDateFrom, compareDateTo, true);
-        if (!hasLTx1 && !hasLTx2) return;
-
-        const bal1 = getNodeBalance(l.id, 'ledger', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-        const bal2 = isCompare ? getNodeBalance(l.id, 'ledger', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-        if (hideZero && bal1 === 0 && (!isCompare || bal2 === 0)) return;
-
-        items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
-      });
-
-      return items;
+      return top;
     }
 
-    const mainGroups = [];
-    const orderedMainGroups = [
-      COA_MAIN_GROUPS.find(mg => mg.id === 'equity-liabilities'),
-      COA_MAIN_GROUPS.find(mg => mg.id === 'assets')
-    ];
-
-    orderedMainGroups.forEach(mg => {
-      if (!mg) return;
-
-      const mgBal1 = getNodeBalance(mg.id, 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-      const mgBal2 = isCompare ? getNodeBalance(mg.id, 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-
-      const subgroups = [];
-      const l1Sgs = COA_SYS_SGS.filter(s => s.main === mg.id && s.parent === null);
-      l1Sgs.forEach(l1Sg => {
-        const hasTx1 = subgroupHasTransactions(l1Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
-        const hasTx2 = isCompare && subgroupHasTransactions(l1Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
-        if (!hasTx1 && !hasTx2) return;
-
-        const l1Bal1 = getNodeBalance(l1Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-        const l1Bal2 = isCompare ? getNodeBalance(l1Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-        const hasChildrenSg = COA_SYS_SGS.some(s => s.parent === l1Sg.id);
-
-        if (hasChildrenSg) {
-          const l2Subgroups = [];
-          const l2Sgs = COA_SYS_SGS.filter(s => s.parent === l1Sg.id);
-          l2Sgs.forEach(l2Sg => {
-            const hasL2Tx1 = subgroupHasTransactions(l2Sg.id, dateFrom, dateTo, true, profitAmt1, priorProfit1, openingDiff1);
-            const hasL2Tx2 = isCompare && subgroupHasTransactions(l2Sg.id, compareDateFrom, compareDateTo, true, profitAmt2, priorProfit2, openingDiff2);
-            if (!hasL2Tx1 && !hasL2Tx2) return;
-
-            const l2Bal1 = getNodeBalance(l2Sg.id, 'sg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-            const l2Bal2 = isCompare ? getNodeBalance(l2Sg.id, 'sg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-
-            l2Subgroups.push({
-              id: l2Sg.id,
-              name: l2Sg.name,
-              amount1: l2Bal1,
-              amount2: l2Bal2,
-              items: getSubgroupItems(l2Sg.id)
-            });
-          });
-
-          subgroups.push({
-            id: l1Sg.id,
-            name: l1Sg.name,
-            amount1: l1Bal1,
-            amount2: l1Bal2,
-            hasChildren: true,
-            l2Subgroups
-          });
-        } else {
-          subgroups.push({
-            id: l1Sg.id,
-            name: l1Sg.name,
-            amount1: l1Bal1,
-            amount2: l1Bal2,
-            hasChildren: false,
-            items: getSubgroupItems(l1Sg.id)
-          });
-        }
-      });
-
-      mainGroups.push({
-        id: mg.id,
-        name: mg.name,
-        total1: mgBal1,
-        total2: mgBal2,
-        subgroups
+    const renderedKeys = new Set();
+    [...elGroups, ...asGroups].forEach(g => {
+      if (g.single) renderedKeys.add(g.single.key);
+      (g.lines || []).forEach(ln => {
+        if (ln.children) ln.children.forEach(ch => renderedKeys.add(ch.key));
+        else if (ln.split) ln.split.forEach(sp => renderedKeys.add(sp.key));
+        else renderedKeys.add(ln.key);
       });
     });
 
-    const totAssets1 = getNodeBalance('assets', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
-    const totLiab1   = getNodeBalance('equity-liabilities', 'mg', ledgerBalances1, profitAmt1, openingDiff1, priorProfit1);
+    function lineKeyFor(l, sg) {
+      const nm = (l.name || '').toLowerCase();
+      if (sg.main === 'equity-liabilities' && nm.includes('share application')) return 'samp';
+      if (sg.main === 'assets' && /deferred tax asset/.test(nm)) return 'dta';
+      if (sg.id === 'sg-tp') return l.msme ? 'tp-msme' : 'tp-other'; // supplier MSME dues are moved to 'tp-msme' below
+      let key = L1_FALLBACK[sg.id] || sg.id;
+      let cur = sg;
+      const seen = new Set();
+      while (!renderedKeys.has(key) && cur && cur.parent && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        cur = sgById[cur.parent];
+        if (cur) key = L1_FALLBACK[cur.id] || cur.id;
+      }
+      if (!renderedKeys.has(key)) key = sg.main === 'assets' ? 'sg-oca' : 'sg-ocl';
+      return key;
+    }
 
-    const totAssets2 = isCompare ? getNodeBalance('assets', 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
-    const totLiab2   = isCompare ? getNodeBalance('equity-liabilities', 'mg', ledgerBalances2, profitAmt2, openingDiff2, priorProfit2) : 0;
+    const amt1 = {}, amt2 = {};
+    const addAmt = (map, key, val) => { map[key] = (map[key] || 0) + (val || 0); };
+    bsLedgers.forEach(x => {
+      x.key = lineKeyFor(x.l, x.sg);
+      x.bal1 = p1.bal[x.l.id] || 0;
+      x.bal2 = p2.bal[x.l.id] || 0;
+      addAmt(amt1, x.key, x.bal1);
+      addAmt(amt2, x.key, x.bal2);
+    });
+    // Profit for the period, retained earnings and any opening-balance difference sit in Reserves and surplus
+    addAmt(amt1, 'sg-rs', p1.profit + p1.prior + p1.diff);
+    addAmt(amt2, 'sg-rs', p2.profit + p2.prior + p2.diff);
+
+    // ── Trade payables: split by each supplier's MSME status (set in Master Desk) ──
+    // Supplier postings land in the Trade Payables ledger (see computeTrialBalanceBalances), so a
+    // supplier's balance = its opening balance + credits − debits of rows posted in its name.
+    const tpLedger = coaLedgers.find(l => l.type === 'ledger' && (l.sgId === 'sg-tp' || (l.name || '').trim().toLowerCase() === 'trade payables'));
+    const supplierRecs = [];
+    if (tpLedger) {
+      const ledgerNames = new Set(coaLedgers.filter(l => l.type === 'ledger').map(l => (l.name || '').trim().toLowerCase()));
+      const customerNames = new Set((typeof getKyaCustomers === 'function' ? getKyaCustomers() : []).map(c => (c.name || '').trim().toLowerCase()));
+      const recByName = new Map();
+      (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : []).forEach(s => {
+        const key = (s.name || '').trim().toLowerCase();
+        // Rows matching a ledger or a customer name are not posted to Trade Payables, so skip those
+        if (!key || ledgerNames.has(key) || customerNames.has(key) || recByName.has(key)) return;
+        const opening = parseFloat(s.openingBalance) || 0;
+        const rec = { s, msme: !!s.msme, bal1: opening, bal2: p2.enabled ? opening : 0, active: opening !== 0 };
+        recByName.set(key, rec);
+        supplierRecs.push(rec);
+      });
+      (postedEntries || []).forEach(entry => {
+        const in1 = !dateTo || entry.date <= dateTo;
+        const in2 = p2.enabled && (!prevPeriodTo || entry.date <= prevPeriodTo);
+        if (!in1 && !in2) return;
+        (entry.allRows || []).forEach(r => {
+          const rec = recByName.get((r.particular || '').trim().toLowerCase());
+          if (!rec) return;
+          const net = parseAmt(r.credit) - parseAmt(r.debit);
+          if (net === 0) return;
+          rec.active = true;
+          if (in1) rec.bal1 += net;
+          if (in2) rec.bal2 += net;
+        });
+      });
+      const msme1 = supplierRecs.filter(r => r.msme).reduce((sum, r) => sum + r.bal1, 0);
+      const msme2 = supplierRecs.filter(r => r.msme).reduce((sum, r) => sum + r.bal2, 0);
+      addAmt(amt1, 'tp-msme', msme1);
+      addAmt(amt2, 'tp-msme', msme2);
+      addAmt(amt1, 'tp-other', -msme1);
+      addAmt(amt2, 'tp-other', -msme2);
+    }
+
+    // ── Face of the Balance Sheet ──
+    const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+    const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', 'xi', 'xii'];
+    const scheduleRows = [];
+
+    function buildSection(title, groups) {
+      const rows = [];
+      let total1 = 0, total2 = 0, groupNo = 0;
+      const lineAmts = key => {
+        const a1 = amt1[key] || 0, a2 = amt2[key] || 0;
+        total1 += a1;
+        total2 += a2;
+        return { a1, a2 };
+      };
+
+      groups.forEach(g => {
+        if (g.single) {
+          const { a1, a2 } = lineAmts(g.single.key);
+          if (hideZero && isNil(a1, a2)) return;
+          rows.push({ type: 'main', particular: `(${++groupNo}) ${g.label}`, noteNo: g.single.note, amount1: a1, amount2: a2 });
+          return;
+        }
+
+        const gRows = [];
+        let letter = 0;
+        g.lines.forEach(ln => {
+          if (ln.children || ln.split) {
+            const subRows = [];
+            let roman = 0;
+            (ln.children || ln.split).forEach(ch => {
+              const { a1, a2 } = lineAmts(ch.key);
+              if (hideZero && isNil(a1, a2)) return;
+              subRows.push(ln.children
+                ? { type: 'sub2', particular: `(${ROMAN[roman++]}) ${ch.label}`, noteNo: ch.note, amount1: a1, amount2: a2, isPpe: !!ch.ppe }
+                : { type: 'sub2', particular: ch.label, noteNo: '', linkNote: ln.note, amount1: a1, amount2: a2 });
+            });
+            if (!subRows.length) return;
+            gRows.push({ type: 'sub-hdr', particular: `(${LETTERS[letter++]}) ${ln.label}`, noteNo: ln.split ? ln.note : '', amount1: null, amount2: null }, ...subRows);
+            return;
+          }
+          const { a1, a2 } = lineAmts(ln.key);
+          if (hideZero && isNil(a1, a2)) return;
+          gRows.push({ type: 'sub', particular: `(${LETTERS[letter++]}) ${ln.label}`, noteNo: ln.note, amount1: a1, amount2: a2 });
+        });
+
+        if (!gRows.length) return;
+        rows.push({ type: 'group', particular: `(${++groupNo}) ${g.label}`, noteNo: '', amount1: null, amount2: null }, ...gRows);
+      });
+
+      scheduleRows.push(
+        { type: 'sec-hdr', particular: title, noteNo: '', amount1: null, amount2: null },
+        ...rows,
+        { type: 'grandtotal', particular: 'TOTAL', noteNo: '', amount1: total1, amount2: total2 }
+      );
+      return { total1, total2 };
+    }
+
+    const elTot = buildSection('I. EQUITY AND LIABILITIES', elGroups);
+    const asTot = buildSection('II. ASSETS', asGroups);
+
+    // ── Property, Plant and Equipment / Intangible assets movement schedule ──
+    function isoDayBefore(iso) {
+      const p = (iso || '').split('-').map(Number);
+      const d = new Date(p[0], p[1] - 1, p[2] - 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    const ppeMembers = bsLedgers.filter(x => x.key === 'sg-ppe' || x.key === 'sg-ia');
+    const moves = {};
+    let startBal = {};
+    if (ppeMembers.length) {
+      const idByName = new Map();
+      ppeMembers.forEach(x => {
+        idByName.set((x.l.name || '').trim().toLowerCase(), x.l.id);
+        moves[x.l.id] = { dr: 0, cr: 0, depCr: 0, depCrBefore: 0 };
+      });
+      const daNames = new Set(coaLedgers
+        .filter(l => l.type === 'ledger' && resolveSgId(l) === 'sg-da')
+        .map(l => (l.name || '').trim().toLowerCase()));
+
+      (postedEntries || []).forEach(entry => {
+        if (dateTo && entry.date > dateTo) return;
+        const inPeriod = !dateFrom || entry.date >= dateFrom;
+        const rows = entry.allRows || [];
+        const isDepEntry = rows.some(r => daNames.has((r.particular || '').trim().toLowerCase()) && parseAmt(r.debit) > 0);
+        rows.forEach(r => {
+          const id = idByName.get((r.particular || '').trim().toLowerCase());
+          if (!id) return;
+          const m = moves[id];
+          const dr = parseAmt(r.debit);
+          const cr = parseAmt(r.credit);
+          if (inPeriod) {
+            m.dr += dr;
+            m.cr += cr;
+            if (isDepEntry) m.depCr += cr;
+          } else if (isDepEntry) {
+            m.depCrBefore += cr;
+          }
+        });
+      });
+
+      if (dateFrom) {
+        startBal = computeTrialBalanceBalances('', isoDayBefore(dateFrom));
+      } else {
+        ppeMembers.forEach(x => { startBal[x.l.id] = parseAmt(x.l.openingBalance); });
+      }
+    }
+
+    function ppeBaseName(name) {
+      const STOP = new Set(['accumulated', 'accum', 'acc', 'provision', 'prov', 'for', 'on', 'of', 'to', 'less',
+        'depreciation', 'dep', 'depn', 'amortisation', 'amortization', 'a', 'c', 'ac', 'account']);
+      return (name || '').toLowerCase().split(/[^a-z0-9&]+/).filter(w => w && !STOP.has(w)).join(' ');
+    }
+
+    const PPE_FIELDS = ['grossOpen', 'additions', 'disposals', 'grossClose', 'accOpen', 'accCharge', 'accDisposal', 'accClose', 'netClose', 'netPrev'];
+
+    function buildPpeTable(key, noteNo, title, depLabel) {
+      const members = ppeMembers.filter(x => x.key === key);
+      const isDepLedger = x => /depreciation|amorti[sz]ation/i.test(x.l.name || '');
+      const assets = members.filter(x => !isDepLedger(x)).map(x => ({ x, base: ppeBaseName(x.l.name), deps: [] }));
+      const unmatched = [];
+      members.filter(isDepLedger).forEach(d => {
+        const base = ppeBaseName(d.l.name);
+        let hit = null;
+        if (base) {
+          hit = assets.find(a => a.base === base) ||
+                assets.find(a => a.base && (a.base.includes(base) || base.includes(a.base)));
+        } else if (assets.length === 1) {
+          hit = assets[0];
+        }
+        if (hit) hit.deps.push(d);
+        else unmatched.push(d);
+      });
+
+      function makeRow(name, code, assetX, depXs) {
+        const r = { name, code };
+        PPE_FIELDS.forEach(f => { r[f] = 0; });
+        if (assetX) {
+          const id = assetX.l.id, m = moves[id], s = startBal[id] || 0;
+          r.grossOpen = s + m.depCrBefore;
+          r.additions = m.dr;
+          r.disposals = m.cr - m.depCr;
+          r.accOpen = m.depCrBefore;
+          r.accCharge = m.depCr;
+          r.netPrev += assetX.bal2;
+        }
+        depXs.forEach(d => {
+          const id = d.l.id, m = moves[id], s = startBal[id] || 0;
+          r.accOpen += -s;
+          r.accCharge += m.cr;
+          r.accDisposal += m.dr;
+          r.netPrev += d.bal2;
+        });
+        r.grossClose = r.grossOpen + r.additions - r.disposals;
+        r.accClose = r.accOpen + r.accCharge - r.accDisposal;
+        r.netClose = r.grossClose - r.accClose;
+        return r;
+      }
+
+      const rows = [];
+      assets.forEach(a => rows.push(makeRow(a.x.l.name, a.x.l.code || '', a.x, a.deps)));
+      unmatched.forEach(d => rows.push(makeRow(d.l.name, d.l.code || '', null, [d])));
+      const visible = rows.filter(r => PPE_FIELDS.some(f => Math.abs(r[f]) >= 0.005));
+
+      const totals = { name: 'Total' };
+      PPE_FIELDS.forEach(f => { totals[f] = visible.reduce((sum, r) => sum + r[f], 0); });
+
+      return { noteNo, title, depLabel, rows: visible, totals, lineTotal1: amt1[key] || 0, lineTotal2: amt2[key] || 0 };
+    }
+
+    const ppe = {
+      startLabel: dateFrom ? formatRptDate(dateFrom) : 'Opening',
+      endLabel: dateTo ? formatRptDate(dateTo) : 'Closing',
+      prevLabel: prevPeriodTo ? formatRptDate(prevPeriodTo) : 'Previous Period',
+      periodLabel: formatRptDateRange(dateFrom, dateTo, 'All Periods'),
+      tables: [
+        buildPpeTable('sg-ppe', '13', 'Property, Plant and Equipment', 'Accumulated Depreciation'),
+        buildPpeTable('sg-ia', '14', 'Intangible Assets', 'Accumulated Amortisation')
+      ]
+    };
+
+    // ── Notes to Accounts ──
+    function hasActivity(l) {
+      return ledgerHasTransactions(l, dateFrom, dateTo, true) ||
+        (p2.enabled && ledgerHasTransactions(l, prevPeriodFrom, prevPeriodTo, true));
+    }
+
+    function ledgerItems(keys) {
+      const groups = new Map();
+      const direct = [];
+      bsLedgers.filter(x => keys.includes(x.key)).forEach(x => {
+        if (isNil(x.bal1, x.bal2) && (hideZero || !hasActivity(x.l))) return;
+        const row = { name: x.l.name, code: x.l.code || '', amount1: x.bal1, amount2: x.bal2 };
+        const top = topGroupLedger(x.l);
+        if (top) {
+          if (!groups.has(top.id)) {
+            groups.set(top.id, { name: top.name, code: top.code || '', isGroup: true, amount1: 0, amount2: 0, children: [] });
+          }
+          const g = groups.get(top.id);
+          g.children.push(row);
+          g.amount1 += x.bal1;
+          g.amount2 += x.bal2;
+        } else {
+          direct.push(Object.assign({ isGroup: false }, row));
+        }
+      });
+      return [...groups.values(), ...direct];
+    }
+
+    const flatItems = items => items.flatMap(it => it.isGroup ? it.children : [it]);
+
+    const noteDefs = [];
+    [...elGroups, ...asGroups].forEach(g => {
+      if (g.single) noteDefs.push({ note: g.single.note, title: g.single.label, keys: [g.single.key] });
+      (g.lines || []).forEach(ln => {
+        if (ln.children) ln.children.forEach(ch => noteDefs.push({ note: ch.note, title: ch.label, keys: [ch.key], ppe: !!ch.ppe }));
+        else if (ln.split) noteDefs.push({ note: ln.note, title: ln.label, keys: ln.split.map(sp => sp.key), kind: 'tp' });
+        else noteDefs.push({ note: ln.note, title: ln.label, keys: [ln.key], kind: ln.key === 'sg-rs' ? 'rs' : '' });
+      });
+    });
+    noteDefs.sort((a, b) => Number(a.note) - Number(b.note));
+
+    const SHORT_TITLES = {
+      'sg-sc': 'Share Capital', 'sg-rs': 'Reserves', 'sg-mrsw': 'Share Warrants', 'samp': 'Share Application',
+      'sg-ltb': 'LT Borrowings', 'sg-dtl': 'DTL', 'sg-oll': 'Other LT Liabilities', 'sg-ltp': 'LT Provisions',
+      'sg-stb': 'ST Borrowings', 'tp-msme': 'Trade Payables', 'sg-ocl': 'Other Current Liabilities', 'sg-stp': 'ST Provisions',
+      'sg-ppe': 'PPE', 'sg-ia': 'Intangibles', 'sg-cwip': 'CWIP', 'sg-iaud': 'Intangibles Under Dev.',
+      'sg-nci': 'NC Investments', 'dta': 'DTA', 'sg-ltla': 'LT Loans & Advances', 'sg-onca': 'Other NC Assets',
+      'sg-ci': 'Current Investments', 'sg-inv': 'Inventories', 'sg-tr': 'Trade Receivables', 'sg-cce': 'Cash & Equivalents',
+      'sg-stla': 'ST Loans & Advances', 'sg-oca': 'Other Current Assets'
+    };
+
+    const notesData = noteDefs.map(def => {
+      const total1 = def.keys.reduce((s, k) => s + (amt1[k] || 0), 0);
+      const total2 = def.keys.reduce((s, k) => s + (amt2[k] || 0), 0);
+      let items;
+      if (def.kind === 'rs') {
+        items = ledgerItems(def.keys);
+        items.push({
+          name: 'Surplus in Statement of Profit and Loss', code: '', isGroup: true,
+          amount1: p1.prior + p1.profit, amount2: p2.prior + p2.profit,
+          children: [
+            { name: 'Balance at the beginning of the period', code: '', amount1: p1.prior, amount2: p2.prior },
+            { name: 'Add: Profit / (loss) for the period', code: '', amount1: p1.profit, amount2: p2.profit }
+          ]
+        });
+        if (!isNil(p1.diff, p2.diff)) {
+          items.push({ name: 'Difference in opening balances', code: '', isGroup: false, amount1: p1.diff, amount2: p2.diff });
+        }
+      } else if (def.kind === 'tp') {
+        const showSupplier = r => !isNil(r.bal1, r.bal2) || (!hideZero && r.active);
+        const supplierRow = r => ({ name: r.s.name, code: '', amount1: r.bal1, amount2: r.bal2 });
+        const msmeChildren = supplierRecs.filter(r => r.msme && showSupplier(r)).map(supplierRow);
+        msmeChildren.push(...flatItems(ledgerItems(['tp-msme'])));
+        const otherChildren = supplierRecs.filter(r => !r.msme && showSupplier(r)).map(supplierRow);
+        // Any other ledgers kept under Trade payables
+        otherChildren.push(...flatItems(ledgerItems(['tp-other'])).filter(it => !tpLedger || it.name !== tpLedger.name));
+        // Trade Payables ledger balance not traceable to a supplier (e.g. opening or entries posted to the ledger itself)
+        if (tpLedger) {
+          const unlinked1 = (p1.bal[tpLedger.id] || 0) - supplierRecs.reduce((sum, r) => sum + r.bal1, 0);
+          const unlinked2 = (p2.bal[tpLedger.id] || 0) - supplierRecs.reduce((sum, r) => sum + r.bal2, 0);
+          if (!isNil(unlinked1, unlinked2)) {
+            otherChildren.push({ name: `${tpLedger.name} (not linked to a supplier)`, code: '', amount1: unlinked1, amount2: unlinked2 });
+          }
+        }
+        items = [
+          { name: '(A) Micro enterprises and small enterprises', code: '', isGroup: true, amount1: amt1['tp-msme'] || 0, amount2: amt2['tp-msme'] || 0, children: msmeChildren },
+          { name: '(B) Creditors other than micro enterprises and small enterprises', code: '', isGroup: true, amount1: amt1['tp-other'] || 0, amount2: amt2['tp-other'] || 0, children: otherChildren }
+        ];
+      } else if (def.ppe) {
+        const t = ppe.tables.find(tb => tb.noteNo === def.note);
+        items = t.rows.map(r => ({ name: `${r.name} (net block)`, code: r.code || '', isGroup: false, amount1: r.netClose, amount2: r.netPrev }));
+      } else {
+        items = ledgerItems(def.keys);
+      }
+      return {
+        noteNo: def.note,
+        title: def.title,
+        shortTitle: SHORT_TITLES[def.keys[0]] || def.title,
+        total1,
+        total2,
+        items,
+        ppeLink: !!def.ppe
+      };
+    });
 
     return {
       companyName,
@@ -913,11 +1285,18 @@
       isCompare,
       compareDateFrom,
       compareDateTo,
-      mainGroups,
-      totAssets1,
-      totLiab1,
-      totAssets2,
-      totLiab2
+      prevPeriodFrom,
+      prevPeriodTo,
+      col1Title,
+      col2Title,
+      scheduleRows,
+      notesData,
+      ppe,
+      totEL1: elTot.total1,
+      totEL2: elTot.total2,
+      totAssets1: asTot.total1,
+      totAssets2: asTot.total2,
+      isBalanced: Math.abs(elTot.total1 - asTot.total1) < 0.01
     };
   }
 
@@ -975,31 +1354,21 @@
     }
   });
 
-  document.getElementById('bsExpandAll')?.addEventListener('click', () => {
-    _bsExpanded = new Set([
-      'mg-assets', 'mg-equity-liabilities',
-      ...COA_SYS_SGS.map(sg => 'sg-' + sg.id),
-      ...coaLedgers.filter(l => l.type === 'group-ledger').map(gl => 'gl-' + gl.id)
-    ]);
-    document.getElementById('bsMoreDropdown')?.classList.remove('open');
+  document.getElementById('bsLayoutSchedule')?.addEventListener('click', () => {
+    _bsLayoutMode = 'Schedule';
     renderBalanceSheetPanel();
   });
 
-  document.getElementById('bsCollapseAll')?.addEventListener('click', () => {
-    _bsExpanded = new Set();
-    document.getElementById('bsMoreDropdown')?.classList.remove('open');
+  document.getElementById('bsLayoutNotes')?.addEventListener('click', () => {
+    _bsLayoutMode = 'Notes';
     renderBalanceSheetPanel();
   });
 
-  document.getElementById('bsLayoutVertical')?.addEventListener('click', () => {
-    _bsLayoutMode = 'Vertical';
+  document.getElementById('bsLayoutPpe')?.addEventListener('click', () => {
+    _bsLayoutMode = 'Ppe';
     renderBalanceSheetPanel();
   });
 
-  document.getElementById('bsLayoutHorizontal')?.addEventListener('click', () => {
-    _bsLayoutMode = 'Horizontal';
-    renderBalanceSheetPanel();
-  });
 
 
   // ══════════════════════════════════════════════════════════════════
@@ -1691,6 +2060,7 @@
     // Any other custom expense subgroups (excluding sg-tax and the 7 system ones)
     const stdExpSgIds = new Set(['sg-cmc', 'sg-pst', 'sg-cinv', 'sg-ebe', 'sg-fc', 'sg-da', 'sg-oe', 'sg-tax']);
     const customExpSgs = COA_SYS_SGS.filter(sg => sg.main === 'expense' && !stdExpSgIds.has(sg.id));
+    const nn = getPnlNoteMap(customExpSgs);
 
     let customExpTotal1 = 0;
     let customExpTotal2 = 0;
@@ -1810,10 +2180,10 @@
             </thead>
             <tbody>
               <!-- I. Revenue from operations -->
-              ${renderSgRow('I. Revenue from operations', '1', rfoBal1, rfoBal2, true, false)}
+              ${renderSgRow('I. Revenue from operations', nn.rfo, rfoBal1, rfoBal2, true, false)}
 
               <!-- II. Other income -->
-              ${renderSgRow('II. Other income', '2', oiBal1, oiBal2, true, false)}
+              ${renderSgRow('II. Other income', nn.oi, oiBal1, oiBal2, true, false)}
 
               <!-- III. Total Revenue (I + II) -->
               <tr class="pnl-sch-subtotal">
@@ -1833,21 +2203,20 @@
               </tr>
 
               <!-- Expense items -->
-              ${renderSgRow('Cost of materials consumed', '3', cmcBal1, cmcBal2, false, true)}
-              ${renderSgRow('Purchases of Stock-in-Trade', '4', pstBal1, pstBal2, false, true)}
-              ${renderSgRow('Changes in inventories of finished goods / Work-in-progress and Stock-In-Trade', '5', cinvBal1, cinvBal2, false, true)}
-              ${renderSgRow('Employee Benefits Expenses', '6', ebeBal1, ebeBal2, false, true)}
-              ${renderSgRow('Finance Costs', '7', fcBal1, fcBal2, false, true)}
-              ${renderSgRow('Depreciation and amortization expense', '8', daBal1, daBal2, false, true)}
-              ${renderSgRow('Other expenses', '9', oeBal1, oeBal2, false, true)}
+              ${renderSgRow('Cost of materials consumed', nn.cmc, cmcBal1, cmcBal2, false, true)}
+              ${renderSgRow('Purchases of Stock-in-Trade', nn.pst, pstBal1, pstBal2, false, true)}
+              ${renderSgRow('Changes in inventories of finished goods / Work-in-progress and Stock-In-Trade', nn.cinv, cinvBal1, cinvBal2, false, true)}
+              ${renderSgRow('Employee Benefits Expenses', nn.ebe, ebeBal1, ebeBal2, false, true)}
+              ${renderSgRow('Finance Costs', nn.fc, fcBal1, fcBal2, false, true)}
+              ${renderSgRow('Depreciation and amortization expense', nn.da, daBal1, daBal2, false, true)}
+              ${renderSgRow('Other expenses', nn.oe, oeBal1, oeBal2, false, true)}
     `;
 
     // Custom Expense subgroups if any
-    let customNoteCtr = 10;
     customExpSgs.forEach(sg => {
       const b1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
       const b2 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances2);
-      tableHtml += renderSgRow(sg.name, String(customNoteCtr++), b1, b2, false, true);
+      tableHtml += renderSgRow(sg.name, nn.custom[sg.id], b1, b2, false, true);
     });
 
     tableHtml += `
@@ -1876,7 +2245,7 @@
               </tr>
 
               <!-- VI. Exceptional Items -->
-              ${renderSgRow('VI. Exceptional Items', '10', exceptional1, exceptional2, true, false)}
+              ${renderSgRow('VI. Exceptional Items', nn.exc, exceptional1, exceptional2, true, false)}
 
               <!-- VII. Profit/(loss) before tax (V-VI) -->
               <tr class="pnl-sch-row-highlight">
@@ -1896,10 +2265,10 @@
               </tr>
 
               <!-- (1) Current tax -->
-              ${renderSgRow('(1) Current tax', '11', currTaxBal1, currTaxBal2, false, true)}
+              ${renderSgRow('(1) Current tax', nn.curTax, currTaxBal1, currTaxBal2, false, true)}
 
               <!-- (2) Deferred tax -->
-              ${renderSgRow('(2) Deferred tax', '12', defTaxBal1, defTaxBal2, false, true)}
+              ${renderSgRow('(2) Deferred tax', nn.defTax, defTaxBal1, defTaxBal2, false, true)}
 
               <!-- IX. Profit (Loss) for the period from continuing operations (VII-VIII) -->
               <tr class="pnl-sch-row-highlight">
@@ -1914,10 +2283,10 @@
               </tr>
 
               <!-- X. Profit/(loss) from discontinued operations -->
-              ${renderSgRow('X. Profit/(loss) from discontinued operations', '13', discont1, discont2, true, false)}
+              ${renderSgRow('X. Profit/(loss) from discontinued operations', nn.disc, discont1, discont2, true, false)}
 
               <!-- XI. Tax expense of discontinued operations -->
-              ${renderSgRow('XI. Tax expense of discontinued operations', '14', discontTax1, discontTax2, true, false)}
+              ${renderSgRow('XI. Tax expense of discontinued operations', nn.discTax, discontTax1, discontTax2, true, false)}
 
               <!-- XII. Profit/(loss) from Discontinued operations (after tax) (X-XI) -->
               <tr class="pnl-sch-row-highlight">
@@ -1948,24 +2317,24 @@
                 <td colspan="4">XV. Earnings per equity share:</td>
               </tr>
 
-              <tr class="pnl-sch-row-sub" data-pnl-goto-note="15" style="cursor: pointer;" title="Click to view Note 15 details in Notes to Accounts">
+              <tr class="pnl-sch-row-sub" data-pnl-goto-note="${nn.eps}" style="cursor: pointer;" title="Click to view Note ${nn.eps} details in Notes to Accounts">
                 <td>
                   <div class="pnl-sch-name">
                     <span>Basic</span>
                   </div>
                 </td>
-                <td class="pnl-sch-note-cell">${fmtNoteBadge('15')}</td>
+                <td class="pnl-sch-note-cell">${fmtNoteBadge(nn.eps)}</td>
                 <td class="pnl-sch-amt">₹ ${basicEps1}</td>
                 <td class="pnl-sch-amt">₹ ${basicEps2}</td>
               </tr>
 
-              <tr class="pnl-sch-row-sub" data-pnl-goto-note="15" style="cursor: pointer;" title="Click to view Note 15 details in Notes to Accounts">
+              <tr class="pnl-sch-row-sub" data-pnl-goto-note="${nn.eps}" style="cursor: pointer;" title="Click to view Note ${nn.eps} details in Notes to Accounts">
                 <td>
                   <div class="pnl-sch-name">
                     <span>Diluted</span>
                   </div>
                 </td>
-                <td class="pnl-sch-note-cell">${fmtNoteBadge('15')}</td>
+                <td class="pnl-sch-note-cell">${fmtNoteBadge(nn.eps)}</td>
                 <td class="pnl-sch-amt">₹ ${dilutedEps1}</td>
                 <td class="pnl-sch-amt">₹ ${dilutedEps2}</td>
               </tr>
@@ -2030,6 +2399,7 @@
 
     const stdExpSgIds = new Set(['sg-cmc', 'sg-pst', 'sg-cinv', 'sg-ebe', 'sg-fc', 'sg-da', 'sg-oe', 'sg-tax']);
     const customExpSgs = COA_SYS_SGS.filter(sg => sg.main === 'expense' && !stdExpSgIds.has(sg.id));
+    const nn = getPnlNoteMap(customExpSgs);
 
     let customExpTotal1 = 0, customExpTotal2 = 0;
     customExpSgs.forEach(sg => {
@@ -2371,47 +2741,46 @@
             </button>
           </div>
           <div class="pnl-notes-pills-wrap">
-            <a class="pnl-note-pill" href="#pnl-note-1">Note 1: Revenue</a>
-            <a class="pnl-note-pill" href="#pnl-note-2">Note 2: Other Income</a>
-            <a class="pnl-note-pill" href="#pnl-note-3">Note 3: Material Consumed</a>
-            <a class="pnl-note-pill" href="#pnl-note-4">Note 4: Purchases</a>
-            <a class="pnl-note-pill" href="#pnl-note-5">Note 5: Inventories</a>
-            <a class="pnl-note-pill" href="#pnl-note-6">Note 6: Employee Benefits</a>
-            <a class="pnl-note-pill" href="#pnl-note-7">Note 7: Finance Costs</a>
-            <a class="pnl-note-pill" href="#pnl-note-8">Note 8: Depreciation</a>
-            <a class="pnl-note-pill" href="#pnl-note-9">Note 9: Other Expenses</a>
-            <a class="pnl-note-pill" href="#pnl-note-10">Note 10: Exceptional</a>
-            <a class="pnl-note-pill" href="#pnl-note-11">Note 11: Current Tax</a>
-            <a class="pnl-note-pill" href="#pnl-note-12">Note 12: Deferred Tax</a>
-            <a class="pnl-note-pill" href="#pnl-note-15">Note 15: EPS</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.rfo}">Note ${nn.rfo}: Revenue</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.oi}">Note ${nn.oi}: Other Income</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.cmc}">Note ${nn.cmc}: Material Consumed</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.pst}">Note ${nn.pst}: Purchases</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.cinv}">Note ${nn.cinv}: Inventories</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.ebe}">Note ${nn.ebe}: Employee Benefits</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.fc}">Note ${nn.fc}: Finance Costs</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.da}">Note ${nn.da}: Depreciation</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.oe}">Note ${nn.oe}: Other Expenses</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.exc}">Note ${nn.exc}: Exceptional</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.curTax}">Note ${nn.curTax}: Current Tax</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.defTax}">Note ${nn.defTax}: Deferred Tax</a>
+            <a class="pnl-note-pill" href="#pnl-note-${nn.eps}">Note ${nn.eps}: EPS</a>
           </div>
         </div>
 
         <!-- Note Cards -->
-        ${renderNoteCardForSubgroup('1', 'Revenue from Operations', 'sg-rfo')}
-        ${renderNoteCardForSubgroup('2', 'Other Income', 'sg-oi')}
-        ${renderNoteCardForSubgroup('3', 'Cost of Materials Consumed', 'sg-cmc')}
-        ${renderNoteCardForSubgroup('4', 'Purchases of Stock-in-Trade', 'sg-pst')}
-        ${renderNoteCardForSubgroup('5', 'Changes in Inventories of Finished Goods, Work-in-Progress and Stock-in-Trade', 'sg-cinv')}
-        ${renderNoteCardForSubgroup('6', 'Employee Benefits Expense', 'sg-ebe')}
-        ${renderNoteCardForSubgroup('7', 'Finance Costs', 'sg-fc')}
-        ${renderNoteCardForSubgroup('8', 'Depreciation and Amortization Expense', 'sg-da')}
-        ${renderNoteCardForSubgroup('9', 'Other Expenses', 'sg-oe')}
+        ${renderNoteCardForSubgroup(nn.rfo, 'Revenue from Operations', 'sg-rfo')}
+        ${renderNoteCardForSubgroup(nn.oi, 'Other Income', 'sg-oi')}
+        ${renderNoteCardForSubgroup(nn.cmc, 'Cost of Materials Consumed', 'sg-cmc')}
+        ${renderNoteCardForSubgroup(nn.pst, 'Purchases of Stock-in-Trade', 'sg-pst')}
+        ${renderNoteCardForSubgroup(nn.cinv, 'Changes in Inventories of Finished Goods, Work-in-Progress and Stock-in-Trade', 'sg-cinv')}
+        ${renderNoteCardForSubgroup(nn.ebe, 'Employee Benefits Expense', 'sg-ebe')}
+        ${renderNoteCardForSubgroup(nn.fc, 'Finance Costs', 'sg-fc')}
+        ${renderNoteCardForSubgroup(nn.da, 'Depreciation and Amortization Expense', 'sg-da')}
+        ${renderNoteCardForSubgroup(nn.oe, 'Other Expenses', 'sg-oe')}
     `;
 
     // Custom Expense subgroups Notes
-    let noteCtr = 10;
     customExpSgs.forEach(sg => {
-      notesHtml += renderNoteCardForSubgroup(String(noteCtr++), sg.name, sg.id);
+      notesHtml += renderNoteCardForSubgroup(nn.custom[sg.id], sg.name, sg.id);
     });
 
     notesHtml += `
-        ${renderCustomNoteCard('10', 'Exceptional Items', exceptional1, exceptional2, 'Exceptional gains / (losses) during the period')}
-        ${renderTaxNoteCard('11', 'Current Tax', false)}
-        ${renderTaxNoteCard('12', 'Deferred Tax', true)}
-        ${renderCustomNoteCard('13', 'Discontinued Operations', discont1, discont2, 'Profit / (loss) from discontinued operations')}
-        ${renderCustomNoteCard('14', 'Tax Expense of Discontinued Operations', discontTax1, discontTax2, 'Tax on discontinued operations')}
-        ${renderEpsNoteCard('15')}
+        ${renderCustomNoteCard(nn.exc, 'Exceptional Items', exceptional1, exceptional2, 'Exceptional gains / (losses) during the period')}
+        ${renderTaxNoteCard(nn.curTax, 'Current Tax', false)}
+        ${renderTaxNoteCard(nn.defTax, 'Deferred Tax', true)}
+        ${renderCustomNoteCard(nn.disc, 'Discontinued Operations', discont1, discont2, 'Profit / (loss) from discontinued operations')}
+        ${renderCustomNoteCard(nn.discTax, 'Tax Expense of Discontinued Operations', discontTax1, discontTax2, 'Tax on discontinued operations')}
+        ${renderEpsNoteCard(nn.eps)}
       </div>
     `;
 
@@ -2993,11 +3362,11 @@
 
     const stdExpSgIds = new Set(['sg-cmc', 'sg-pst', 'sg-cinv', 'sg-ebe', 'sg-fc', 'sg-da', 'sg-oe', 'sg-tax']);
     const customExpSgs = COA_SYS_SGS.filter(sg => sg.main === 'expense' && !stdExpSgIds.has(sg.id));
+    const nn = getPnlNoteMap(customExpSgs);
 
     let customExpTotal1 = 0;
     let customExpTotal2 = 0;
     const customExpRows = [];
-    let customNoteCtr = 10;
     customExpSgs.forEach(sg => {
       const b1 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances1);
       const b2 = getPnlNodeBalance(sg.id, 'sg', ledgerBalances2);
@@ -3006,7 +3375,7 @@
       customExpRows.push({
         id: sg.id,
         name: sg.name,
-        noteNo: String(customNoteCtr++),
+        noteNo: nn.custom[sg.id],
         amount1: b1,
         amount2: b2
       });
@@ -3081,17 +3450,17 @@
 
     // ── Build Schedule Rows ──
     const scheduleRows = [
-      { particular: 'I. Revenue from operations', noteNo: '1', amount1: rfoBal1, amount2: rfoBal2, type: 'main' },
-      { particular: 'II. Other income', noteNo: '2', amount1: oiBal1, amount2: oiBal2, type: 'main' },
+      { particular: 'I. Revenue from operations', noteNo: nn.rfo, amount1: rfoBal1, amount2: rfoBal2, type: 'main' },
+      { particular: 'II. Other income', noteNo: nn.oi, amount1: oiBal1, amount2: oiBal2, type: 'main' },
       { particular: 'III. Total Revenue (I + II)', noteNo: '', amount1: totalRevenue1, amount2: totalRevenue2, type: 'subtotal-revenue' },
       { particular: 'IV. Expenses :', noteNo: '', amount1: null, amount2: null, type: 'sec-hdr' },
-      { particular: 'Cost of materials consumed', noteNo: '3', amount1: cmcBal1, amount2: cmcBal2, type: 'sub' },
-      { particular: 'Purchases of Stock-in-Trade', noteNo: '4', amount1: pstBal1, amount2: pstBal2, type: 'sub' },
-      { particular: 'Changes in inventories of finished goods / Work-in-progress and Stock-In-Trade', noteNo: '5', amount1: cinvBal1, amount2: cinvBal2, type: 'sub' },
-      { particular: 'Employee Benefits Expenses', noteNo: '6', amount1: ebeBal1, amount2: ebeBal2, type: 'sub' },
-      { particular: 'Finance Costs', noteNo: '7', amount1: fcBal1, amount2: fcBal2, type: 'sub' },
-      { particular: 'Depreciation and amortization expense', noteNo: '8', amount1: daBal1, amount2: daBal2, type: 'sub' },
-      { particular: 'Other expenses', noteNo: '9', amount1: oeBal1, amount2: oeBal2, type: 'sub' }
+      { particular: 'Cost of materials consumed', noteNo: nn.cmc, amount1: cmcBal1, amount2: cmcBal2, type: 'sub' },
+      { particular: 'Purchases of Stock-in-Trade', noteNo: nn.pst, amount1: pstBal1, amount2: pstBal2, type: 'sub' },
+      { particular: 'Changes in inventories of finished goods / Work-in-progress and Stock-In-Trade', noteNo: nn.cinv, amount1: cinvBal1, amount2: cinvBal2, type: 'sub' },
+      { particular: 'Employee Benefits Expenses', noteNo: nn.ebe, amount1: ebeBal1, amount2: ebeBal2, type: 'sub' },
+      { particular: 'Finance Costs', noteNo: nn.fc, amount1: fcBal1, amount2: fcBal2, type: 'sub' },
+      { particular: 'Depreciation and amortization expense', noteNo: nn.da, amount1: daBal1, amount2: daBal2, type: 'sub' },
+      { particular: 'Other expenses', noteNo: nn.oe, amount1: oeBal1, amount2: oeBal2, type: 'sub' }
     ];
 
     customExpRows.forEach(cer => {
@@ -3101,19 +3470,19 @@
     scheduleRows.push(
       { particular: 'Total expenses (IV)', noteNo: '', amount1: totalExpenses1, amount2: totalExpenses2, type: 'subtotal-expense' },
       { particular: 'V. Profit/(loss) before exceptional items and tax (I- IV)', noteNo: '', amount1: pbeita1, amount2: pbeita2, type: 'highlight' },
-      { particular: 'VI. Exceptional Items', noteNo: '10', amount1: exceptional1, amount2: exceptional2, type: 'main' },
+      { particular: 'VI. Exceptional Items', noteNo: nn.exc, amount1: exceptional1, amount2: exceptional2, type: 'main' },
       { particular: 'VII. Profit/(loss) before tax (V-VI)', noteNo: '', amount1: pbt1, amount2: pbt2, type: 'highlight' },
       { particular: 'VIII. Tax expense:', noteNo: '', amount1: null, amount2: null, type: 'sec-hdr' },
-      { particular: '(1) Current tax', noteNo: '11', amount1: currTaxBal1, amount2: currTaxBal2, type: 'sub' },
-      { particular: '(2) Deferred tax', noteNo: '12', amount1: defTaxBal1, amount2: defTaxBal2, type: 'sub' },
+      { particular: '(1) Current tax', noteNo: nn.curTax, amount1: currTaxBal1, amount2: currTaxBal2, type: 'sub' },
+      { particular: '(2) Deferred tax', noteNo: nn.defTax, amount1: defTaxBal1, amount2: defTaxBal2, type: 'sub' },
       { particular: 'IX. Profit (Loss) for the period from continuing operations (VII-VIII)', noteNo: '', amount1: pcont1, amount2: pcont2, type: 'highlight' },
-      { particular: 'X. Profit/(loss) from discontinued operations', noteNo: '13', amount1: discont1, amount2: discont2, type: 'main' },
-      { particular: 'XI. Tax expense of discontinued operations', noteNo: '14', amount1: discontTax1, amount2: discontTax2, type: 'main' },
+      { particular: 'X. Profit/(loss) from discontinued operations', noteNo: nn.disc, amount1: discont1, amount2: discont2, type: 'main' },
+      { particular: 'XI. Tax expense of discontinued operations', noteNo: nn.discTax, amount1: discontTax1, amount2: discontTax2, type: 'main' },
       { particular: 'XII. Profit/(loss) from Discontinued operations (after tax) (X-XI)', noteNo: '', amount1: discontAfter1, amount2: discontAfter2, type: 'highlight' },
       { particular: 'XIII. Profit/(loss) for the period (IX+XII)', noteNo: '', amount1: pat1, amount2: pat2, type: 'grandtotal' },
       { particular: 'XV. Earnings per equity share:', noteNo: '', amount1: null, amount2: null, type: 'sec-hdr' },
-      { particular: 'Basic', noteNo: '15', amount1: basicEps1, amount2: basicEps2, type: 'eps', isEps: true },
-      { particular: 'Diluted', noteNo: '15', amount1: dilutedEps1, amount2: dilutedEps2, type: 'eps', isEps: true }
+      { particular: 'Basic', noteNo: nn.eps, amount1: basicEps1, amount2: basicEps2, type: 'eps', isEps: true },
+      { particular: 'Diluted', noteNo: nn.eps, amount1: dilutedEps1, amount2: dilutedEps2, type: 'eps', isEps: true }
     );
 
     // ── Build Notes Data ──
@@ -3185,15 +3554,15 @@
     }
 
     const notesData = [
-      buildNoteForSubgroup('1', 'Revenue from Operations', 'sg-rfo'),
-      buildNoteForSubgroup('2', 'Other Income', 'sg-oi'),
-      buildNoteForSubgroup('3', 'Cost of Materials Consumed', 'sg-cmc'),
-      buildNoteForSubgroup('4', 'Purchases of Stock-in-Trade', 'sg-pst'),
-      buildNoteForSubgroup('5', 'Changes in Inventories of Finished Goods, Work-in-Progress and Stock-in-Trade', 'sg-cinv'),
-      buildNoteForSubgroup('6', 'Employee Benefits Expense', 'sg-ebe'),
-      buildNoteForSubgroup('7', 'Finance Costs', 'sg-fc'),
-      buildNoteForSubgroup('8', 'Depreciation and Amortization Expense', 'sg-da'),
-      buildNoteForSubgroup('9', 'Other Expenses', 'sg-oe')
+      buildNoteForSubgroup(nn.rfo, 'Revenue from Operations', 'sg-rfo'),
+      buildNoteForSubgroup(nn.oi, 'Other Income', 'sg-oi'),
+      buildNoteForSubgroup(nn.cmc, 'Cost of Materials Consumed', 'sg-cmc'),
+      buildNoteForSubgroup(nn.pst, 'Purchases of Stock-in-Trade', 'sg-pst'),
+      buildNoteForSubgroup(nn.cinv, 'Changes in Inventories of Finished Goods, Work-in-Progress and Stock-in-Trade', 'sg-cinv'),
+      buildNoteForSubgroup(nn.ebe, 'Employee Benefits Expense', 'sg-ebe'),
+      buildNoteForSubgroup(nn.fc, 'Finance Costs', 'sg-fc'),
+      buildNoteForSubgroup(nn.da, 'Depreciation and Amortization Expense', 'sg-da'),
+      buildNoteForSubgroup(nn.oe, 'Other Expenses', 'sg-oe')
     ];
 
     customExpRows.forEach(cer => {
@@ -3201,13 +3570,13 @@
     });
 
     notesData.push(
-      buildCustomNote('10', 'Exceptional Items', exceptional1, exceptional2, 'Exceptional gains / (losses) during the period'),
-      buildTaxNote('11', 'Current Tax', false),
-      buildTaxNote('12', 'Deferred Tax', true),
-      buildCustomNote('13', 'Discontinued Operations', discont1, discont2, 'Profit / (loss) from discontinued operations'),
-      buildCustomNote('14', 'Tax Expense of Discontinued Operations', discontTax1, discontTax2, 'Tax on discontinued operations'),
+      buildCustomNote(nn.exc, 'Exceptional Items', exceptional1, exceptional2, 'Exceptional gains / (losses) during the period'),
+      buildTaxNote(nn.curTax, 'Current Tax', false),
+      buildTaxNote(nn.defTax, 'Deferred Tax', true),
+      buildCustomNote(nn.disc, 'Discontinued Operations', discont1, discont2, 'Profit / (loss) from discontinued operations'),
+      buildCustomNote(nn.discTax, 'Tax Expense of Discontinued Operations', discontTax1, discontTax2, 'Tax on discontinued operations'),
       {
-        noteNo: '15',
+        noteNo: nn.eps,
         title: 'Earnings Per Equity Share (EPS)',
         isEps: true,
         pat1,

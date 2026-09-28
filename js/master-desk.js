@@ -242,10 +242,43 @@
     return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(raw);
   }
 
+  // 4th character of a PAN encodes the holder's status (standard Income Tax Dept. scheme).
+  const PAN_HOLDER_TYPES = {
+    P: 'Individual (Person)',
+    C: 'Company',
+    H: 'Hindu Undivided Family (HUF)',
+    A: 'Association of Persons (AOP)',
+    B: 'Body of Individuals (BOI)',
+    G: 'Government Agency',
+    J: 'Artificial Juridical Person',
+    L: 'Local Authority',
+    F: 'Firm / LLP',
+    T: 'Trust'
+  };
+  function getPanHolderType(raw) {
+    if (!isValidPan(raw)) return '';
+    return PAN_HOLDER_TYPES[raw[3]] || '';
+  }
+
+  // The 7 GSTIN taxpayer classifications under the CGST Act.
+  const GST_REGISTRATION_TYPES = [
+    { value: '', label: '-- Not Specified --' },
+    { value: 'regular', label: 'Regular' },
+    { value: 'composition', label: 'Composition' },
+    { value: 'casual', label: 'Casual Taxable Person' },
+    { value: 'non_resident', label: 'Non-Resident Taxable Person' },
+    { value: 'isd', label: 'Input Service Distributor' },
+    { value: 'tds', label: 'TDS Deductor' },
+    { value: 'tcs', label: 'TCS Collector' }
+  ];
+  window.GST_REGISTRATION_TYPES = GST_REGISTRATION_TYPES; // Reports (GSTR-1 Taxpayer Type) reads the labels
+
   // Wires live GSTIN/PAN validity status + "Update PAN from GSTIN" affordance onto an
   // existing GSTIN/PAN input pair. Safe to call after every render (creates its DOM
   // helpers once per fresh input, since contentArea is fully re-rendered each time).
-  function wireGstinPanValidation(container, gstinId, panId) {
+  // Also adds a derived read-only "PAN Type" column next to PAN, and a "GST Registration
+  // Type" dropdown (the 7 CGST Act taxpayer classifications) below the GSTIN/PAN row.
+  function wireGstinPanValidation(container, gstinId, panId, initialGstRegType) {
     const gstinInput = container.querySelector('#' + gstinId);
     const panInput = container.querySelector('#' + panId);
     if (!gstinInput || !panInput) return;
@@ -292,6 +325,50 @@
     panStatus.style.cssText = 'font-size: 11px; font-weight: 600; margin-top: 5px; min-height: 14px;';
     panCell.appendChild(panStatus);
 
+    // Reshape into two rows: GSTIN + its Registration Type, then PAN + its PAN Type —
+    // each field paired with its own "type" column, instead of cramming all three
+    // into one row.
+    const gstinRow = gstinCell.parentElement;
+    let panTypeDisplay = null;
+    let gstRegTypeSel = null;
+
+    if (gstinRow) {
+      // Move PAN out of the GSTIN row — it gets its own row below.
+      gstinRow.removeChild(panCell);
+
+      // Row 1, column 2: GST Registration Type (the 7 CGST Act taxpayer classifications)
+      const gstRegTypeCell = document.createElement('div');
+      gstRegTypeCell.style.cssText = 'width: 100%; min-width: 0;';
+      gstRegTypeSel = document.createElement('select');
+      gstRegTypeSel.id = gstinId + 'RegType';
+      gstRegTypeSel.style.cssText = 'width: 100%; height: 36.5px; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;';
+      GST_REGISTRATION_TYPES.forEach(opt => {
+        const optionEl = document.createElement('option');
+        optionEl.value = opt.value;
+        optionEl.textContent = opt.label;
+        gstRegTypeSel.appendChild(optionEl);
+      });
+      gstRegTypeSel.value = initialGstRegType || 'regular';
+      gstRegTypeCell.appendChild(gstRegTypeSel);
+      gstinRow.appendChild(gstRegTypeCell);
+
+      // Row 2: PAN + its derived PAN Type, same 2-column grid as row 1
+      const panRow = document.createElement('div');
+      panRow.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;';
+      panRow.appendChild(panCell);
+
+      const panTypeCell = document.createElement('div');
+      panTypeCell.style.cssText = 'width: 100%; min-width: 0;';
+      panTypeDisplay = document.createElement('div');
+      panTypeDisplay.id = panId + 'Type';
+      panTypeDisplay.style.cssText = 'padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; background: #f8fafc; color: var(--slate-400); height: 36.5px; display: flex; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+      panTypeDisplay.textContent = 'PAN Type';
+      panTypeCell.appendChild(panTypeDisplay);
+      panRow.appendChild(panTypeCell);
+
+      gstinRow.insertAdjacentElement('afterend', panRow);
+    }
+
     const renderPanStatus = () => {
       const raw = panInput.value.toUpperCase().trim();
       if (!raw) {
@@ -302,6 +379,12 @@
       } else {
         panStatus.textContent = 'Invalid PAN';
         panStatus.style.color = '#dc2626';
+      }
+
+      if (panTypeDisplay) {
+        const holderType = getPanHolderType(raw);
+        panTypeDisplay.textContent = holderType || 'PAN Type';
+        panTypeDisplay.style.color = holderType ? 'var(--slate-700)' : 'var(--slate-400)';
       }
     };
 
@@ -757,6 +840,56 @@
     updateMasterDeskContent();
   }
 
+  // ── MSME Status slider (Non-MSME | MSME) for suppliers / Trade Payables ledgers ──
+  // The value lives in a hidden input ('no' | 'yes') so row-state capture/load and save code
+  // read it like any other field; call syncMasterMsmeSlider after setting it from code.
+  function buildMasterMsmeSliderHtml(inputId, isMsme) {
+    const on = !!isMsme;
+    return `
+      <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">MSME Status</label>
+      <div class="master-saveas-slider-wrap master-msme-slider" data-msme-for="${inputId}" role="radiogroup" aria-label="MSME Status" style="width: 100%; height: 36px; border-radius: 9px; padding: 3px;">
+        <div class="master-saveas-slider-bg ${on ? 'party-active' : 'ledger-active'}" data-msme-bg style="top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 7px;"></div>
+        <button type="button" class="master-saveas-btn${on ? '' : ' active'}" data-msme-val="no" role="radio" aria-checked="${!on}" style="font-size: 12.5px;">Non-MSME</button>
+        <button type="button" class="master-saveas-btn${on ? ' active' : ''}" data-msme-val="yes" role="radio" aria-checked="${on}" style="font-size: 12.5px;">MSME</button>
+      </div>
+      <input type="hidden" id="${inputId}" value="${on ? 'yes' : 'no'}">
+      <div style="font-size: 11.5px; color: var(--slate-500); margin-top: 6px; line-height: 1.45;">MSME = Micro / Small enterprise. Their dues are shown separately under Trade payables in the Balance Sheet.</div>
+    `;
+  }
+
+  function syncMasterMsmeSlider(container, inputId) {
+    const slider = container.querySelector(`[data-msme-for="${inputId}"]`);
+    const inp = container.querySelector('#' + inputId);
+    if (!slider || !inp) return;
+    const val = inp.value;
+    const bg = slider.querySelector('[data-msme-bg]');
+    if (bg) {
+      bg.className = 'master-saveas-slider-bg ' + (val === 'yes' ? 'party-active' : 'ledger-active');
+      bg.style.visibility = (val === 'yes' || val === 'no') ? 'visible' : 'hidden'; // blank = nothing picked yet
+    }
+    slider.querySelectorAll('[data-msme-val]').forEach(btn => {
+      const isOn = btn.dataset.msmeVal === val;
+      btn.classList.toggle('active', isOn);
+      btn.setAttribute('aria-checked', String(isOn));
+    });
+  }
+
+  function wireMasterMsmeSlider(container, inputId) {
+    const slider = container.querySelector(`[data-msme-for="${inputId}"]`);
+    const inp = container.querySelector('#' + inputId);
+    if (!slider || !inp) return;
+    slider.querySelectorAll('[data-msme-val]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (inp.disabled) return;
+        inp.value = btn.dataset.msmeVal;
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+        syncMasterMsmeSlider(container, inputId);
+      });
+    });
+    syncMasterMsmeSlider(container, inputId);
+  }
+
   function ensureCleanCoaTradeParties() {
     if (typeof coaLedgers === 'undefined' || !Array.isArray(coaLedgers)) return;
     const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
@@ -804,7 +937,8 @@
             ifsc: l.ifsc || '',
             branch: l.branch || '',
             gstin: l.gstin || '',
-            pan: l.pan || ''
+            pan: l.pan || '',
+            msme: !!l.msme
           });
         }
         coaLedgers.splice(i, 1);
@@ -4202,6 +4336,8 @@
       el.disabled = true;
       el.style.background = '#ffffff';
     });
+    // Slider fields (e.g. MSME Status) show no choice until a record is picked
+    contentArea.querySelectorAll('[data-msme-for]').forEach(sl => syncMasterMsmeSlider(contentArea, sl.dataset.msmeFor));
     contentArea.querySelectorAll('[id$="TriggerText"]').forEach(txt => {
       if (txt.id === cfg.selectorId + 'TriggerText') return;
       txt.textContent = '—';
@@ -5830,6 +5966,11 @@
             <label class="coa-modal-label" for="masterLedgerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
             <input class="coa-modal-inp" id="masterLedgerBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
 
+            <!-- MSME status (Trade Payables group only): splits Trade payables in the Schedule III Balance Sheet -->
+            <div id="masterLedgerMsmeWrap" style="display: none; margin-top: 16px;">
+              ${buildMasterMsmeSliderHtml('masterLedgerMsme', false)}
+            </div>
+
             <!-- Additional Details (only for groups that need them) -->
             <div id="masterLedgerAddlBtnWrap" style="display: none; margin-top: 16px;">
               <button type="button" class="btn btn-secondary" id="masterLedgerAddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
@@ -6168,6 +6309,8 @@
         const isParty = isRec || isPay;
 
         addInfoWrap.style.display = isParty ? 'block' : 'none';
+        const msmeWrap = contentArea.querySelector('#masterLedgerMsmeWrap');
+        if (msmeWrap) msmeWrap.style.display = isPay ? 'block' : 'none';
         if (isParty) {
           applySaveAsModeUi();
         } else {
@@ -6485,16 +6628,18 @@
       const ledgerAddRowWrap = contentArea.querySelector('#masterLedgerAddRowWrap');
       const ledgerAddRowBtn = contentArea.querySelector('#masterLedgerAddRowBtn');
       const ledgerBalanceInp = contentArea.querySelector('#masterLedgerBalance');
+      wireMasterMsmeSlider(contentArea, 'masterLedgerMsme');
 
       // Popup field ids and the value a fresh row starts with
       const LEDGER_ADDL_FIELD_DEFAULTS = {
         masterLedgerContactName: '', masterLedgerAddress: '', masterLedgerCity: '', masterLedgerPincode: '',
         masterLedgerState: '', masterLedgerCountry: 'India',
         masterLedgerBankName: '', masterLedgerAccountNo: '', masterLedgerIfsc: '', masterLedgerBranch: '',
-        masterLedgerGstin: '', masterLedgerPan: '',
+        masterLedgerGstin: '', masterLedgerPan: '', masterLedgerGstinRegType: '',
         masterLedgerBankAcctBankName: '', masterLedgerBankAcctHolder: '', masterLedgerBankAcctNo: '',
         masterLedgerBankAcctIfsc: '', masterLedgerBankAcctBranch: '',
-        masterLedgerSacCode: '', masterLedgerSacDesc: '', masterLedgerSacRate: '', masterLedgerSacGstSel: '18'
+        masterLedgerSacCode: '', masterLedgerSacDesc: '', masterLedgerSacRate: '', masterLedgerSacGstSel: '18',
+        masterLedgerMsme: 'no'
       };
 
       const newLedgerRowState = () => ({
@@ -6536,6 +6681,7 @@
           const el = contentArea.querySelector('#' + id);
           if (el) el.value = st.fields[id] !== undefined ? st.fields[id] : LEDGER_ADDL_FIELD_DEFAULTS[id];
         });
+        syncMasterMsmeSlider(contentArea, 'masterLedgerMsme');
         setLedgerTriggerText('masterLedgerBankAcctBankName', st.fields.masterLedgerBankAcctBankName, 'Select Bank');
         setLedgerTriggerText('masterLedgerSacCode', st.fields.masterLedgerSacCode, 'Select SAC Code');
         setLedgerTriggerText('masterLedgerSacDesc', st.fields.masterLedgerSacDesc, 'Auto-filled from SAC Code');
@@ -6792,7 +6938,9 @@
           ifsc: val('masterLedgerIfsc'),
           branch: val('masterLedgerBranch'),
           gstin: val('masterLedgerGstin'),
-          pan: val('masterLedgerPan')
+          pan: val('masterLedgerPan'),
+          gstRegType: val('masterLedgerGstinRegType'),
+          panType: getPanHolderType(val('masterLedgerPan').toUpperCase())
         };
 
         if (row.mode === 'customer') {
@@ -6818,7 +6966,10 @@
 
         if (row.mode === 'supplier') {
           const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
-          const newSupplier = Object.assign({ id: 'supp-' + Date.now() + (seq ? '-' + seq : '') }, partyCommon, { createdAt: Date.now() });
+          const newSupplier = Object.assign({ id: 'supp-' + Date.now() + (seq ? '-' + seq : '') }, partyCommon, {
+            msme: val('masterLedgerMsme') === 'yes',
+            createdAt: Date.now()
+          });
           suppliers.push(newSupplier);
 
           // Ensure central Trade Payables ledger exists in CoA and update combined balance
@@ -6880,6 +7031,8 @@
           bankAccountInfo: bankAcctInfo,
           sacInfo: sacInfo
         });
+        // A ledger saved under Trade Payables keeps its MSME status (carried over when it becomes a supplier)
+        if (isTradePayableGroup(row.groupVal)) newLedger.msme = val('masterLedgerMsme') === 'yes';
 
         if (typeof coaLedgers !== 'undefined') {
           coaLedgers.push(newLedger);
@@ -7252,7 +7405,7 @@
         masterCustomerContactName: '', masterCustomerAddress: '', masterCustomerCity: '', masterCustomerPincode: '',
         masterCustomerState: '', masterCustomerCountry: 'India',
         masterCustomerBankName: '', masterCustomerAccountNo: '', masterCustomerIfsc: '', masterCustomerBranch: '',
-        masterCustomerGstin: '', masterCustomerPan: ''
+        masterCustomerGstin: '', masterCustomerPan: '', masterCustomerGstinRegType: ''
       };
       const newCustomerRowState = () => ({
         aliases: [],
@@ -7568,6 +7721,8 @@
               branch: val('masterCustomerBranch'),
               gstin: val('masterCustomerGstin'),
               pan: val('masterCustomerPan'),
+              gstRegType: val('masterCustomerGstinRegType'),
+              panType: getPanHolderType(val('masterCustomerPan').toUpperCase()),
               createdAt: Date.now()
             };
             customers.push(newCustomer);
@@ -7706,6 +7861,11 @@
             <label class="coa-modal-label" for="masterSupplierBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
             <input class="coa-modal-inp" id="masterSupplierBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
 
+            <!-- MSME status: splits Trade payables into (A) MSME / (B) Others in the Schedule III Balance Sheet -->
+            <div style="margin-top: 16px;">
+              ${buildMasterMsmeSliderHtml('masterSupplierMsme', false)}
+            </div>
+
             <div style="margin-top: 16px;">
               <button type="button" class="btn btn-secondary" id="masterSupplierAddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -7818,6 +7978,7 @@
       `;
 
       renderMasterSupplierAliases();
+      wireMasterMsmeSlider(contentArea, 'masterSupplierMsme');
 
       // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
       wireGstinPanValidation(contentArea, 'masterSupplierGstin', 'masterSupplierPan');
@@ -7879,7 +8040,8 @@
         masterSupplierContactName: '', masterSupplierAddress: '', masterSupplierCity: '', masterSupplierPincode: '',
         masterSupplierState: '', masterSupplierCountry: 'India',
         masterSupplierBankName: '', masterSupplierAccountNo: '', masterSupplierIfsc: '', masterSupplierBranch: '',
-        masterSupplierGstin: '', masterSupplierPan: ''
+        masterSupplierGstin: '', masterSupplierPan: '', masterSupplierGstinRegType: '',
+        masterSupplierMsme: 'no'
       };
       const newSupplierRowState = () => ({
         aliases: [],
@@ -7907,6 +8069,7 @@
           const el = contentArea.querySelector('#' + id);
           if (el) el.value = st.fields[id] !== undefined ? st.fields[id] : SUPPLIER_ADDL_FIELD_DEFAULTS[id];
         });
+        syncMasterMsmeSlider(contentArea, 'masterSupplierMsme');
         // Refresh the GSTIN / PAN validity hints for the loaded values
         ['#masterSupplierGstin', '#masterSupplierPan'].forEach(sel => {
           const el = contentArea.querySelector(sel);
@@ -8195,6 +8358,9 @@
               branch: val('masterSupplierBranch'),
               gstin: val('masterSupplierGstin'),
               pan: val('masterSupplierPan'),
+              gstRegType: val('masterSupplierGstinRegType'),
+              panType: getPanHolderType(val('masterSupplierPan').toUpperCase()),
+              msme: val('masterSupplierMsme') === 'yes',
               createdAt: Date.now()
             };
             suppliers.push(newSupplier);
@@ -11734,7 +11900,7 @@
           updateAdditionalInfoVisibility();
         }
 
-        wireGstinPanValidation(contentArea, 'masterAlterLedgerGstin', 'masterAlterLedgerPan');
+        wireGstinPanValidation(contentArea, 'masterAlterLedgerGstin', 'masterAlterLedgerPan', currentLedger.gstRegType);
         const ifscInp = contentArea.querySelector('#masterAlterLedgerIfsc');
         if (ifscInp) {
           ifscInp.addEventListener('input', (e) => {
@@ -12053,6 +12219,7 @@
             const branch = isParty && contentArea.querySelector('#masterAlterLedgerBranch') ? contentArea.querySelector('#masterAlterLedgerBranch').value.trim() : '';
             const gstin = isParty && contentArea.querySelector('#masterAlterLedgerGstin') ? contentArea.querySelector('#masterAlterLedgerGstin').value.trim() : '';
             const pan = isParty && contentArea.querySelector('#masterAlterLedgerPan') ? contentArea.querySelector('#masterAlterLedgerPan').value.trim() : '';
+            const gstRegType = contentArea.querySelector('#masterAlterLedgerGstinRegType')?.value || '';
 
             const isRevenueOpsGroup = isRevenueFromOperationsGroup(groupVal);
             const sacInfo = isRevenueOpsGroup ? {
@@ -12080,7 +12247,9 @@
               currentLedger.branch = branch;
               currentLedger.gstin = gstin;
               currentLedger.pan = pan;
+              currentLedger.panType = getPanHolderType(pan.toUpperCase());
             }
+            currentLedger.gstRegType = gstRegType;
             currentLedger.sacInfo = sacInfo;
 
             // Bank Account group: the details from the Additional Details popup
@@ -12376,7 +12545,7 @@
         }
 
 
-        wireGstinPanValidation(contentArea, 'masterAlterCustomerGstin', 'masterAlterCustomerPan');
+        wireGstinPanValidation(contentArea, 'masterAlterCustomerGstin', 'masterAlterCustomerPan', currentCustomer.gstRegType);
 
         // Additional Details popup (Name & Address, Bank Information, GSTIN & PAN), like Create
         wireAlterAddlPopup(contentArea, 'masterAlterCustomer', {
@@ -12492,6 +12661,7 @@
             const branch = contentArea.querySelector('#masterAlterCustomerBranch') ? contentArea.querySelector('#masterAlterCustomerBranch').value.trim() : '';
             const gstin = contentArea.querySelector('#masterAlterCustomerGstin') ? contentArea.querySelector('#masterAlterCustomerGstin').value.trim() : '';
             const pan = contentArea.querySelector('#masterAlterCustomerPan') ? contentArea.querySelector('#masterAlterCustomerPan').value.trim() : '';
+            const gstRegType = contentArea.querySelector('#masterAlterCustomerGstinRegType')?.value || '';
             const balInp = contentArea.querySelector('#masterAlterCustomerBalance');
             const openingBal = balInp && balInp.value ? parseFloat(balInp.value) : 0;
 
@@ -12509,6 +12679,8 @@
             currentCustomer.branch = branch;
             currentCustomer.gstin = gstin;
             currentCustomer.pan = pan;
+            currentCustomer.panType = getPanHolderType(pan.toUpperCase());
+            currentCustomer.gstRegType = gstRegType;
             currentCustomer.openingBalance = openingBal;
 
             // Recalculate Trade Receivables opening balance in CoA
@@ -12661,6 +12833,10 @@
               <label class="coa-modal-label" for="masterAlterSupplierBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
               <input class="coa-modal-inp" id="masterAlterSupplierBalance" type="number" min="0" step="0.01" value="${balVal}" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
             </div>
+            <!-- MSME status: splits Trade payables into (A) MSME / (B) Others in the Schedule III Balance Sheet -->
+            <div class="coa-modal-fg" style="margin-bottom: 24px;">
+              ${buildMasterMsmeSliderHtml('masterAlterSupplierMsme', !!currentSupplier.msme)}
+            </div>
             <div id="masterAlterSupplierAddlBtnWrap" style="margin-bottom: 16px;">
               <button type="button" class="btn btn-secondary" id="masterAlterSupplierAddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -12796,7 +12972,8 @@
         }
 
 
-        wireGstinPanValidation(contentArea, 'masterAlterSupplierGstin', 'masterAlterSupplierPan');
+        wireGstinPanValidation(contentArea, 'masterAlterSupplierGstin', 'masterAlterSupplierPan', currentSupplier.gstRegType);
+        wireMasterMsmeSlider(contentArea, 'masterAlterSupplierMsme');
 
         // Additional Details popup (Name & Address, Bank Information, GSTIN & PAN), like Create
         wireAlterAddlPopup(contentArea, 'masterAlterSupplier', {
@@ -12912,6 +13089,7 @@
             const branch = contentArea.querySelector('#masterAlterSupplierBranch') ? contentArea.querySelector('#masterAlterSupplierBranch').value.trim() : '';
             const gstin = contentArea.querySelector('#masterAlterSupplierGstin') ? contentArea.querySelector('#masterAlterSupplierGstin').value.trim() : '';
             const pan = contentArea.querySelector('#masterAlterSupplierPan') ? contentArea.querySelector('#masterAlterSupplierPan').value.trim() : '';
+            const gstRegType = contentArea.querySelector('#masterAlterSupplierGstinRegType')?.value || '';
             const balInp = contentArea.querySelector('#masterAlterSupplierBalance');
             const openingBal = balInp && balInp.value ? parseFloat(balInp.value) : 0;
 
@@ -12929,7 +13107,10 @@
             currentSupplier.branch = branch;
             currentSupplier.gstin = gstin;
             currentSupplier.pan = pan;
+            currentSupplier.panType = getPanHolderType(pan.toUpperCase());
+            currentSupplier.gstRegType = gstRegType;
             currentSupplier.openingBalance = openingBal;
+            currentSupplier.msme = (contentArea.querySelector('#masterAlterSupplierMsme')?.value || 'no') === 'yes';
 
             // Recalculate Trade Payables opening balance in CoA
             if (typeof coaLedgers !== 'undefined') {
