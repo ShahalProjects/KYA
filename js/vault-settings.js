@@ -127,6 +127,10 @@
         if (!usedReg[kind].includes(no)) usedReg[kind].push(no);
       });
 
+      // The sales entries dropped above are rebuilt from the posted vouchers, so sales keep
+      // flowing into the Chart of Accounts, ledgers and reports after every load.
+      if (typeof rebuildSalesJournalEntries === 'function') rebuildSalesJournalEntries();
+
       if (!quiet) {
         showToast('Data restored successfully.', 'success');
         updateVaultUI();

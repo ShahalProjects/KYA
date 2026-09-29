@@ -668,6 +668,17 @@
       + text.slice(idx + q.length);
   }
 
+  // Current balance of each ledger — opening balance plus every posted entry (sales,
+  // journals, Cashline…), the same figures the Trial Balance uses. Worked out once per
+  // render; renderChartPanel clears it.
+  let _coaBalCache = null;
+  function _coaLedgerBal(l) {
+    if (!_coaBalCache) {
+      _coaBalCache = (typeof computeTrialBalanceBalances === 'function') ? computeTrialBalanceBalances() : {};
+    }
+    return (l.id in _coaBalCache) ? _coaBalCache[l.id] : (parseFloat(l.openingBalance) || 0);
+  }
+
   function _coaLdgMatchesFilters(l, q) {
     // 1. Search Query match
     if (q) {
@@ -680,9 +691,9 @@
     if (_coaFilterType) {
       if (l.type !== _coaFilterType) return false;
     }
-    // 3. Opening Balance Filter match
+    // 3. Balance Filter match
     if (_coaFilterBal) {
-      if (l.type !== 'ledger' || !parseFloat(l.openingBalance || 0)) return false;
+      if (l.type !== 'ledger' || Math.abs(_coaLedgerBal(l)) < 0.005) return false;
     }
     return true;
   }
@@ -743,6 +754,14 @@
   // ── Render one ledger row ────────────────────────────────────────
   function _coaLdgRow(l, indentClass, q) {
     const ic = indentClass || '';
+    const bal = _coaLedgerBal(l);
+    let balHtml = '';
+    if (Math.abs(bal) >= 0.005) {
+      const mainGroup = (typeof getLedgerMainGroup === 'function') ? getLedgerMainGroup(l) : '';
+      const drNormal = mainGroup === 'assets' || mainGroup === 'expense';
+      const side = (bal >= 0) === drNormal ? 'Dr' : 'Cr';
+      balHtml = `<span class="coa-ldg-bal">₹ ${Math.abs(bal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${side}</span>`;
+    }
     return `
       <div class="coa-ldg ${ic}">
         <div class="coa-ldg-dot" style="margin-top: 6px; align-self: flex-start;"></div>
@@ -753,7 +772,7 @@
           </div>
           ${l.aliases && l.aliases.length > 0 ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500; margin-top: 2px;">A.K.A: ${l.aliases.map(a => _coaHl(a, q)).join(', ')}</div>` : ''}
         </div>
-        ${l.openingBalance ? `<span class="coa-ldg-bal">₹ ${parseFloat(l.openingBalance||0).toLocaleString('en-IN')}</span>` : ''}
+        ${balHtml}
       </div>`;
   }
 
@@ -2404,6 +2423,7 @@
     injectChartStyles();
     const wrap = document.getElementById('chartWrap');
     if (!wrap) return;
+    _coaBalCache = null;
     const q = _coaSearch.toLowerCase().trim();
 
     // Preserve search focus/caret
@@ -2420,7 +2440,7 @@
       if (!q && !_coaFilterMg && !_coaFilterType && !_coaFilterBal) return null;
       return coaLedgers.filter(l => {
         if (_coaFilterType && l.type !== _coaFilterType) return false;
-        if (_coaFilterBal && (l.type !== 'ledger' || !parseFloat(l.openingBalance || 0))) return false;
+        if (_coaFilterBal && (l.type !== 'ledger' || Math.abs(_coaLedgerBal(l)) < 0.005)) return false;
         if (_coaFilterMg) {
           const sg = COA_SYS_SGS.find(s => s.id === l.sgId);
           if (!sg || sg.main !== _coaFilterMg) return false;

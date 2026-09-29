@@ -20,13 +20,22 @@
   let _b2bDocsPage = 0;
   const _b2bDocsHiddenCols = new Set();
 
+  // 12 - HSN-wise summary
+  let _hsnTab = 'b2b';                  // b2b | b2c
+  let _hsnSearch = '';
+  let _hsnPageSize = 10;
+  let _hsnPage = 0;
+  let _hsnSortDir = 'asc';              // HSN column sort
+
   // Where the Back button goes from each GST view
-  const GST_VIEW_PARENT = { gstr1: 'dashboard', gstr3b: 'dashboard', 'gstr1-b2b': 'gstr1', 'gstr1-b2b-docs': 'gstr1-b2b', 'gstr1-b2b-invoice': 'gstr1-b2b-docs', 'gstr1-b2cs': 'gstr1' };
+  const GST_VIEW_PARENT = { gstr1: 'dashboard', gstr3b: 'dashboard', 'gstr1-b2b': 'gstr1', 'gstr1-b2b-docs': 'gstr1-b2b', 'gstr1-b2b-invoice': 'gstr1-b2b-docs', 'gstr1-b2cs': 'gstr1', 'gstr1-hsn': 'gstr1', 'gstr1-docs': 'gstr1' };
 
   // GSTR-1 tiles that open a detail view when clicked
   const GSTR1_SECTION_VIEWS = {
     '4A, 4B, 6B, 6C - B2B, SEZ, DE Invoices': 'gstr1-b2b',
     '7 - B2C (Others)': 'gstr1-b2cs',
+    '12 - HSN-wise summary of outward supplies': 'gstr1-hsn',
+    '13 - Documents Issued': 'gstr1-docs',
   };
 
   // GSTR-1 sections, in GST portal order
@@ -408,6 +417,46 @@
       }
       .gst-activity-table.gst-inv-items td { padding: 8px 10px; }
       .gst-activity-table.gst-inv-items th { color: var(--slate-600); }
+
+      /* Sub-tabs (e.g. HSN summary B2B / B2C Supplies) */
+      .gst-subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--slate-200); }
+      .gst-subtab {
+        height: 36px;
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        color: var(--slate-500);
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        cursor: pointer;
+      }
+      .gst-subtab:hover { color: var(--slate-800); }
+      .gst-subtab.active { color: var(--blue-700); border-bottom-color: var(--blue-600); }
+      .gst-sort-btn {
+        padding: 0;
+        font: inherit;
+        color: inherit;
+        text-transform: inherit;
+        letter-spacing: inherit;
+        background: none;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .gst-hsn-desc { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      /* 12 columns: compact headers and cells so it fits a laptop screen */
+      .gst-activity-table.gst-hsn-table th { text-transform: none; letter-spacing: 0; font-size: 12px; padding: 10px 8px; }
+      .gst-activity-table.gst-hsn-table td { padding: 10px 8px; }
+
+      /* 13 - Documents Issued */
+      .gst-docs-list { display: flex; flex-direction: column; gap: 16px; }
+      .gst-docs-card { padding: 16px 18px; }
+      .gst-docs-title { font-size: 14px; font-weight: 700; color: var(--slate-800); margin-bottom: 10px; }
+      .gst-activity-table.gst-docs-table th { text-transform: none; letter-spacing: 0; font-size: 12px; }
+      .gst-activity-table.gst-docs-table td { padding: 8px 10px; }
 
       /* Disclaimer under every GST screen */
       .gst-disclaimer {
@@ -1430,6 +1479,291 @@
     `;
   }
 
+  // ── 12 - HSN-wise summary of outward supplies ───────────────────────
+
+  // KYA units (free text) → GST Unit Quantity Codes
+  const UQC_BY_UNIT = {
+    nos: 'NOS', no: 'NOS', number: 'NOS', numbers: 'NOS',
+    pcs: 'PCS', pc: 'PCS', piece: 'PCS', pieces: 'PCS',
+    kg: 'KGS', kgs: 'KGS', kilogram: 'KGS', kilograms: 'KGS',
+    g: 'GMS', gm: 'GMS', gms: 'GMS', gram: 'GMS', grams: 'GMS',
+    l: 'LTR', ltr: 'LTR', ltrs: 'LTR', litre: 'LTR', litres: 'LTR', liter: 'LTR', liters: 'LTR',
+    ml: 'MLT', mtr: 'MTR', mtrs: 'MTR', m: 'MTR', meter: 'MTR', meters: 'MTR', metre: 'MTR', metres: 'MTR',
+    cm: 'CMS', cms: 'CMS', km: 'KME', mm: 'MTR',
+    box: 'BOX', boxes: 'BOX', bag: 'BAG', bags: 'BAG', bottle: 'BTL', bottles: 'BTL', btl: 'BTL',
+    dozen: 'DOZ', doz: 'DOZ', dozens: 'DOZ', pack: 'PAC', packs: 'PAC', pkt: 'PAC', packet: 'PAC', packets: 'PAC',
+    set: 'SET', sets: 'SET', pair: 'PRS', pairs: 'PRS', roll: 'ROL', rolls: 'ROL', bundle: 'BDL', bundles: 'BDL',
+    carton: 'CTN', cartons: 'CTN', can: 'CAN', cans: 'CAN', tube: 'TUB', tubes: 'TUB',
+    ton: 'TON', tons: 'TON', tonne: 'TON', tonnes: 'TON', quintal: 'QTL', qtl: 'QTL',
+    unit: 'UNT', units: 'UNT', sqft: 'SQF', 'sq ft': 'SQF', sqm: 'SQM', 'sq m': 'SQM',
+  };
+
+  function uqcOf(row) {
+    if (row.revenueLedgerId) return 'NA'; // service line
+    const u = String(row.unit || '').trim().toLowerCase().replace(/\./g, '');
+    if (!u) return 'OTH';
+    return UQC_BY_UNIT[u] || (/^[A-Z]{3}$/.test(String(row.unit).trim()) ? String(row.unit).trim() : 'OTH');
+  }
+
+  // tab: 'b2b' (recipients with a GSTIN) or 'b2c' (everyone else, incl. exports)
+  function computeGstr1HsnRows(period, tab) {
+    const groups = new Map();
+    getSalesVouchers().forEach(inv => {
+      if (!inPeriod(inv.date, period)) return;
+      const party = findCustomer(inv);
+      const registered = !!String((party && party.gstin) || '').trim();
+      if ((tab === 'b2b') !== registered) return;
+      const sign = inv.isReturn ? -1 : 1;
+      const isProduct = inv.type === 'Product';
+      (inv.rows || []).forEach(r => {
+        const hsn = String(r.hsn || '').trim();
+        const uqc = isProduct ? uqcOf(r) : 'NA';
+        const rate = parseFloat(r.tax) || 0;
+        const { taxable, gst } = rowTaxableAndGst(r, isProduct);
+        const split = gstSplit(gst, inv.salesSupplyType);
+        const key = [hsn, uqc, rate].join('|');
+        const g = groups.get(key) || { hsn, uqc, rate, hsnDesc: '', qty: 0, taxable: 0, igst: 0, cgst: 0, sgst: 0 };
+        if (!g.hsnDesc && r.hsnDesc) g.hsnDesc = r.hsnDesc;
+        if (uqc !== 'NA') g.qty += sign * (parseFloat(r.qty) || 0);
+        g.taxable += sign * taxable;
+        g.igst += sign * split.igst;
+        g.cgst += sign * split.cgst;
+        g.sgst += sign * split.sgst;
+        groups.set(key, g);
+      });
+    });
+    const dir = _hsnSortDir === 'desc' ? -1 : 1;
+    return Array.from(groups.values())
+      .filter(g => Math.abs(g.taxable) >= 0.005 || Math.abs(g.qty) > 0)
+      .sort((a, b) => dir * a.hsn.localeCompare(b.hsn, undefined, { numeric: true }) || b.rate - a.rate);
+  }
+
+  function fmtQty(n) {
+    return (Math.round((Number(n) || 0) * 1000) / 1000).toLocaleString('en-IN', { maximumFractionDigits: 3 });
+  }
+
+  // Table + pager only, so typing in Search keeps focus
+  function renderHsnTable() {
+    const { period } = getGstSelection();
+    const q = _hsnSearch.trim().toLowerCase();
+    const all = computeGstr1HsnRows(period, _hsnTab);
+    const rows = all.filter(g => !q || [g.hsn, g.hsnDesc, g.uqc, String(g.rate), fmtAmt(g.taxable)].some(v => String(v).toLowerCase().includes(q)));
+    const pages = Math.max(1, Math.ceil(rows.length / _hsnPageSize));
+    if (_hsnPage >= pages) _hsnPage = pages - 1;
+    const start = _hsnPage * _hsnPageSize;
+    const pageRows = rows.slice(start, start + _hsnPageSize);
+    const dash = v => (Math.abs(v) < 0.005 ? '-' : fmtAmt(v));
+    return `
+      <div class="gst-activity-scroll">
+        <table class="gst-activity-table gst-grid-table gst-hsn-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="num" style="text-align: center;">Sr No.</th>
+              <th rowspan="2"><button type="button" class="gst-sort-btn" id="hsnSortBtn" aria-label="Sort by HSN">HSN ${_hsnSortDir === 'asc' ? '▲' : '▼'}</button></th>
+              <th rowspan="2">Description</th>
+              <th rowspan="2">Description as per HSN Code</th>
+              <th rowspan="2" style="text-align: center;">UQC</th>
+              <th rowspan="2" class="num">Total Quantity</th>
+              <th rowspan="2" class="num">Total taxable value (₹)</th>
+              <th rowspan="2" class="num" style="text-align: center;">Rate (%)</th>
+              <th colspan="4" style="text-align: center;">Amount of tax</th>
+            </tr>
+            <tr>
+              <th class="num">Integrated tax (₹)</th>
+              <th class="num">Central tax (₹)</th>
+              <th class="num">State/UT tax (₹)</th>
+              <th class="num">Cess (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pageRows.length ? pageRows.map((g, i) => `
+              <tr>
+                <td class="num" style="text-align: center;">${start + i + 1}</td>
+                <td class="nowrap gst-ret">${escHtml(g.hsn) || '—'}</td>
+                <td></td>
+                <td><div class="gst-hsn-desc" title="${escHtml(g.hsnDesc)}">${escHtml(g.hsnDesc)}</div></td>
+                <td class="nowrap" style="text-align: center;">${escHtml(g.uqc)}</td>
+                <td class="num">${fmtQty(g.qty)}</td>
+                <td class="num">${fmtAmt(g.taxable)}</td>
+                <td class="num" style="text-align: center;">${g.rate}</td>
+                <td class="num">${dash(g.igst)}</td>
+                <td class="num">${dash(g.cgst)}</td>
+                <td class="num">${dash(g.sgst)}</td>
+                <td class="num">-</td>
+              </tr>
+            `).join('') : `
+              <tr><td colspan="12" style="text-align: center; padding: 28px 14px; color: var(--slate-400);">${q ? 'No records match your search.' : 'No supplies in this period.'}</td></tr>
+            `}
+          </tbody>
+        </table>
+      </div>
+      <div class="b2b-docs-pager">
+        <span>${rows.length ? `Showing ${start + 1}–${start + pageRows.length} of ${rows.length}` : ''}</span>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary hsn-page-btn" type="button" data-page="${_hsnPage - 1}" ${_hsnPage <= 0 ? 'disabled' : ''}>‹ Prev</button>
+          <button class="btn btn-secondary hsn-page-btn" type="button" data-page="${_hsnPage + 1}" ${_hsnPage >= pages - 1 ? 'disabled' : ''}>Next ›</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderGstr1HsnView() {
+    const tab = (id, label) => `<button type="button" class="gst-subtab ${_hsnTab === id ? 'active' : ''}" data-hsn-tab="${id}" role="tab" aria-selected="${_hsnTab === id}">${label}</button>`;
+    return `
+      <div class="gst-dash">
+        <div class="gst-activity-card" style="padding: 18px;">
+          <div class="b2b-docs-toolbar">
+            <div class="gst-subtabs" role="tablist" aria-label="HSN summary">
+              ${tab('b2b', 'B2B Supplies')}
+              ${tab('b2c', 'B2C Supplies')}
+            </div>
+            <div class="b2b-docs-controls">
+              <span class="rpt-filter-select-wrap">
+                <select class="rpt-filter-select" id="hsnPageSize" aria-label="Records per page">
+                  ${[10, 25, 50, 100].map(n => `<option value="${n}" ${n === _hsnPageSize ? 'selected' : ''}>${n} per page</option>`).join('')}
+                </select>
+                ${CARET_ICON}
+              </span>
+              <input type="search" class="b2b-docs-search" id="hsnSearch" placeholder="Search..." value="${escHtml(_hsnSearch)}" aria-label="Search HSN summary">
+            </div>
+          </div>
+          <div id="hsnTableWrap">${renderHsnTable()}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireHsnView(container) {
+    const wrap = container.querySelector('#hsnTableWrap');
+    if (!wrap) return;
+    const refresh = () => { wrap.innerHTML = renderHsnTable(); wireTable(); };
+    const wireTable = () => {
+      wrap.querySelectorAll('.hsn-page-btn').forEach(btn => {
+        btn.addEventListener('click', () => { _hsnPage = parseInt(btn.dataset.page, 10) || 0; refresh(); });
+      });
+      const sortBtn = wrap.querySelector('#hsnSortBtn');
+      if (sortBtn) sortBtn.addEventListener('click', () => { _hsnSortDir = _hsnSortDir === 'asc' ? 'desc' : 'asc'; refresh(); });
+    };
+    wireTable();
+
+    container.querySelectorAll('.gst-subtab[data-hsn-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _hsnTab = btn.dataset.hsnTab;
+        _hsnPage = 0;
+        container.querySelectorAll('.gst-subtab[data-hsn-tab]').forEach(b => {
+          const on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-selected', String(on));
+        });
+        refresh();
+      });
+    });
+
+    const search = container.querySelector('#hsnSearch');
+    if (search) {
+      search.addEventListener('input', () => { _hsnSearch = search.value; _hsnPage = 0; refresh(); });
+    }
+
+    const pageSize = container.querySelector('#hsnPageSize');
+    if (pageSize) {
+      pageSize.addEventListener('change', () => { _hsnPageSize = parseInt(pageSize.value, 10) || 10; _hsnPage = 0; refresh(); });
+    }
+  }
+
+  // ── 13 - Documents Issued ──────────────────────────────────────────
+
+  // GSTR-1 Table 13 document categories, in portal order
+  const GSTR1_DOC_CATEGORIES = [
+    'Invoices for outward supply',
+    'Invoices for inward supply from unregistered person',
+    'Revised Invoice',
+    'Debit Note',
+    'Credit Note',
+    'Receipt voucher',
+    'Payment Voucher',
+    'Refund voucher',
+    'Delivery Challan for job work',
+    'Delivery Challan for supply on approval',
+    'Delivery Challan in case of liquid gas',
+    'Delivery Challan in cases other than by way of supply (excluding at S no. 9 to 11)',
+  ];
+
+  // Group document numbers into series (text prefix + running number), e.g. SCR-26-27-000001 … 000065
+  function documentSeries(numbers) {
+    const series = new Map();
+    numbers.forEach(raw => {
+      const no = String(raw || '').trim();
+      if (!no) return;
+      const m = /^(.*?)(\d+)$/.exec(no);
+      const key = m ? `${m[1]}|${m[2].length}` : `${no}|x`;
+      const s = series.get(key) || { prefix: m ? m[1] : no, numbers: new Map() };
+      s.numbers.set(no, m ? parseInt(m[2], 10) : 0);
+      series.set(key, s);
+    });
+    return Array.from(series.values()).map(s => {
+      const sorted = Array.from(s.numbers.entries()).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+      const total = sorted.length;
+      return { from: sorted[0][0], to: sorted[total - 1][0], total, cancelled: 0, net: total };
+    }).sort((a, b) => a.from.localeCompare(b.from));
+  }
+
+  function computeGstr1DocumentsIssued(period) {
+    const sales = getSalesVouchers().filter(v => inPeriod(v.date, period));
+    const rowsByCategory = {
+      'Invoices for outward supply': documentSeries(sales.filter(v => !v.isReturn).map(v => v.invoiceNo)),
+      'Credit Note': documentSeries(sales.filter(v => v.isReturn).map(v => v.invoiceNo)),
+    };
+    return GSTR1_DOC_CATEGORIES.map((name, i) => ({ no: i + 1, name, rows: rowsByCategory[name] || [] }));
+  }
+
+  function renderGstr1DocumentsView() {
+    const { period } = getGstSelection();
+    const categories = computeGstr1DocumentsIssued(period);
+    const box = v => `<div class="gst-inv-box">${escHtml(v)}</div>`;
+    return `
+      <div class="gst-dash">
+        <div class="gst-docs-list">
+          ${categories.map(cat => `
+            <div class="gst-activity-card gst-docs-card">
+              <div class="gst-docs-title">${cat.no}. ${escHtml(cat.name)}</div>
+              <div class="gst-activity-scroll">
+                <table class="gst-activity-table gst-grid-table gst-docs-table">
+                  <thead>
+                    <tr>
+                      <th rowspan="2" style="text-align: center; width: 56px;">No.</th>
+                      <th colspan="2" style="text-align: center;">Sr. No.</th>
+                      <th rowspan="2" style="text-align: center;">Total number</th>
+                      <th rowspan="2" style="text-align: center;">Cancelled</th>
+                      <th rowspan="2" style="text-align: center;">Net issued</th>
+                    </tr>
+                    <tr>
+                      <th style="text-align: center;">From</th>
+                      <th style="text-align: center;">To</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${cat.rows.length ? cat.rows.map((r, i) => `
+                      <tr>
+                        <td style="text-align: center;">${i + 1}</td>
+                        <td>${box(r.from)}</td>
+                        <td>${box(r.to)}</td>
+                        <td>${box(fmtCount(r.total))}</td>
+                        <td>${box(fmtCount(r.cancelled))}</td>
+                        <td>${box(fmtCount(r.net))}</td>
+                      </tr>
+                    `).join('') : `
+                      <tr><td colspan="6" style="text-align: center; padding: 16px 14px; color: var(--slate-400);">No documents in this period.</td></tr>
+                    `}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   // Close the Display/Hide Columns menu on any outside click
   document.addEventListener('click', () => {
     document.querySelectorAll('#panel-reports .b2b-docs-cols-menu').forEach(m => { m.hidden = true; });
@@ -1441,12 +1775,14 @@
     const { period } = getGstSelection();
     const b2bCount = computeGstr1B2bRecipients(period).reduce((sum, r) => sum + r.records, 0);
     const b2csCount = computeGstr1B2csRows(period).length;
+    const hsnCount = computeGstr1HsnRows(period, 'b2b').length + computeGstr1HsnRows(period, 'b2c').length;
+    const docsCount = computeGstr1DocumentsIssued(period).reduce((n, c) => n + c.rows.length, 0);
     return `
       <div class="gst-dash">
         <div class="gstr1-sec-grid">
           ${GSTR1_SECTIONS.map(title => {
             const view = GSTR1_SECTION_VIEWS[title];
-            const count = view === 'gstr1-b2b' ? b2bCount : view === 'gstr1-b2cs' ? b2csCount : 0;
+            const count = view === 'gstr1-b2b' ? b2bCount : view === 'gstr1-b2cs' ? b2csCount : view === 'gstr1-hsn' ? hsnCount : view === 'gstr1-docs' ? docsCount : 0;
             return `
               <div class="gstr1-sec-tile ${view ? 'is-link' : ''}" ${view ? `data-section-view="${view}" role="button" tabindex="0"` : ''}>
                 <div class="gstr1-sec-head">${title}</div>
@@ -1554,6 +1890,8 @@
     if (_gstView === 'gstr1') return renderGstr1SectionsView();
     if (_gstView === 'gstr1-b2b') return renderGstr1B2bView();
     if (_gstView === 'gstr1-b2cs') return renderGstr1B2csView();
+    if (_gstView === 'gstr1-hsn') return renderGstr1HsnView();
+    if (_gstView === 'gstr1-docs') return renderGstr1DocumentsView();
     if (_gstView === 'gstr1-b2b-docs') return renderGstr1B2bDocsView();
     if (_gstView === 'gstr1-b2b-invoice') return renderGstr1B2bInvoiceView();
     if (_gstView === 'gstr3b') return renderGstr3bSectionsView();
@@ -1710,6 +2048,7 @@
     });
 
     wireB2bDocsView(container);
+    wireHsnView(container);
 
     container.querySelectorAll('.gst-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {

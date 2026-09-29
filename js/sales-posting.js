@@ -828,8 +828,58 @@
     return usable.length ? usable : [{ name: nameOf(splits[0].accountId), amount: amount }];
   }
 
-  function postSalesVoucherToJournal(invoice) {
+  // Groups an invoice's taxable value by the revenue ledger each line belongs to, in line
+  // order. A service line carries its own Revenue from Operations ledger (the ledger picked
+  // in Master Desk → Ledgers), so it lands there; a product line has no ledger of its own
+  // and goes to Sales Account (Sales Reversals on a return).
+  function getSalesRevenueLines(invoice) {
+    const ledgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []);
+    const fallbackName = invoice.isReturn ? 'Sales Reversals' : 'Sales Account';
+    const lines = [];
+    (invoice.rows || []).forEach(r => {
+      const base = invoice.type === 'Service'
+        ? (parseFloat(r.baseAmount) || 0)
+        : (parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0);
+      const discAmt = r.discountType === 'pct' ? (base * ((parseFloat(r.discount) || 0) / 100)) : (parseFloat(r.discount) || 0);
+      const amt = Math.max(0, base - discAmt);
+      if (amt <= 0) return;
+
+      const own = r.revenueLedgerId
+        ? ledgers.find(l => l.type === 'ledger' && String(l.id) === String(r.revenueLedgerId))
+        : null;
+      let name = own && own.name;
+      if (!name) {
+        const fallbackId = getOrCreateSystemLedger(fallbackName, 'sg-rfo');
+        name = (ledgers.find(l => l.id == fallbackId) || { name: fallbackName }).name;
+      }
+      const line = lines.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+      if (line) line.amount += amt;
+      else lines.push({ name, amount: amt });
+    });
+    return lines;
+  }
+
+  // Sales journal entries are derived from the posted sales vouchers, and a restore drops
+  // them (see performRestore), so they are rebuilt here from the vouchers after every load.
+  function rebuildSalesJournalEntries() {
+    if (typeof postedEntries === 'undefined' || !window.KYA_STORE) return;
+    const vouchers = (window.KYA_STORE.salesVouchers || []).filter(v => v && !v.isDraft && !v.isOrder);
+    const idBase = Date.now();
+    // Oldest first, so the newest entry ends up on top like a fresh post
+    vouchers.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).forEach((v, i) => {
+      if (!v.journalEntryId) v.journalEntryId = idBase + i * 3;
+      const res = postSalesVoucherToJournal(v, { silent: true });
+      if (res && typeof res === 'object') {
+        if (res.tdsJEId) { v.tdsJournalEntryId = res.tdsJEId; v.tdsVoucherNo = res.tdsVoucherNo; }
+        if (res.paymentJEId) { v.paymentJournalEntryId = res.paymentJEId; v.paymentVoucherNo = res.paymentVoucherNo; }
+      }
+    });
+    window.postedEntries = postedEntries;
+  }
+
+  function postSalesVoucherToJournal(invoice, options) {
     if (!invoice) return '';
+    const silent = !!(options && options.silent);
     const isRet = !!invoice.isReturn;
     
     // Ensure core system ledgers exist in CoA
@@ -848,8 +898,10 @@
       getOrCreateSystemLedger('Refund Payable', 'sg-ocl');
     }
 
+    // A posted voucher already stores its paid amount; the form's limit is only a fallback
+    const storedPaid = parseFloat(invoice.paymentAmount) || 0;
     const paidAmount = (invoice.paymentStatus === 'Full Payment' || invoice.paymentStatus === 'Full Refund')
-      ? getSalesPaymentMax(invoice.total)
+      ? (storedPaid > 0 ? storedPaid : getSalesPaymentMax(invoice.total))
       : ((invoice.paymentStatus === 'Partial Payment' || invoice.paymentStatus === 'Partial Refund')
         ? (parseFloat(invoice.paymentAmount) || 0)
         : 0);
@@ -874,34 +926,9 @@
 
     if (isRet) {
       // ── SALES REVERSAL / RETURN ───────────────────────────────────────
-      if (invoice.type === 'Product') {
-        let totalRevenue = 0;
-        (invoice.rows || []).forEach(r => {
-          const base = (parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0);
-          const discAmt = r.discountType === 'pct' ? (base * ((parseFloat(r.discount) || 0) / 100)) : (parseFloat(r.discount) || 0);
-          totalRevenue += Math.max(0, base - discAmt);
-        });
-        if (totalRevenue > 0) {
-          const salesReturnLedgerId = getOrCreateSystemLedger('Sales Reversals', 'sg-rfo');
-          const salesReturnName = (coaLedgers.find(l => l.id == salesReturnLedgerId) || { name: 'Sales Reversals' }).name;
-          journalRows.push({ id: journalRows.length + 1, type: 'By', particular: salesReturnName, debit: totalRevenue.toFixed(2), credit: '' });
-        }
-      } else {
-        const revenueByLedger = {};
-        (invoice.rows || []).forEach(r => {
-          const base = parseFloat(r.baseAmount) || 0;
-          const discAmt = r.discountType === 'pct' ? (base * ((parseFloat(r.discount) || 0) / 100)) : (parseFloat(r.discount) || 0);
-          const amt = Math.max(0, base - discAmt);
-          revenueByLedger[r.revenueLedgerId] = (revenueByLedger[r.revenueLedgerId] || 0) + amt;
-        });
-        for (const ledgId in revenueByLedger) {
-          const revAmt = revenueByLedger[ledgId];
-          if (revAmt > 0) {
-            const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
-            journalRows.push({ id: journalRows.length + 1, type: 'By', particular: ledgerName, debit: revAmt.toFixed(2), credit: '' });
-          }
-        }
-      }
+      getSalesRevenueLines(invoice).forEach(line => {
+        journalRows.push({ id: journalRows.length + 1, type: 'By', particular: line.name, debit: line.amount.toFixed(2), credit: '' });
+      });
 
       let totalGst = 0;
       (invoice.rows || []).forEach(r => {
@@ -974,34 +1001,9 @@
         invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'By', particular: adjName, debit: Math.abs(adjAmt).toFixed(2), credit: '' });
       }
 
-      if (invoice.type === 'Product') {
-        let totalRevenue = 0;
-        (invoice.rows || []).forEach(r => {
-          const base = (parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0);
-          const discAmt = r.discountType === 'pct' ? (base * ((parseFloat(r.discount) || 0) / 100)) : (parseFloat(r.discount) || 0);
-          totalRevenue += Math.max(0, base - discAmt);
-        });
-        if (totalRevenue > 0) {
-          const salesLedgerId = getOrCreateSystemLedger('Sales Account', 'sg-rfo');
-          const salesLedgerName = (coaLedgers.find(l => l.id == salesLedgerId) || { name: 'Sales Account' }).name;
-          invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: salesLedgerName, debit: '', credit: totalRevenue.toFixed(2) });
-        }
-      } else {
-        const revenueByLedger = {};
-        (invoice.rows || []).forEach(r => {
-          const base = parseFloat(r.baseAmount) || 0;
-          const discAmt = r.discountType === 'pct' ? (base * ((parseFloat(r.discount) || 0) / 100)) : (parseFloat(r.discount) || 0);
-          const amt = Math.max(0, base - discAmt);
-          revenueByLedger[r.revenueLedgerId] = (revenueByLedger[r.revenueLedgerId] || 0) + amt;
-        });
-        for (const ledgId in revenueByLedger) {
-          const revAmt = revenueByLedger[ledgId];
-          if (revAmt > 0) {
-            const ledgerName = (coaLedgers.find(l => l.id == ledgId) || { name: 'Revenue' }).name;
-            invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: ledgerName, debit: '', credit: revAmt.toFixed(2) });
-          }
-        }
-      }
+      getSalesRevenueLines(invoice).forEach(line => {
+        invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: line.name, debit: '', credit: line.amount.toFixed(2) });
+      });
 
       let totalGst = 0;
       (invoice.rows || []).forEach(r => {
@@ -1222,7 +1224,7 @@
         if (typeof window !== 'undefined') window.postedEntries = postedEntries;
       }
 
-      refreshAllReports();
+      if (!silent) refreshAllReports();
       return { invoiceJEId, tdsJEId, tdsVoucherNo, paymentJEId, paymentVoucherNo };
     }
 
@@ -1250,7 +1252,7 @@
         postedEntries.unshift(entry);
       }
     }
-    refreshAllReports();
+    if (!silent) refreshAllReports();
     return entryId;
   }
 
@@ -1259,3 +1261,4 @@
   window.saveSalesDraft = saveSalesDraft;
   window.loadSalesInvoice = loadSalesInvoice;
   window.postSalesVoucherToJournal = postSalesVoucherToJournal;
+  window.rebuildSalesJournalEntries = rebuildSalesJournalEntries;
