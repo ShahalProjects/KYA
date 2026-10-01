@@ -2436,7 +2436,12 @@
     }
   }
 
-  async function exportProformaToPDF(proforma) {
+  async function exportProformaToPDF(proforma, labels) {
+    // `labels` lets Sales Order / Delivery Challan reuse this layout under their own titles
+    const L = Object.assign({
+      title: 'PROFORMA INVOICE', forLabel: 'PROFORMA FOR:', dateLabel: 'Proforma Date:',
+      fallbackSub: 'Provisional Invoice', footer: 'Proforma Invoice', filePrefix: 'Proforma'
+    }, labels || {});
     try {
       await ensureJsPDFLoaded();
       const { jsPDF } = global.jspdf || global;
@@ -2447,7 +2452,7 @@
 
       const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
       const compName = (activeCo.name || 'KYA Accounting').toUpperCase();
-      const title = 'PROFORMA INVOICE';
+      const title = L.title;
 
       // Top Blue Bar
       doc.setFillColor(29, 78, 216);
@@ -2495,7 +2500,7 @@
       // Left: Proforma For
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('PROFORMA FOR:', 18, 35);
+      doc.text(L.forLabel, 18, 35);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
@@ -2508,13 +2513,13 @@
       } else if (partyAddr) {
         doc.text(partyAddr.length > 35 ? partyAddr.substring(0, 32) + '...' : partyAddr, 18, 47);
       } else {
-        doc.text('Provisional Invoice', 18, 47);
+        doc.text(L.fallbackSub, 18, 47);
       }
 
       // Right: Dates and Supply
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('Proforma Date:', 110, 35);
+      doc.text(L.dateLabel, 110, 35);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
       doc.text(formatRptDate(proforma.date) || '—', 135, 35);
@@ -2658,14 +2663,14 @@
         doc.setFontSize(8);
         doc.setTextColor(148, 163, 184);
         doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
-        doc.text('KYA Accounting • Proforma Invoice', 14, doc.internal.pageSize.getHeight() - 8);
+        doc.text(`KYA Accounting • ${L.footer}`, 14, doc.internal.pageSize.getHeight() - 8);
       }
 
-      const pNum = (proforma.proformaNo || 'Proforma').replace(/[^a-zA-Z0-9_-]/g, '_');
-      doc.save(`Proforma_${pNum}.pdf`);
+      const pNum = (proforma.proformaNo || L.filePrefix).replace(/[^a-zA-Z0-9_-]/g, '_');
+      doc.save(`${L.filePrefix}_${pNum}.pdf`);
       return true;
     } catch (err) {
-      console.error('Failed to export Proforma to PDF:', err);
+      console.error(`Failed to export ${L.footer} to PDF:`, err);
       window.print();
       return false;
     }

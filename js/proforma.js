@@ -54,8 +54,10 @@
     if (preInvCard) preInvCard.style.display = 'none';
     if (salesFormCard) salesFormCard.style.display = 'none';
     if (quoteListCard) quoteListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (quoteFormCard) quoteFormCard.style.display = 'none';
     if (proformaListCard) proformaListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (orderFormCard) orderFormCard.style.display = 'none';
     if (challanFormCard) challanFormCard.style.display = 'none';
     if (proformaFormCard) proformaFormCard.style.display = 'block';
@@ -89,6 +91,7 @@
     if (preInvCard) preInvCard.style.display = 'none';
     if (salesFormCard) salesFormCard.style.display = 'none';
     if (quoteListCard) quoteListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (quoteFormCard) quoteFormCard.style.display = 'none';
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (orderFormCard) orderFormCard.style.display = 'none';
@@ -110,6 +113,7 @@
     const proformaFormCard = document.getElementById('salesProformaFormCard');
 
     if (proformaListCard) proformaListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (preInvCard) preInvCard.style.display = 'block';
 
@@ -150,6 +154,7 @@
 
       // Populate customer
       populateProformaCustomers();
+      selectProformaCustomer(''); // clear the box; a saved customer is selected just below
       if (proformaData.customerId) {
         selectProformaCustomer(proformaData.customerId);
       }
@@ -219,6 +224,7 @@
       proformaRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
 
       populateProformaCustomers();
+      selectProformaCustomer(''); // a new proforma starts with no customer
       populateProformaExecutives();
 
       const adjEl = document.getElementById('proformaAdjustments');
@@ -481,7 +487,7 @@
 
   // ── Customer Search & Selection ──
   function populateProformaCustomers(filter) {
-    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const custs = typeof getKyaCustomerParties === 'function' ? getKyaCustomerParties() : [];
     const optionsList = document.getElementById('proformaCustomerSelectOptionsList');
     const selectEl = document.getElementById('proformaCustomer');
     if (!optionsList) return;
@@ -493,6 +499,9 @@
 
     const query = (filter || '').toLowerCase().trim();
     let matchCount = 0;
+    // Customers first, then parties that exist only as ledgers, each under its own heading
+    const hasLedgerParties = custs.some(isKyaLedgerParty);
+    let lastSection = '';
 
     custs.forEach(c => {
       if (selectEl) {
@@ -508,6 +517,12 @@
 
       if (query && !matchName && !matchAlias && !matchGstin) return;
       matchCount++;
+
+      const section = isKyaLedgerParty(c) ? 'Ledgers' : 'Customers';
+      if (hasLedgerParties && section !== lastSection) {
+        optionsList.appendChild(createKyaPartySectionHeader(section));
+        lastSection = section;
+      }
 
       const item = document.createElement('div');
       item.style.padding = '8px 12px';
@@ -525,7 +540,7 @@
       item.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
           <span style="font-weight: 600; color: var(--slate-800);">${safeEsc(c.name)}</span>
-          <span style="font-size: 11px; color: var(--slate-400);">${safeEsc(c.alias ? `Alias: ${c.alias} • ` : '')}${safeEsc(c.gstin || 'Unregistered')}</span>
+          <span style="font-size: 11px; color: var(--slate-400);">${safeEsc(c.alias ? `Alias: ${c.alias} • ` : '')}${safeEsc(isKyaLedgerParty(c) ? `Ledger${c.gstin ? ` • ${c.gstin}` : ''}` : (c.gstin || 'Unregistered'))}</span>
         </div>
         <span style="font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">Select</span>
       `;
@@ -548,10 +563,14 @@
       emptyMsg.textContent = 'No customers found';
       optionsList.appendChild(emptyMsg);
     }
+    // Create new Ledger always at the bottom of the list
+    if (typeof appendSalesPartyCreateFooter === 'function') {
+      appendSalesPartyCreateFooter(optionsList, filter, preInvoicePartyCreateTarget('proforma', populateProformaCustomers, selectProformaCustomer));
+    }
   }
 
   function selectProformaCustomer(customerId) {
-    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const custs = typeof getKyaCustomerParties === 'function' ? getKyaCustomerParties() : [];
     const cust = custs.find(c => String(c.id) === String(customerId));
     const triggerText = document.getElementById('proformaCustomerSelectTriggerText');
     const selectEl = document.getElementById('proformaCustomer');
@@ -990,7 +1009,7 @@
     const dueDate = document.getElementById('proformaDueDate')?.value || expiryDate;
     const proformaNo = document.getElementById('proformaNo')?.value?.trim() || getNextProformaNumber();
     const customerId = document.getElementById('proformaCustomer')?.value || '';
-    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const custs = typeof getKyaCustomerParties === 'function' ? getKyaCustomerParties() : [];
     const cust = custs.find(c => String(c.id) === String(customerId));
     const customerName = cust ? cust.name : '';
 
@@ -1130,13 +1149,7 @@
     if (isDraft) {
       data.status = 'Draft';
       // If was previously active and had advance JE, remove it while in draft state
-      if (data.advanceJournalEntryId && typeof postedEntries !== 'undefined') {
-        postedEntries = postedEntries.filter(e => String(e.id) !== String(data.advanceJournalEntryId));
-        if (typeof window !== 'undefined') window.postedEntries = postedEntries;
-        data.advanceJournalEntryId = null;
-        data.advanceVoucherNo = null;
-        data.advancePaidAmount = 0;
-      }
+      if (data.advanceJournalEntryId) removePreInvoiceAdvanceEntry(data);
       const existingIdx = window.KYA_STORE.proformaInvoicesDrafts.findIndex(q => q.id === data.id);
       if (existingIdx >= 0) {
         window.KYA_STORE.proformaInvoicesDrafts[existingIdx] = data;
@@ -1153,74 +1166,14 @@
         : (data.paymentStatus === 'Partial Payment' ? (parseFloat(data.paymentAmount) || 0) : 0);
 
       if (paidAmount > 0) {
-        const advLedgerId = (typeof getOrCreateSystemLedger === 'function')
-          ? getOrCreateSystemLedger('Advance from Customers', 'sg-ocl')
-          : (typeof window.getOrCreateSystemLedger === 'function' ? window.getOrCreateSystemLedger('Advance from Customers', 'sg-ocl') : null);
-        const advLedger = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
-          ? (coaLedgers.find(l => l.id == advLedgerId) || coaLedgers.find(l => (l.name || '').toLowerCase() === 'advance from customers'))
-          : null;
-        const advLedgerName = advLedger ? advLedger.name : 'Advance from Customers';
-
-        const receiptRows = getProformaAdvanceReceiptRows(data, paidAmount);
-        const payAccountName = receiptRows[0].name;
-        const custName = data.customerName || 'Customer';
-
-        let advanceVoucherNo = data.advanceVoucherNo;
-        if (!advanceVoucherNo || !advanceVoucherNo.startsWith('JV-')) {
-          if (typeof getNextJournalVoucherNo === 'function') {
-            advanceVoucherNo = getNextJournalVoucherNo(data.date);
-          } else if (typeof window.getNextJournalVoucherNo === 'function') {
-            advanceVoucherNo = window.getNextJournalVoucherNo(data.date);
-          } else {
-            const yr = data.date ? new Date(data.date).getFullYear() : new Date().getFullYear();
-            advanceVoucherNo = `JV-${yr}-001`;
-          }
-        }
-        const advanceJEId = data.advanceJournalEntryId || Date.now();
-        data.advanceJournalEntryId = advanceJEId;
-        data.advanceVoucherNo = advanceVoucherNo;
-        data.advancePaidAmount = paidAmount;
-
-        const advanceJERows = receiptRows.map((r, i) => ({
-          id: i + 1, type: 'By', particular: r.name, debit: r.amount.toFixed(2), credit: ''
-        }));
-        advanceJERows.push({
-          id: advanceJERows.length + 1, type: 'To', particular: advLedgerName, debit: '', credit: paidAmount.toFixed(2)
-        });
-
-        const advanceEntry = {
-          id: advanceJEId,
-          date: data.date,
-          voucherNo: advanceVoucherNo,
+        postPreInvoiceAdvanceEntry(data, paidAmount, getProformaAdvanceReceiptRows(data, paidAmount), {
           preparedBy: 'Proforma Module',
-          departmentId: '',
-          isBudget: false,
-          firstParticular: payAccountName,
-          amount: (typeof fmtNum === 'function' ? fmtNum(paidAmount) : safeFmtNum(paidAmount)),
-          allRows: advanceJERows,
-          narration: `Advance received from customer ${custName} against Proforma Invoice No. ${data.proformaNo} (${data.paymentStatus}).`.trim(),
-          jeType: 'advance_receipt',
-          proformaId: data.id,
-          proformaNo: data.proformaNo
-        };
-
-        if (typeof postedEntries !== 'undefined') {
-          const exIdx = postedEntries.findIndex(e => String(e.id) === String(advanceJEId));
-          if (exIdx > -1) {
-            postedEntries[exIdx] = advanceEntry;
-          } else {
-            postedEntries.unshift(advanceEntry);
-          }
-          if (typeof window !== 'undefined') window.postedEntries = postedEntries;
-        }
+          docLabel: 'Proforma Invoice',
+          docNo: data.proformaNo,
+          extra: { proformaId: data.id, proformaNo: data.proformaNo }
+        });
       } else if (data.advanceJournalEntryId) {
-        if (typeof postedEntries !== 'undefined') {
-          postedEntries = postedEntries.filter(e => String(e.id) !== String(data.advanceJournalEntryId));
-          if (typeof window !== 'undefined') window.postedEntries = postedEntries;
-        }
-        data.advanceJournalEntryId = null;
-        data.advanceVoucherNo = null;
-        data.advancePaidAmount = 0;
+        removePreInvoiceAdvanceEntry(data);
       }
 
       const existingIdx = window.KYA_STORE.proformaInvoices.findIndex(q => q.id === data.id);
@@ -1658,6 +1611,11 @@
       return;
     }
 
+    if (prof.status === 'Completed' && newStatus === 'Active') {
+      showToast('Completed proforma invoices cannot be reopened.', 'warning');
+      return;
+    }
+
     prof.status = newStatus;
     prof.updatedAt = Date.now();
 
@@ -1672,51 +1630,13 @@
         ? (parseFloat(prof.total) || 0)
         : (parseFloat(prof.paymentAmount) || 0);
 
-      if (paidAmt > 0 && typeof postedEntries !== 'undefined') {
-        const jeId = prof.advanceJournalEntryId || Date.now();
-        prof.advanceJournalEntryId = jeId;
-        const advLedgerId = (typeof getOrCreateSystemLedger === 'function')
-          ? getOrCreateSystemLedger('Advance from Customers', 'sg-ocl')
-          : (typeof window.getOrCreateSystemLedger === 'function' ? window.getOrCreateSystemLedger('Advance from Customers', 'sg-ocl') : null);
-        const advLedger = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
-          ? (coaLedgers.find(l => l.id == advLedgerId) || coaLedgers.find(l => (l.name || '').toLowerCase() === 'advance from customers'))
-          : null;
-        const advLedgerName = advLedger ? advLedger.name : 'Advance from Customers';
-
-        const receiptRows = getProformaAdvanceReceiptRows(prof, paidAmt);
-        const payAccountName = receiptRows[0].name;
-        const custName = prof.customerName || 'Customer';
-
-        const statusJERows = receiptRows.map((r, i) => ({
-          id: i + 1, type: 'By', particular: r.name, debit: r.amount.toFixed(2), credit: ''
-        }));
-        statusJERows.push({
-          id: statusJERows.length + 1, type: 'To', particular: advLedgerName, debit: '', credit: paidAmt.toFixed(2)
-        });
-
-        const advanceEntry = {
-          id: jeId,
-          date: prof.date,
-          voucherNo: prof.advanceVoucherNo || (typeof getNextJournalVoucherNo === 'function' ? getNextJournalVoucherNo(prof.date) : 'JV-2026-001'),
+      if (paidAmt > 0) {
+        postPreInvoiceAdvanceEntry(prof, paidAmt, getProformaAdvanceReceiptRows(prof, paidAmt), {
           preparedBy: 'Proforma Module',
-          departmentId: '',
-          isBudget: false,
-          firstParticular: payAccountName,
-          amount: (typeof fmtNum === 'function' ? fmtNum(paidAmt) : safeFmtNum(paidAmt)),
-          allRows: statusJERows,
-          narration: `Advance received from customer ${custName} against Proforma Invoice No. ${prof.proformaNo} (${prof.paymentStatus}).`.trim(),
-          jeType: 'advance_receipt',
-          proformaId: prof.id,
-          proformaNo: prof.proformaNo
-        };
-
-        const exIdx = postedEntries.findIndex(e => String(e.id) === String(jeId));
-        if (exIdx > -1) {
-          postedEntries[exIdx] = advanceEntry;
-        } else {
-          postedEntries.unshift(advanceEntry);
-        }
-        if (typeof window !== 'undefined') window.postedEntries = postedEntries;
+          docLabel: 'Proforma Invoice',
+          docNo: prof.proformaNo,
+          extra: { proformaId: prof.id, proformaNo: prof.proformaNo }
+        });
         if (typeof refreshAllReports === 'function') refreshAllReports();
       }
     }
@@ -1747,6 +1667,11 @@
                  window.KYA_STORE.proformaInvoicesDrafts.find(d => String(d.id) === String(id));
 
     const pNo = prof ? (prof.proformaNo || 'proforma invoice') : 'proforma invoice';
+
+    if (prof && prof.status === 'Completed') {
+      showToast('Completed proforma invoices cannot be deleted.', 'warning');
+      return;
+    }
 
     showKyaConfirm({
       title: 'Delete Proforma Invoice?',
@@ -1780,6 +1705,10 @@
     const prof = all.find(p => String(p.id) === String(id));
     if (!prof) {
       showToast('Proforma invoice not found.', 'error');
+      return;
+    }
+    if (prof.status === 'Completed') {
+      showToast('Completed proforma invoices cannot be edited.', 'warning');
       return;
     }
     openProformaForm(prof, 'proformalist');
@@ -1836,10 +1765,12 @@
     if (typeof loadSalesInvoice === 'function') {
       const proformaListCard = document.getElementById('salesProformaListCard');
       if (proformaListCard) proformaListCard.style.display = 'none';
+      if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
       const proformaFormCard = document.getElementById('salesProformaFormCard');
       if (proformaFormCard) proformaFormCard.style.display = 'none';
       const quoteListCard = document.getElementById('salesQuotationListCard');
       if (quoteListCard) quoteListCard.style.display = 'none';
+      if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
       const quoteFormCard = document.getElementById('salesQuotationFormCard');
       if (quoteFormCard) quoteFormCard.style.display = 'none';
       const preInvCard = document.getElementById('salesPreInvoiceCard');
@@ -1961,30 +1892,18 @@
     const isAct = prof.status === 'Active' || !prof.status;
     const isDrf = prof.status === 'Draft' || prof.isDraft;
 
+    const actBtnStyle = 'padding: 8px 16px;';
     let statusActionsHtml = '';
     if (isAct || isDrf) {
       statusActionsHtml = `
-        <button type="button" id="btnPreviewToInvoice" class="btn btn-sm" title="Convert to Invoice" aria-label="Convert to Invoice" style="background: #10b981; color: #fff; border: 1.5px solid #059669; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: all 0.15s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        </button>
-        <button type="button" id="btnPreviewEditProforma" class="btn btn-sm" title="Edit Proforma Invoice" aria-label="Edit Proforma Invoice" style="background: #fff; color: var(--blue-700); border: 1.5px solid var(--slate-300); width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='var(--slate-100)'; this.style.borderColor='var(--blue-400)'" onmouseout="this.style.background='#fff'; this.style.borderColor='var(--slate-300)'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button type="button" id="btnPreviewComplete" class="btn btn-sm" title="Mark Completed" aria-label="Mark Completed" style="background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#dbeafe'; this.style.borderColor='#93c5fd'" onmouseout="this.style.background='#eff6ff'; this.style.borderColor='#bfdbfe'">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-        <button type="button" id="btnPreviewCancel" class="btn btn-sm" title="Mark Cancelled" aria-label="Mark Cancelled" style="background: #fff1f2; color: #be123c; border: 1.5px solid #fecdd3; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#ffe4e6'; this.style.borderColor='#fda4af'" onmouseout="this.style.background='#fff1f2'; this.style.borderColor='#fecdd3'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <button type="button" id="btnPreviewToInvoice" class="btn btn-secondary" style="${actBtnStyle}">Convert to Sale</button>
+        <button type="button" id="btnPreviewComplete" class="btn btn-secondary" style="${actBtnStyle}">Mark Completed</button>
+        <button type="button" id="btnPreviewCancel" class="btn btn-secondary" style="${actBtnStyle}">Mark Cancelled</button>
       `;
-    } else {
+    } else if (prof.status === 'Cancelled') {
+      // Only cancelled proformas can be reopened; completed ones are final
       statusActionsHtml = `
-        <button type="button" id="btnPreviewReopen" class="btn btn-sm" title="Reopen as Active" aria-label="Reopen as Active" style="background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#d1fae5'; this.style.borderColor='#6ee7b7'" onmouseout="this.style.background='#ecfdf5'; this.style.borderColor='#a7f3d0'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        </button>
-        <button type="button" id="btnPreviewEditProforma" class="btn btn-sm" title="Edit Proforma Invoice" aria-label="Edit Proforma Invoice" style="background: #fff; color: var(--blue-700); border: 1.5px solid var(--slate-300); width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='var(--slate-100)'; this.style.borderColor='var(--blue-400)'" onmouseout="this.style.background='#fff'; this.style.borderColor='var(--slate-300)'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
+        <button type="button" id="btnPreviewReopen" class="btn btn-secondary" style="${actBtnStyle}">Reopen</button>
       `;
     }
 
@@ -1995,7 +1914,7 @@
 
     overlay.innerHTML = `
       <div class="inv-modal-card">
-        <div class="inv-modal-hdr" style="background: linear-gradient(90deg, #1d4ed8, #2563eb);">
+        <div class="inv-modal-hdr" style="background: linear-gradient(90deg, #1d4ed8, #2563eb); flex-wrap: wrap; gap: 10px;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">
               <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z"/>
@@ -2006,7 +1925,7 @@
               <span style="margin-left: 8px; font-family: monospace; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 6px; font-size: 13px;">${safeEsc(prof.proformaNo || 'PI-XXXX')}</span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
             <!-- Export Dropdown (PDF & Excel) -->
             <div class="rpt-more-wrap" style="position: relative;">
               <button class="btn btn-secondary" id="btnExportProformaAction" type="button" style="background: rgba(255,255,255,0.18); color: #fff; border: 1.5px solid rgba(255,255,255,0.35); font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; height: 36px; transition: all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
@@ -2041,17 +1960,29 @@
                 </button>
               </div>
             </div>
+            <!-- Edit / Delete (same icons as the Quotation preview); completed proformas are locked -->
+            ${prof.status === 'Completed' ? '' : `
+            <button type="button" id="btnPreviewEditProforma" title="Edit Proforma Invoice" aria-label="Edit Proforma Invoice" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button type="button" id="btnPreviewDeleteProforma" title="Delete Proforma Invoice" aria-label="Delete Proforma Invoice" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>`}
             <button id="btnCloseProformaModal" style="background: rgba(255,255,255,0.18); border: none; color: #fff; font-size: 18px; cursor: pointer; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; line-height: 1; transition: all 0.15s;" type="button" title="Close Preview" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">✕</button>
           </div>
         </div>
 
-        <!-- Action Bar: Inside the proforma preview with all actions aligned to the right side -->
-        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+        <!-- Action Bar: status actions aligned to the left side (hidden when none apply) -->
+        ${statusActionsHtml ? `
+        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap;">
           ${statusActionsHtml}
-          <button type="button" id="btnPreviewDeleteProforma" class="btn btn-sm" title="Delete Proforma Invoice" aria-label="Delete Proforma Invoice" style="background: #fee2e2; color: #dc2626; border: 1.5px solid #fca5a5; width: 34px; height: 34px; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; transition: all 0.15s;" onmouseover="this.style.background='#fecdd3'; this.style.borderColor='#f87171'" onmouseout="this.style.background='#fee2e2'; this.style.borderColor='#fca5a5'">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-          </button>
-        </div>
+        </div>` : ''}
 
         <div class="inv-modal-body">
           <div class="inv-paper">
@@ -2229,17 +2160,45 @@
       overlay.remove();
       editProformaItem(prof.id);
     });
+    const pNoHtml = `<strong>${safeEsc(prof.proformaNo || 'this proforma invoice')}</strong>`;
     overlay.querySelector('#btnPreviewToInvoice')?.addEventListener('click', () => {
-      overlay.remove();
-      convertProformaToInvoice(prof.id);
+      showKyaConfirm({
+        title: 'Convert to Sale?',
+        message: `Convert proforma invoice ${pNoHtml} to a Sales Invoice?<br>It will be marked Completed once the invoice is posted.`,
+        confirmLabel: 'Convert to Sale',
+        okBg: '#2563eb',
+        iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14h8M13 11l3 3-3 3"/></svg>',
+        onConfirm: () => {
+          overlay.remove();
+          convertProformaToInvoice(prof.id);
+        }
+      });
     });
     overlay.querySelector('#btnPreviewComplete')?.addEventListener('click', () => {
-      overlay.remove();
-      setProformaStatus(prof.id, 'Completed');
+      showKyaConfirm({
+        title: 'Mark as Completed?',
+        message: `Mark proforma invoice ${pNoHtml} as Completed?<br>Completed proforma invoices cannot be reopened.`,
+        confirmLabel: 'Mark Completed',
+        okBg: '#2563eb',
+        iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+        onConfirm: () => {
+          overlay.remove();
+          setProformaStatus(prof.id, 'Completed');
+        }
+      });
     });
     overlay.querySelector('#btnPreviewCancel')?.addEventListener('click', () => {
-      overlay.remove();
-      setProformaStatus(prof.id, 'Cancelled');
+      showKyaConfirm({
+        title: 'Mark as Cancelled?',
+        message: `Mark proforma invoice ${pNoHtml} as Cancelled?<br>Its advance entry is removed; you can reopen it later if needed.`,
+        confirmLabel: 'Mark Cancelled',
+        okBg: '#dc2626',
+        iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+        onConfirm: () => {
+          overlay.remove();
+          setProformaStatus(prof.id, 'Cancelled');
+        }
+      });
     });
     overlay.querySelector('#btnPreviewReopen')?.addEventListener('click', () => {
       overlay.remove();

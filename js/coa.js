@@ -1986,7 +1986,17 @@
         optionsList.appendChild(item);
       });
 
-      if (optionsList.children.length === 0) {
+      const isSalesList = (selectId === 'salesCustomer' || partyType.toLowerCase().includes('customer'));
+      if (isSalesList && typeof window.appendSalesPartyCreateFooter === 'function') {
+        // Customers: "No Customer Found" when empty, and Create new Ledger always at the bottom
+        if (optionsList.children.length === 0) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'padding: 12px 10px; text-align: center; font-size: 13px; font-weight: 600; color: var(--slate-500);';
+          empty.textContent = 'No Customer Found';
+          optionsList.appendChild(empty);
+        }
+        window.appendSalesPartyCreateFooter(optionsList, searchInput.value, null);
+      } else if (optionsList.children.length === 0) {
         const isSales = (selectId === 'salesCustomer' || partyType.toLowerCase().includes('customer'));
         const isPurch = (selectId === 'purchaseVendor' || partyType.toLowerCase().includes('vendor') || partyType.toLowerCase().includes('supplier'));
 

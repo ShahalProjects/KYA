@@ -754,7 +754,7 @@
         
         if (total > 0 && parseFloat(payAmtEl.value) > maxVal) {
           payAmtEl.value = maxVal.toFixed(2);
-          showToast(`Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the Grand Total.`, 'warning');
+          showToast(getSalesPaymentLimitMessage(maxVal, total, true), 'warning');
         }
 
         if (typeof updateSalesMultiPaymentSummary === 'function') updateSalesMultiPaymentSummary();
@@ -1087,12 +1087,12 @@
     const proformaCompleted = proformas.filter(p => p.status === 'Completed').length;
     const proformaCancelled = proformas.filter(p => p.status === 'Cancelled').length;
 
-    const orders = window.KYA_STORE.salesOrders || [];
+    const orders = (window.KYA_STORE.salesOrders || []).concat(window.KYA_STORE.salesOrdersDrafts || []);
     const orderActive = orders.filter(o => o.status === 'Active' || !o.status || o.status === 'Draft').length;
     const orderCompleted = orders.filter(o => o.status === 'Completed').length;
     const orderCancelled = orders.filter(o => o.status === 'Cancelled').length;
 
-    const challans = window.KYA_STORE.deliveryChallans || [];
+    const challans = (window.KYA_STORE.deliveryChallans || []).concat(window.KYA_STORE.deliveryChallansDrafts || []);
     const challanActive = challans.filter(c => c.status === 'Active' || !c.status || c.status === 'Draft').length;
     const challanCompleted = challans.filter(c => c.status === 'Completed').length;
     const challanCancelled = challans.filter(c => c.status === 'Cancelled').length;
@@ -1164,7 +1164,7 @@
             </tr>
 
             <!-- 3. Sales Order -->
-            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openSalesOrderForm()">
+            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openSalesOrderList('all')">
               <td style="padding: 16px 24px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <div style="width: 36px; height: 36px; border-radius: 8px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -1181,18 +1181,18 @@
                 </div>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${orderActive}</span>
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openSalesOrderList('active')">${orderActive}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${orderCompleted}</span>
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openSalesOrderList('completed')">${orderCompleted}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${orderCancelled}</span>
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-500); padding: 4px 10px; cursor: pointer; border-radius: 6px; display: inline-block;" onmouseover="this.style.background='var(--slate-100)'" onmouseout="this.style.background='transparent'" onclick="event.stopPropagation(); openSalesOrderList('cancelled')">${orderCancelled}</span>
               </td>
             </tr>
 
             <!-- 4. Delivery Challan -->
-            <tr style="transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openDeliveryChallanForm()">
+            <tr style="transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='transparent'" onclick="openDeliveryChallanList('all')">
               <td style="padding: 16px 24px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <div style="width: 36px; height: 36px; border-radius: 8px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -1210,13 +1210,13 @@
                 </div>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${challanActive}</span>
+                <span class="badge badge-green" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openDeliveryChallanList('active')">${challanActive}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px;">${challanCompleted}</span>
+                <span class="badge badge-blue" style="font-size: 13px; font-weight: 700; min-width: 32px; justify-content: center; padding: 4px 10px; cursor: pointer;" onclick="event.stopPropagation(); openDeliveryChallanList('completed')">${challanCompleted}</span>
               </td>
               <td style="padding: 16px 20px; text-align: center;">
-                <span style="font-size: 13px; font-weight: 700; color: var(--slate-400);">${challanCancelled}</span>
+                <span style="font-size: 13px; font-weight: 700; color: var(--slate-500); padding: 4px 10px; cursor: pointer; border-radius: 6px; display: inline-block;" onmouseover="this.style.background='var(--slate-100)'" onmouseout="this.style.background='transparent'" onclick="event.stopPropagation(); openDeliveryChallanList('cancelled')">${challanCancelled}</span>
               </td>
             </tr>
           </tbody>

@@ -50,8 +50,10 @@
 
     if (preInvCard) preInvCard.style.display = 'none';
     if (quoteListCard) quoteListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (salesFormCard) salesFormCard.style.display = 'none';
     if (proformaListCard) proformaListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (orderFormCard) orderFormCard.style.display = 'none';
     if (challanFormCard) challanFormCard.style.display = 'none';
@@ -87,6 +89,7 @@
     if (salesFormCard) salesFormCard.style.display = 'none';
     if (quoteFormCard) quoteFormCard.style.display = 'none';
     if (proformaListCard) proformaListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (orderFormCard) orderFormCard.style.display = 'none';
     if (challanFormCard) challanFormCard.style.display = 'none';
@@ -109,8 +112,10 @@
     const proformaFormCard = document.getElementById('salesProformaFormCard');
 
     if (quoteListCard) quoteListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (quoteFormCard) quoteFormCard.style.display = 'none';
     if (proformaListCard) proformaListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     if (preInvCard) preInvCard.style.display = 'block';
 
@@ -149,6 +154,7 @@
 
       // Populate customer
       populateQuoteCustomers();
+      selectQuoteCustomer(''); // clear the box; a saved customer is selected just below
       if (quoteData.customerId) {
         selectQuoteCustomer(quoteData.customerId);
       }
@@ -205,6 +211,7 @@
       quoteRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
 
       populateQuoteCustomers();
+      selectQuoteCustomer(''); // a new quotation starts with no customer
       populateQuoteExecutives();
 
       const adjEl = document.getElementById('quoteAdjustments');
@@ -230,7 +237,7 @@
 
   // ── Customer Search & Selection ──
   function populateQuoteCustomers(filter) {
-    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const custs = typeof getKyaCustomerParties === 'function' ? getKyaCustomerParties() : [];
     const optionsList = document.getElementById('quoteCustomerSelectOptionsList');
     const selectEl = document.getElementById('quoteCustomer');
     if (!optionsList) return;
@@ -242,6 +249,9 @@
 
     const query = (filter || '').toLowerCase().trim();
     let matchCount = 0;
+    // Customers first, then parties that exist only as ledgers, each under its own heading
+    const hasLedgerParties = custs.some(isKyaLedgerParty);
+    let lastSection = '';
 
     custs.forEach(c => {
       if (selectEl) {
@@ -257,6 +267,12 @@
 
       if (query && !matchName && !matchAlias && !matchGstin) return;
       matchCount++;
+
+      const section = isKyaLedgerParty(c) ? 'Ledgers' : 'Customers';
+      if (hasLedgerParties && section !== lastSection) {
+        optionsList.appendChild(createKyaPartySectionHeader(section));
+        lastSection = section;
+      }
 
       const item = document.createElement('div');
       item.style.padding = '8px 12px';
@@ -274,7 +290,7 @@
       item.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
           <span style="font-weight: 600; color: var(--slate-800);">${safeEsc(c.name)}</span>
-          <span style="font-size: 11px; color: var(--slate-400);">${safeEsc(c.alias ? `Alias: ${c.alias} • ` : '')}${safeEsc(c.gstin || 'Unregistered')}</span>
+          <span style="font-size: 11px; color: var(--slate-400);">${safeEsc(c.alias ? `Alias: ${c.alias} • ` : '')}${safeEsc(isKyaLedgerParty(c) ? `Ledger${c.gstin ? ` • ${c.gstin}` : ''}` : (c.gstin || 'Unregistered'))}</span>
         </div>
         <span style="font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">Select</span>
       `;
@@ -297,10 +313,14 @@
       emptyMsg.textContent = 'No customers found';
       optionsList.appendChild(emptyMsg);
     }
+    // Create new Ledger always at the bottom of the list
+    if (typeof appendSalesPartyCreateFooter === 'function') {
+      appendSalesPartyCreateFooter(optionsList, filter, preInvoicePartyCreateTarget('quote', populateQuoteCustomers, selectQuoteCustomer));
+    }
   }
 
   function selectQuoteCustomer(customerId) {
-    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const custs = typeof getKyaCustomerParties === 'function' ? getKyaCustomerParties() : [];
     const cust = custs.find(c => String(c.id) === String(customerId));
     const triggerText = document.getElementById('quoteCustomerSelectTriggerText');
     const selectEl = document.getElementById('quoteCustomer');
@@ -726,7 +746,7 @@
     const expiryDate = document.getElementById('quoteExpiryDate')?.value || '';
     const quoteNo = document.getElementById('quoteNo')?.value?.trim() || getNextQuoteNumber();
     const customerId = document.getElementById('quoteCustomer')?.value || '';
-    const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const custs = typeof getKyaCustomerParties === 'function' ? getKyaCustomerParties() : [];
     const cust = custs.find(c => String(c.id) === String(customerId));
     const customerName = cust ? cust.name : '';
 
@@ -1336,10 +1356,12 @@
     if (typeof loadSalesInvoice === 'function') {
       const quoteListCard = document.getElementById('salesQuotationListCard');
       if (quoteListCard) quoteListCard.style.display = 'none';
+      if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
       const quoteFormCard = document.getElementById('salesQuotationFormCard');
       if (quoteFormCard) quoteFormCard.style.display = 'none';
       const proformaListCard = document.getElementById('salesProformaListCard');
       if (proformaListCard) proformaListCard.style.display = 'none';
+      if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
       const proformaFormCard = document.getElementById('salesProformaFormCard');
       if (proformaFormCard) proformaFormCard.style.display = 'none';
       const preInvCard = document.getElementById('salesPreInvoiceCard');

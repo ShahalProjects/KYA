@@ -2141,7 +2141,12 @@
   /**
    * Export Proforma Invoice to Excel (.xlsx) using ExcelJS
    */
-  async function exportProformaToExcel(proforma) {
+  async function exportProformaToExcel(proforma, labels) {
+    // `labels` lets Sales Order / Delivery Challan reuse this layout under their own titles
+    const L = Object.assign({
+      title: 'PROFORMA INVOICE', sheetName: 'Proforma_Invoice', noLabel: 'Proforma #',
+      forLabel: 'Proforma For', filePrefix: 'Proforma', footer: 'Proforma'
+    }, labels || {});
     try {
       await ensureExcelJSLoaded();
       if (!global.ExcelJS) throw new Error('ExcelJS library could not be loaded.');
@@ -2150,7 +2155,7 @@
       workbook.creator = 'KYA Accounting';
       workbook.created = new Date();
 
-      const sheet = workbook.addWorksheet('Proforma_Invoice', {
+      const sheet = workbook.addWorksheet(L.sheetName, {
         views: [{ state: 'frozen', ySplit: 6, showGridLines: true }]
       });
 
@@ -2178,7 +2183,7 @@
       cA1.alignment = { vertical: 'middle', horizontal: 'left' };
 
       // Row 2: Title & Proforma #
-      const r2 = sheet.addRow(['PROFORMA INVOICE', '', '', '', '', '', `Proforma #: ${proforma.proformaNo || '—'}`]);
+      const r2 = sheet.addRow([L.title, '', '', '', '', '', `${L.noLabel}: ${proforma.proformaNo || '—'}`]);
       r2.height = 20;
       sheet.mergeCells('A2:E2');
       sheet.mergeCells(`F2:${lastColLetter}2`);
@@ -2191,7 +2196,7 @@
                        (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) ||
                        { name: proforma.customerName || 'Customer' };
       const partyName = customer.name || proforma.customerName || 'Customer';
-      const r3 = sheet.addRow([`Proforma For: ${partyName}`, '', '', '', `Date: ${formatRptDate(proforma.date) || '—'}`]);
+      const r3 = sheet.addRow([`${L.forLabel}: ${partyName}`, '', '', '', `Date: ${formatRptDate(proforma.date) || '—'}`]);
       r3.height = 18;
       sheet.mergeCells('A3:D3');
       sheet.mergeCells(`E3:${lastColLetter}3`);
@@ -2318,27 +2323,28 @@
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      const pNum = (proforma.proformaNo || 'Proforma').replace(/[^a-zA-Z0-9_-]/g, '_');
-      link.download = `Proforma_${pNum}.xlsx`;
+      const pNum = (proforma.proformaNo || L.filePrefix).replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `${L.filePrefix}_${pNum}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
       return true;
     } catch (err) {
-      console.error('Failed to export Proforma to Excel:', err);
-      exportProformaToCsvFallback(proforma);
+      console.error(`Failed to export ${L.footer} to Excel:`, err);
+      exportProformaToCsvFallback(proforma, L);
       return false;
     }
   }
 
   /**
-   * CSV fallback for Proforma export
+   * CSV fallback for Proforma export (also Sales Order / Delivery Challan via `labels`)
    */
-  function exportProformaToCsvFallback(proforma) {
+  function exportProformaToCsvFallback(proforma, labels) {
+    const L = Object.assign({ noLabel: 'Proforma #', filePrefix: 'Proforma' }, labels || {});
     try {
       const rows = [
-        ['Proforma #', proforma.proformaNo || ''],
+        [L.noLabel, proforma.proformaNo || ''],
         ['Date', proforma.date || ''],
         ['Due Date', proforma.dueDate || proforma.expiryDate || ''],
         ['Customer', proforma.customerName || ''],
@@ -2378,8 +2384,8 @@
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      const pNum = (proforma.proformaNo || 'Proforma').replace(/[^a-zA-Z0-9_-]/g, '_');
-      link.download = `Proforma_${pNum}.csv`;
+      const pNum = (proforma.proformaNo || L.filePrefix).replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `${L.filePrefix}_${pNum}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

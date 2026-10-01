@@ -33,8 +33,41 @@
     return window.KYA_STORE.suppliers;
   }
 
+  // Everyone a sales document can be raised for: the customer master plus ledgers created
+  // under Trade Receivables (same list the Sales Invoice offers). Names already in the
+  // master are not repeated, and the Trade Receivables control ledger itself is left out.
+  function getKyaCustomerParties() {
+    const parties = getKyaCustomers().slice();
+    const seen = new Set(parties.map(c => (c.name || '').trim().toLowerCase()));
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      coaLedgers.forEach(l => {
+        const key = (l.name || '').trim().toLowerCase();
+        if (l.type !== 'ledger' || l.sgId !== 'sg-tr' || !key || key === 'trade receivables' || seen.has(key)) return;
+        seen.add(key);
+        parties.push(l);
+      });
+    }
+    return parties;
+  }
+
+  // A party that exists only as a Trade Receivables ledger (not in Master Desk → Customers)
+  function isKyaLedgerParty(party) {
+    return !!party && party.type === 'ledger' && party.sgId === 'sg-tr';
+  }
+
+  // Heading that splits a party dropdown into its Customers and Ledgers sections
+  function createKyaPartySectionHeader(label) {
+    const header = document.createElement('div');
+    header.textContent = label;
+    header.style.cssText = 'padding: 8px 12px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--slate-400); cursor: default;';
+    return header;
+  }
+
   window.getKyaCustomers = getKyaCustomers;
+  window.isKyaLedgerParty = isKyaLedgerParty;
+  window.createKyaPartySectionHeader = createKyaPartySectionHeader;
   window.getKyaSuppliers = getKyaSuppliers;
+  window.getKyaCustomerParties = getKyaCustomerParties;
 
   /* ======================
      LANDING → APP
@@ -1016,8 +1049,9 @@
         if (typeof salesRows !== 'undefined' && salesRows.length === 0 && typeof initSalesForm === 'function') {
           initSalesForm();
         } else {
-          if (typeof populateSalesCustomers === 'function') populateSalesCustomers();
-          if (typeof populateSalesExecutives === 'function') populateSalesExecutives();
+          // Refresh the lists but keep what the form already holds (e.g. a converted Pre Invoice)
+          if (typeof populateSalesCustomers === 'function') populateSalesCustomers(document.getElementById('salesCustomer')?.value || null);
+          if (typeof populateSalesExecutives === 'function') populateSalesExecutives(document.getElementById('salesExecutive')?.value || null);
         }
         if (typeof window.checkAndRestorePendingJournalState === 'function') {
           window.checkAndRestorePendingJournalState();

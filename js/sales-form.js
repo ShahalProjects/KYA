@@ -79,6 +79,9 @@
     let _highlightIdx = -1;
     let _open         = false;
     let _activeFilter = 'all';
+    // Set per open(): a voucher that moves goods only (Delivery Challan) lists stock items alone
+    let _productsOnly = false;
+    function _filter() { return _productsOnly ? 'product' : _activeFilter; }
 
     function _items() { return el.querySelectorAll('.je-drop-item'); }
 
@@ -185,8 +188,8 @@
     };
 
     function _renderCreateOptions(rawQuery) {
-      const showProduct = _activeFilter !== 'service' && typeof window.openMasterDeskCreateStockItem === 'function';
-      const showService = _activeFilter !== 'product' && typeof window.openMasterDeskCreateLedger === 'function';
+      const showProduct = _filter() !== 'service' && typeof window.openMasterDeskCreateStockItem === 'function';
+      const showService = _filter() !== 'product' && typeof window.openMasterDeskCreateLedger === 'function';
       if (!showProduct && !showService) return;
 
       const wrap = document.createElement('div');
@@ -224,9 +227,10 @@
       el.appendChild(wrap);
     }
 
-    function open(inp, query, onSelect) {
+    function open(inp, query, onSelect, opts) {
       _activeInp    = inp;
       _activeCb     = onSelect;
+      _productsOnly = !!(opts && opts.productsOnly);
       _highlightIdx = -1;
       _position(inp);
       _renderPortalList(query);
@@ -272,10 +276,10 @@
         btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
         filterBar.appendChild(btn);
       });
-      el.appendChild(filterBar);
+      if (!_productsOnly) el.appendChild(filterBar);
 
-      let products = _activeFilter === 'service' ? [] : getProductsList();
-      let services = _activeFilter === 'product' ? [] : getServicesList();
+      let products = _filter() === 'service' ? [] : getProductsList();
+      let services = _filter() === 'product' ? [] : getServicesList();
 
       if (q) {
         products = products.filter(p =>
@@ -306,7 +310,7 @@
             <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
             <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
-          <span class="je-drop-empty-txt">No stock item or service found</span>
+          <span class="je-drop-empty-txt">${_productsOnly ? 'No stock item found' : 'No stock item or service found'}</span>
           <span class="je-drop-empty-sub">Create one below, or type a description directly</span>
         `;
         el.appendChild(emptyDiv);
@@ -952,16 +956,18 @@
         el.appendChild(emptyDiv);
       }
 
-      // Typed text that isn't a master unit: offer to create it, or use it as typed
-      if (raw && !findMasterUnit(raw)) {
+      // Create new always sits at the bottom; typed text that isn't a master unit can
+      // also be created under that name, or used as typed
+      const unknown = !!raw && !findMasterUnit(raw);
+      if (unknown || typeof window.openMasterDeskCreateUnit === 'function') {
         const wrap = document.createElement('div');
         wrap.style.cssText = `
           position: sticky; bottom: 0; z-index: 10; background: #ffffff;
           border-top: 1px solid #e2e8f0; padding: 8px 10px 10px; border-radius: 0 0 12px 12px;
         `;
         const note = document.createElement('div');
-        note.style.cssText = 'font-size: 11px; font-weight: 600; color: #b45309; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-        note.textContent = `"${raw}" is not in the Unit master`;
+        note.style.cssText = `font-size: 11px; font-weight: 600; color: ${unknown ? '#b45309' : '#64748b'}; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`;
+        note.textContent = unknown ? `"${raw}" is not in the Unit master` : 'Create new';
         wrap.appendChild(note);
 
         const btnRow = document.createElement('div');
@@ -979,13 +985,15 @@
           btnRow.appendChild(btn);
         };
         if (typeof window.openMasterDeskCreateUnit === 'function') {
-          addBtn('Create Unit', () => _startCreate(raw), true);
+          addBtn(unknown ? 'Create Unit' : 'Unit', () => _startCreate(unknown ? raw : ''), true);
         }
-        addBtn('Use as typed', () => {
-          const inp = _activeInp;
-          close();
-          markVoucherRowUnit(inp);
-        }, false);
+        if (unknown) {
+          addBtn('Use as typed', () => {
+            const inp = _activeInp;
+            close();
+            markVoucherRowUnit(inp);
+          }, false);
+        }
         wrap.appendChild(btnRow);
         el.appendChild(wrap);
       }
@@ -1503,6 +1511,16 @@
 
   window.onPartyCreatedForSales = function(newParty, partySource) {
     if (!newParty) return;
+    // Started from a Pre Invoice form's customer box: hand the new party to that form
+    const target = window._salesPartyCreateTarget;
+    window._salesPartyCreateTarget = null;
+    if (target && typeof target.onCreated === 'function') {
+      setTimeout(() => {
+        target.onCreated(newParty);
+        showToast(`${partySource === 'ledger' ? 'Ledger' : 'Customer'} "${newParty.name}" selected.`, 'success');
+      }, 60);
+      return;
+    }
     populateSalesCustomers(newParty.id);
     setTimeout(() => {
       const custSelect = document.getElementById('salesCustomer');
@@ -1517,6 +1535,12 @@
   };
 
   window.onPartyCreationCancelledForSales = function(initialName) {
+    const target = window._salesPartyCreateTarget;
+    window._salesPartyCreateTarget = null;
+    if (target && typeof target.onCancelled === 'function') {
+      setTimeout(() => target.onCancelled(initialName), 60);
+      return;
+    }
     setTimeout(() => {
       const dropdown = document.getElementById('salesCustomerSelectDropdown');
       const searchInput = document.getElementById('salesCustomerSelectSearch');
@@ -2729,10 +2753,11 @@
         const currentVal = parseFloat(payAmtEl.value) || 0;
         if (currentVal > maxVal) {
           payAmtEl.value = maxVal.toFixed(2);
-          showToast(`Payment Amount adjusted to ₹${fmtNum(maxVal)} to not exceed the Grand Total.`, 'warning');
+          showToast(getSalesPaymentLimitMessage(maxVal, total, true), 'warning');
         }
       }
     }
+    if (typeof updateSalesAdvanceInfo === 'function') updateSalesAdvanceInfo(total);
     
     // Show/hide Refund Info Message banner
     const refundInfoEl = document.getElementById('salesRefundInfoMessage');
@@ -2792,8 +2817,10 @@
     deactiveBtn(returnBtn);
 
     if (quoteListCard) quoteListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (quoteCard) quoteCard.style.display = 'none';
     if (proformaListCard) proformaListCard.style.display = 'none';
+    if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
     if (proformaCard) proformaCard.style.display = 'none';
     if (orderCard) orderCard.style.display = 'none';
     if (challanCard) challanCard.style.display = 'none';
@@ -2843,6 +2870,8 @@
         }
       }
     }
+    // Pre Invoice No. box: invoices only, showing any linked pre-invoice
+    if (typeof window.refreshSalesPreInvoicePicker === 'function') window.refreshSalesPreInvoicePicker();
   }
 
   function refreshSalesInvoiceDropdownOptions(filter = '') {
@@ -3010,6 +3039,9 @@
   function initSalesForm() {
     window._pendingConvertQuotationId = null;
     window._pendingConvertProformaId = null;
+    window._pendingConvertSalesOrderId = null;
+    window._pendingConvertDeliveryChallanId = null;
+    window._pendingConvertProformaAdvance = null;
     window._salesPartyOverride = null;
     updateVoucherSubtypeUI();
     // Local date — toISOString() is UTC and gives yesterday before 05:30 IST

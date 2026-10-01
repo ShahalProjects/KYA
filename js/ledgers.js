@@ -581,10 +581,28 @@
       if (v.journalEntryId) salesJournalEntryIds.add(String(v.journalEntryId));
       if (v.tdsJournalEntryId) salesJournalEntryIds.add(String(v.tdsJournalEntryId));
       if (v.paymentJournalEntryId) salesJournalEntryIds.add(String(v.paymentJournalEntryId));
+      if (v.advanceRefundJournalEntryId) salesJournalEntryIds.add(String(v.advanceRefundJournalEntryId));
       if (Array.isArray(v.refundJournalEntryIds)) {
         v.refundJournalEntryIds.forEach(id => salesJournalEntryIds.add(String(id)));
       }
     });
+
+    // A proforma advance is posted Cash/Bank Dr → Advance from Customers Cr, so it never
+    // names the customer. It was still received from this customer, so the statement lists
+    // it as well (Trade Receivables and the trial balance are untouched — no double count).
+    const custNameLower = customer.name.toLowerCase();
+    const proformas = (window.KYA_STORE && Array.isArray(window.KYA_STORE.proformaInvoices)) ? window.KYA_STORE.proformaInvoices : [];
+    const advanceEntryIds = new Set(postedEntries.filter(entry => {
+      if (!entry || entry.jeType !== 'advance_receipt') return false;
+      if (entry.customerId || entry.customerName) {
+        return String(entry.customerId) === String(customer.id) || (entry.customerName || '').toLowerCase() === custNameLower;
+      }
+      // Entries posted before they carried the customer: go through the proforma
+      const prof = proformas.find(p => String(p.id) === String(entry.proformaId));
+      return prof
+        ? (String(prof.customerId) === String(customer.id) || (prof.customerName || '').toLowerCase() === custNameLower)
+        : (entry.narration || '').toLowerCase().includes(custNameLower);
+    }).map(entry => String(entry.id)));
 
     vouchers.forEach(v => {
       if (v.isDraft) return;
@@ -643,10 +661,21 @@
             : invoiceTotal)
           : (parseFloat(v.paymentAmount) || 0);
 
+        // Part of the payment may be the proforma advance, which the statement already
+        // shows on the proforma's date — only the balance is a fresh receipt.
+        const prof = v.convertedFromProformaId
+          ? proformas.find(p => String(p.id) === String(v.convertedFromProformaId))
+          : null;
+        const advJEId = (prof && prof.advanceJournalEntryId) || v.advanceJournalEntryId;
+        const advAdjusted = (advJEId && advanceEntryIds.has(String(advJEId)))
+          ? Math.min(parseFloat(prof ? prof.advancePaidAmount : v.advancePaidAmount) || 0, paid)
+          : 0;
+        const received = paid - advAdjusted;
+
         if (dateFrom && vDate < dateFrom) {
           preInvoiced += grossAmount;
           if (tdsAmt > 0) preReceived += tdsAmt;
-          if (paid > 0) preReceived += paid;
+          if (received > 0) preReceived += received;
         } else if ((!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo)) {
           periodInvoiced += grossAmount;
           transactions.push({
@@ -697,7 +726,7 @@
             });
           }
           if (paid > 0) {
-            periodReceived += paid;
+            periodReceived += received;
             const payEntry = v.paymentJournalEntryId && (typeof postedEntries !== 'undefined')
               ? postedEntries.find(e => String(e.id) === String(v.paymentJournalEntryId))
               : null;
@@ -724,13 +753,35 @@
               v.paymentVoucherNo = payVoucherNo;
             }
 
+            if (received > 0) {
+              transactions.push({
+                id: v.paymentJournalEntryId || v.id,
+                date: vDate,
+                voucherNo: payVoucherNo,
+                particulars: 'Payment Received',
+                debit: 0,
+                credit: received,
+                isSales: true
+              });
+            }
+          }
+        }
+
+        // Advance above the invoice value paid back to the customer (the part not refunded
+        // stays as a credit here — it is owed to them, held in Refund Payable)
+        const advRefunded = (v.advanceRefund && v.advanceRefundJournalEntryId) ? (parseFloat(v.advanceRefund.amount) || 0) : 0;
+        if (advRefunded > 0) {
+          if (dateFrom && vDate < dateFrom) {
+            preInvoiced += advRefunded;
+          } else if ((!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo)) {
+            periodInvoiced += advRefunded;
             transactions.push({
-              id: v.paymentJournalEntryId || v.id,
+              id: v.advanceRefundJournalEntryId,
               date: vDate,
-              voucherNo: payVoucherNo,
-              particulars: 'Payment Received',
-              debit: 0,
-              credit: paid,
+              voucherNo: v.advanceRefundVoucherNo || '',
+              particulars: 'Advance Refunded',
+              debit: advRefunded,
+              credit: 0,
               isSales: true
             });
           }
@@ -740,6 +791,25 @@
 
     postedEntries.forEach(entry => {
       if (!entry) return;
+      if (advanceEntryIds.has(String(entry.id))) {
+        const advAmt = (entry.allRows || []).reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
+        if (advAmt <= 0) return;
+        if (dateFrom && entry.date < dateFrom) {
+          preReceived += advAmt;
+        } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
+          periodReceived += advAmt;
+          transactions.push({
+            id: entry.id,
+            date: entry.date,
+            voucherNo: entry.voucherNo || 'JE-' + entry.id,
+            particulars: (entry.sourceDocNo || entry.proformaNo) ? `Advance Received (${entry.sourceDocNo || entry.proformaNo})` : 'Advance Received',
+            debit: 0,
+            credit: advAmt,
+            isJournal: true
+          });
+        }
+        return;
+      }
       // Skip entries originating from Sales Module or linked to sales vouchers
       if (entry.preparedBy === 'Sales Module') return;
       if (entry.jeType === 'invoice' || entry.jeType === 'tds' || entry.jeType === 'payment') return;

@@ -136,6 +136,9 @@
           if (invoice.paymentJournalEntryId) {
             postedEntries = postedEntries.filter(e => e.id !== invoice.paymentJournalEntryId);
           }
+          if (invoice.advanceRefundJournalEntryId) {
+            postedEntries = postedEntries.filter(e => String(e.id) !== String(invoice.advanceRefundJournalEntryId));
+          }
           if (invoice.refundJournalEntryIds && Array.isArray(invoice.refundJournalEntryIds)) {
             postedEntries = postedEntries.filter(e => !invoice.refundJournalEntryIds.includes(e.id));
           }

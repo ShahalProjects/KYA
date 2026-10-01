@@ -2680,6 +2680,20 @@
                 </div>
               </div>
             </div>
+            <!-- Pre Invoice No.: pick an active Quotation / Proforma / Sales Order / Delivery Challan to bill (sales-preinvoice-picker.js) -->
+            <div class="je-field" id="salesPreInvoiceField">
+              <label for="salesPreInvoiceSelectTrigger">Pre Invoice No.</label>
+              <div class="kya-searchable-select-wrap" id="salesPreInvoiceSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="salesPreInvoiceSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-500); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04);">
+                  <span id="salesPreInvoiceSelectTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">&mdash; Select &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px; flex-shrink: 0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="salesPreInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 100%; width: 340px; max-width: 90vw; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 300px; overflow-y: auto; flex-direction: column; gap: 4px; box-sizing: border-box;">
+                  <input type="text" id="salesPreInvoiceSelectSearch" placeholder="Search no., customer, item..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; height: auto; box-sizing: border-box;" />
+                  <div id="salesPreInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
             <div class="je-field" id="salesCustomerWrap">
               <label for="salesCustomer">Customer *</label>
               <select id="salesCustomer" class="je-input" aria-label="Customer Selection" style="display: none;">
@@ -2761,7 +2775,7 @@
             <!-- Left side notes & Payment details -->
             <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
               <!-- Payment Status Sliding selector -->
-              <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+              <div id="salesPaymentBox" style="position: relative; background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
                 <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
                   <label id="salesPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment Status</label>
                   <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
@@ -2771,6 +2785,8 @@
                     <button class="sales-paystatus-btn" id="salesPaymentStatusPartial" type="button">Partial Payment</button>
                   </div>
                   <div id="salesRefundInfoMessage" style="display: none; margin-top: 8px; padding: 10px 12px; background: var(--emerald-50); border: 1.5px solid var(--emerald-100); border-radius: 8px; color: var(--emerald-800); font-size: 12.5px; font-weight: 600; line-height: 1.4;"></div>
+                  <!-- Advance carried in from a Pre Invoice: advance received and balance due, shown while hovering the payment box (sales-helpers.js) -->
+                  <div id="salesAdvanceInfo" role="tooltip" style="display: none; position: absolute; left: 14px; right: 14px; bottom: calc(100% + 6px); z-index: 50; padding: 9px 12px; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; box-shadow: 0 8px 20px -6px rgba(15,23,42,0.25); color: #1e3a8a; font-size: 12.5px; font-weight: 600; line-height: 1.45;"></div>
                 </div>
                 
                 <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
@@ -3069,14 +3085,14 @@
                 </svg>
                 <span>Proforma Invoice</span>
               </button>
-              <button type="button" class="btn" onclick="openSalesOrderForm()" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+              <button type="button" class="btn" onclick="openSalesOrderList('all')" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
                   <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
                   <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                 </svg>
                 <span>Sales Order</span>
               </button>
-              <button type="button" class="btn" onclick="openDeliveryChallanForm()" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+              <button type="button" class="btn" onclick="openDeliveryChallanList('all')" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
                   <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.5"/>
                   <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
@@ -3356,12 +3372,6 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage provisional commercial invoices and advance billing</div>
               </div>
             </div>
-            <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">
-              <button type="button" class="btn" id="btnProformaListNewTop" onclick="openProformaForm(null, 'proformalist')" style="background: #fff; color: var(--blue-700); font-weight: 700; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); transition: transform 0.15s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                New Proforma
-              </button>
-            </div>
           </div>
 
           <!-- Navigation row between header and content -->
@@ -3383,14 +3393,14 @@
                 </svg>
                 <span>Quotation</span>
               </button>
-              <button type="button" class="btn" onclick="openSalesOrderForm()" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+              <button type="button" class="btn" onclick="openSalesOrderList('all')" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
                   <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
                   <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                 </svg>
                 <span>Sales Order</span>
               </button>
-              <button type="button" class="btn" onclick="openDeliveryChallanForm()" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+              <button type="button" class="btn" onclick="openDeliveryChallanList('all')" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
                   <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.5"/>
                   <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
@@ -3730,6 +3740,94 @@
 
         </div><!-- /#salesProformaFormCard -->
 
+        <!-- SALES ORDER LIST CARD (same layout as the Quotation list; filled by preinvoice-list.js) -->
+        <div class="table-card" id="salesOrderListCard" style="display: none; padding: 24px 28px;">
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 20 20" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Sales Order</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage confirmed customer orders for fulfillment</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn" onclick="closeSalesOrderList()" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                <span>Back to Pre Invoice</span>
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn" onclick="openQuotationList('all')" title="Open Quotation" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span>Quotation</span>
+              </button>
+              <button type="button" class="btn" onclick="openProformaList('all')" title="Open Proforma Invoice" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span>Proforma Invoice</span>
+              </button>
+              <button type="button" class="btn" onclick="openDeliveryChallanList('all')" title="Open Delivery Challan" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.5"/><path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                <span>Delivery Challan</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="orderListFullContentArea"></div>
+        </div><!-- /#salesOrderListCard -->
+
+        <!-- DELIVERY CHALLAN LIST CARD (same layout as the Quotation list; filled by preinvoice-list.js) -->
+        <div class="table-card" id="salesDeliveryChallanListCard" style="display: none; padding: 24px 28px;">
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 20 20" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <path d="M1 4h11v9H1z" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M12 7h4l3 3v3h-7V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <circle cx="4.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                  <circle cx="15.5" cy="15.5" r="1.5" stroke="currentColor" stroke-width="1.6"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Delivery Challan</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage dispatch challans for goods in transit</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn" onclick="closeDeliveryChallanList()" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                <span>Back to Pre Invoice</span>
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn" onclick="openQuotationList('all')" title="Open Quotation" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span>Quotation</span>
+              </button>
+              <button type="button" class="btn" onclick="openProformaList('all')" title="Open Proforma Invoice" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 7h4M8 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span>Proforma Invoice</span>
+              </button>
+              <button type="button" class="btn" onclick="openSalesOrderList('all')" title="Open Sales Order" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span>Sales Order</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="challanListFullContentArea"></div>
+        </div><!-- /#salesDeliveryChallanListCard -->
+
         <!-- SALES ORDER FORM CARD (Full Screen with Back Button) -->
         <div class="je-form-card" id="salesOrderFormCard" style="display: none;">
           <!-- Colored header strip -->
@@ -3878,33 +3976,28 @@
           <div class="sales-totals-grid">
             <!-- Left side Notes & Payment details -->
             <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
-              <!-- Payment Status Sliding selector -->
+              <!-- Advance Payment -->
               <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
                 <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
-                  <label id="orderPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment / Advance Status</label>
-                  <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
-                    <div class="sales-paystatus-bg notpaid-active" id="orderPaymentStatusBg"></div>
-                    <button class="sales-paystatus-btn active" id="orderPaymentStatusNotPaid" type="button">Not Paid</button>
-                    <button class="sales-paystatus-btn" id="orderPaymentStatusFull" type="button">Full Payment</button>
-                    <button class="sales-paystatus-btn" id="orderPaymentStatusPartial" type="button">Partial Payment</button>
-                  </div>
+                  <label id="orderPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Advance Payment</label>
                 </div>
-                
-                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
-                  <div id="orderDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+
+                <div style="display: flex; gap: 10px; align-items: flex-start; width: 100%;">
+                  <div id="orderDueDateField" style="flex: 0 0 158px; display: flex; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
-                    <div id="orderDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                      <input type="date" id="orderDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                    <div id="orderDueDateWrapper" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%;">
+                      <input type="date" id="orderDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 100%;" aria-label="Due date" />
                       <span id="orderDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
                     </div>
                   </div>
-                  <div id="orderPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
-                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
-                    <select id="orderPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
+                  <div id="orderPaymentAmountField" style="display: flex; flex: 1.2; min-width: 0; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Advance Amount</label>
+                    <input type="number" id="orderPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 100%;" />
                   </div>
-                  <div id="orderPaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
-                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
-                    <input type="number" id="orderPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
+                  <div id="orderPaymentAccountField" style="display: flex; flex: 1.6; min-width: 0; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
+                    <select id="orderPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%;"></select>
+                    <button type="button" id="orderMultiPaymentSummary" title="Edit the multi payment split" style="display: none; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 5px 9px; background: var(--slate-50); border: 1.5px solid var(--slate-200); border-radius: 8px; font-size: 11.5px; font-weight: 700; color: var(--slate-600); cursor: pointer; text-align: left;"></button>
                   </div>
                 </div>
               </div>
@@ -4127,11 +4220,11 @@
             <div class="je-field" id="challanCustomerWrap">
               <label for="challanCustomer">Customer / Consignee *</label>
               <select id="challanCustomer" class="je-input" aria-label="Customer Selection" style="display: none;">
-                <option value="">&mdash; Select Customer / Consignee &mdash;</option>
+                <option value="">&mdash; Select &mdash;</option>
               </select>
               <div class="kya-searchable-select-wrap" id="challanCustomerSelectWrap" style="position: relative; width: 100%;">
                 <div class="kya-searchable-select-trigger" id="challanCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
-                  <span id="challanCustomerSelectTriggerText">&mdash; Select Customer / Consignee &mdash;</span>
+                  <span id="challanCustomerSelectTriggerText">&mdash; Select &mdash;</span>
                   <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
                 <div class="kya-searchable-select-dropdown" id="challanCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
@@ -4155,7 +4248,7 @@
             <div class="je-field">
               <label for="challanSalesExecutive">Dispatched By / Executive</label>
               <select id="challanSalesExecutive" class="je-input" aria-label="Sales Executive Selection">
-                <option value="">&mdash; Select Dispatched By &mdash;</option>
+                <option value="">&mdash; Select &mdash;</option>
               </select>
             </div>
           </div>
@@ -4199,33 +4292,28 @@
           <div class="sales-totals-grid">
             <!-- Left side Notes & Payment details -->
             <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
-              <!-- Payment / Dispatch Status Sliding selector -->
+              <!-- Advance Payment -->
               <div style="background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
                 <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
-                  <label id="challanPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment / Dispatch Status</label>
-                  <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
-                    <div class="sales-paystatus-bg notpaid-active" id="challanPaymentStatusBg"></div>
-                    <button class="sales-paystatus-btn active" id="challanPaymentStatusNotPaid" type="button">Not Paid</button>
-                    <button class="sales-paystatus-btn" id="challanPaymentStatusFull" type="button">Full Payment</button>
-                    <button class="sales-paystatus-btn" id="challanPaymentStatusPartial" type="button">Partial Payment</button>
-                  </div>
+                  <label id="challanPaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Advance Payment</label>
                 </div>
-                
-                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
-                  <div id="challanDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+
+                <div style="display: flex; gap: 10px; align-items: flex-start; width: 100%;">
+                  <div id="challanDueDateField" style="flex: 0 0 158px; display: flex; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
-                    <div id="challanDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                      <input type="date" id="challanDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                    <div id="challanDueDateWrapper" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%;">
+                      <input type="date" id="challanDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 100%;" aria-label="Due date" />
                       <span id="challanDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
                     </div>
                   </div>
-                  <div id="challanPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
-                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
-                    <select id="challanPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
+                  <div id="challanPaymentAmountField" style="display: flex; flex: 1.2; min-width: 0; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Advance Amount</label>
+                    <input type="number" id="challanPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 100%;" />
                   </div>
-                  <div id="challanPaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
-                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
-                    <input type="number" id="challanPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
+                  <div id="challanPaymentAccountField" style="display: flex; flex: 1.6; min-width: 0; flex-direction: column; gap: 4px;">
+                    <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
+                    <select id="challanPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%;"></select>
+                    <button type="button" id="challanMultiPaymentSummary" title="Edit the multi payment split" style="display: none; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 5px 9px; background: var(--slate-50); border: 1.5px solid var(--slate-200); border-radius: 8px; font-size: 11.5px; font-weight: 700; color: var(--slate-600); cursor: pointer; text-align: left;"></button>
                   </div>
                 </div>
               </div>
@@ -4702,14 +4790,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-<script src="js/exportPdf.js?v=20260905_2"></script>
-<script src="js/exportExcel.js?v=20260905_2"></script>
-<script src="js/app-shell.js?v=20260825_1"></script>
+<script src="js/exportPdf.js?v=20261001_1"></script>
+<script src="js/exportExcel.js?v=20261001_1"></script>
+<script src="js/app-shell.js?v=20261001_4"></script>
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
 <script src="js/master-desk.js?v=20260926_9"></script>
 <script src="js/journal.js?v=20260905_1"></script>
-<script src="js/coa.js?v=20260929_1"></script>
+<script src="js/coa.js?v=20261001_15"></script>
 <script src="js/reports.js"></script>
 <script src="js/stock-hub.js"></script>
 <script src="js/reports-hub.js"></script>
@@ -4720,20 +4808,22 @@
 <script src="js/onehub-reminders-core.js"></script>
 <script src="js/onehub-reminders-view.js"></script>
 <script src="js/vault-core.js"></script>
-<script src="js/ledgers.js"></script>
+<script src="js/ledgers.js?v=20261001_11"></script>
 <script src="js/vault-settings.js?v=20260929_1"></script>
 <script src="js/kya-datepicker.js?v=20260927_3"></script>
-<script src="js/sales-form.js?v=20260927_1"></script>
-<script src="js/sales-posting.js?v=20260929_1"></script>
-<script src="js/sales-helpers.js?v=20260902_4"></script>
-<script src="js/sales-records.js?v=20260905_1"></script>
-<script src="js/sales-print-events.js?v=20260927_1"></script>
+<script src="js/sales-form.js?v=20261001_13"></script>
+<script src="js/sales-posting.js?v=20261001_12"></script>
+<script src="js/sales-helpers.js?v=20261001_15"></script>
+<script src="js/sales-records.js?v=20261001_11"></script>
+<script src="js/sales-print-events.js?v=20261001_11"></script>
 <script src="js/sales-invoice-print.js?v=20260918_6"></script>
 <script src="js/sales-invoice-export.js?v=20260918_21"></script>
-<script src="js/quotation.js?v=20260926_9"></script>
-<script src="js/proforma.js?v=20260926_9"></script>
-<script src="js/sales-order.js?v=20260926_9"></script>
-<script src="js/delivery-challan.js?v=20260926_9"></script>
+<script src="js/quotation.js?v=20261001_15"></script>
+<script src="js/proforma.js?v=20261001_15"></script>
+<script src="js/preinvoice-list.js?v=20261001_8"></script>
+<script src="js/sales-order.js?v=20261001_15"></script>
+<script src="js/delivery-challan.js?v=20261001_15"></script>
+<script src="js/sales-preinvoice-picker.js?v=20261001_3"></script>
 <script src="js/purchase-form.js?v=20260830_2"></script>
 <script src="js/company-profile.js?v=20260912_2"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>
