@@ -126,10 +126,12 @@
 
   // ── Initialize Quotation Form ──
   function initQuotationForm(quoteData) {
-    const today = new Date().toISOString().split('T')[0];
+    // The party edit saved with this document (none for a new one)
+    if (typeof setPartyOverride === 'function') setPartyOverride('quote', (quoteData && quoteData.partyOverride) ? JSON.parse(JSON.stringify(quoteData.partyOverride)) : null);
+    const today = kyaLocalIso();
     const expiryDateObj = new Date();
     expiryDateObj.setDate(expiryDateObj.getDate() + 30);
-    const expiryDate = expiryDateObj.toISOString().split('T')[0];
+    const expiryDate = kyaLocalIso(expiryDateObj);
 
     const dateEl = document.getElementById('quoteDate');
     const expiryEl = document.getElementById('quoteExpiryDate');
@@ -225,14 +227,13 @@
 
     renderQuoteRows();
     recalculateQuoteTotals();
+    if (typeof validateDocNoField === 'function') validateDocNoField('quotation'); // clear an old "already used" line
   }
 
+  // Next free number from the quotation number format (prefix / start / digits — the
+  // pencil in the number box), skipping numbers already used; see doc-numbering.js
   function getNextQuoteNumber() {
-    const list = window.KYA_STORE.quotations || [];
-    const count = list.length + 1;
-    const year = new Date().getFullYear();
-    const pad = count < 10 ? '00' + count : (count < 100 ? '0' + count : count);
-    return `QT-${year}-${pad}`;
+    return getNextDocNo('quotation');
   }
 
   // ── Customer Search & Selection ──
@@ -295,6 +296,8 @@
         <span style="font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">Select</span>
       `;
 
+      // Hovering a party shows its details, as in the Sales Invoice list
+      if (typeof bindPartyListItemPreview === 'function') bindPartyListItemPreview(item, c, 'Customer');
       item.addEventListener('click', () => {
         selectQuoteCustomer(c.id);
         const dropdown = document.getElementById('quoteCustomerSelectDropdown');
@@ -339,6 +342,13 @@
         supplyTypeEl.value = isInterstate ? 'Inter-State (IGST)' : 'Intra-State (CGST + SGST)';
       }
     }
+    // A name changed for this document only (Customer Details → Temporary In-Voucher Edit);
+    // an edit made for another party doesn't carry over
+    const partyEdit = typeof getPartyOverride === 'function' ? getPartyOverride('quote') : null;
+    if (partyEdit && customerId && String(partyEdit.partyId) !== String(customerId)) setPartyOverride('quote', null);
+    else if (cust && partyEdit && partyEdit.isOverridden && partyEdit.name && triggerText) triggerText.textContent = partyEdit.name;
+    // Alter pencil in the Customer box, as on the Sales Invoice
+    if (typeof refreshPreInvoiceCustomerAlterPencil === 'function') refreshPreInvoiceCustomerAlterPencil('quote');
   }
 
   function isQuoteInterstate(partyState) {
@@ -742,7 +752,7 @@
 
   // ── Save / Post Quotation ──
   function getQuotationFormData() {
-    const date = document.getElementById('quoteDate')?.value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('quoteDate')?.value || kyaLocalIso();
     const expiryDate = document.getElementById('quoteExpiryDate')?.value || '';
     const quoteNo = document.getElementById('quoteNo')?.value?.trim() || getNextQuoteNumber();
     const customerId = document.getElementById('quoteCustomer')?.value || '';
@@ -799,6 +809,8 @@
       expiryDate,
       customerId,
       customerName,
+      // Customer details changed for this document only (Customer Details card)
+      partyOverride: typeof getPartyOverrideToSave === 'function' ? getPartyOverrideToSave('quote', customerId) : null,
       supplyType,
       salesExecutiveId,
       salesExecutiveName,
@@ -840,6 +852,9 @@
       return;
     }
 
+    // A number already used can't be issued again (the quotation being edited keeps its own)
+    if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('quotation', data.quoteNo, data.id)) return;
+
     window.KYA_STORE.quotations = window.KYA_STORE.quotations || [];
     window.KYA_STORE.quotationsDrafts = window.KYA_STORE.quotationsDrafts || [];
 
@@ -863,6 +878,8 @@
 
       // Remove from drafts if existed
       window.KYA_STORE.quotationsDrafts = window.KYA_STORE.quotationsDrafts.filter(d => d.id !== data.id);
+      // Saved: the number is used for good, even if the quotation is deleted later
+      if (typeof registerDocNo === 'function') registerDocNo('quotation', data.quoteNo);
 
       showToast(`Quotation ${data.quoteNo} saved successfully!`, 'success');
     }
@@ -937,10 +954,16 @@
     const chipEl = document.getElementById('quoteChipDisplay');
     if (quoteNoEl && chipEl) {
       quoteNoEl.addEventListener('input', () => {
-        chipEl.textContent = quoteNoEl.value.trim() || 'QT-2026-001';
+        chipEl.textContent = quoteNoEl.value.trim() || quoteNoEl.placeholder;
       });
     }
+    // Pencil (number format) and the "already used" check, as on the Sales Invoice
+    if (typeof wireDocNumberField === 'function') wireDocNumberField('quotation', () => (_editingQuote ? _editingQuote.id : null));
 
+    // Customer box pencil → Master Desk Alter, as on the Sales Invoice
+    if (typeof wirePreInvoiceCustomerAlterPencil === 'function') wirePreInvoiceCustomerAlterPencil('quote', populateQuoteCustomers, selectQuoteCustomer);
+    // Customer Details card (hover the box): Temporary In-Voucher Edit, as on the Sales Invoice
+    if (typeof attachPartyDetailsCard === 'function') attachPartyDetailsCard({ context: 'quote', triggerId: 'quoteCustomerSelectTrigger', triggerTextId: 'quoteCustomerSelectTriggerText', selectId: 'quoteCustomer', dropdownId: 'quoteCustomerSelectDropdown' });
     // Customer Searchable Select
     const custTrigger = document.getElementById('quoteCustomerSelectTrigger');
     const custDropdown = document.getElementById('quoteCustomerSelectDropdown');
@@ -1193,6 +1216,7 @@
   // ══════════════════════════════════════════════════════════════════
 
   function getAllQuotations() {
+    if (typeof window.healPreInvoiceReversals === 'function') window.healPreInvoiceReversals();
     window.KYA_STORE = window.KYA_STORE || {};
     const posted = window.KYA_STORE.quotations || [];
     const drafts = window.KYA_STORE.quotationsDrafts || [];
@@ -1232,6 +1256,7 @@
       showToast('Quotation not found.', 'error');
       return;
     }
+    if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(quote, `Quotation ${quote.quoteNo || ''}`)) return;
 
     if (quote.status === 'Completed' && newStatus === 'Active') {
       showToast('Completed quotations cannot be reopened.', 'warning');
@@ -1267,6 +1292,7 @@
                   window.KYA_STORE.quotationsDrafts.find(d => String(d.id) === String(id));
 
     const qNo = quote ? (quote.quoteNo || 'quotation') : 'quotation';
+    if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(quote, `Quotation ${qNo}`)) return;
 
     if (quote && quote.status === 'Completed') {
       showToast('Completed quotations cannot be deleted.', 'warning');
@@ -1306,6 +1332,7 @@
       showToast('Completed quotations cannot be edited.', 'warning');
       return;
     }
+    if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(quote, `Quotation ${quote.quoteNo || ''}`)) return;
     openQuotationForm(quote, 'quotelist');
   }
 
@@ -1324,8 +1351,8 @@
       id: Date.now(),
       customerId: quote.customerId,
       customerName: quote.customerName,
-      date: new Date().toISOString().split('T')[0],
-      dueDate: quote.expiryDate || new Date().toISOString().split('T')[0],
+      date: kyaLocalIso(),
+      dueDate: quote.expiryDate || kyaLocalIso(),
       invoiceNo: nextInvNo,
       salesSupplyType: quote.supplyType || 'Intra-State (CGST + SGST)',
       salesExecutiveId: quote.salesExecutiveId || '',
@@ -1341,6 +1368,8 @@
       subTotal: quote.subTotal,
       total: quote.total,
       rows: Array.isArray(quote.rows) ? JSON.parse(JSON.stringify(quote.rows)) : [],
+      // Customer details changed on the quotation carry over to the invoice
+      partyOverride: quote.partyOverride ? JSON.parse(JSON.stringify(quote.partyOverride)) : null,
       uploadedDoc: quote.document ? {
         fileName: quote.document.name,
         fileSize: quote.document.size ? `${(quote.document.size / 1024).toFixed(1)} KB` : '',
@@ -1423,9 +1452,11 @@
     const coGstin = activeCo.gstin || '';
     const coPhone = activeCo.phone || '';
 
-    const customer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) ||
+    const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) ||
                      (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == quote.customerId) : null) ||
                      { name: quote.customerName || 'Customer' };
+    // With the customer details changed for this document only (Customer Details card)
+    const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, quote.partyOverride) : masterCustomer;
     const partyName = customer.name || quote.customerName || 'Customer';
     const partyContact = customer.contactName || '';
     const partyAddr = customer.address || '';

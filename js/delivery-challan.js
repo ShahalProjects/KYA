@@ -87,10 +87,12 @@
 
   // ── Initialize Delivery Challan Form ──
   function initDeliveryChallanForm(challanData) {
-    const today = new Date().toISOString().split('T')[0];
+    // The party edit saved with this document (none for a new one)
+    if (typeof setPartyOverride === 'function') setPartyOverride('challan', (challanData && challanData.partyOverride) ? JSON.parse(JSON.stringify(challanData.partyOverride)) : null);
+    const today = kyaLocalIso();
     const dispatchDateObj = new Date();
     dispatchDateObj.setDate(dispatchDateObj.getDate() + 7);
-    const dispatchDate = dispatchDateObj.toISOString().split('T')[0];
+    const dispatchDate = kyaLocalIso(dispatchDateObj);
 
     const dateEl = document.getElementById('challanDate');
     const dispatchEl = document.getElementById('challanDispatchDate');
@@ -195,15 +197,13 @@
     updateChallanDueDateHelper();
     renderChallanRows();
     recalculateChallanTotals();
+    if (typeof validateDocNoField === 'function') validateDocNoField('deliveryChallan'); // clear an old "already used" line
   }
 
+  // Next free number from the delivery challan number format (prefix / start / digits — the
+  // pencil in the number box), skipping numbers already used; see doc-numbering.js
   function getNextChallanNumber() {
-    window.KYA_STORE = window.KYA_STORE || {};
-    const list = (window.KYA_STORE.deliveryChallans || []).concat(window.KYA_STORE.deliveryChallansDrafts || []);
-    const count = list.length + 1;
-    const year = new Date().getFullYear();
-    const pad = count < 10 ? '00' + count : (count < 100 ? '0' + count : count);
-    return `DC-${year}-${pad}`;
+    return getNextDocNo('deliveryChallan');
   }
 
   // ── Due / Dispatch Date Helper ──
@@ -332,6 +332,8 @@
         <span style="font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">Select</span>
       `;
 
+      // Hovering a party shows its details, as in the Sales Invoice list
+      if (typeof bindPartyListItemPreview === 'function') bindPartyListItemPreview(item, c, 'Customer');
       item.addEventListener('click', () => {
         selectChallanCustomer(c.id);
         const dropdown = document.getElementById('challanCustomerSelectDropdown');
@@ -368,6 +370,13 @@
       triggerText.style.color = cust ? 'var(--slate-800)' : 'var(--slate-500)';
       triggerText.style.fontWeight = cust ? '600' : '500';
     }
+    // A name changed for this document only (Customer Details → Temporary In-Voucher Edit);
+    // an edit made for another party doesn't carry over
+    const partyEdit = typeof getPartyOverride === 'function' ? getPartyOverride('challan') : null;
+    if (partyEdit && customerId && String(partyEdit.partyId) !== String(customerId)) setPartyOverride('challan', null);
+    else if (cust && partyEdit && partyEdit.isOverridden && partyEdit.name && triggerText) triggerText.textContent = partyEdit.name;
+    // Alter pencil in the Customer box, as on the Sales Invoice
+    if (typeof refreshPreInvoiceCustomerAlterPencil === 'function') refreshPreInvoiceCustomerAlterPencil('challan');
   }
 
   function populateChallanExecutives(selectedId) {
@@ -767,7 +776,7 @@
 
   // ── Save / Post Delivery Challan ──
   function getChallanFormData() {
-    const date = document.getElementById('challanDate')?.value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('challanDate')?.value || kyaLocalIso();
     const dispatchDate = document.getElementById('challanDispatchDate')?.value || '';
     const dueDate = document.getElementById('challanDueDate')?.value || dispatchDate;
     const challanNo = document.getElementById('challanNo')?.value?.trim() || getNextChallanNumber();
@@ -818,7 +827,7 @@
     else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
     total += adjustments;
 
-    const { paymentStatus, paymentAccountId, paymentAccountName, paymentAmount, paymentSplits } = getChallanAdvanceBox().read(total);
+    const { paymentStatus, paymentAccountId, paymentAccountName, paymentAmount, paymentSplits, creditAdjustments } = getChallanAdvanceBox().read(total);
 
     return {
       id: _editingChallan ? _editingChallan.id : Date.now(),
@@ -829,6 +838,8 @@
       dueDate,
       customerId,
       customerName,
+      // Customer details changed for this document only (Customer Details card)
+      partyOverride: typeof getPartyOverrideToSave === 'function' ? getPartyOverrideToSave('challan', customerId) : null,
       supplyType,
       salesExecutiveId,
       salesExecutiveName,
@@ -837,6 +848,7 @@
       paymentAccountName,
       paymentAmount,
       paymentSplits,
+      creditAdjustments: creditAdjustments || [],
       advanceJournalEntryId: _editingChallan ? _editingChallan.advanceJournalEntryId : null,
       advanceVoucherNo: _editingChallan ? _editingChallan.advanceVoucherNo : null,
       advancePaidAmount: _editingChallan ? _editingChallan.advancePaidAmount : 0,
@@ -879,6 +891,9 @@
       return;
     }
 
+    // A number already used can't be issued again (the challan being edited keeps its own)
+    if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('deliveryChallan', data.challanNo, data.id)) return;
+
     window.KYA_STORE.deliveryChallans = window.KYA_STORE.deliveryChallans || [];
     window.KYA_STORE.deliveryChallansDrafts = window.KYA_STORE.deliveryChallansDrafts || [];
 
@@ -920,6 +935,8 @@
 
       // Remove from drafts if existed
       window.KYA_STORE.deliveryChallansDrafts = window.KYA_STORE.deliveryChallansDrafts.filter(d => d.id !== data.id);
+      // Saved: the number is used for good, even if the challan is deleted later
+      if (typeof registerDocNo === 'function') registerDocNo('deliveryChallan', data.challanNo);
 
       showToast(`Delivery Challan ${data.challanNo} saved successfully!`, 'success');
     }
@@ -981,9 +998,11 @@
     const chipEl = document.getElementById('challanChipDisplay');
     if (challanNoEl && chipEl) {
       challanNoEl.addEventListener('input', () => {
-        chipEl.textContent = challanNoEl.value.trim() || 'DC-2026-001';
+        chipEl.textContent = challanNoEl.value.trim() || challanNoEl.placeholder;
       });
     }
+    // Pencil (number format) and the "already used" check, as on the Sales Invoice
+    if (typeof wireDocNumberField === 'function') wireDocNumberField('deliveryChallan', () => (_editingChallan ? _editingChallan.id : null));
 
     // Due / Dispatch Date helpers
     const dateEl = document.getElementById('challanDate');
@@ -1012,6 +1031,10 @@
     // Advance Payment — account (with Multi Payment) + amount, same as the Proforma Invoice
     getChallanAdvanceBox().wire();
 
+    // Customer box pencil → Master Desk Alter, as on the Sales Invoice
+    if (typeof wirePreInvoiceCustomerAlterPencil === 'function') wirePreInvoiceCustomerAlterPencil('challan', populateChallanCustomers, selectChallanCustomer);
+    // Customer Details card (hover the box): Temporary In-Voucher Edit, as on the Sales Invoice
+    if (typeof attachPartyDetailsCard === 'function') attachPartyDetailsCard({ context: 'challan', triggerId: 'challanCustomerSelectTrigger', triggerTextId: 'challanCustomerSelectTriggerText', selectId: 'challanCustomer', dropdownId: 'challanCustomerSelectDropdown' });
     // Customer Searchable Select
     const custTrigger = document.getElementById('challanCustomerSelectTrigger');
     const custDropdown = document.getElementById('challanCustomerSelectDropdown');
@@ -1260,6 +1283,7 @@
 
   // ── Global Exports ──
   window.openDeliveryChallanForm = openDeliveryChallanForm;
+  window.viewDeliveryChallanPreview = id => _challanList.view(id); // e.g. from Sales → Customers
   window.closeDeliveryChallanForm = closeDeliveryChallanForm;
   window.initDeliveryChallanForm = initDeliveryChallanForm;
   window.renderChallanRows = renderChallanRows;

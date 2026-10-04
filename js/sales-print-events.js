@@ -441,6 +441,25 @@
       selectSearch.addEventListener('input', () => {
         refreshSalesInvoiceDropdownOptions(selectSearch.value);
       });
+
+      // Keyboard, like the Pre Invoice No. box: Enter / Space opens, Esc closes,
+      // Enter in the search picks the first match
+      selectTrigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (selectDropdown.style.display !== 'flex') selectTrigger.click();
+        }
+      });
+      selectSearch.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          selectDropdown.style.display = 'none';
+          if (typeof hidePreInvoiceDetailsCard === 'function') hidePreInvoiceDetailsCard();
+          selectTrigger.focus();
+        } else if (e.key === 'Enter') {
+          const first = document.querySelector('#salesInvoiceSelectOptionsList [role="option"]');
+          if (first) { e.preventDefault(); first.click(); }
+        }
+      });
       
       selectSearch.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -467,7 +486,9 @@
     if (invNoFormatBtn) {
       invNoFormatBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (typeof openSalesInvoiceNumberingModal === 'function') openSalesInvoiceNumberingModal();
+        // On a reversal the pencil sets the reversal prefix; otherwise the invoice format
+        if (currentSalesVoucherSubtype === 'Return' && typeof openSalesReversalNumberingModal === 'function') openSalesReversalNumberingModal();
+        else if (typeof openSalesInvoiceNumberingModal === 'function') openSalesInvoiceNumberingModal();
       });
     }
     
@@ -594,24 +615,29 @@
     
     const dateEl = document.getElementById('salesDate');
     const dueEl = document.getElementById('salesDueDate');
-    // Typeable DD-MM-YYYY box + calendar for the invoice Date
+    // Date / Due Date: the KYA calendar and the "Due Date follows the Date, never before
+    // it" rules are wired from the markup (kya-datepicker.js); the attach calls are no-ops
+    // when that already happened
     if (dateEl && typeof window.attachKyaDatePicker === 'function') {
       window.attachKyaDatePicker(dateEl, document.getElementById('salesDateDisplay'));
     }
+    if (dueEl && typeof window.attachKyaDatePicker === 'function') {
+      window.attachKyaDatePicker(dueEl, document.getElementById('salesDueDateDisplay'));
+    }
+    if (typeof window.attachMarkedKyaDatePickers === 'function') window.attachMarkedKyaDatePickers();
     if (dateEl && dueEl) {
-      dateEl.addEventListener('change', () => {
-        dueEl.value = dateEl.value;
-        updateDueDateHelper();
-      });
-      dueEl.addEventListener('change', () => {
-        updateDueDateHelper();
-      });
+      dateEl.addEventListener('change', updateDueDateHelper);
+      dueEl.addEventListener('change', updateDueDateHelper);
     }
     
     const custEl = document.getElementById('salesCustomer');
     if (custEl) {
       custEl.addEventListener('focus', () => {
         populateSalesCustomers(custEl.value);
+      });
+      // A Cash and Cash Equivalents ledger as the customer: a cash sale, paid in full there
+      custEl.addEventListener('change', () => {
+        if (typeof applySalesCashCustomerLock === 'function') applySalesCashCustomerLock();
       });
     }
     
@@ -671,7 +697,7 @@
         payAccField.style.display = 'flex';
         payAmtField.style.display = 'none';
         if (payDueDateField) payDueDateField.style.display = 'none';
-        populateSalesPaymentAccounts();
+        populateSalesPaymentAccounts(document.getElementById('salesPaymentAccount')?.value || ''); // keep the account already chosen
         recalculateSalesTotals();
       });
       
@@ -690,7 +716,7 @@
           wrapper.style.gap = '4px';
         }
         updateDueDateHelper();
-        populateSalesPaymentAccounts();
+        populateSalesPaymentAccounts(document.getElementById('salesPaymentAccount')?.value || ''); // keep the account already chosen
         recalculateSalesTotals();
       });
     }
@@ -699,9 +725,17 @@
     if (payAccEl) {
       payAccEl.addEventListener('focus', () => {
         window._salesPaymentAccountPrev = payAccEl.value;
+        if (typeof getSalesAdjust === 'function' && getSalesAdjust()) getSalesAdjust().rememberPrev();
         populateSalesPaymentAccounts(payAccEl.value);
       });
       payAccEl.addEventListener('change', () => {
+        // Invoice Balance opens its own popup
+        const adjust = typeof getSalesAdjust === 'function' ? getSalesAdjust() : null;
+        if (adjust && adjust.handleChange()) {
+          if (typeof resetSalesMultiPayments === 'function') resetSalesMultiPayments();
+          if (typeof updateSalesMultiPaymentUI === 'function') updateSalesMultiPaymentUI();
+          return;
+        }
         if (payAccEl.value === 'multi-payment') {
           if (typeof openSalesMultiPaymentModal === 'function') openSalesMultiPaymentModal();
         } else {
@@ -897,6 +931,18 @@
         e.preventDefault();
         currentSalesVoucherSubtype = 'PreInvoice';
         window._editingSalesInvoice = null;
+        updateVoucherSubtypeUI();
+      });
+    }
+
+    // Customers: Overview, Customer Details and Customer Balances (sales-customers.js)
+    const customersBtn = document.getElementById('btnSalesCustomers');
+    if (customersBtn) {
+      customersBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentSalesVoucherSubtype = 'Customers';
+        window._editingSalesInvoice = null;
+        if (typeof setSalesCustomersHubTab === 'function') setSalesCustomersHubTab('overview');
         updateVoucherSubtypeUI();
       });
     }

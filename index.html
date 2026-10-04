@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=20260927_3" />
+  <link rel="stylesheet" href="css/styles.css?v=20261004_6" />
 </head>
 <body>
 
@@ -2564,6 +2564,14 @@
               </svg>
               Reversal
             </button>
+            <button class="btn-sales-action" id="btnSalesCustomers" type="button" aria-label="Customers" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <circle cx="6" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M1.5 13.5c.6-2.4 2.3-3.7 4.5-3.7s3.9 1.3 4.5 3.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M10.5 3.2a2.4 2.4 0 010 4.6M12.2 10.2c1.1.5 1.9 1.6 2.3 3.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              Customers
+            </button>
           </div>
         </div>
 
@@ -2650,12 +2658,26 @@
           <div class="je-fields-bar">
             <div class="je-field">
               <label for="salesDateDisplay">Date</label>
-              <input type="hidden" id="salesDate" />
+              <input type="hidden" id="salesDate" data-kya-date-display="salesDateDisplay" />
               <div class="kya-dp-wrap">
                 <input type="text" id="salesDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Invoice date (DD-MM-YYYY)" />
                 <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                 </button>
+              </div>
+            </div>
+            <!-- Original Doc (Sales Reversal only): the invoice or pre-invoice being reversed -->
+            <div class="je-field" id="salesOriginalDocField" style="display: none;">
+              <label for="salesInvoiceSelectTrigger">Original Doc *</label>
+              <div class="kya-searchable-select-wrap" id="salesInvoiceSelectWrap" style="display: none; position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="salesInvoiceSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-500); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04);">
+                  <span id="salesInvoiceSelectTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">&mdash; Select &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px; flex-shrink: 0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="salesInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: 340px; max-width: 90vw; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 300px; overflow-y: auto; flex-direction: column; gap: 4px; box-sizing: border-box;">
+                  <input type="text" id="salesInvoiceSelectSearch" placeholder="Search no., customer, item..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="salesInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
               </div>
             </div>
             <div class="je-field" id="salesInvoiceNoContainer">
@@ -2666,18 +2688,6 @@
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                 </button>
                 <div id="salesInvoiceNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
-              </div>
-
-              <!-- Searchable Select for returns -->
-              <div class="kya-searchable-select-wrap" id="salesInvoiceSelectWrap" style="display: none; position: relative; width: 100%;">
-                <div class="kya-searchable-select-trigger" id="salesInvoiceSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
-                  <span id="salesInvoiceSelectTriggerText">Select Invoice</span>
-                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div class="kya-searchable-select-dropdown" id="salesInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
-                  <input type="text" id="salesInvoiceSelectSearch" placeholder="Search invoice..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
-                  <div id="salesInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
-                </div>
               </div>
             </div>
             <!-- Pre Invoice No.: pick an active Quotation / Proforma / Sales Order / Delivery Challan to bill (sales-preinvoice-picker.js) -->
@@ -2789,19 +2799,25 @@
                   <div id="salesAdvanceInfo" role="tooltip" style="display: none; position: absolute; left: 14px; right: 14px; bottom: calc(100% + 6px); z-index: 50; padding: 9px 12px; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; box-shadow: 0 8px 20px -6px rgba(15,23,42,0.25); color: #1e3a8a; font-size: 12.5px; font-weight: 600; line-height: 1.45;"></div>
                 </div>
                 
-                <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
-                  <div id="salesDueDateField" style="flex: 1; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; width: 100%;">
+                  <div id="salesDueDateField" style="flex: 1 1 150px; min-width: 150px; max-width: 320px; display: flex; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
                     <div id="salesDueDateWrapper" style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                      <input type="date" id="salesDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 150px;" aria-label="Due date" />
+                      <input type="hidden" id="salesDueDate" data-kya-date-display="salesDueDateDisplay" data-kya-date-after="salesDate" data-kya-date-label="Due Date" />
+                      <div class="kya-dp-wrap" style="width: 150px; flex-shrink: 0;">
+                        <input type="text" id="salesDueDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Due date (DD-MM-YYYY)" style="height: 38px; padding: 0 36px 0 10px; font-size: 13px; font-weight: 600;" />
+                        <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar" style="width: 26px; height: 26px; right: 5px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </button>
+                      </div>
                       <span id="salesDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
                     </div>
                   </div>
-                  <div id="salesPaymentAmountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                  <div id="salesPaymentAmountField" style="display: none; flex: 1 1 110px; min-width: 110px; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Amount *</label>
                     <input type="number" id="salesPaymentAmount" class="je-input" placeholder="0.00" min="0" step="0.01" style="height: 38px; padding: 0 10px;" />
                   </div>
-                  <div id="salesPaymentAccountField" style="display: none; flex: 1; flex-direction: column; gap: 4px;">
+                  <div id="salesPaymentAccountField" style="display: none; flex: 1 1 150px; min-width: 150px; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Payment Account *</label>
                     <select id="salesPaymentAccount" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer;"></select>
                     <button type="button" id="salesMultiPaymentSummary" title="Edit the multi payment split" style="display: none; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 5px 9px; background: var(--slate-50); border: 1.5px solid var(--slate-200); border-radius: 8px; font-size: 11.5px; font-weight: 700; color: var(--slate-600); cursor: pointer; text-align: left;"></button>
@@ -3048,6 +3064,93 @@
           </div>
         </div><!-- /#salesPreInvoiceCard -->
 
+        <!-- CUSTOMERS CARD (Overview / Customer Details / Customer Balances — js/sales-customers.js) -->
+        <div class="table-card" id="salesCustomersCard" style="display: none; padding: 24px 28px;">
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <circle cx="6" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M1.5 13.5c.6-2.4 2.3-3.7 4.5-3.7s3.9 1.3 4.5 3.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <path d="M10.5 3.2a2.4 2.4 0 010 4.6M12.2 10.2c1.1.5 1.9 1.6 2.3 3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Customers</div>
+                <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Customer details, receivables, refund balances and advances</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="oh-layout">
+            <div class="oh-sub-tabs" role="tablist" aria-label="Customers sections">
+              <button class="oh-sub-tab active" id="custHubTabOverview" role="tab" aria-selected="true" aria-controls="custHubContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <rect x="2.5" y="2.5" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+                    <rect x="11.5" y="2.5" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+                    <rect x="2.5" y="11.5" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+                    <rect x="11.5" y="11.5" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Overview</span>
+              </button>
+              <button class="oh-sub-tab" id="custHubTabDetails" role="tab" aria-selected="false" aria-controls="custHubContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="7" r="3.2" stroke="currentColor" stroke-width="1.7"/>
+                    <path d="M3.5 17c.9-3.2 3.4-4.8 6.5-4.8s5.6 1.6 6.5 4.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Customer Details</span>
+              </button>
+              <button class="oh-sub-tab" id="custHubTabBalances" role="tab" aria-selected="false" aria-controls="custHubContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <rect x="2.5" y="4.5" width="15" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/>
+                    <path d="M2.5 8.5h15" stroke="currentColor" stroke-width="1.7"/>
+                    <path d="M6 12.5h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Customer Balances</span>
+              </button>
+            </div>
+            <div class="oh-content-area" id="custHubContentArea"></div>
+          </div>
+        </div><!-- /#salesCustomersCard -->
+
+        <!-- CUSTOMER DETAILS / CUSTOMER BALANCES (Full Screen with Back Button — js/sales-customers.js) -->
+        <div class="table-card" id="salesCustomersListCard" style="display: none; padding: 24px 28px;">
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+              <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
+                  <circle cx="6" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M1.5 13.5c.6-2.4 2.3-3.7 4.5-3.7s3.9 1.3 4.5 3.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <path d="M10.5 3.2a2.4 2.4 0 010 4.6M12.2 10.2c1.1.5 1.9 1.6 2.3 3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class="je-card-title-text" id="custHubFullTitle" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Customer Details</div>
+                <div class="je-card-subtitle-text" id="custHubFullSubtitle" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="kya-back-btn" id="btnCustHubBack" title="Back to Customers" aria-label="Back to Customers">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div id="custHubFullNavRight" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"></div>
+          </div>
+
+          <div id="custHubFullContentArea"></div>
+        </div><!-- /#salesCustomersListCard -->
+
         <!-- QUOTATION LIST CARD (Full Screen with Back Button) -->
         <div class="table-card" id="salesQuotationListCard" style="display: none; padding: 24px 28px;">
           <!-- Colored header strip -->
@@ -3069,11 +3172,10 @@
           <!-- Navigation row between header and content -->
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" id="btnQuoteListBack" onclick="closeQuotationList()" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <button type="button" class="kya-back-btn" id="btnQuoteListBack" onclick="closeQuotationList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>Back to Pre Invoice</span>
               </button>
             </div>
 
@@ -3130,11 +3232,10 @@
           <!-- Navigation row between title card and fields -->
           <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <button type="button" class="btn" id="btnQuotationBack" title="Back" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <button type="button" class="kya-back-btn" id="btnQuotationBack" title="Back" aria-label="Back">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>Back</span>
               </button>
               <button type="button" class="btn" id="btnQuotationViewList" onclick="openQuotationList('all')" title="View Quotation List" style="background: var(--slate-100); color: var(--blue-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-50)'; this.style.borderColor='var(--blue-300)'" onmouseout="this.style.background='var(--slate-100)'; this.style.borderColor='var(--slate-200)'">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3179,16 +3280,34 @@
           <!-- Header fields -->
           <div class="je-fields-bar">
             <div class="je-field">
-              <label for="quoteDate">Date *</label>
-              <input type="date" id="quoteDate" class="je-input" aria-label="Quotation date" />
+              <label for="quoteDateDisplay">Date *</label>
+              <input type="hidden" id="quoteDate" data-kya-date-display="quoteDateDisplay" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="quoteDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Quotation date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
-              <label for="quoteExpiryDate">Expiry Date</label>
-              <input type="date" id="quoteExpiryDate" class="je-input" aria-label="Quotation expiry date" />
+              <label for="quoteExpiryDateDisplay">Expiry Date</label>
+              <input type="hidden" id="quoteExpiryDate" data-kya-date-display="quoteExpiryDateDisplay" data-kya-date-after="quoteDate" data-kya-date-label="Expiry Date" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="quoteExpiryDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Quotation expiry date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
-              <label for="quoteNo">Quotes No. *</label>
-              <input type="text" id="quoteNo" class="je-input" placeholder="QT-2026-001" aria-label="Quotation number" />
+              <label for="quoteNo">Quotation No. *</label>
+              <div id="quoteNoInputWrap" class="kya-docno-wrap" style="position: relative; width: 100%;">
+                <input type="text" id="quoteNo" class="je-input" placeholder="QT-2026-001" aria-label="Quotation number" aria-describedby="quoteNoError" style="padding-right: 38px;" />
+                <button type="button" id="quoteNoFormatBtn" class="sales-invno-edit-btn" title="Set quotation number prefix" aria-label="Set quotation number prefix">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <div id="quoteNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
+              </div>
             </div>
             <div class="je-field" id="quoteCustomerWrap">
               <label for="quoteCustomer">Customer *</label>
@@ -3196,10 +3315,13 @@
                 <option value="">&mdash; Select Customer &mdash;</option>
               </select>
               <div class="kya-searchable-select-wrap" id="quoteCustomerSelectWrap" style="position: relative; width: 100%;">
-                <div class="kya-searchable-select-trigger" id="quoteCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                <div class="kya-searchable-select-trigger" id="quoteCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-900); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color var(--duration), box-shadow var(--duration);">
                   <span id="quoteCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
                   <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
+                <button type="button" id="quoteCustomerAlterBtn" class="kya-alter-pencil kya-alter-pencil-field" title="Alter this customer in Master Desk" aria-label="Alter this customer in Master Desk" hidden>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
                 <div class="kya-searchable-select-dropdown" id="quoteCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
                   <input type="text" id="quoteCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
                   <div id="quoteCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
@@ -3377,11 +3499,10 @@
           <!-- Navigation row between header and content -->
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" id="btnProformaListBack" onclick="closeProformaList()" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <button type="button" class="kya-back-btn" id="btnProformaListBack" onclick="closeProformaList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>Back to Pre Invoice</span>
               </button>
             </div>
 
@@ -3438,11 +3559,10 @@
           <!-- Navigation row between title card and fields -->
           <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" id="btnProformaBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <button type="button" class="kya-back-btn" id="btnProformaBack" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>Back</span>
               </button>
               <button type="button" class="btn" id="btnProformaViewList" onclick="openProformaList('all')" title="View Proforma List" style="background: var(--slate-100); color: var(--blue-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-50)'; this.style.borderColor='var(--blue-300)'" onmouseout="this.style.background='var(--slate-100)'; this.style.borderColor='var(--slate-200)'">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3487,16 +3607,34 @@
           <!-- Header fields -->
           <div class="je-fields-bar">
             <div class="je-field">
-              <label for="proformaDate">Date *</label>
-              <input type="date" id="proformaDate" class="je-input" aria-label="Proforma date" />
+              <label for="proformaDateDisplay">Date *</label>
+              <input type="hidden" id="proformaDate" data-kya-date-display="proformaDateDisplay" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="proformaDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Proforma date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
-              <label for="proformaExpiryDate">Valid Until</label>
-              <input type="date" id="proformaExpiryDate" class="je-input" aria-label="Proforma validity date" />
+              <label for="proformaExpiryDateDisplay">Valid Until</label>
+              <input type="hidden" id="proformaExpiryDate" data-kya-date-display="proformaExpiryDateDisplay" data-kya-date-after="proformaDate" data-kya-date-label="Valid Until" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="proformaExpiryDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Proforma validity date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
               <label for="proformaNo">Proforma No. *</label>
-              <input type="text" id="proformaNo" class="je-input" placeholder="PI-2026-001" aria-label="Proforma invoice number" />
+              <div id="proformaNoInputWrap" class="kya-docno-wrap" style="position: relative; width: 100%;">
+                <input type="text" id="proformaNo" class="je-input" placeholder="PI-2026-001" aria-label="Proforma invoice number" aria-describedby="proformaNoError" style="padding-right: 38px;" />
+                <button type="button" id="proformaNoFormatBtn" class="sales-invno-edit-btn" title="Set proforma invoice number prefix" aria-label="Set proforma invoice number prefix">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <div id="proformaNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
+              </div>
             </div>
             <div class="je-field" id="proformaCustomerWrap">
               <label for="proformaCustomer">Customer *</label>
@@ -3504,10 +3642,13 @@
                 <option value="">&mdash; Select Customer &mdash;</option>
               </select>
               <div class="kya-searchable-select-wrap" id="proformaCustomerSelectWrap" style="position: relative; width: 100%;">
-                <div class="kya-searchable-select-trigger" id="proformaCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                <div class="kya-searchable-select-trigger" id="proformaCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-900); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color var(--duration), box-shadow var(--duration);">
                   <span id="proformaCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
                   <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
+                <button type="button" id="proformaCustomerAlterBtn" class="kya-alter-pencil kya-alter-pencil-field" title="Alter this customer in Master Desk" aria-label="Alter this customer in Master Desk" hidden>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
                 <div class="kya-searchable-select-dropdown" id="proformaCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
                   <input type="text" id="proformaCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
                   <div id="proformaCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
@@ -3582,7 +3723,13 @@
                   <div id="proformaDueDateField" style="flex: 0 0 158px; display: flex; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
                     <div id="proformaDueDateWrapper" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%;">
-                      <input type="date" id="proformaDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 100%;" aria-label="Due date" />
+                      <input type="hidden" id="proformaDueDate" data-kya-date-display="proformaDueDateDisplay" data-kya-date-after="proformaDate" data-kya-date-label="Due Date" />
+                      <div class="kya-dp-wrap" style="width: 100%;">
+                        <input type="text" id="proformaDueDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Due date (DD-MM-YYYY)" style="height: 38px; padding: 0 36px 0 10px; font-size: 13px; font-weight: 600;" />
+                        <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar" style="width: 26px; height: 26px; right: 5px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </button>
+                      </div>
                       <span id="proformaDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
                     </div>
                   </div>
@@ -3759,9 +3906,10 @@
 
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" onclick="closeSalesOrderList()" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                <span>Back to Pre Invoice</span>
+              <button type="button" class="kya-back-btn" onclick="closeSalesOrderList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
               </button>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -3804,9 +3952,10 @@
 
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" onclick="closeDeliveryChallanList()" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                <span>Back to Pre Invoice</span>
+              <button type="button" class="kya-back-btn" onclick="closeDeliveryChallanList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
               </button>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -3853,11 +4002,21 @@
           <!-- Navigation row between title card and fields -->
           <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" id="btnOrderBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <button type="button" class="kya-back-btn" id="btnOrderBack" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>Back</span>
+              </button>
+              <button type="button" class="btn" id="btnOrderViewList" onclick="openSalesOrderList('all')" title="View Sales Order List" style="background: var(--slate-100); color: var(--blue-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-50)'; this.style.borderColor='var(--blue-300)'" onmouseout="this.style.background='var(--slate-100)'; this.style.borderColor='var(--slate-200)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+                <span>Sales Order List</span>
               </button>
             </div>
 
@@ -3891,16 +4050,34 @@
           <!-- Header fields -->
           <div class="je-fields-bar">
             <div class="je-field">
-              <label for="orderDate">Date *</label>
-              <input type="date" id="orderDate" class="je-input" aria-label="Order date" />
+              <label for="orderDateDisplay">Date *</label>
+              <input type="hidden" id="orderDate" data-kya-date-display="orderDateDisplay" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="orderDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Order date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
-              <label for="orderDeliveryDate">Delivery Date</label>
-              <input type="date" id="orderDeliveryDate" class="je-input" aria-label="Order delivery date" />
+              <label for="orderDeliveryDateDisplay">Delivery Date</label>
+              <input type="hidden" id="orderDeliveryDate" data-kya-date-display="orderDeliveryDateDisplay" data-kya-date-after="orderDate" data-kya-date-label="Delivery Date" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="orderDeliveryDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Order delivery date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
               <label for="orderNo">Order No. *</label>
-              <input type="text" id="orderNo" class="je-input" placeholder="SO-2026-001" aria-label="Sales order number" />
+              <div id="orderNoInputWrap" class="kya-docno-wrap" style="position: relative; width: 100%;">
+                <input type="text" id="orderNo" class="je-input" placeholder="SO-2026-001" aria-label="Sales order number" aria-describedby="orderNoError" style="padding-right: 38px;" />
+                <button type="button" id="orderNoFormatBtn" class="sales-invno-edit-btn" title="Set sales order number prefix" aria-label="Set sales order number prefix">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <div id="orderNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
+              </div>
             </div>
             <div class="je-field" id="orderCustomerWrap">
               <label for="orderCustomer">Customer *</label>
@@ -3908,10 +4085,13 @@
                 <option value="">&mdash; Select Customer &mdash;</option>
               </select>
               <div class="kya-searchable-select-wrap" id="orderCustomerSelectWrap" style="position: relative; width: 100%;">
-                <div class="kya-searchable-select-trigger" id="orderCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                <div class="kya-searchable-select-trigger" id="orderCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-900); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color var(--duration), box-shadow var(--duration);">
                   <span id="orderCustomerSelectTriggerText">&mdash; Select Customer &mdash;</span>
                   <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
+                <button type="button" id="orderCustomerAlterBtn" class="kya-alter-pencil kya-alter-pencil-field" title="Alter this customer in Master Desk" aria-label="Alter this customer in Master Desk" hidden>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
                 <div class="kya-searchable-select-dropdown" id="orderCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
                   <input type="text" id="orderCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
                   <div id="orderCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
@@ -3986,7 +4166,13 @@
                   <div id="orderDueDateField" style="flex: 0 0 158px; display: flex; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
                     <div id="orderDueDateWrapper" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%;">
-                      <input type="date" id="orderDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 100%;" aria-label="Due date" />
+                      <input type="hidden" id="orderDueDate" data-kya-date-display="orderDueDateDisplay" data-kya-date-after="orderDate" data-kya-date-label="Due Date" />
+                      <div class="kya-dp-wrap" style="width: 100%;">
+                        <input type="text" id="orderDueDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Due date (DD-MM-YYYY)" style="height: 38px; padding: 0 36px 0 10px; font-size: 13px; font-weight: 600;" />
+                        <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar" style="width: 26px; height: 26px; right: 5px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </button>
+                      </div>
                       <span id="orderDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
                     </div>
                   </div>
@@ -4170,11 +4356,21 @@
           <!-- Navigation row between title card and fields -->
           <div class="quote-nav-bar" style="padding: 16px 28px 4px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="btn" id="btnChallanBack" title="Back to Pre Invoice" style="background: var(--slate-100); color: var(--slate-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-200)'; this.style.color='var(--slate-900)'" onmouseout="this.style.background='var(--slate-100)'; this.style.color='var(--slate-700)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+              <button type="button" class="kya-back-btn" id="btnChallanBack" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                  <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>Back</span>
+              </button>
+              <button type="button" class="btn" id="btnChallanViewList" onclick="openDeliveryChallanList('all')" title="View Delivery Challan List" style="background: var(--slate-100); color: var(--blue-700); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background='var(--blue-50)'; this.style.borderColor='var(--blue-300)'" onmouseout="this.style.background='var(--slate-100)'; this.style.borderColor='var(--slate-200)'">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+                <span>Delivery Challan List</span>
               </button>
             </div>
 
@@ -4206,16 +4402,34 @@
           <!-- Header fields -->
           <div class="je-fields-bar">
             <div class="je-field">
-              <label for="challanDate">Date *</label>
-              <input type="date" id="challanDate" class="je-input" aria-label="Challan date" />
+              <label for="challanDateDisplay">Date *</label>
+              <input type="hidden" id="challanDate" data-kya-date-display="challanDateDisplay" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="challanDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Challan date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
-              <label for="challanDispatchDate">Dispatch Date</label>
-              <input type="date" id="challanDispatchDate" class="je-input" aria-label="Dispatch date" />
+              <label for="challanDispatchDateDisplay">Dispatch Date</label>
+              <input type="hidden" id="challanDispatchDate" data-kya-date-display="challanDispatchDateDisplay" data-kya-date-after="challanDate" data-kya-date-label="Dispatch Date" />
+              <div class="kya-dp-wrap">
+                <input type="text" id="challanDispatchDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Dispatch date (DD-MM-YYYY)" />
+                <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </button>
+              </div>
             </div>
             <div class="je-field">
               <label for="challanNo">Challan No. *</label>
-              <input type="text" id="challanNo" class="je-input" placeholder="DC-2026-001" aria-label="Delivery challan number" />
+              <div id="challanNoInputWrap" class="kya-docno-wrap" style="position: relative; width: 100%;">
+                <input type="text" id="challanNo" class="je-input" placeholder="DC-2026-001" aria-label="Delivery challan number" aria-describedby="challanNoError" style="padding-right: 38px;" />
+                <button type="button" id="challanNoFormatBtn" class="sales-invno-edit-btn" title="Set delivery challan number prefix" aria-label="Set delivery challan number prefix">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <div id="challanNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
+              </div>
             </div>
             <div class="je-field" id="challanCustomerWrap">
               <label for="challanCustomer">Customer / Consignee *</label>
@@ -4223,10 +4437,13 @@
                 <option value="">&mdash; Select &mdash;</option>
               </select>
               <div class="kya-searchable-select-wrap" id="challanCustomerSelectWrap" style="position: relative; width: 100%;">
-                <div class="kya-searchable-select-trigger" id="challanCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10.5px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700); height: 38px; box-sizing: border-box;">
+                <div class="kya-searchable-select-trigger" id="challanCustomerSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-900); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color var(--duration), box-shadow var(--duration);">
                   <span id="challanCustomerSelectTriggerText">&mdash; Select &mdash;</span>
                   <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
+                <button type="button" id="challanCustomerAlterBtn" class="kya-alter-pencil kya-alter-pencil-field" title="Alter this customer in Master Desk" aria-label="Alter this customer in Master Desk" hidden>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
                 <div class="kya-searchable-select-dropdown" id="challanCustomerSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
                   <input type="text" id="challanCustomerSelectSearch" placeholder="Search customer name, alias, GSTIN..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
                   <div id="challanCustomerSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
@@ -4234,7 +4451,7 @@
               </div>
             </div>
             <div class="je-field">
-              <label for="challanSupplyType">Challan Purpose / Supply Type *</label>
+              <label for="challanSupplyType">Purpose / Supply Type *</label>
               <select id="challanSupplyType" class="je-input" aria-label="Supply Type Selection">
                 <option value="Transportation of Goods">Transportation of Goods</option>
                 <option value="Supply on Approval">Supply on Approval</option>
@@ -4302,7 +4519,13 @@
                   <div id="challanDueDateField" style="flex: 0 0 158px; display: flex; flex-direction: column; gap: 4px;">
                     <label style="font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--slate-400); margin: 0;">Due Date</label>
                     <div id="challanDueDateWrapper" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%;">
-                      <input type="date" id="challanDueDate" class="je-input" style="height: 38px; padding: 0 10px; font-size: 13px; font-weight: 600; width: 100%;" aria-label="Due date" />
+                      <input type="hidden" id="challanDueDate" data-kya-date-display="challanDueDateDisplay" data-kya-date-after="challanDate" data-kya-date-label="Due Date" />
+                      <div class="kya-dp-wrap" style="width: 100%;">
+                        <input type="text" id="challanDueDateDisplay" class="je-input" inputmode="numeric" maxlength="10" placeholder="DD-MM-YYYY" aria-label="Due date (DD-MM-YYYY)" style="height: 38px; padding: 0 36px 0 10px; font-size: 13px; font-weight: 600;" />
+                        <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar" style="width: 26px; height: 26px; right: 5px;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </button>
+                      </div>
                       <span id="challanDueDateDays" style="font-size: 12px; font-weight: 600; color: var(--slate-500); white-space: nowrap;"></span>
                     </div>
                   </div>
@@ -4790,17 +5013,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-<script src="js/exportPdf.js?v=20261001_1"></script>
-<script src="js/exportExcel.js?v=20261001_1"></script>
+<script src="js/exportPdf.js?v=20261004_7"></script>
+<script src="js/exportExcel.js?v=20261004_7"></script>
 <script src="js/app-shell.js?v=20261001_4"></script>
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
-<script src="js/master-desk.js?v=20260926_9"></script>
+<script src="js/master-desk.js?v=20261004_17"></script>
 <script src="js/journal.js?v=20260905_1"></script>
-<script src="js/coa.js?v=20261001_15"></script>
+<script src="js/coa.js?v=20261004_17"></script>
 <script src="js/reports.js"></script>
 <script src="js/stock-hub.js"></script>
-<script src="js/reports-hub.js"></script>
+<script src="js/reports-hub.js?v=20261002_1"></script>
 <script src="js/onehub-shell.js"></script>
 <script src="js/onehub-departments.js"></script>
 <script src="js/onehub-employees.js"></script>
@@ -4808,22 +5031,26 @@
 <script src="js/onehub-reminders-core.js"></script>
 <script src="js/onehub-reminders-view.js"></script>
 <script src="js/vault-core.js"></script>
-<script src="js/ledgers.js?v=20261001_11"></script>
+<script src="js/ledgers.js?v=20261004_15"></script>
 <script src="js/vault-settings.js?v=20260929_1"></script>
-<script src="js/kya-datepicker.js?v=20260927_3"></script>
-<script src="js/sales-form.js?v=20261001_13"></script>
-<script src="js/sales-posting.js?v=20261001_12"></script>
-<script src="js/sales-helpers.js?v=20261001_15"></script>
-<script src="js/sales-records.js?v=20261001_11"></script>
-<script src="js/sales-print-events.js?v=20261001_11"></script>
+<script src="js/kya-datepicker.js?v=20261004_1"></script>
+<script src="js/sales-form.js?v=20261004_19"></script>
+<script src="js/sales-posting.js?v=20261004_17"></script>
+<script src="js/sales-helpers.js?v=20261004_19"></script>
+<script src="js/sales-credit-adjust.js?v=20261004_15"></script>
+<script src="js/sales-customers.js?v=20261004_17"></script>
+<script src="js/doc-numbering.js?v=20261004_2"></script>
+<script src="js/sales-records.js?v=20261004_13"></script>
+<script src="js/sales-print-events.js?v=20261004_19"></script>
 <script src="js/sales-invoice-print.js?v=20260918_6"></script>
 <script src="js/sales-invoice-export.js?v=20260918_21"></script>
-<script src="js/quotation.js?v=20261001_15"></script>
-<script src="js/proforma.js?v=20261001_15"></script>
-<script src="js/preinvoice-list.js?v=20261001_8"></script>
-<script src="js/sales-order.js?v=20261001_15"></script>
-<script src="js/delivery-challan.js?v=20261001_15"></script>
-<script src="js/sales-preinvoice-picker.js?v=20261001_3"></script>
+<script src="js/quotation.js?v=20261004_8"></script>
+<script src="js/proforma.js?v=20261004_15"></script>
+<script src="js/preinvoice-list.js?v=20261004_15"></script>
+<script src="js/sales-order.js?v=20261004_15"></script>
+<script src="js/delivery-challan.js?v=20261004_15"></script>
+<script src="js/sales-preinvoice-picker.js?v=20261002_1"></script>
+<script src="js/sales-preinvoice-reversal.js?v=20261004_15"></script>
 <script src="js/purchase-form.js?v=20260830_2"></script>
 <script src="js/company-profile.js?v=20260912_2"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>

@@ -87,10 +87,12 @@
 
   // ── Initialize Sales Order Form ──
   function initSalesOrderForm(orderData) {
-    const today = new Date().toISOString().split('T')[0];
+    // The party edit saved with this document (none for a new one)
+    if (typeof setPartyOverride === 'function') setPartyOverride('order', (orderData && orderData.partyOverride) ? JSON.parse(JSON.stringify(orderData.partyOverride)) : null);
+    const today = kyaLocalIso();
     const deliveryDateObj = new Date();
     deliveryDateObj.setDate(deliveryDateObj.getDate() + 30);
-    const deliveryDate = deliveryDateObj.toISOString().split('T')[0];
+    const deliveryDate = kyaLocalIso(deliveryDateObj);
 
     const dateEl = document.getElementById('orderDate');
     const deliveryEl = document.getElementById('orderDeliveryDate');
@@ -195,15 +197,13 @@
     updateOrderDueDateHelper();
     renderOrderRows();
     recalculateOrderTotals();
+    if (typeof validateDocNoField === 'function') validateDocNoField('salesOrder'); // clear an old "already used" line
   }
 
+  // Next free number from the sales order number format (prefix / start / digits — the
+  // pencil in the number box), skipping numbers already used; see doc-numbering.js
   function getNextOrderNumber() {
-    window.KYA_STORE = window.KYA_STORE || {};
-    const list = (window.KYA_STORE.salesOrders || []).concat(window.KYA_STORE.salesOrdersDrafts || []);
-    const count = list.length + 1;
-    const year = new Date().getFullYear();
-    const pad = count < 10 ? '00' + count : (count < 100 ? '0' + count : count);
-    return `SO-${year}-${pad}`;
+    return getNextDocNo('salesOrder');
   }
 
   // ── Due / Delivery Date Helper ──
@@ -332,6 +332,8 @@
         <span style="font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">Select</span>
       `;
 
+      // Hovering a party shows its details, as in the Sales Invoice list
+      if (typeof bindPartyListItemPreview === 'function') bindPartyListItemPreview(item, c, 'Customer');
       item.addEventListener('click', () => {
         selectOrderCustomer(c.id);
         const dropdown = document.getElementById('orderCustomerSelectDropdown');
@@ -376,6 +378,13 @@
         supplyTypeEl.value = isInterstate ? 'Inter-State (IGST)' : 'Intra-State (CGST + SGST)';
       }
     }
+    // A name changed for this document only (Customer Details → Temporary In-Voucher Edit);
+    // an edit made for another party doesn't carry over
+    const partyEdit = typeof getPartyOverride === 'function' ? getPartyOverride('order') : null;
+    if (partyEdit && customerId && String(partyEdit.partyId) !== String(customerId)) setPartyOverride('order', null);
+    else if (cust && partyEdit && partyEdit.isOverridden && partyEdit.name && triggerText) triggerText.textContent = partyEdit.name;
+    // Alter pencil in the Customer box, as on the Sales Invoice
+    if (typeof refreshPreInvoiceCustomerAlterPencil === 'function') refreshPreInvoiceCustomerAlterPencil('order');
   }
 
   function isOrderInterstate(partyState) {
@@ -782,7 +791,7 @@
 
   // ── Save / Post Sales Order ──
   function getOrderFormData() {
-    const date = document.getElementById('orderDate')?.value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('orderDate')?.value || kyaLocalIso();
     const deliveryDate = document.getElementById('orderDeliveryDate')?.value || '';
     const dueDate = document.getElementById('orderDueDate')?.value || deliveryDate;
     const orderNo = document.getElementById('orderNo')?.value?.trim() || getNextOrderNumber();
@@ -833,7 +842,7 @@
     else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
     total += adjustments;
 
-    const { paymentStatus, paymentAccountId, paymentAccountName, paymentAmount, paymentSplits } = getOrderAdvanceBox().read(total);
+    const { paymentStatus, paymentAccountId, paymentAccountName, paymentAmount, paymentSplits, creditAdjustments } = getOrderAdvanceBox().read(total);
 
     return {
       id: _editingOrder ? _editingOrder.id : Date.now(),
@@ -844,6 +853,8 @@
       dueDate,
       customerId,
       customerName,
+      // Customer details changed for this document only (Customer Details card)
+      partyOverride: typeof getPartyOverrideToSave === 'function' ? getPartyOverrideToSave('order', customerId) : null,
       supplyType,
       salesExecutiveId,
       salesExecutiveName,
@@ -852,6 +863,7 @@
       paymentAccountName,
       paymentAmount,
       paymentSplits,
+      creditAdjustments: creditAdjustments || [],
       advanceJournalEntryId: _editingOrder ? _editingOrder.advanceJournalEntryId : null,
       advanceVoucherNo: _editingOrder ? _editingOrder.advanceVoucherNo : null,
       advancePaidAmount: _editingOrder ? _editingOrder.advancePaidAmount : 0,
@@ -894,6 +906,9 @@
       return;
     }
 
+    // A number already used can't be issued again (the order being edited keeps its own)
+    if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('salesOrder', data.orderNo, data.id)) return;
+
     window.KYA_STORE.salesOrders = window.KYA_STORE.salesOrders || [];
     window.KYA_STORE.salesOrdersDrafts = window.KYA_STORE.salesOrdersDrafts || [];
 
@@ -935,6 +950,8 @@
 
       // Remove from drafts if existed
       window.KYA_STORE.salesOrdersDrafts = window.KYA_STORE.salesOrdersDrafts.filter(d => d.id !== data.id);
+      // Saved: the number is used for good, even if the order is deleted later
+      if (typeof registerDocNo === 'function') registerDocNo('salesOrder', data.orderNo);
 
       showToast(`Sales Order ${data.orderNo} saved successfully!`, 'success');
     }
@@ -998,9 +1015,11 @@
     const chipEl = document.getElementById('orderChipDisplay');
     if (orderNoEl && chipEl) {
       orderNoEl.addEventListener('input', () => {
-        chipEl.textContent = orderNoEl.value.trim() || 'SO-2026-001';
+        chipEl.textContent = orderNoEl.value.trim() || orderNoEl.placeholder;
       });
     }
+    // Pencil (number format) and the "already used" check, as on the Sales Invoice
+    if (typeof wireDocNumberField === 'function') wireDocNumberField('salesOrder', () => (_editingOrder ? _editingOrder.id : null));
 
     // Due / Delivery Date helpers
     const dateEl = document.getElementById('orderDate');
@@ -1029,6 +1048,10 @@
     // Advance Payment — account (with Multi Payment) + amount, same as the Proforma Invoice
     getOrderAdvanceBox().wire();
 
+    // Customer box pencil → Master Desk Alter, as on the Sales Invoice
+    if (typeof wirePreInvoiceCustomerAlterPencil === 'function') wirePreInvoiceCustomerAlterPencil('order', populateOrderCustomers, selectOrderCustomer);
+    // Customer Details card (hover the box): Temporary In-Voucher Edit, as on the Sales Invoice
+    if (typeof attachPartyDetailsCard === 'function') attachPartyDetailsCard({ context: 'order', triggerId: 'orderCustomerSelectTrigger', triggerTextId: 'orderCustomerSelectTriggerText', selectId: 'orderCustomer', dropdownId: 'orderCustomerSelectDropdown' });
     // Customer Searchable Select
     const custTrigger = document.getElementById('orderCustomerSelectTrigger');
     const custDropdown = document.getElementById('orderCustomerSelectDropdown');
@@ -1277,6 +1300,7 @@
 
   // ── Global Exports ──
   window.openSalesOrderForm = openSalesOrderForm;
+  window.viewSalesOrderPreview = id => _orderList.view(id); // e.g. from Sales → Customers
   window.closeSalesOrderForm = closeSalesOrderForm;
   window.initSalesOrderForm = initSalesOrderForm;
   window.renderOrderRows = renderOrderRows;

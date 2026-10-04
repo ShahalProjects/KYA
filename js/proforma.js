@@ -124,10 +124,12 @@
 
   // ── Initialize Proforma Form ──
   function initProformaForm(proformaData) {
-    const today = new Date().toISOString().split('T')[0];
+    // The party edit saved with this document (none for a new one)
+    if (typeof setPartyOverride === 'function') setPartyOverride('proforma', (proformaData && proformaData.partyOverride) ? JSON.parse(JSON.stringify(proformaData.partyOverride)) : null);
+    const today = kyaLocalIso();
     const expiryDateObj = new Date();
     expiryDateObj.setDate(expiryDateObj.getDate() + 30);
-    const expiryDate = expiryDateObj.toISOString().split('T')[0];
+    const expiryDate = kyaLocalIso(expiryDateObj);
 
     const dateEl = document.getElementById('proformaDate');
     const expiryEl = document.getElementById('proformaExpiryDate');
@@ -197,6 +199,10 @@
       // Advance Payment
       populateProformaPaymentAccounts(proformaData.paymentAccountId);
       setProformaMultiPayments(proformaData.paymentSplits || []);
+      if (getProformaAdjust()) {
+        getProformaAdjust().load(typeof usesCreditAdjust === 'function' && usesCreditAdjust(proformaData.paymentAccountId, proformaData.paymentSplits)
+          ? proformaData.creditAdjustments : []);
+      }
       _proformaPaymentAccountPrev = proformaData.paymentAccountId || '';
       const payAmtEl = document.getElementById('proformaPaymentAmount');
       if (payAmtEl) {
@@ -235,6 +241,7 @@
 
       populateProformaPaymentAccounts();
       resetProformaMultiPayments();
+      if (getProformaAdjust()) getProformaAdjust().reset();
 
       const payAccEl = document.getElementById('proformaPaymentAccount');
       if (payAccEl) payAccEl.value = '';
@@ -247,15 +254,13 @@
     updateProformaDueDateHelper();
     renderProformaRows();
     recalculateProformaTotals();
+    if (typeof validateDocNoField === 'function') validateDocNoField('proforma'); // clear an old "already used" line
   }
 
+  // Next free number from the proforma number format (prefix / start / digits — the
+  // pencil in the number box), skipping numbers already used; see doc-numbering.js
   function getNextProformaNumber() {
-    window.KYA_STORE = window.KYA_STORE || {};
-    const list = (window.KYA_STORE.proformaInvoices || []).concat(window.KYA_STORE.proformaInvoicesDrafts || []);
-    const count = list.length + 1;
-    const year = new Date().getFullYear();
-    const pad = count < 10 ? '00' + count : (count < 100 ? '0' + count : count);
-    return `PI-${year}-${pad}`;
+    return getNextDocNo('proforma');
   }
 
   // ── Due Date Helper ──
@@ -326,6 +331,35 @@
     multiOpt.textContent = 'Multi Payment';
     if (String(selectedId) === PROFORMA_MULTI_PAYMENT_VALUE) multiOpt.selected = true;
     paySelect.appendChild(multiOpt);
+    // Invoice Balance, between the accounts and Multi Payment (sales-credit-adjust.js)
+    if (typeof appendAdjustOptions === 'function') appendAdjustOptions(paySelect, selectedId);
+  }
+
+  // The advance paid from credit the customer already has
+  let _proformaAdjust = null;
+  function getProformaAdjust() {
+    if (_proformaAdjust || typeof createAdjustController !== 'function') return _proformaAdjust;
+    _proformaAdjust = createAdjustController({
+      selectId: 'proformaPaymentAccount',
+      summaryAfterId: 'proformaMultiPaymentSummary',
+      getMode: () => 'pay',
+      getCustomerId: () => document.getElementById('proformaCustomer')?.value || '',
+      purpose: () => 'advance',
+      getRequired: () => getProformaMultiPaymentTarget(),
+      getCtx: () => getProformaAdjustCtx(),
+      onAmount: (total) => {
+        const amt = document.getElementById('proformaPaymentAmount');
+        if (amt) amt.value = total.toFixed(2);
+        recalculateProformaTotals();
+      },
+      repopulate: (id) => populateProformaPaymentAccounts(id)
+    });
+    return _proformaAdjust;
+  }
+  // This proforma's own advance / use of credits doesn't count against it
+  function getProformaAdjustCtx() {
+    return (_editingProforma && _editingProforma.id != null)
+      ? { excludeDoc: { store: 'proformaInvoices', id: _editingProforma.id } } : {};
   }
 
   // Debit rows for the advance receipt: one per account, scaled to `amount` when the
@@ -336,6 +370,11 @@
       const ledger = ledgers.find(l => String(l.id) === String(id));
       return ledger ? ledger.name : 'Cash Account';
     };
+    // Invoice Balance: the advance comes from the customer's existing credit
+    if (String(data.paymentAccountId) === 'credit-adjust' && typeof getCreditAdjustDebitRows === 'function') {
+      const rows = getCreditAdjustDebitRows(data.creditAdjustments, amount);
+      if (rows.length) return rows;
+    }
 
     const splits = (Array.isArray(data.paymentSplits) ? data.paymentSplits : [])
       .filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0);
@@ -353,6 +392,11 @@
         ? Math.round((amount - allocated) * 100) / 100
         : Math.round(((parseFloat(sp.amount) || 0) / splitTotal) * amount * 100) / 100;
       allocated += amt;
+      // The Invoice Balance row: the ledgers the customer's credit sits in
+      if (String(sp.accountId) === 'credit-adjust' && typeof getCreditAdjustDebitRows === 'function') {
+        getCreditAdjustDebitRows(data.creditAdjustments, amt).forEach(r => rows.push(r));
+        return;
+      }
       rows.push({ name: nameOf(sp.accountId), amount: amt });
     });
 
@@ -392,6 +436,7 @@
       typeLabel: 'Advance',
       getTarget: getProformaMultiPaymentTarget,
       getAccounts: getProformaCashEquivalentLedgers,
+      adjust: getProformaAdjust(),
       splits: _proformaMultiPayments,
       onSave: rows => {
         _proformaMultiPayments = rows;
@@ -410,6 +455,7 @@
 
   // Compact recap under the Payment Account dropdown; click it to reopen the modal.
   function updateProformaMultiPaymentUI() {
+    if (getProformaAdjust()) getProformaAdjust().refreshSummary();
     const summaryBtn = document.getElementById('proformaMultiPaymentSummary');
     if (!summaryBtn) return;
 
@@ -545,6 +591,8 @@
         <span style="font-size: 11px; font-weight: 600; color: var(--blue-600); background: #eff6ff; padding: 2px 6px; border-radius: 4px;">Select</span>
       `;
 
+      // Hovering a party shows its details, as in the Sales Invoice list
+      if (typeof bindPartyListItemPreview === 'function') bindPartyListItemPreview(item, c, 'Customer');
       item.addEventListener('click', () => {
         selectProformaCustomer(c.id);
         const dropdown = document.getElementById('proformaCustomerSelectDropdown');
@@ -589,6 +637,13 @@
         supplyTypeEl.value = isInterstate ? 'Inter-State (IGST)' : 'Intra-State (CGST + SGST)';
       }
     }
+    // A name changed for this document only (Customer Details → Temporary In-Voucher Edit);
+    // an edit made for another party doesn't carry over
+    const partyEdit = typeof getPartyOverride === 'function' ? getPartyOverride('proforma') : null;
+    if (partyEdit && customerId && String(partyEdit.partyId) !== String(customerId)) setPartyOverride('proforma', null);
+    else if (cust && partyEdit && partyEdit.isOverridden && partyEdit.name && triggerText) triggerText.textContent = partyEdit.name;
+    // Alter pencil in the Customer box, as on the Sales Invoice
+    if (typeof refreshPreInvoiceCustomerAlterPencil === 'function') refreshPreInvoiceCustomerAlterPencil('proforma');
   }
 
   function isProformaInterstate(partyState) {
@@ -1004,7 +1059,7 @@
 
   // ── Save / Post Proforma Invoice ──
   function getProformaFormData() {
-    const date = document.getElementById('proformaDate')?.value || new Date().toISOString().split('T')[0];
+    const date = document.getElementById('proformaDate')?.value || kyaLocalIso();
     const expiryDate = document.getElementById('proformaExpiryDate')?.value || '';
     const dueDate = document.getElementById('proformaDueDate')?.value || expiryDate;
     const proformaNo = document.getElementById('proformaNo')?.value?.trim() || getNextProformaNumber();
@@ -1060,6 +1115,8 @@
     let paymentAccountName = '';
     if (paymentAccountId === PROFORMA_MULTI_PAYMENT_VALUE) {
       paymentAccountName = 'Multi Payment';
+    } else if (paymentAccountId === 'credit-adjust') {
+      paymentAccountName = 'Invoice Balance';
     } else if (paymentAccountId && typeof coaLedgers !== 'undefined') {
       const acc = coaLedgers.find(l => String(l.id) === String(paymentAccountId));
       if (acc) paymentAccountName = acc.name;
@@ -1075,6 +1132,8 @@
       dueDate,
       customerId,
       customerName,
+      // Customer details changed for this document only (Customer Details card)
+      partyOverride: typeof getPartyOverrideToSave === 'function' ? getPartyOverrideToSave('proforma', customerId) : null,
       supplyType,
       salesExecutiveId,
       salesExecutiveName,
@@ -1083,6 +1142,10 @@
       paymentAccountName,
       paymentAmount,
       paymentSplits: getProformaMultiPaymentSplits(),
+      // Invoice Balance (the account, or its Multi Payment row): the customer's credits the
+      // advance came from
+      creditAdjustments: (typeof usesCreditAdjust === 'function' && usesCreditAdjust(paymentAccountId, getProformaMultiPaymentSplits()) && getProformaAdjust())
+        ? getProformaAdjust().get() : [],
       advanceJournalEntryId: _editingProforma ? _editingProforma.advanceJournalEntryId : null,
       advanceVoucherNo: _editingProforma ? _editingProforma.advanceVoucherNo : null,
       advancePaidAmount: _editingProforma ? _editingProforma.advancePaidAmount : 0,
@@ -1124,6 +1187,17 @@
       return;
     }
 
+    // Invoice Balance: the credits chosen must cover its part of the advance
+    if (typeof usesCreditAdjust === 'function' && usesCreditAdjust(data.paymentAccountId, data.paymentSplits)
+        && data.paymentStatus !== 'Not Paid' && typeof validateAllocations === 'function') {
+      const adjustErr = validateAllocations('pay', data.creditAdjustments,
+        getCreditAdjustPortion(data.paymentAccountId, data.paymentSplits, data.paymentAmount), data.customerId, getProformaAdjustCtx());
+      if (adjustErr) {
+        showToast(adjustErr, 'warning');
+        return;
+      }
+    }
+
     if (data.paymentAccountId === PROFORMA_MULTI_PAYMENT_VALUE && data.paymentStatus !== 'Not Paid') {
       const splits = data.paymentSplits || [];
       if (splits.length === 0) {
@@ -1142,6 +1216,9 @@
         return;
       }
     }
+
+    // A number already used can't be issued again (the proforma being edited keeps its own)
+    if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('proforma', data.proformaNo, data.id)) return;
 
     window.KYA_STORE.proformaInvoices = window.KYA_STORE.proformaInvoices || [];
     window.KYA_STORE.proformaInvoicesDrafts = window.KYA_STORE.proformaInvoicesDrafts || [];
@@ -1185,6 +1262,8 @@
 
       // Remove from drafts if existed
       window.KYA_STORE.proformaInvoicesDrafts = window.KYA_STORE.proformaInvoicesDrafts.filter(d => d.id !== data.id);
+      // Saved: the number is used for good, even if the proforma is deleted later
+      if (typeof registerDocNo === 'function') registerDocNo('proforma', data.proformaNo);
 
       showToast(`Proforma Invoice ${data.proformaNo} saved successfully!`, 'success');
     }
@@ -1264,9 +1343,11 @@
     const chipEl = document.getElementById('proformaChipDisplay');
     if (proformaNoEl && chipEl) {
       proformaNoEl.addEventListener('input', () => {
-        chipEl.textContent = proformaNoEl.value.trim() || 'PI-2026-001';
+        chipEl.textContent = proformaNoEl.value.trim() || proformaNoEl.placeholder;
       });
     }
+    // Pencil (number format) and the "already used" check, as on the Sales Invoice
+    if (typeof wireDocNumberField === 'function') wireDocNumberField('proforma', () => (_editingProforma ? _editingProforma.id : null));
 
     // Due Date helpers
     const dateEl = document.getElementById('proformaDate');
@@ -1285,9 +1366,16 @@
     if (payAccEl) {
       payAccEl.addEventListener('focus', () => {
         _proformaPaymentAccountPrev = payAccEl.value;
+        if (getProformaAdjust()) getProformaAdjust().rememberPrev();
         populateProformaPaymentAccounts(payAccEl.value);
       });
       payAccEl.addEventListener('change', () => {
+        // Invoice Balance opens its own popup
+        if (getProformaAdjust() && getProformaAdjust().handleChange()) {
+          resetProformaMultiPayments();
+          updateProformaMultiPaymentUI();
+          return;
+        }
         if (payAccEl.value === PROFORMA_MULTI_PAYMENT_VALUE) {
           openProformaMultiPaymentModal();
         } else {
@@ -1320,6 +1408,10 @@
       });
     }
 
+    // Customer box pencil → Master Desk Alter, as on the Sales Invoice
+    if (typeof wirePreInvoiceCustomerAlterPencil === 'function') wirePreInvoiceCustomerAlterPencil('proforma', populateProformaCustomers, selectProformaCustomer);
+    // Customer Details card (hover the box): Temporary In-Voucher Edit, as on the Sales Invoice
+    if (typeof attachPartyDetailsCard === 'function') attachPartyDetailsCard({ context: 'proforma', triggerId: 'proformaCustomerSelectTrigger', triggerTextId: 'proformaCustomerSelectTriggerText', selectId: 'proformaCustomer', dropdownId: 'proformaCustomerSelectDropdown' });
     // Customer Searchable Select
     const custTrigger = document.getElementById('proformaCustomerSelectTrigger');
     const custDropdown = document.getElementById('proformaCustomerSelectDropdown');
@@ -1571,6 +1663,7 @@
   // ══════════════════════════════════════════════════════════════════
 
   function getAllProformaInvoices() {
+    if (typeof window.healPreInvoiceReversals === 'function') window.healPreInvoiceReversals();
     window.KYA_STORE = window.KYA_STORE || {};
     const posted = window.KYA_STORE.proformaInvoices || [];
     const drafts = window.KYA_STORE.proformaInvoicesDrafts || [];
@@ -1610,7 +1703,11 @@
       showToast('Proforma invoice not found.', 'error');
       return;
     }
+    if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(prof, `Proforma ${prof.proformaNo || ''}`)) return;
 
+    // Cancelling gives the advance back — not while part of it paid other documents
+    if (newStatus === 'Cancelled' && typeof blockIfCreditUsed === 'function'
+        && blockIfCreditUsed([`adv:proformaInvoices:${prof.id}`], `Proforma ${prof.proformaNo || ''}`, 'cancelled')) return;
     if (prof.status === 'Completed' && newStatus === 'Active') {
       showToast('Completed proforma invoices cannot be reopened.', 'warning');
       return;
@@ -1667,7 +1764,10 @@
                  window.KYA_STORE.proformaInvoicesDrafts.find(d => String(d.id) === String(id));
 
     const pNo = prof ? (prof.proformaNo || 'proforma invoice') : 'proforma invoice';
+    if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(prof, `Proforma ${pNo}`)) return;
 
+    if (prof && typeof blockIfCreditUsed === 'function'
+        && blockIfCreditUsed([`adv:proformaInvoices:${prof.id}`], `Proforma ${pNo}`, 'deleted')) return;
     if (prof && prof.status === 'Completed') {
       showToast('Completed proforma invoices cannot be deleted.', 'warning');
       return;
@@ -1711,6 +1811,7 @@
       showToast('Completed proforma invoices cannot be edited.', 'warning');
       return;
     }
+    if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(prof, `Proforma ${prof.proformaNo || ''}`)) return;
     openProformaForm(prof, 'proformalist');
   }
 
@@ -1729,8 +1830,8 @@
       id: Date.now(),
       customerId: prof.customerId,
       customerName: prof.customerName,
-      date: new Date().toISOString().split('T')[0],
-      dueDate: prof.dueDate || prof.expiryDate || new Date().toISOString().split('T')[0],
+      date: kyaLocalIso(),
+      dueDate: prof.dueDate || prof.expiryDate || kyaLocalIso(),
       invoiceNo: nextInvNo,
       salesSupplyType: prof.supplyType || 'Intra-State (CGST + SGST)',
       salesExecutiveId: prof.salesExecutiveId || '',
@@ -1750,6 +1851,8 @@
       subTotal: prof.subTotal,
       total: prof.total,
       rows: Array.isArray(prof.rows) ? JSON.parse(JSON.stringify(prof.rows)) : [],
+      // Customer details changed on the proforma carry over to the invoice
+      partyOverride: prof.partyOverride ? JSON.parse(JSON.stringify(prof.partyOverride)) : null,
       uploadedDoc: prof.document ? {
         fileName: prof.document.name,
         fileSize: prof.document.size ? `${(prof.document.size / 1024).toFixed(1)} KB` : '',
@@ -1759,6 +1862,8 @@
       _isFromProforma: true,
       convertedFromProformaId: prof.id
     };
+    // Only the advance still free comes across (Invoice Balance may have used some)
+    if (typeof getConvertedAdvanceFields === 'function') Object.assign(inv, getConvertedAdvanceFields('proformaInvoices', prof));
 
     window._pendingConvertProformaId = prof.id;
 
@@ -1832,9 +1937,11 @@
     const coGstin = activeCo.gstin || '';
     const coPhone = activeCo.phone || '';
 
-    const customer = (typeof findPartyById === 'function' ? findPartyById(prof.customerId, 'Customer') : null) ||
+    const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(prof.customerId, 'Customer') : null) ||
                      (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == prof.customerId) : null) ||
                      { name: prof.customerName || 'Customer' };
+    // With the customer details changed for this document only (Customer Details card)
+    const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, prof.partyOverride) : masterCustomer;
     const partyName = customer.name || prof.customerName || 'Customer';
     const partyContact = customer.contactName || '';
     const partyAddr = customer.address || '';

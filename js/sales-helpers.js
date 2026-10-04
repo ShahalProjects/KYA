@@ -100,7 +100,8 @@
     'salesQuotationListCard', 'salesQuotationFormCard',
     'salesProformaListCard', 'salesProformaFormCard',
     'salesOrderListCard', 'salesOrderFormCard',
-    'salesDeliveryChallanListCard', 'salesDeliveryChallanFormCard'
+    'salesDeliveryChallanListCard', 'salesDeliveryChallanFormCard',
+    'salesCustomersCard', 'salesCustomersListCard'
   ];
   function showSalesPreInvoiceCard(cardId) {
     SALES_PRE_INVOICE_CARD_IDS.forEach(id => {
@@ -172,7 +173,13 @@
       jeType: 'advance_receipt',
       customerId: doc.customerId,
       customerName: custName,
-      sourceDocNo: info.docNo
+      sourceDocNo: info.docNo,
+      // Paid from credit the customer already had (Invoice Balance — the account, or its
+      // Multi Payment row): the statement already shows that credit, so it isn't a new receipt
+      creditFunded: typeof getCreditAdjustPortion === 'function' ? getCreditAdjustPortion(doc.paymentAccountId, doc.paymentSplits, amount) : 0,
+      // Set off against another party's ledger: that party's statement shows it
+      ledgerAdjust: typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(doc.paymentAccountId),
+      partyName: custName
     }, info.extra || {});
 
     const idx = postedEntries.findIndex(e => String(e.id) === String(entryId));
@@ -200,6 +207,12 @@
   function getPreInvoiceAdvanceReceiptRows(data, amount) {
     const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
     const nameOf = id => (ledgers.find(l => String(l.id) === String(id)) || {}).name || 'Cash Account';
+    // Invoice Balance: the advance comes from the customer's existing credit —
+    // one row per ledger that credit sits in
+    if (String(data.paymentAccountId) === 'credit-adjust' && typeof getCreditAdjustDebitRows === 'function') {
+      const rows = getCreditAdjustDebitRows(data.creditAdjustments, amount);
+      if (rows.length) return rows;
+    }
     const used = (Array.isArray(data.paymentSplits) ? data.paymentSplits : [])
       .filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0);
     const splitTotal = used.reduce((sum, sp) => sum + (parseFloat(sp.amount) || 0), 0);
@@ -214,6 +227,11 @@
         ? Math.round((amount - allocated) * 100) / 100
         : Math.round(((parseFloat(sp.amount) || 0) / splitTotal) * amount * 100) / 100;
       allocated += amt;
+      // The Invoice Balance row: the ledgers the customer's credit sits in
+      if (String(sp.accountId) === 'credit-adjust' && typeof getCreditAdjustDebitRows === 'function') {
+        getCreditAdjustDebitRows(data.creditAdjustments, amt).forEach(r => rows.push(r));
+        return;
+      }
       rows.push({ name: nameOf(sp.accountId), amount: amt });
     });
     const usable = rows.filter(r => r.amount > 0);
@@ -234,6 +252,36 @@
     const $ = name => document.getElementById(prefix + name);
     let splits = [];
     let prevAccount = '';
+    let docId = null; // the document open on the form (null for a new one)
+    const storeKey = prefix === 'order' ? 'salesOrders' : (prefix === 'challan' ? 'deliveryChallans' : null);
+
+    // Invoice Balance (sales-credit-adjust.js): the advance paid from
+    // credit the customer already has
+    let adjust = null;
+    function getAdjust() {
+      if (adjust || typeof createAdjustController !== 'function') return adjust;
+      adjust = createAdjustController({
+        selectId: prefix + 'PaymentAccount',
+        summaryAfterId: prefix + 'MultiPaymentSummary',
+        getMode: () => 'pay',
+        getCustomerId: () => document.getElementById(prefix + 'Customer')?.value || '',
+        purpose: () => 'advance',
+        getRequired: () => getTarget(),
+        getCtx: () => adjustCtx(),
+        onAmount: (total) => {
+          const amtEl = $('PaymentAmount');
+          if (amtEl) amtEl.value = total.toFixed(2);
+          if (typeof onAmountChange === 'function') onAmountChange();
+          updateSummary();
+        },
+        repopulate: (id) => populateAccounts(id)
+      });
+      return adjust;
+    }
+    // This document's own advance / use of credits doesn't count against it
+    function adjustCtx() {
+      return (storeKey && docId != null) ? { excludeDoc: { store: storeKey, id: docId } } : {};
+    }
 
     function cashAccounts() {
       let accounts = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers))
@@ -263,6 +311,7 @@
       multiOpt.textContent = 'Multi Payment';
       if (String(selectedId) === MULTI) multiOpt.selected = true;
       select.appendChild(multiOpt);
+      if (typeof appendAdjustOptions === 'function') appendAdjustOptions(select, selectedId);
     }
 
     function isMulti() {
@@ -297,6 +346,7 @@
 
     // Compact recap under the Payment Account dropdown; click it to reopen the split
     function updateSummary() {
+      if (getAdjust()) getAdjust().refreshSummary();
       const btn = $('MultiPaymentSummary');
       if (!btn) return;
       if (!isMulti()) { btn.style.display = 'none'; return; }
@@ -316,6 +366,7 @@
         typeLabel: 'Advance',
         getTarget,
         getAccounts: cashAccounts,
+        adjust: getAdjust(),
         splits,
         onSave: rows => { splits = rows; updateSummary(); },
         onCancel: () => {
@@ -350,6 +401,11 @@
         amtEl.value = !doc ? ''
           : (doc.paymentStatus === 'Full Payment' ? (doc.paymentAmount || doc.total || '') : (doc.paymentAmount || ''));
       }
+      docId = (doc && doc.id != null) ? doc.id : null;
+      if (getAdjust()) {
+        getAdjust().load(doc && typeof usesCreditAdjust === 'function' && usesCreditAdjust(doc.paymentAccountId, doc.paymentSplits)
+          ? doc.creditAdjustments : []);
+      }
       updateSummary();
     }
 
@@ -367,6 +423,8 @@
       let accountName = '';
       if (accountId === MULTI) {
         accountName = 'Multi Payment';
+      } else if (accountId === 'credit-adjust') {
+        accountName = 'Invoice Balance';
       } else if (accountId && typeof coaLedgers !== 'undefined') {
         const acc = coaLedgers.find(l => String(l.id) === String(accountId));
         if (acc) accountName = acc.name;
@@ -377,7 +435,11 @@
         paymentAccountId: accountId,
         paymentAccountName: accountName,
         paymentAmount: (total > 0) ? Math.min(advance, total) : advance,
-        paymentSplits: getSplits()
+        paymentSplits: getSplits(),
+        // Invoice Balance (the account, or its Multi Payment row): the customer's credits the
+        // advance came from
+        creditAdjustments: (typeof usesCreditAdjust === 'function' && usesCreditAdjust(accountId, getSplits()) && getAdjust())
+          ? getAdjust().get() : []
       };
     }
 
@@ -385,6 +447,13 @@
     function validate(data) {
       if (data.paymentStatus === 'Not Paid') return '';
       if (!data.paymentAccountId) return 'Please select a Payment Account for the advance payment.';
+      // Invoice Balance: the credits chosen must cover its part of the advance
+      if (typeof usesCreditAdjust === 'function' && usesCreditAdjust(data.paymentAccountId, data.paymentSplits)
+          && typeof validateAllocations === 'function') {
+        const err = validateAllocations('pay', data.creditAdjustments,
+          getCreditAdjustPortion(data.paymentAccountId, data.paymentSplits, data.paymentAmount), data.customerId, adjustCtx());
+        if (err) return err;
+      }
       if (data.paymentAccountId !== MULTI) return '';
       const used = data.paymentSplits || [];
       if (used.length === 0) return 'Please set up the Multi Payment split for this advance.';
@@ -408,9 +477,16 @@
       if (select) {
         select.addEventListener('focus', () => {
           prevAccount = select.value;
+          if (getAdjust()) getAdjust().rememberPrev();
           populateAccounts(select.value);
         });
         select.addEventListener('change', () => {
+          // Invoice Balance opens its own popup
+          if (getAdjust() && getAdjust().handleChange()) {
+            clearSplits();
+            updateSummary();
+            return;
+          }
           if (select.value === MULTI) {
             openSplit();
           } else {
@@ -454,13 +530,14 @@
   function isSalesReturnInvoiceSelected() {
     if (currentSalesVoucherSubtype !== 'Return') return false;
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
-    return triggerText && triggerText.textContent !== 'Select Invoice';
+    return triggerText && triggerText.textContent !== '— Select —';
   }
 
   function getInvoiceRemainingRows(origInv, excludeReturnId = null) {
     if (!origInv || !origInv.rows) return [];
-    const postedReturns = (window.KYA_STORE.salesVouchers || []).filter(v => 
-      v.isReturn && 
+    const postedReturns = (window.KYA_STORE.salesVouchers || []).filter(v =>
+      v.isReturn &&
+      !v.reversedPreInvoice &&
       v.returnAgainstInvoice && 
       v.returnAgainstInvoice.toLowerCase() === origInv.invoiceNo.toLowerCase() && 
       (excludeReturnId === null || v.id !== excludeReturnId)
@@ -493,14 +570,171 @@
 
   function getOriginalInvoiceForReturn() {
     if (currentSalesVoucherSubtype !== 'Return') return null;
+    if (window._salesReversalPreInvoice) return null; // reversing a pre-invoice, not an invoice
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
-    if (!triggerText || triggerText.textContent === 'Select Invoice') return null;
+    if (!triggerText || triggerText.textContent === '— Select —') return null;
     const invNo = triggerText.textContent.trim();
     return (window.KYA_STORE.salesVouchers || []).find(v => v.invoiceNo.toLowerCase() === invNo.toLowerCase() && !v.isReturn);
   }
 
-  function updateSalesReturnLockState() {
-    const isLocked = isSalesReturnInvoiceSelected();
+  // ── Reversal No.: <prefix><Original Doc no.> ──
+  // The prefix is set from the pencil in the Reversal No. box (default "REV-"); a further
+  // reversal of the same document gets -2, -3 …
+  function getSalesReversalPrefix() {
+    const s = typeof getSalesNumberingSettings === 'function' ? getSalesNumberingSettings('reversal') : null;
+    return (s && s.prefix) || 'REV-';
+  }
+
+  function getSalesReversalNoFor(docNo, prefix) {
+    const base = `${prefix === undefined ? getSalesReversalPrefix() : prefix}${docNo}`;
+    let candidate = base;
+    let n = 1;
+    while (typeof isSalesInvoiceNoUsed === 'function' && isSalesInvoiceNoUsed(candidate, 'return')) {
+      n++;
+      candidate = `${base}-${n}`;
+    }
+    return candidate;
+  }
+
+  // The Original Doc number on the form ('' when none is chosen)
+  function getSalesReversalDocNo() {
+    const trigger = document.getElementById('salesInvoiceSelectTriggerText');
+    return (trigger && trigger.textContent.trim() !== '— Select —') ? trigger.textContent.trim() : '';
+  }
+
+  // Fills the read-only Reversal No. box: empty until an Original Doc is chosen. A number
+  // that already belongs to the chosen document is kept unless `force` is set.
+  function refreshSalesReversalNo(force) {
+    if (currentSalesVoucherSubtype !== 'Return') return;
+    const invNoEl = document.getElementById('salesInvoiceNo');
+    const chipEl = document.getElementById('salesVoucherChipDisplay');
+    if (!invNoEl) return;
+    // The pencil sets the prefix; the rest of the number comes from the Original Doc
+    const fmtBtn = document.getElementById('btnSalesInvoiceNoFormat');
+    if (fmtBtn) {
+      fmtBtn.style.display = '';
+      fmtBtn.title = 'Set reversal number prefix';
+      fmtBtn.setAttribute('aria-label', 'Set reversal number prefix');
+    }
+    invNoEl.readOnly = true;
+    invNoEl.style.background = 'var(--slate-50)';
+    invNoEl.style.cursor = 'default';
+    invNoEl.title = 'Prefix + Original Doc number';
+
+    const trigger = document.getElementById('salesInvoiceSelectTriggerText');
+    const docNo = getSalesReversalDocNo();
+    // The chosen document reads like a value, the empty box like a placeholder
+    if (trigger) {
+      trigger.style.color = docNo ? 'var(--slate-800)' : '';
+      trigger.style.fontWeight = docNo ? '600' : '';
+    }
+    if (!docNo) {
+      invNoEl.value = '';
+      invNoEl.placeholder = 'Select Original Doc first';
+    } else {
+      invNoEl.placeholder = '';
+      const base = `${getSalesReversalPrefix()}${docNo}`.toLowerCase();
+      const cur = invNoEl.value.trim().toLowerCase();
+      const belongs = !!cur && (cur === base || cur.startsWith(`${base}-`));
+      if (force || !belongs) invNoEl.value = getSalesReversalNoFor(docNo);
+    }
+    if (chipEl) chipEl.textContent = invNoEl.value || 'REV-XXXX';
+    if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
+  }
+  window.refreshSalesReversalNo = refreshSalesReversalNo;
+
+  // Pencil in the Reversal No. box: the same Number Format popup as the invoice, with the
+  // prefix only (the number itself is the Original Doc's)
+  function openSalesReversalNumberingModal() {
+    if (typeof openKyaNumberingModal !== 'function') return;
+    const docNo = getSalesReversalDocNo();
+    openKyaNumberingModal({
+      kind: 'reversal',
+      noun: 'Reversal',
+      prefixOnly: true,
+      requirePrefix: true,
+      subtitle: 'A reversal is numbered with this prefix followed by its Original Doc number. A further reversal of the same document gets -2, -3 …',
+      previewLabel: docNo ? `Reversal number for ${docNo}` : 'Example reversal number',
+      preview: f => ({
+        text: f.prefix ? getSalesReversalNoFor(docNo || 'INV-2026-001', f.prefix) : '',
+        note: docNo ? '' : 'Shown for an example invoice — the chosen Original Doc number is used.'
+      }),
+      onSaved: () => {
+        // A posted reversal being edited keeps its number; anything else takes the prefix
+        const editing = window._editingSalesInvoice;
+        if (editing && !editing.isDraft) {
+          if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
+        } else {
+          refreshSalesReversalNo(true);
+        }
+      }
+    });
+  }
+  window.openSalesReversalNumberingModal = openSalesReversalNumberingModal;
+
+  // Lets code set TDS / TCS from an Original Doc (a disabled button ignores .click());
+  // updateSalesReturnLockState locks them again afterwards
+  function unlockSalesTdsTcsButtons() {
+    ['salesTdsTcsNone', 'salesTdsTcsTds', 'salesTdsTcsTcs', 'salesTdsTcsRateSelect', 'salesTdsTcsRateCustom'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = false;
+    });
+  }
+  window.unlockSalesTdsTcsButtons = unlockSalesTdsTcsButtons;
+
+  // Line items on a Sales Reversal: nothing can be typed until an Original Doc is chosen;
+  // a pre-invoice is reversed whole; an invoice's lines keep their rate, amount and tax —
+  // only the quantity (and a ₹ discount) being reversed changes.
+  function applySalesReversalRowLocks() {
+    if (currentSalesVoucherSubtype !== 'Return') return;
+    const body = document.getElementById('salesItemBody');
+    if (!body) return;
+    if (typeof getSalesReversalPreInvoice === 'function' && getSalesReversalPreInvoice()) {
+      if (typeof lockSalesRowsForPreInvoiceReversal === 'function') lockSalesRowsForPreInvoiceReversal();
+      return;
+    }
+    const lockEl = el => {
+      if (!el) return;
+      if (el.tagName === 'SELECT') el.disabled = true;
+      else el.readOnly = true;
+      el.style.cursor = 'not-allowed';
+      el.style.color = 'var(--slate-500)';
+    };
+    const hasDoc = !!getOriginalInvoiceForReturn();
+    body.querySelectorAll('tr.sales-row').forEach(tr => {
+      if (!hasDoc) {
+        tr.querySelectorAll('input, select').forEach(lockEl);
+        tr.querySelectorAll('.sales-del-row, .kya-alter-pencil').forEach(b => { b.style.display = 'none'; });
+        return;
+      }
+      ['.sales-row-rate', '.sales-row-amount-input', '.sales-row-tax', '.sales-row-discount-type']
+        .forEach(sel => lockEl(tr.querySelector(sel)));
+      tr.querySelectorAll('.kya-alter-pencil').forEach(b => { b.style.display = 'none'; });
+    });
+  }
+  window.applySalesReversalRowLocks = applySalesReversalRowLocks;
+
+  // While the Customer box is locked (data-locked="1"), a click or Enter / Space on it does
+  // nothing; runs in the capture phase, ahead of the box's own handler that opens the list
+  function guardSalesCustomerTrigger(trigger) {
+    if (!trigger || trigger._lockGuarded) return;
+    trigger._lockGuarded = true;
+    const block = (e) => {
+      if (trigger.dataset.locked !== '1') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    trigger.addEventListener('click', block, true);
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') block(e);
+    }, true);
+  }
+
+  function updateSalesReturnLockStateBase() {
+    // On a Sales Reversal the party, supply type, executive, type and TDS / TCS all come
+    // from the Original Doc — they are never edited, even before one is chosen
+    const isReversal = currentSalesVoucherSubtype === 'Return';
+    const isLocked = isReversal || isSalesReturnInvoiceSelected();
     
     const custEl = document.getElementById('salesCustomer');
     const custTrigger = document.getElementById('salesCustomerSelectTrigger');
@@ -510,9 +744,13 @@
       custEl.style.cursor = isLocked ? 'not-allowed' : '';
     }
     if (custTrigger) {
-      custTrigger.style.pointerEvents = isLocked ? 'none' : '';
+      // Locked against picking another party, but still hoverable: the Customer Details card
+      // opens on hover as on a new invoice (the click / key guard below keeps the list shut)
+      guardSalesCustomerTrigger(custTrigger);
+      custTrigger.dataset.locked = isLocked ? '1' : '';
+      custTrigger.style.pointerEvents = '';
       custTrigger.style.backgroundColor = isLocked ? 'var(--slate-50)' : '#fff';
-      custTrigger.style.cursor = isLocked ? 'not-allowed' : 'pointer';
+      custTrigger.style.cursor = isLocked ? 'default' : 'pointer';
       custTrigger.style.opacity = isLocked ? '0.7' : '1';
     }
     
@@ -548,6 +786,8 @@
     
     const addRowBtn = document.getElementById('salesAddRow');
     if (addRowBtn) {
+      // A reversal only works on the Original Doc's lines — no new rows
+      addRowBtn.style.display = isReversal ? 'none' : '';
       addRowBtn.disabled = isLocked;
       addRowBtn.style.cursor = isLocked ? 'not-allowed' : '';
       if (isLocked) {
@@ -580,6 +820,7 @@
     const payAmtEl = document.getElementById('salesPaymentAmount');
     if (payAmtEl) {
       payAmtEl.removeAttribute('max');
+      delete payAmtEl.dataset.refundable; // what the Original Doc still allows to be refunded
     }
 
     const rateSelect = document.getElementById('salesTdsTcsRateSelect');
@@ -594,6 +835,35 @@
       customRateInput.disabled = false;
       customRateInput.style.backgroundColor = '';
       customRateInput.style.cursor = '';
+    }
+
+    // Reversing a pre-invoice: refund limited to its advance
+    if (typeof applyPreInvoiceReversalLocks === 'function' && applyPreInvoiceReversalLocks()) return;
+
+    // Reversal with no Original Doc yet: TDS / TCS stays as it is until one is chosen
+    if (isReversal && !getOriginalInvoiceForReturn()) {
+      [tdsTcsNoneBtn, tdsTcsTdsBtn, tdsTcsTcsBtn].forEach(btn => {
+        if (btn && !btn.classList.contains('active')) {
+          btn.disabled = true;
+          btn.style.cursor = 'not-allowed';
+          btn.style.opacity = '0.5';
+        }
+      });
+      [rateSelect, customRateInput].forEach(el => {
+        if (!el) return;
+        el.disabled = true;
+        el.style.backgroundColor = 'var(--slate-50)';
+        el.style.cursor = 'not-allowed';
+      });
+      // …and nothing can be refunded yet
+      if (payNotPaidBtn && !payNotPaidBtn.classList.contains('active')) payNotPaidBtn.click();
+      [payFullBtn, payPartialBtn].forEach(btn => {
+        if (!btn) return;
+        btn.disabled = true;
+        btn.style.cursor = 'not-allowed';
+        btn.style.opacity = '0.5';
+      });
+      return;
     }
 
     const origInv = getOriginalInvoiceForReturn();
@@ -621,25 +891,17 @@
       const remainingRefundable = Math.max(0, origPaidAmt - alreadyRefunded);
 
       if (origInv.paymentStatus === 'Not Paid' || remainingRefundable <= 0) {
-        if (payNotPaidBtn && !payNotPaidBtn.classList.contains('active')) {
-          payNotPaidBtn.click();
-        }
-        if (payFullBtn) {
-          payFullBtn.disabled = true;
-          payFullBtn.style.cursor = 'not-allowed';
-          payFullBtn.style.opacity = '0.5';
-        }
-        if (payPartialBtn) {
-          payPartialBtn.disabled = true;
-          payPartialBtn.style.cursor = 'not-allowed';
-          payPartialBtn.style.opacity = '0.5';
-        }
+        // Nothing to pay back in cash — Full / Partial stay open so the credit can still be
+        // applied to unpaid invoices (Invoice Balance); a cash refund is
+        // refused on posting
         if (payAmtEl) {
           payAmtEl.max = 0;
+          payAmtEl.dataset.refundable = 0;
         }
       } else {
         if (payAmtEl) {
           payAmtEl.max = remainingRefundable;
+          payAmtEl.dataset.refundable = remainingRefundable;
         }
       }
 
@@ -708,6 +970,81 @@
       }
     }
   }
+
+  function updateSalesReturnLockState() {
+    // The base sets every control afresh — the cash-sale lock goes back on top of it
+    clearSalesCashCustomerFlags();
+    updateSalesReturnLockStateBase();
+    applySalesCashCustomerLock();
+  }
+
+  // ── Cash sale: a Cash and Cash Equivalents ledger picked as the customer ──
+  // The money comes in there and then, so the payment is always Full Payment (Full Refund on
+  // its reversal) into that same account; Not Paid / Partial, Multi Payment and Invoice
+  // Balance don't apply.
+  function getSalesCashCustomerLedger(customerId) {
+    const id = (customerId !== undefined) ? customerId : document.getElementById('salesCustomer')?.value;
+    if (!id || typeof coaLedgers === 'undefined' || !Array.isArray(coaLedgers)) return null;
+    return coaLedgers.find(l => l && l.type === 'ledger' && l.sgId === 'sg-cce' && String(l.id) === String(id)) || null;
+  }
+
+  function setSalesCashLocked(el, locked) {
+    if (!el) return;
+    el.disabled = locked;
+    el.style.cursor = locked ? 'not-allowed' : '';
+    if (el.tagName === 'SELECT') el.style.backgroundColor = locked ? 'var(--slate-50)' : '';
+    else el.style.opacity = locked ? '0.5' : '';
+    if (locked) el.dataset.cashLocked = '1';
+    else delete el.dataset.cashLocked;
+  }
+
+  const SALES_CASH_LOCK_IDS = ['salesPaymentStatusNotPaid', 'salesPaymentStatusPartial', 'salesPaymentAccount'];
+
+  // Forget the lock: the base sets the status buttons afresh, but not the account list
+  function clearSalesCashCustomerFlags() {
+    const paySel = document.getElementById('salesPaymentAccount');
+    if (paySel && paySel.dataset.cashLocked) setSalesCashLocked(paySel, false);
+    SALES_CASH_LOCK_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) delete el.dataset.cashLocked;
+    });
+  }
+
+  function applySalesCashCustomerLock() {
+    const cash = getSalesCashCustomerLedger();
+    const fullBtn = document.getElementById('salesPaymentStatusFull');
+    const paySel = document.getElementById('salesPaymentAccount');
+    if (!cash) {
+      // Another party now: undo only what this lock did
+      SALES_CASH_LOCK_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.dataset.cashLocked) setSalesCashLocked(el, false);
+      });
+      if (paySel) paySel.title = '';
+      return false;
+    }
+    if (fullBtn && !fullBtn.classList.contains('active')) {
+      fullBtn.disabled = false;
+      fullBtn.click();
+    }
+    if (fullBtn) { fullBtn.disabled = false; fullBtn.style.cursor = ''; fullBtn.style.opacity = ''; }
+    setSalesCashLocked(document.getElementById('salesPaymentStatusNotPaid'), true);
+    setSalesCashLocked(document.getElementById('salesPaymentStatusPartial'), true);
+    if (paySel) {
+      if (String(paySel.value) !== String(cash.id)) {
+        if (typeof resetSalesMultiPayments === 'function') resetSalesMultiPayments();
+        if (typeof getSalesAdjust === 'function' && getSalesAdjust()) getSalesAdjust().reset();
+        if (typeof populateSalesPaymentAccounts === 'function') populateSalesPaymentAccounts(cash.id);
+        paySel.value = String(cash.id);
+        if (typeof updateSalesMultiPaymentUI === 'function') updateSalesMultiPaymentUI();
+      }
+      setSalesCashLocked(paySel, true);
+      paySel.title = `Cash sale — ${currentSalesVoucherSubtype === 'Return' ? 'refunded' : 'received'} in full in ${cash.name}`;
+    }
+    return true;
+  }
+  window.getSalesCashCustomerLedger = getSalesCashCustomerLedger;
+  window.applySalesCashCustomerLock = applySalesCashCustomerLock;
 
   // ── Advance carried in from a Pre Invoice (Proforma / Sales Order / Delivery Challan) ──
   // The advance already received: from the conversion in progress, or stored on the
@@ -810,6 +1147,36 @@
     payBox.addEventListener('focusout', e => { if (!payBox.contains(e.relatedTarget)) hide(); });
   }
 
+  // Hover popup on a Sales Reversal of an invoice: paid, already refunded, refundable now
+  function updateInvoiceReversalInfo(box, total) {
+    const origInv = getOriginalInvoiceForReturn();
+    if (!origInv || !box) return false;
+    const fmt = n => (typeof fmtNum === 'function') ? fmtNum(n) : (parseFloat(n) || 0).toFixed(2);
+    const paid = origInv.paymentStatus === 'Full Payment'
+      ? ((parseFloat(origInv.paymentAmount) || 0) > 0 ? parseFloat(origInv.paymentAmount) : (parseFloat(origInv.total) || 0))
+      : (origInv.paymentStatus === 'Partial Payment' ? (parseFloat(origInv.paymentAmount) || 0) : 0);
+    const payAmtEl = document.getElementById('salesPaymentAmount');
+    const refundable = payAmtEl ? (parseFloat(payAmtEl.dataset.refundable) || 0) : 0;
+    const already = Math.max(0, Math.round((paid - refundable) * 100) / 100);
+    const row = (label, value, strong) => `<div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 2px;"><span>${label}</span>${strong ? `<strong>${value}</strong>` : `<span>${value}</span>`}</div>`;
+    const invNo = typeof ohEsc === 'function' ? ohEsc(origInv.invoiceNo) : origInv.invoiceNo;
+    const adjustHint = '<div style="margin-top: 4px; font-weight: 500;">Or choose Invoice Balance as the Refund Account to apply the credit to the customer\'s unpaid invoices.</div>';
+    box.dataset.active = '1';
+    if (document.getElementById('salesPaymentAccount')?.value === 'credit-adjust') {
+      box.innerHTML = `${row('Credit to apply to invoices', `₹ ${fmt(getSalesPaymentMax(total))}`, true)}
+        <div style="margin-top: 4px; font-weight: 500;">Nothing is paid out — the invoices chosen show this much less due.</div>`;
+    } else {
+      const now = Math.min(total, refundable);
+      box.innerHTML = paid > 0
+        ? `${row(`Received on ${invNo}`, `₹ ${fmt(paid)}`)}
+           ${already > 0 ? row('Already refunded', `₹ ${fmt(already)}`) : ''}
+           ${row('Refundable on this reversal', `₹ ${fmt(now)}`, true)}
+           <div style="margin-top: 4px; font-weight: 500;">Any part not refunded stays as a credit to the customer.</div>${adjustHint}`
+        : `<div style="font-weight: 500;">Nothing was received on ${invNo} — the reversal reduces what the customer owes.</div>${adjustHint}`;
+    }
+    return true;
+  }
+
   // Advance / balance popup content for the Payment Status box; Full & Partial are off
   // once the advance covers the whole invoice
   function updateSalesAdvanceInfo(total) {
@@ -829,6 +1196,10 @@
     };
 
     if (currentSalesVoucherSubtype !== 'Return') setSalesPaymentLabels(getSalesAdvanceExcess(t) > 0);
+    // Reversal of a pre-invoice: show its advance instead
+    if (currentSalesVoucherSubtype === 'Return' && typeof updatePreInvoiceReversalInfo === 'function' && updatePreInvoiceReversalInfo(box)) return;
+    // Reversal of an invoice: what was paid on it and what can still be refunded
+    if (currentSalesVoucherSubtype === 'Return' && updateInvoiceReversalInfo(box, t)) return;
 
     if (adv.amount <= 0) {
       box.dataset.active = '0';
@@ -953,12 +1324,23 @@
       maxVal = excess > 0 ? excess : Math.max(0, total - getSalesAdvanceApplied(total));
     }
     if (currentSalesVoucherSubtype === 'Return') {
+      // Reversing a pre-invoice: only its advance can be refunded
+      const revPre = typeof getSalesReversalPreInvoice === 'function' ? getSalesReversalPreInvoice() : null;
+      if (revPre) return revPre.advance;
+      // What the invoice still has to refund (set when it is chosen). The input's own max
+      // follows this and the current total, so it is not read back here — otherwise a
+      // lower total would stick after the quantity goes up again.
+      // Applying the credit to unpaid invoices (Invoice Balance) pays nothing
+      // out, so it can use the whole reversal
+      if (document.getElementById('salesPaymentAccount')?.value === 'credit-adjust' && getOriginalInvoiceForReturn()) {
+        return total;
+      }
       const payAmtEl = document.getElementById('salesPaymentAmount');
-      if (payAmtEl && payAmtEl.max) {
-        const maxPaid = parseFloat(payAmtEl.max);
-        if (!isNaN(maxPaid)) {
-          maxVal = Math.min(total, maxPaid);
-        }
+      const refundable = payAmtEl ? parseFloat(payAmtEl.dataset.refundable) : NaN;
+      if (!isNaN(refundable)) {
+        maxVal = Math.min(total, refundable);
+      } else if (!getOriginalInvoiceForReturn()) {
+        maxVal = 0; // nothing chosen yet, nothing to refund
       }
     }
     return maxVal;
@@ -1018,10 +1400,10 @@
     const maxVal = getSalesPaymentMax(total);
 
     if (currentSalesVoucherSubtype === 'Return') {
-      payNotPaidBtn.textContent = 'No Refund';
-      payFullBtn.textContent = `Full Refund (₹${fmtNum(maxVal)})`;
-      payPartialBtn.textContent = 'Partial Refund';
-      
+      // Same wording as an invoice's refund of excess advance; the refundable amount shows
+      // in the hover popup, like the invoice's advance / balance
+      setSalesPaymentLabels(true);
+
       const payAmtEl = document.getElementById('salesPaymentAmount');
       if (payAmtEl) {
         payAmtEl.max = maxVal;

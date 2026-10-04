@@ -1176,6 +1176,70 @@
 
   window._salesPartyOverride = window._salesPartyOverride || null;
   window._purchasePartyOverride = window._purchasePartyOverride || null;
+  window._preInvoicePartyOverrides = window._preInvoicePartyOverrides || {};
+
+  // Where each form keeps its "Temporary In-Voucher Edit" of the party, and the box that
+  // shows the party's name. Sales Invoice and Purchase use their own globals; the
+  // pre-invoice forms (quote / proforma / order / challan) are added by attachPartyDetailsCard.
+  const PARTY_OVERRIDE_CONTEXTS = {
+    sales: {
+      get: () => window._salesPartyOverride,
+      set: (v) => { window._salesPartyOverride = v; },
+      triggerTextId: 'salesCustomerSelectTriggerText',
+      // A Sales Reversal (credit note) keeps the GSTIN / PAN of its Original Doc
+      // (currentSalesVoucherSubtype is a script-level `let`, not a window property)
+      lockedFields: () => ((typeof currentSalesVoucherSubtype !== 'undefined' && currentSalesVoucherSubtype === 'Return')
+        ? { fields: ['Gstin', 'Pan'], reason: "GSTIN and PAN can't be changed on a reversal — they stay as on the Original Doc." }
+        : null)
+    },
+    purchase: {
+      get: () => window._purchasePartyOverride,
+      set: (v) => { window._purchasePartyOverride = v; },
+      triggerTextId: 'purchaseVendorSelectTriggerText'
+    }
+  };
+
+  function registerPartyOverrideContext(context, triggerTextId) {
+    if (PARTY_OVERRIDE_CONTEXTS[context]) return;
+    PARTY_OVERRIDE_CONTEXTS[context] = {
+      get: () => window._preInvoicePartyOverrides[context] || null,
+      set: (v) => { window._preInvoicePartyOverrides[context] = v; },
+      triggerTextId
+    };
+  }
+
+  // A form's in-voucher edit of its party (null when none)
+  // (A pre-invoice form not wired yet still reads / writes the same per-form store)
+  function getPartyOverride(context) {
+    const c = PARTY_OVERRIDE_CONTEXTS[context];
+    return c ? (c.get() || null) : (window._preInvoicePartyOverrides[context] || null);
+  }
+  function setPartyOverride(context, value) {
+    const c = PARTY_OVERRIDE_CONTEXTS[context];
+    if (c) c.set(value || null);
+    else window._preInvoicePartyOverrides[context] = value || null;
+  }
+  // What a document stores: the edit, only when it was really changed for this party
+  function getPartyOverrideToSave(context, partyId) {
+    const ov = getPartyOverride(context);
+    return (ov && ov.isOverridden && String(ov.partyId) === String(partyId)) ? JSON.parse(JSON.stringify(ov)) : null;
+  }
+  // Party details as a saved document shows them: the master, with the document's edit on top
+  function mergePartyOverride(party, override) {
+    if (!party || !override || !override.isOverridden) return party;
+    if (party.id !== undefined && override.partyId !== undefined && String(party.id) !== String(override.partyId)) return party;
+    const merged = { ...party };
+    Object.keys(override).forEach(k => {
+      if (k === 'partyId' || k === 'isOverridden') return;
+      const v = override[k];
+      if (v !== undefined && v !== null && String(v).trim() !== '') merged[k] = v;
+    });
+    return merged;
+  }
+  window.getPartyOverride = getPartyOverride;
+  window.setPartyOverride = setPartyOverride;
+  window.getPartyOverrideToSave = getPartyOverrideToSave;
+  window.mergePartyOverride = mergePartyOverride;
 
   function ensurePartyGlobalListeners() {
     if (_kyaPartyGlobalListenersAttached) return;
@@ -1307,81 +1371,10 @@
   }
   window.findPartyById = findPartyById;
 
-  function getPartyActiveDetails(partyId, partyType, context) {
-    const master = findPartyById(partyId, partyType) || { id: partyId, name: '' };
-    const pStr = String(partyId);
-
-    if (context === 'sales') {
-      if (window._salesPartyOverride && String(window._salesPartyOverride.partyId) === pStr) {
-        return {
-          master,
-          active: { ...master, ...window._salesPartyOverride },
-          isOverridden: Boolean(window._salesPartyOverride.isOverridden)
-        };
-      } else {
-        const fresh = {
-          partyId: pStr,
-          name: master.name || '',
-          contactName: master.contactName || '',
-          address: master.address || '',
-          city: master.city || '',
-          pincode: master.pincode || '',
-          state: master.state || '',
-          country: master.country || 'India',
-          phone: master.phone || master.mobile || '',
-          email: master.email || '',
-          gstin: master.gstin || '',
-          pan: master.pan || '',
-          bankName: master.bankName || '',
-          accountNo: master.accountNo || '',
-          ifsc: master.ifsc || '',
-          branch: master.branch || '',
-          isOverridden: false
-        };
-        window._salesPartyOverride = fresh;
-        return { master, active: fresh, isOverridden: false };
-      }
-    } else if (context === 'purchase') {
-      if (window._purchasePartyOverride && String(window._purchasePartyOverride.partyId) === pStr) {
-        return {
-          master,
-          active: { ...master, ...window._purchasePartyOverride },
-          isOverridden: Boolean(window._purchasePartyOverride.isOverridden)
-        };
-      } else {
-        const fresh = {
-          partyId: pStr,
-          name: master.name || '',
-          contactName: master.contactName || '',
-          address: master.address || '',
-          city: master.city || '',
-          pincode: master.pincode || '',
-          state: master.state || '',
-          country: master.country || 'India',
-          phone: master.phone || master.mobile || '',
-          email: master.email || '',
-          gstin: master.gstin || '',
-          pan: master.pan || '',
-          bankName: master.bankName || '',
-          accountNo: master.accountNo || '',
-          ifsc: master.ifsc || '',
-          branch: master.branch || '',
-          isOverridden: false
-        };
-        window._purchasePartyOverride = fresh;
-        return { master, active: fresh, isOverridden: false };
-      }
-    }
-
-    return { master, active: master, isOverridden: false };
-  }
-  window.getPartyActiveDetails = getPartyActiveDetails;
-
-  function resetPartyActiveOverride(context, partyId, partyType) {
-    const master = findPartyById(partyId, partyType) || { id: partyId, name: '' };
-    const pStr = String(partyId);
-    const fresh = {
-      partyId: pStr,
+  // The party's master fields as the starting point of an in-voucher edit
+  function freshPartyOverride(master, partyId) {
+    return {
+      partyId: String(partyId),
       name: master.name || '',
       contactName: master.contactName || '',
       address: master.address || '',
@@ -1399,11 +1392,29 @@
       branch: master.branch || '',
       isOverridden: false
     };
-    if (context === 'sales') {
-      window._salesPartyOverride = fresh;
-    } else if (context === 'purchase') {
-      window._purchasePartyOverride = fresh;
+  }
+
+  function getPartyActiveDetails(partyId, partyType, context) {
+    const master = findPartyById(partyId, partyType) || { id: partyId, name: '' };
+    const pStr = String(partyId);
+    const ctx = PARTY_OVERRIDE_CONTEXTS[context];
+    if (!ctx) return { master, active: master, isOverridden: false };
+
+    const current = ctx.get();
+    if (current && String(current.partyId) === pStr) {
+      return { master, active: { ...master, ...current }, isOverridden: Boolean(current.isOverridden) };
     }
+    const fresh = freshPartyOverride(master, pStr);
+    ctx.set(fresh);
+    return { master, active: fresh, isOverridden: false };
+  }
+  window.getPartyActiveDetails = getPartyActiveDetails;
+
+  function resetPartyActiveOverride(context, partyId, partyType) {
+    const master = findPartyById(partyId, partyType) || { id: partyId, name: '' };
+    const fresh = freshPartyOverride(master, partyId);
+    const ctx = PARTY_OVERRIDE_CONTEXTS[context];
+    if (ctx) ctx.set(fresh);
     return fresh;
   }
   window.resetPartyActiveOverride = resetPartyActiveOverride;
@@ -1415,7 +1426,7 @@
 
     const card = getOrCreatePartyHoverCard();
     
-    if (isEditable && (context === 'sales' || context === 'purchase')) {
+    if (isEditable && PARTY_OVERRIDE_CONTEXTS[context]) {
       const details = getPartyActiveDetails(party.id, partyType, context);
       card.innerHTML = getPartyEditableCardHtml(details.active, details.master, partyType, details.isOverridden, context);
       attachPartyEditableCardEvents(card, party.id, partyType, context, targetElement);
@@ -1644,8 +1655,37 @@
     const fields = ['Name', 'ContactName', 'Address', 'City', 'Pincode', 'State', 'Country', 'Phone', 'Email', 'Gstin', 'Pan', 'BankName', 'AccountNo', 'Ifsc', 'Branch'];
     const pStr = String(partyId);
 
+    const ctx = PARTY_OVERRIDE_CONTEXTS[context];
+
+    // Fields this form doesn't let the card change (GSTIN / PAN on a Sales Reversal):
+    // shown read-only with the reason, and kept as they are by Reset to Master
+    const lock = (ctx && typeof ctx.lockedFields === 'function') ? ctx.lockedFields() : null;
+    const lockedFields = (lock && Array.isArray(lock.fields)) ? lock.fields : [];
+    lockedFields.forEach(f => {
+      const inp = card.querySelector('#kyaHov' + f);
+      if (!inp) return;
+      inp.readOnly = true;
+      inp.tabIndex = -1;
+      inp.title = lock.reason || '';
+      inp.style.background = 'var(--slate-50)';
+      inp.style.color = 'var(--slate-500)';
+      inp.style.cursor = 'not-allowed';
+    });
+    if (lockedFields.length && lock.reason) {
+      const anchor = card.querySelector('#kyaHov' + lockedFields[0]);
+      const grid = anchor && anchor.parentElement && anchor.parentElement.parentElement;
+      if (grid && !card.querySelector('#kyaHovLockedNote')) {
+        const note = document.createElement('div');
+        note.id = 'kyaHovLockedNote';
+        note.style.cssText = 'display: flex; align-items: center; gap: 5px; margin-top: -3px; font-size: 10.5px; color: var(--slate-500);';
+        note.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+        note.appendChild(document.createTextNode(lock.reason));
+        grid.insertAdjacentElement('afterend', note);
+      }
+    }
+
     const updateOverride = () => {
-      let override = (context === 'sales') ? window._salesPartyOverride : window._purchasePartyOverride;
+      let override = ctx ? ctx.get() : null;
       if (!override || String(override.partyId) !== pStr) {
         override = { partyId: pStr, isOverridden: true };
       }
@@ -1659,15 +1699,10 @@
       });
       override.isOverridden = true;
 
-      if (context === 'sales') {
-        window._salesPartyOverride = override;
-        const triggerText = document.getElementById('salesCustomerSelectTriggerText');
-        if (triggerText && override.name) {
-          triggerText.textContent = override.name;
-        }
-      } else if (context === 'purchase') {
-        window._purchasePartyOverride = override;
-        const triggerText = document.getElementById('purchaseVendorSelectTriggerText');
+      if (ctx) {
+        ctx.set(override);
+        // The box shows the name used on this voucher
+        const triggerText = document.getElementById(ctx.triggerTextId);
         if (triggerText && override.name) {
           triggerText.textContent = override.name;
         }
@@ -1711,8 +1746,24 @@
       resetBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // Locked fields keep their values through the reset
+        const kept = {};
+        lockedFields.forEach(f => {
+          const inp = card.querySelector('#kyaHov' + f);
+          if (inp) kept[f] = inp.value;
+        });
         const fresh = resetPartyActiveOverride(context, partyId, partyType);
-        
+        let keptDiffers = false;
+        lockedFields.forEach(f => {
+          const key = f.charAt(0).toLowerCase() + f.slice(1);
+          if (kept[f] !== undefined && (fresh[key] || '') !== kept[f]) {
+            fresh[key] = kept[f];
+            keptDiffers = true;
+          }
+        });
+        // Still different from the master (a kept GSTIN / PAN): it stays a voucher edit
+        if (keptDiffers) fresh.isOverridden = true;
+
         fields.forEach(f => {
           const inp = card.querySelector('#kyaHov' + f);
           if (inp) {
@@ -1723,17 +1774,14 @@
 
         const statusBadge = card.querySelector('#kyaHovStatusBadge');
         if (statusBadge) {
-          statusBadge.textContent = '● Master Default';
-          statusBadge.style.background = '#f1f5f9';
-          statusBadge.style.color = '#64748b';
-          statusBadge.style.border = '1px solid #e2e8f0';
+          statusBadge.textContent = keptDiffers ? '● Voucher Override' : '● Master Default';
+          statusBadge.style.background = keptDiffers ? '#fef3c7' : '#f1f5f9';
+          statusBadge.style.color = keptDiffers ? '#b45309' : '#64748b';
+          statusBadge.style.border = keptDiffers ? '1px solid #fde68a' : '1px solid #e2e8f0';
         }
 
-        if (context === 'sales') {
-          const triggerText = document.getElementById('salesCustomerSelectTriggerText');
-          if (triggerText && fresh.name) triggerText.textContent = fresh.name;
-        } else if (context === 'purchase') {
-          const triggerText = document.getElementById('purchaseVendorSelectTriggerText');
+        if (ctx) {
+          const triggerText = document.getElementById(ctx.triggerTextId);
           if (triggerText && fresh.name) triggerText.textContent = fresh.name;
         }
 
@@ -1923,67 +1971,86 @@
       optionsList.innerHTML = '';
       const query = filter.toLowerCase().trim();
 
-      Array.from(realSelect.options).forEach((opt) => {
-        if (!opt.value) return;
-
-        const partyId = opt.value;
-        const party = findPartyById(partyId, partyType);
-
-        const text = opt.textContent.trim();
-        const aliasStr = party && Array.isArray(party.aliases) ? party.aliases.join(' ') : '';
-        const gstinStr = party && party.gstin ? party.gstin : '';
-        const panStr = party && party.pan ? party.pan : '';
-        const searchCorpus = `${text} ${aliasStr} ${gstinStr} ${panStr}`.toLowerCase();
-
-        if (query && !searchCorpus.includes(query)) {
-          return;
+      // An <optgroup> in the real select becomes a section heading, shown above its first match
+      const sections = [];
+      Array.from(realSelect.children).forEach(node => {
+        if (node.tagName === 'OPTGROUP') {
+          sections.push({ label: node.label, options: Array.from(node.children) });
+        } else {
+          if (!sections.length || sections[sections.length - 1].label) sections.push({ label: '', options: [] });
+          sections[sections.length - 1].options.push(node);
         }
+      });
 
-        const isSelected = (realSelect.value === opt.value);
-        const item = document.createElement('div');
-        item.style.cssText = `
-          padding: 8px 12px;
-          font-size: 13px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-weight: ${isSelected ? '700' : '500'};
-          background: ${isSelected ? 'var(--blue-50)' : 'transparent'};
-          color: ${isSelected ? 'var(--blue-700)' : 'var(--slate-700)'};
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          transition: background 0.15s ease;
-        `;
+      sections.forEach(section => {
+        let headerShown = !section.label;
+        section.options.forEach((opt) => {
+          if (!opt.value) return;
 
-        item.innerHTML = `
-          <div style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            <span>${party ? party.name : text}</span>
-            ${party && party.aliases && party.aliases.length > 0 ? `<span style="font-size: 11px; color: var(--blue-600); margin-left: 6px;">[A.K.A: ${party.aliases.join(', ')}]</span>` : ''}
-          </div>
-          ${party && party.gstin ? `<span style="font-size: 10px; color: #047857; background: #ecfdf5; padding: 1px 5px; border-radius: 4px; font-family: monospace; margin-left: 6px;">GSTIN</span>` : ''}
-        `;
+          const partyId = opt.value;
+          const party = findPartyById(partyId, partyType);
 
-        item.addEventListener('mouseenter', () => {
-          if (!isSelected) item.style.background = 'var(--slate-50)';
-          if (!party) return;
-          cancelHidePartyHoverCard();
-          positionAndShowPartyHoverCard(item, party, partyType, false, '');
+          const text = opt.textContent.trim();
+          const aliasStr = party && Array.isArray(party.aliases) ? party.aliases.join(' ') : '';
+          const gstinStr = party && party.gstin ? party.gstin : '';
+          const panStr = party && party.pan ? party.pan : '';
+          const searchCorpus = `${text} ${aliasStr} ${gstinStr} ${panStr}`.toLowerCase();
+
+          if (query && !searchCorpus.includes(query)) {
+            return;
+          }
+
+          if (!headerShown) {
+            headerShown = true;
+            if (typeof createKyaPartySectionHeader === 'function') optionsList.appendChild(createKyaPartySectionHeader(section.label));
+          }
+
+          const isSelected = (realSelect.value === opt.value);
+          const item = document.createElement('div');
+          item.style.cssText = `
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: ${isSelected ? '700' : '500'};
+            background: ${isSelected ? 'var(--blue-50)' : 'transparent'};
+            color: ${isSelected ? 'var(--blue-700)' : 'var(--slate-700)'};
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background 0.15s ease;
+          `;
+
+          item.innerHTML = `
+            <div style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span>${party ? party.name : text}</span>
+              ${party && party.aliases && party.aliases.length > 0 ? `<span style="font-size: 11px; color: var(--blue-600); margin-left: 6px;">[A.K.A: ${party.aliases.join(', ')}]</span>` : ''}
+            </div>
+            ${party && party.gstin ? `<span style="font-size: 10px; color: #047857; background: #ecfdf5; padding: 1px 5px; border-radius: 4px; font-family: monospace; margin-left: 6px;">GSTIN</span>` : ''}
+          `;
+
+          item.addEventListener('mouseenter', () => {
+            if (!isSelected) item.style.background = 'var(--slate-50)';
+            if (!party) return;
+            cancelHidePartyHoverCard();
+            positionAndShowPartyHoverCard(item, party, partyType, false, '');
+          });
+
+          item.addEventListener('mouseleave', () => {
+            if (!isSelected) item.style.background = 'transparent';
+            scheduleHidePartyHoverCard(250);
+          });
+
+          item.addEventListener('click', () => {
+            realSelect.value = opt.value;
+            realSelect.dispatchEvent(new Event('change'));
+            updateTriggerText();
+            dropdown.style.display = 'none';
+            hidePartyHoverCard();
+          });
+
+          optionsList.appendChild(item);
         });
-
-        item.addEventListener('mouseleave', () => {
-          if (!isSelected) item.style.background = 'transparent';
-          scheduleHidePartyHoverCard(250);
-        });
-
-        item.addEventListener('click', () => {
-          realSelect.value = opt.value;
-          realSelect.dispatchEvent(new Event('change'));
-          updateTriggerText();
-          dropdown.style.display = 'none';
-          hidePartyHoverCard();
-        });
-
-        optionsList.appendChild(item);
       });
 
       const isSalesList = (selectId === 'salesCustomer' || partyType.toLowerCase().includes('customer'));
@@ -2100,6 +2167,68 @@
   }
 
   window.positionAndShowPartyHoverCard = positionAndShowPartyHoverCard;
+
+  // The Sales Invoice's Customer Details card on another form's party box (Quotation,
+  // Proforma, Sales Order, Delivery Challan): hovering the box for a second with a party
+  // chosen opens the editable card — Temporary In-Voucher Edit, ● Master Default /
+  // ● Voucher Override, Reset to Master. The edit is kept per form (getPartyOverride).
+  // opts: { context, triggerId, triggerTextId, selectId, dropdownId, partyType }
+  function attachPartyDetailsCard(opts) {
+    const trigger = document.getElementById(opts.triggerId);
+    const select = document.getElementById(opts.selectId);
+    const dropdown = document.getElementById(opts.dropdownId);
+    if (!trigger || !select || trigger._partyCardWired) return;
+    trigger._partyCardWired = true;
+    const context = opts.context;
+    const partyType = opts.partyType || 'Customer';
+    registerPartyOverrideContext(context, opts.triggerTextId);
+
+    let hoverTimer = null;
+    const cancelHoverTimer = () => {
+      if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+    };
+    const listOpen = () => !!dropdown && dropdown.style.display === 'flex';
+
+    trigger.addEventListener('mouseenter', () => {
+      cancelHoverTimer();
+      cancelHidePartyHoverCard();
+      if (listOpen() || !select.value) return;
+      if (_kyaPartyHoverCardEl && _kyaPartyHoverCardEl.style.display === 'block' && _kyaPartyCardIsEditable) return;
+      hoverTimer = setTimeout(() => {
+        if (listOpen() || !select.value) return;
+        const party = findPartyById(select.value, partyType);
+        if (party) {
+          cancelHidePartyHoverCard();
+          positionAndShowPartyHoverCard(trigger, party, partyType, true, context);
+        }
+      }, 1000);
+    });
+    trigger.addEventListener('mouseleave', () => {
+      cancelHoverTimer();
+      if (_kyaPartyHoverCardEl && _kyaPartyHoverCardEl.style.display === 'block') {
+        scheduleHidePartyHoverCard(_kyaPartyCardIsEditable ? 2000 : 350);
+      }
+    });
+    // Opening the list puts the card away
+    trigger.addEventListener('click', () => {
+      cancelHoverTimer();
+      hidePartyHoverCard();
+    });
+  }
+  window.attachPartyDetailsCard = attachPartyDetailsCard;
+
+  // A party in a form's list: hovering shows its master details (read-only), as in the
+  // Sales Invoice's customer list
+  function bindPartyListItemPreview(item, party, partyType) {
+    if (!item || !party) return;
+    item.addEventListener('mouseenter', () => {
+      cancelHidePartyHoverCard();
+      positionAndShowPartyHoverCard(item, party, partyType || 'Customer', false, '');
+    });
+    item.addEventListener('mouseleave', () => scheduleHidePartyHoverCard(250));
+    item.addEventListener('click', () => hidePartyHoverCard());
+  }
+  window.bindPartyListItemPreview = bindPartyListItemPreview;
   window.getPartyHoverPreviewHtml = getPartyHoverPreviewHtml;
   window.initPartySearchableSelect = initPartySearchableSelect;
 

@@ -294,4 +294,84 @@
     }
 
     window.attachKyaDatePicker = attachKyaDatePicker;
+
+    // Local YYYY-MM-DD for "today" — toISOString() is UTC and gives yesterday before 05:30 IST
+    window.kyaLocalIso = (d) => toIso(d instanceof Date ? d : new Date());
+
+    // Whole days since the epoch for a YYYY-MM-DD value (NaN when blank / invalid)
+    const isoDays = (iso) => {
+      const d = fromIso(iso);
+      return d ? Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000) : NaN;
+    };
+    const daysIso = (n) => {
+      const d = new Date(n * 86400000);
+      return toIso(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    };
+
+    // Later dates tied to a document Date (Due Date, Expiry, Delivery…), as on the Sales
+    // Invoice: moving the Date moves each of them by the same number of days (keeping the
+    // credit / validity days), and none of them can be set before the Date.
+    // followers: [{ el: hidden input, label: 'Due Date' }]
+    function linkKyaDateFollowers(dateHidden, followers) {
+      if (!dateHidden || !Array.isArray(followers) || !followers.length) return;
+      dateHidden._kyaFollowers = (dateHidden._kyaFollowers || []).concat(followers.filter(f => f && f.el));
+      if (dateHidden._kyaFollowersLinked) return;
+      dateHidden._kyaFollowersLinked = true;
+
+      // The Date is also set from code (new / loaded document), so its previous value is
+      // taken as each edit starts
+      let prev = dateHidden.value;
+      const p = dateHidden._kyaDatePicker;
+      if (p && p.display) p.display.addEventListener('focus', () => { prev = dateHidden.value; });
+
+      // Capture phase: followers move before the form's own "Due in N days" helpers run
+      dateHidden.addEventListener('change', () => {
+        const now = isoDays(dateHidden.value);
+        if (!isNaN(now)) {
+          dateHidden._kyaFollowers.forEach(({ el }) => {
+            if (!el.value) return; // a blank optional date stays blank
+            const gap = isoDays(el.value) - isoDays(prev);
+            el.value = (gap > 0 && !isNaN(gap)) ? daysIso(now + gap) : dateHidden.value;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        }
+        prev = dateHidden.value;
+      }, true);
+    }
+
+    function guardKyaDateNotBefore(el, dateHidden, label) {
+      if (!el || !dateHidden || el._kyaNotBeforeGuard) return;
+      el._kyaNotBeforeGuard = true;
+      el.addEventListener('change', () => {
+        if (dateHidden.value && el.value && el.value < dateHidden.value) {
+          el.value = dateHidden.value;
+          if (typeof window.showToast === 'function') window.showToast(`${label || 'This date'} cannot be before the Date.`, 'warning');
+        }
+      }, true);
+    }
+    window.linkKyaDateFollowers = linkKyaDateFollowers;
+
+    // Markup-driven: a hidden input with data-kya-date-display="<display box id>" gets the
+    // picker on its own; data-kya-date-after="<Date input id>" (+ data-kya-date-label) ties
+    // it to that Date as above. Used by the Sales Invoice, Quotation, Proforma Invoice,
+    // Sales Order and Delivery Challan.
+    function attachMarkedKyaDatePickers(root) {
+      const scope = root || document;
+      scope.querySelectorAll('input[type="hidden"][data-kya-date-display]').forEach(hidden => {
+        const display = document.getElementById(hidden.dataset.kyaDateDisplay);
+        if (display) attachKyaDatePicker(hidden, display);
+      });
+      scope.querySelectorAll('input[type="hidden"][data-kya-date-after]').forEach(el => {
+        const base = document.getElementById(el.dataset.kyaDateAfter);
+        if (!base || !base._kyaDatePicker || el._kyaFollowerOf) return;
+        el._kyaFollowerOf = base.id;
+        guardKyaDateNotBefore(el, base, el.dataset.kyaDateLabel);
+        linkKyaDateFollowers(base, [{ el, label: el.dataset.kyaDateLabel }]);
+      });
+    }
+    window.attachMarkedKyaDatePickers = attachMarkedKyaDatePickers;
+    attachMarkedKyaDatePickers();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => attachMarkedKyaDatePickers());
+    }
   })();

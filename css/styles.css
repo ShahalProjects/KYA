@@ -602,6 +602,39 @@
       transform: scale(1.05);
     }
 
+    /* Back button on the Sales Voucher screens — an icon only, the same look as the
+       sidebar's collapse button above (its title / aria-label says where it goes) */
+    .kya-back-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--slate-200);
+      background: var(--white);
+      color: var(--slate-500);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      padding: 0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      transition:
+        background var(--sb-dur-fast) var(--sb-spring),
+        color     var(--sb-dur-fast) var(--sb-spring),
+        border-color var(--sb-dur-fast) var(--sb-spring),
+        transform var(--sb-dur-fast) var(--sb-spring);
+    }
+    .kya-back-btn:hover {
+      background: var(--blue-50);
+      color: var(--blue-600);
+      border-color: var(--blue-300);
+      transform: scale(1.05);
+    }
+    .kya-back-btn:focus-visible {
+      outline: 2px solid var(--blue-300);
+      outline-offset: 2px;
+    }
+
     /* Toggle icons: smooth crossfade + rotate instead of display:none */
     .sidebar-toggle-btn .toggle-icon-expand,
     .sidebar-toggle-btn .toggle-icon-collapse {
@@ -5189,9 +5222,18 @@
     }
     .kya-dp-today:hover { background: var(--blue-600, #2563eb); border-color: var(--blue-600, #2563eb); color: #ffffff; }
 
-    /* Sales Customer box: same hover / open states as the .je-input boxes beside it */
-    #salesCustomerSelectTrigger:hover { border-color: var(--slate-400) !important; }
-    #salesCustomerSelectWrap:has(#salesCustomerSelectDropdown[style*="display: flex"]) #salesCustomerSelectTrigger {
+    /* Customer box (Sales Invoice and the Quotation / Proforma / Sales Order / Delivery
+       Challan forms): same hover / open states as the .je-input boxes beside it */
+    #salesCustomerSelectTrigger:hover,
+    #quoteCustomerSelectTrigger:hover,
+    #proformaCustomerSelectTrigger:hover,
+    #orderCustomerSelectTrigger:hover,
+    #challanCustomerSelectTrigger:hover { border-color: var(--slate-400) !important; }
+    #salesCustomerSelectWrap:has(#salesCustomerSelectDropdown[style*="display: flex"]) #salesCustomerSelectTrigger,
+    #quoteCustomerSelectWrap:has(#quoteCustomerSelectDropdown[style*="display: flex"]) #quoteCustomerSelectTrigger,
+    #proformaCustomerSelectWrap:has(#proformaCustomerSelectDropdown[style*="display: flex"]) #proformaCustomerSelectTrigger,
+    #orderCustomerSelectWrap:has(#orderCustomerSelectDropdown[style*="display: flex"]) #orderCustomerSelectTrigger,
+    #challanCustomerSelectWrap:has(#challanCustomerSelectDropdown[style*="display: flex"]) #challanCustomerSelectTrigger {
       border-color: var(--blue-500) !important;
       box-shadow: 0 0 0 3px rgba(59,130,246,.18), 0 1px 2px rgba(0,0,0,.04) !important;
     }
@@ -5244,8 +5286,9 @@
       text-overflow: ellipsis;
       pointer-events: none;
     }
-    /* Full message on hovering the Invoice No. box */
-    #salesInvoiceNoInputWrap.has-invno-error::after {
+    /* Full message on hovering the Invoice No. box (and the pre-invoice number boxes) */
+    #salesInvoiceNoInputWrap.has-invno-error::after,
+    .kya-docno-wrap.has-invno-error::after {
       content: attr(data-error-full);
       position: absolute;
       bottom: calc(100% + 6px);
@@ -5265,7 +5308,8 @@
       transition: opacity .12s ease;
       pointer-events: none;
     }
-    #salesInvoiceNoInputWrap.has-invno-error:hover::after {
+    #salesInvoiceNoInputWrap.has-invno-error:hover::after,
+    .kya-docno-wrap.has-invno-error:hover::after {
       opacity: 1;
       visibility: visible;
     }

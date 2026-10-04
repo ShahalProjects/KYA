@@ -704,7 +704,10 @@
   }
 
   function getSalesVouchers() {
-    return (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [];
+    // A reversal of a pre-invoice cancels a document that never made a sale — it is not a
+    // credit note, so it stays out of the sales and GST reports
+    return (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers))
+      ? window.KYA_STORE.salesVouchers.filter(v => !(v && v.reversedPreInvoice)) : [];
   }
 
   function getPurchaseVouchers() {

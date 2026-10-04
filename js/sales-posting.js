@@ -1,5 +1,15 @@
   function loadSalesInvoice(inv, isDraft = false) {
+    // Editing a stored voucher (posted or draft) vs. filling a fresh conversion — set first,
+    // so numbering, refund limits and the like see the right voucher while it loads
+    const store = window.KYA_STORE || {};
+    const editIsPosted = !isDraft && (store.salesVouchers || []).some(v => String(v.id) === String(inv.id));
+    const editIsDraft = isDraft && (store.salesVouchersDrafts || []).some(d => String(d.id) === String(inv.id));
+    const editCtx = (editIsPosted || editIsDraft) ? { id: inv.id, isDraft: !!isDraft } : null;
+    window._editingSalesInvoice = editCtx;
     window._salesPartyOverride = inv.partyOverride ? JSON.parse(JSON.stringify(inv.partyOverride)) : null;
+    // A reversal made against a pre-invoice keeps that document as its Original Doc
+    window._salesReversalPreInvoice = (inv.isReturn && inv.reversedPreInvoice)
+      ? { type: inv.reversedPreInvoice.type, id: inv.reversedPreInvoice.id } : null;
     currentSalesVoucherSubtype = inv.isReturn ? 'Return' : 'Invoice';
     updateVoucherSubtypeUI();
     const dateEl = document.getElementById('salesDate');
@@ -7,11 +17,28 @@
     if (dateEl) dateEl.value = inv.date;
     if (dueEl) dueEl.value = inv.dueDate || inv.date;
     
+    // Original Doc first, so a reversal's number can be built from it
+    const returnTriggerText = document.getElementById('salesInvoiceSelectTriggerText');
+    if (returnTriggerText) {
+      if (inv.isReturn && inv.returnAgainstInvoice) {
+        returnTriggerText.textContent = inv.returnAgainstInvoice;
+      } else {
+        returnTriggerText.textContent = '— Select —';
+      }
+      const hasOrigDoc = !!(inv.isReturn && inv.returnAgainstInvoice);
+      returnTriggerText.style.color = hasOrigDoc ? 'var(--slate-800)' : '';
+      returnTriggerText.style.fontWeight = hasOrigDoc ? '600' : '';
+    }
+
     setInvoiceNoMode(inv.mode || 'Manual');
     const invNoEl = document.getElementById('salesInvoiceNo');
+    // A draft saved without a number is stored as "Draft" — that is not a number
+    const storedNo = (inv.invoiceNo && inv.invoiceNo.trim() && inv.invoiceNo.trim() !== 'Draft') ? inv.invoiceNo : '';
     if (invNoEl) {
-      if (inv.invoiceNo && inv.invoiceNo.trim()) {
-        invNoEl.value = inv.invoiceNo;
+      if (storedNo) {
+        invNoEl.value = storedNo;
+      } else if (inv.isReturn) {
+        // setInvoiceNoMode already built it from the Original Doc
       } else if (inv.mode === 'Auto' || inv._isFromQuotation || inv.convertedFromQuotationId || inv._isFromProforma || inv.convertedFromProformaId) {
         invNoEl.value = typeof getNextAutoInvoiceNumber === 'function' ? getNextAutoInvoiceNumber() :
                         (typeof window.getNextAutoInvoiceNumber === 'function' ? window.getNextAutoInvoiceNumber() : '');
@@ -20,16 +47,7 @@
       }
     }
     const chipEl = document.getElementById('salesVoucherChipDisplay');
-    if (chipEl) chipEl.textContent = (invNoEl && invNoEl.value) || inv.invoiceNo || 'INV-XXXX';
-
-    const returnTriggerText = document.getElementById('salesInvoiceSelectTriggerText');
-    if (returnTriggerText) {
-      if (inv.isReturn && inv.returnAgainstInvoice) {
-        returnTriggerText.textContent = inv.returnAgainstInvoice;
-      } else {
-        returnTriggerText.textContent = 'Select Invoice';
-      }
-    }
+    if (chipEl) chipEl.textContent = (invNoEl && invNoEl.value) || storedNo || (inv.isReturn ? 'REV-XXXX' : 'INV-XXXX');
     
     const notesEl = document.getElementById('salesNotes');
     if (notesEl) notesEl.value = inv.notes || '';
@@ -49,6 +67,7 @@
     const noneBtn = document.getElementById('salesTdsTcsNone');
     const tdsBtn = document.getElementById('salesTdsTcsTds');
     const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (typeof unlockSalesTdsTcsButtons === 'function') unlockSalesTdsTcsButtons();
     if (inv.tdsTcsMode === 'TDS' && tdsBtn) tdsBtn.click();
     else if (inv.tdsTcsMode === 'TCS' && tcsBtn) tcsBtn.click();
     else if (noneBtn) noneBtn.click();
@@ -94,6 +113,8 @@
     const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     const fullBtn = document.getElementById('salesPaymentStatusFull');
     const partBtn = document.getElementById('salesPaymentStatusPartial');
+    // A disabled button ignores .click(); the lock state is applied again below
+    [notPaidBtn, fullBtn, partBtn].forEach(b => { if (b) b.disabled = false; });
     if (inv.paymentStatus === 'Full Payment' || inv.paymentStatus === 'Full Refund') {
       if (fullBtn) fullBtn.click();
     } else if (inv.paymentStatus === 'Partial Payment' || inv.paymentStatus === 'Partial Refund') {
@@ -146,11 +167,13 @@
             ? remainingRows.find(r => r.item === row.item)
             : remainingRows.find(r => r.serviceName === row.serviceName);
           if (match) {
-            row.origQty = match.qty + (parseFloat(row.qty) || 0);
+            // `remaining` already leaves out the reversal being edited (and a draft was
+            // never taken out), so it is exactly what this reversal may cover
+            row.origQty = match.qty;
             row.origRate = match.rate;
             row.origDiscount = match.discount;
             row.origDiscountType = match.discountType;
-            row.origBaseAmount = match.baseAmount + (parseFloat(row.baseAmount) || 0);
+            row.origBaseAmount = match.baseAmount;
           }
         });
       }
@@ -165,33 +188,39 @@
     window._pendingConvertProformaAdvance = null;
     window._pendingConvertSalesOrderId = null;
     window._pendingConvertDeliveryChallanId = null;
-    if (inv && (inv._isFromQuotation || inv.convertedFromQuotationId)) {
-      window._pendingConvertQuotationId = inv.convertedFromQuotationId;
-      window._editingSalesInvoice = null;
-    } else if (inv && (inv._isFromProforma || inv.convertedFromProformaId)) {
-      window._pendingConvertProformaId = inv.convertedFromProformaId;
-      window._pendingConvertProformaAdvance = {
-        amount: inv.advancePaidAmount || 0,
-        journalEntryId: inv.advanceJournalEntryId || null,
-        voucherNo: inv.advanceVoucherNo || null
-      };
-      window._editingSalesInvoice = null;
-    } else if (inv && (inv.convertedFromSalesOrderId || inv.convertedFromDeliveryChallanId)) {
-      // A Sales Order / Delivery Challan brings its advance across the same way a proforma does
-      window._pendingConvertSalesOrderId = inv.convertedFromSalesOrderId || null;
-      window._pendingConvertDeliveryChallanId = inv.convertedFromDeliveryChallanId || null;
-      window._pendingConvertProformaAdvance = {
-        amount: inv.advancePaidAmount || 0,
-        journalEntryId: inv.advanceJournalEntryId || null,
-        voucherNo: inv.advanceVoucherNo || null
-      };
-      window._editingSalesInvoice = null;
-    } else {
-      window._editingSalesInvoice = { id: inv.id, isDraft: isDraft };
+    // A posted invoice keeps its links on the record itself (read back when re-posted);
+    // a fresh conversion or a draft carries them as the pending conversion
+    if (!editIsPosted) {
+      if (inv && (inv._isFromQuotation || inv.convertedFromQuotationId)) {
+        window._pendingConvertQuotationId = inv.convertedFromQuotationId;
+      } else if (inv && (inv._isFromProforma || inv.convertedFromProformaId)) {
+        window._pendingConvertProformaId = inv.convertedFromProformaId;
+        window._pendingConvertProformaAdvance = {
+          amount: inv.advancePaidAmount || 0,
+          journalEntryId: inv.advanceJournalEntryId || null,
+          voucherNo: inv.advanceVoucherNo || null
+        };
+      } else if (inv && (inv.convertedFromSalesOrderId || inv.convertedFromDeliveryChallanId)) {
+        // A Sales Order / Delivery Challan brings its advance across the same way a proforma does
+        window._pendingConvertSalesOrderId = inv.convertedFromSalesOrderId || null;
+        window._pendingConvertDeliveryChallanId = inv.convertedFromDeliveryChallanId || null;
+        window._pendingConvertProformaAdvance = {
+          amount: inv.advancePaidAmount || 0,
+          journalEntryId: inv.advanceJournalEntryId || null,
+          voucherNo: inv.advanceVoucherNo || null
+        };
+      }
     }
+    window._editingSalesInvoice = editCtx;
     if (typeof window.refreshSalesPreInvoicePicker === 'function') window.refreshSalesPreInvoicePicker();
     // With an advance, show the balance-only payment view and the advance / balance strip
     if (typeof window.applySalesAdvanceToPaymentUI === 'function') window.applySalesAdvanceToPaymentUI(inv);
+    // Invoice Balance: the credits used, or the invoices a refund went to
+    if (typeof getSalesAdjust === 'function' && getSalesAdjust()) {
+      getSalesAdjust().load(inv.isReturn ? inv.creditApplications
+        : ((inv.advanceRefund && typeof usesCreditAdjust === 'function' && usesCreditAdjust(inv.advanceRefund.accountId, inv.advanceRefund.splits))
+          ? inv.advanceRefund.applications : inv.creditAdjustments));
+    }
     // Now that the edit context is known, flag a number that's already used
     if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
     updateSalesDocUI(inv.uploadedDoc || null);
@@ -203,10 +232,11 @@
     if (typeof syncSalesRowsFromDOM === 'function') {
       syncSalesRowsFromDOM();
     }
-    if (currentSalesVoucherSubtype === 'Return') {
+    const draftRevPre = (currentSalesVoucherSubtype === 'Return' && typeof getSalesReversalPreInvoice === 'function') ? getSalesReversalPreInvoice() : null;
+    if (currentSalesVoucherSubtype === 'Return' && !draftRevPre) {
       const origInv = getOriginalInvoiceForReturn();
       if (!origInv) {
-        showToast('Please select the original Document (Invoice) for this sales reversal draft.', 'warning');
+        showToast('Please select the Original Doc (Invoice or Pre Invoice) for this sales reversal draft.', 'warning');
         return;
       }
     }
@@ -247,7 +277,10 @@
     let paymentStatus = getSalesPaymentStatus();
     const paymentAccountId = document.getElementById('salesPaymentAccount').value;
     let paymentAmount = 0;
-    
+    // Invoice Balance as the account, or as a row of the Multi Payment / Multi Refund
+    const draftUsesCredit = typeof usesCreditAdjust === 'function' && usesCreditAdjust(paymentAccountId,
+      (typeof getSalesMultiPaymentSplits === 'function') ? getSalesMultiPaymentSplits() : []);
+
     if (paymentStatus === 'Full Payment' || paymentStatus === 'Full Refund') {
       paymentAmount = getSalesPaymentMax(total);
     } else if (paymentStatus === 'Partial Payment' || paymentStatus === 'Partial Refund') {
@@ -283,6 +316,7 @@
       invoiceNo: invoiceNo || 'Draft',
       isReturn: currentSalesVoucherSubtype === 'Return',
       returnAgainstInvoice: currentSalesVoucherSubtype === 'Return' ? (document.getElementById('salesInvoiceSelectTriggerText')?.textContent.trim() || '') : '',
+      reversedPreInvoice: draftRevPre ? { type: draftRevPre.src.type, id: draftRevPre.doc.id, no: draftRevPre.docNo } : null,
       customerId,
       customerName: getSalesPartyName(customerId),
       salesExecutiveId,
@@ -310,7 +344,13 @@
       advancePaidAmount: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.amount) || 0,
       advanceJournalEntryId: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.journalEntryId) || null,
       advanceVoucherNo: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.voucherNo) || null,
-      advanceRefund: draftAdvanceRefund,
+      advanceRefund: draftAdvanceRefund
+        ? Object.assign(draftAdvanceRefund, draftUsesCredit && typeof getSalesAdjust === 'function' && getSalesAdjust()
+          ? { applications: getSalesAdjust().get() } : {})
+        : null,
+      // Invoice Balance (kept for when the draft is posted)
+      creditAdjustments: (draftUsesCredit && currentSalesVoucherSubtype !== 'Return' && !draftAdvanceRefund && typeof getSalesAdjust === 'function' && getSalesAdjust()) ? getSalesAdjust().get() : [],
+      creditApplications: (draftUsesCredit && currentSalesVoucherSubtype === 'Return' && typeof getSalesAdjust === 'function' && getSalesAdjust()) ? getSalesAdjust().get() : [],
       updatedAt: Date.now()
     };
     window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
@@ -338,10 +378,15 @@
     if (typeof syncSalesRowsFromDOM === 'function') {
       syncSalesRowsFromDOM();
     }
+    // Reversal of a Quotation / Proforma / Sales Order / Delivery Challan
+    if (currentSalesVoucherSubtype === 'Return' && window._salesReversalPreInvoice && typeof postPreInvoiceReversal === 'function') {
+      postPreInvoiceReversal();
+      return;
+    }
     if (currentSalesVoucherSubtype === 'Return') {
       const origInv = getOriginalInvoiceForReturn();
       if (!origInv) {
-        showToast('Please select the original Document (Invoice) for this sales reversal.', 'warning');
+        showToast('Please select the Original Doc (Invoice or Pre Invoice) for this sales reversal.', 'warning');
         return;
       }
     }
@@ -504,7 +549,9 @@
           showToast(limitMsg, 'warning');
           return;
         }
-        if (currentSalesVoucherSubtype === 'Return') {
+        // Money paid back can't exceed what was received on the invoice (applying the credit
+        // to unpaid invoices isn't a payout, so it can use the whole reversal)
+        if (currentSalesVoucherSubtype === 'Return' && paymentAccountId !== 'credit-adjust') {
           const origInv = getOriginalInvoiceForReturn();
           if (origInv) {
             let origPaidAmt = 0;
@@ -518,6 +565,27 @@
               return;
             }
           }
+        }
+      }
+
+      if (paymentAmount <= 0) {
+        showToast(currentSalesVoucherSubtype === 'Return'
+          ? 'Nothing was received on the Original Doc to pay back — choose Invoice Balance as the Refund Account to apply this credit to unpaid invoices, or No Refund.'
+          : `${moneyLabel} Amount must be greater than zero.`, 'warning');
+        return;
+      }
+
+      // Invoice Balance: the credits / invoices chosen must cover its amount — the whole
+      // payment, or its row of the Multi Payment / Multi Refund
+      if (typeof usesCreditAdjust === 'function' && usesCreditAdjust(paymentAccountId, paymentSplits)) {
+        const adjust = typeof getSalesAdjust === 'function' ? getSalesAdjust() : null;
+        const mode = (currentSalesVoucherSubtype === 'Return' || advRefundMode) ? 'apply' : 'pay';
+        const adjustErr = adjust
+          ? validateAllocations(mode, adjust.get(), getCreditAdjustPortion(paymentAccountId, paymentSplits, paymentAmount), customerId, getSalesAdjustCtx())
+          : 'Adjustment is not available.';
+        if (adjustErr) {
+          showToast(adjustErr, 'warning');
+          return;
         }
       }
 
@@ -542,9 +610,15 @@
     }
     // Refund of the excess advance is kept apart from the invoice's own payment: the
     // invoice is fully paid by the advance, and the excess is refunded and/or parked
+    // Invoice Balance: the credits used (payment) or invoices paid (refund)
+    const isCreditAdjusted = typeof usesCreditAdjust === 'function' && usesCreditAdjust(paymentAccountId, paymentSplits)
+      && paymentStatus !== 'Not Paid' && paymentStatus !== 'No Refund';
+    const creditAllocations = (isCreditAdjusted && typeof getSalesAdjust === 'function' && getSalesAdjust())
+      ? getSalesAdjust().get() : [];
     let advanceRefund = null;
     if (advRefundMode) {
       advanceRefund = toSalesAdvanceRefund(paymentStatus, paymentAmount, total, paymentAccountId, paymentSplits);
+      if (advanceRefund && isCreditAdjusted) advanceRefund.applications = creditAllocations;
       paymentStatus = 'Not Paid';
       paymentAmount = 0;
       paymentAccountId = '';
@@ -583,6 +657,9 @@
       paymentAccountId,
       paymentAmount,
       paymentSplits,
+      // Invoice Balance (sales-credit-adjust.js)
+      creditAdjustments: (currentSalesVoucherSubtype !== 'Return' && !advRefundMode && isCreditAdjusted) ? creditAllocations : [],
+      creditApplications: (currentSalesVoucherSubtype === 'Return' && isCreditAdjusted) ? creditAllocations : [],
       convertedFromQuotationId: window._pendingConvertQuotationId || (existingPostedInv && existingPostedInv.convertedFromQuotationId) || null,
       convertedFromProformaId: window._pendingConvertProformaId || (existingPostedInv && existingPostedInv.convertedFromProformaId) || null,
       convertedFromSalesOrderId: window._pendingConvertSalesOrderId || (existingPostedInv && existingPostedInv.convertedFromSalesOrderId) || null,
@@ -723,7 +800,7 @@
     });
 
     window._editingSalesInvoice = null;
-    currentSalesVoucherSubtype = 'Invoice';
+    currentSalesVoucherSubtype = _subtypeSnapshot === 'Return' ? 'Return' : 'Invoice'; // a reversal is followed by a fresh reversal
     initSalesForm();
     openTab('sales_voucher');
 
@@ -883,12 +960,24 @@
   // gives one row; a Multi Payment invoice gives one row per selected account, scaled
   // to `amount` (so an advance-adjusted part payment still balances) with the rounding
   // difference absorbed by the last row.
-  function getSalesPaymentSplitRows(invoice, amount) {
+  // Invoice Balance (the account, or a Multi row) gives one row per ledger the customer's
+  // credit sits in (their own ledger for a reversal / on-account credit, Refund Payable,
+  // Advance from Customers). A refund passes creditRowsFor(amount) instead: the part applied
+  // to unpaid invoices is credited to the customer, or — [] — left out.
+  function getSalesPaymentSplitRows(invoice, amount, creditRowsFor) {
     const ledgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []);
     const nameOf = (id) => {
       const ledger = ledgers.find(l => l.id == id);
       return ledger ? ledger.name : 'Cash Account';
     };
+    const creditRows = (amt) => (typeof creditRowsFor === 'function')
+      ? creditRowsFor(amt)
+      : ((typeof getCreditAdjustDebitRows === 'function') ? getCreditAdjustDebitRows(invoice.creditAdjustments, amt) : []);
+
+    if (String(invoice.paymentAccountId) === 'credit-adjust') {
+      const rows = creditRows(amount);
+      if (rows.length || typeof creditRowsFor === 'function') return rows;
+    }
 
     const splits = (Array.isArray(invoice.paymentSplits) ? invoice.paymentSplits : [])
       .filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0);
@@ -905,11 +994,16 @@
         ? Math.round((amount - allocated) * 100) / 100
         : Math.round(((parseFloat(sp.amount) || 0) / splitTotal) * amount * 100) / 100;
       allocated += amt;
+      if (String(sp.accountId) === 'credit-adjust') {
+        creditRows(amt).forEach(r => rows.push(r));
+        return;
+      }
       rows.push({ name: nameOf(sp.accountId), amount: amt });
     });
 
     const usable = rows.filter(r => r.amount > 0);
-    return usable.length ? usable : [{ name: nameOf(splits[0].accountId), amount: amount }];
+    if (usable.length || typeof creditRowsFor === 'function') return usable;
+    return [{ name: nameOf(splits[0].accountId), amount: amount }];
   }
 
   // Groups an invoice's taxable value by the revenue ledger each line belongs to, in line
@@ -968,13 +1062,21 @@
     const parked = Math.round((refund.excess - refundAmt) * 100) / 100;
     const rows = [];
     let rId = 1;
+    // The part applied to the customer's unpaid invoices (Invoice Balance — the account, or
+    // its Multi Refund row) goes to the customer's account instead of being paid out
+    const appliedAmt = typeof getCreditAdjustPortion === 'function'
+      ? getCreditAdjustPortion(refund.accountId, refund.splits, refundAmt) : 0;
+    const paidOutAmt = Math.round((refundAmt - appliedAmt) * 100) / 100;
+    const refundAccount = { paymentAccountId: refund.accountId, paymentSplits: refund.splits || [] };
+    // A ledger party's excess is already in its ledger: applying it moves nothing
     const refundRows = refundAmt > 0
-      ? getSalesPaymentSplitRows({ paymentAccountId: refund.accountId, paymentSplits: refund.splits || [] }, refundAmt)
+      ? getSalesPaymentSplitRows(refundAccount, refundAmt, inPartyLedger ? () => [] : (amt) => [{ name: customerName, amount: amt }])
       : [];
 
     if (inPartyLedger) {
-      if (refundAmt <= 0) return { id: '', voucherNo: '' }; // the excess just stays in the ledger
-      rows.push({ id: rId++, type: 'By', particular: customerName, debit: refundAmt.toFixed(2), credit: '' });
+      // the excess just stays in the ledger — only money paid out is posted
+      if (paidOutAmt <= 0) return { id: '', voucherNo: '' };
+      rows.push({ id: rId++, type: 'By', particular: customerName, debit: paidOutAmt.toFixed(2), credit: '' });
     } else {
       const advLedgerId = getOrCreateSystemLedger('Advance from Customers', 'sg-ocl');
       const advName = (coaLedgers.find(l => l.id == advLedgerId) || { name: 'Advance from Customers' }).name;
@@ -992,7 +1094,8 @@
       ? invoice.advanceRefundVoucherNo
       : (typeof getNextJournalVoucherNo === 'function' ? getNextJournalVoucherNo(invoice.date) : `JV-${new Date().getFullYear()}-001`);
     const parts = [];
-    if (refundAmt > 0) parts.push(`₹${fmtNum(refundAmt)} refunded`);
+    if (paidOutAmt > 0) parts.push(`₹${fmtNum(paidOutAmt)} ${typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(refund.accountId) ? `adjusted with ${refundRows[0] ? refundRows[0].name : 'a ledger'}` : 'refunded'}`);
+    if (appliedAmt > 0) parts.push(`₹${fmtNum(appliedAmt)} applied to ${typeof describeApplications === 'function' ? describeApplications(refund.applications) : 'unpaid invoices'}`);
     if (!inPartyLedger && parked > 0) parts.push(`₹${fmtNum(parked)} moved to Refund Payable`);
 
     postedEntries.unshift({
@@ -1003,13 +1106,97 @@
       departmentId: '',
       isBudget: false,
       firstParticular: rows[0].particular,
-      amount: fmtNum(inPartyLedger ? refundAmt : refund.excess),
+      amount: fmtNum(inPartyLedger ? paidOutAmt : refund.excess),
       allRows: rows,
       narration: `Advance of ₹${fmtNum(refund.excess)} received from ${customerName} above Invoice No. ${invoice.invoiceNo}: ${parts.join(', ')}.`,
-      jeType: 'advance_refund'
+      jeType: 'advance_refund',
+      ledgerAdjust: typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(refund.accountId),
+      partyName: customerName
     });
     window.postedEntries = postedEntries;
     return { id: entryId, voucherNo };
+  }
+
+  // ── Sales Reversal of a Pre Invoice ──
+  // Nothing was sold, so there is no sales / GST / receivable line — the entry only
+  // settles the advance. Customer: Dr Advance from Customers; Cr Cash/Bank (refund) and
+  // Cr Refund Payable (the rest). Ledger party (advance in its own ledger): Dr Party,
+  // Cr Cash/Bank for the refund; the rest stays in the ledger. Returns the entry id, or ''
+  // when there is nothing to post.
+  function postPreInvoiceReversalJournal(invoice, customerName, voucherNo, silent) {
+    const ref = invoice.reversedPreInvoice || {};
+    const dropOld = () => {
+      if (invoice.journalEntryId && typeof postedEntries !== 'undefined') {
+        postedEntries = postedEntries.filter(e => String(e.id) !== String(invoice.journalEntryId));
+        window.postedEntries = postedEntries;
+      }
+    };
+    if (typeof postedEntries === 'undefined') return '';
+
+    const advance = Math.max(0, parseFloat(ref.advance) || 0);
+    const refund = (invoice.paymentStatus === 'Full Refund' || invoice.paymentStatus === 'Partial Refund')
+      ? Math.min(advance, parseFloat(invoice.paymentAmount) || 0) : 0;
+    const parked = Math.round((advance - refund) * 100) / 100;
+    const rows = [];
+    let rId = 1;
+    // The part applied to the customer's unpaid invoices (Invoice Balance — the account, or
+    // its Multi Refund row) goes to the customer's account instead of being paid out
+    const appliedAmt = typeof getCreditAdjustPortion === 'function'
+      ? getCreditAdjustPortion(invoice.paymentAccountId, invoice.paymentSplits, refund) : 0;
+    const paidOutAmt = Math.round((refund - appliedAmt) * 100) / 100;
+
+    if (ref.inPartyLedger) {
+      // Already in the party's own ledger: applying it to invoices moves nothing
+      if (paidOutAmt > 0) rows.push({ id: rId++, type: 'By', particular: customerName, debit: paidOutAmt.toFixed(2), credit: '' });
+    } else if (advance > 0) {
+      const advLedgerId = getOrCreateSystemLedger('Advance from Customers', 'sg-ocl');
+      const advName = (coaLedgers.find(l => l.id == advLedgerId) || { name: 'Advance from Customers' }).name;
+      rows.push({ id: rId++, type: 'By', particular: advName, debit: advance.toFixed(2), credit: '' });
+    }
+    if (!rows.length) {
+      dropOld();
+      if (!silent) refreshAllReports();
+      return '';
+    }
+    if (refund > 0) {
+      // Applied to invoices: credited to the customer's account (or nothing, when it is
+      // already in the party's ledger); the rest is paid out
+      getSalesPaymentSplitRows(invoice, refund, ref.inPartyLedger ? () => [] : (amt) => [{ name: customerName, amount: amt }]).forEach(p => {
+        rows.push({ id: rId++, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) });
+      });
+    }
+    if (!ref.inPartyLedger && parked > 0) {
+      const rpId = getOrCreateSystemLedger('Refund Payable', 'sg-ocl');
+      const rpName = (coaLedgers.find(l => l.id == rpId) || { name: 'Refund Payable' }).name;
+      rows.push({ id: rId++, type: 'To', particular: rpName, debit: '', credit: parked.toFixed(2) });
+    }
+
+    const parts = [];
+    if (paidOutAmt > 0) parts.push(`₹${fmtNum(paidOutAmt)} ${typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(invoice.paymentAccountId) ? 'adjusted with a ledger' : 'refunded'}`);
+    if (appliedAmt > 0) parts.push(`₹${fmtNum(appliedAmt)} applied to ${typeof describeApplications === 'function' ? describeApplications(invoice.creditApplications) : 'unpaid invoices'}`);
+    if (!ref.inPartyLedger && parked > 0) parts.push(`₹${fmtNum(parked)} moved to Refund Payable`);
+    const entryId = invoice.journalEntryId || Date.now();
+    const entry = {
+      id: entryId,
+      date: invoice.date,
+      voucherNo,
+      preparedBy: 'Sales Module',
+      departmentId: '',
+      isBudget: false,
+      firstParticular: rows[0].particular,
+      amount: fmtNum(ref.inPartyLedger ? paidOutAmt : advance),
+      allRows: rows,
+      narration: `Sales Reversal No. ${invoice.invoiceNo} of ${ref.type || 'Pre Invoice'} ${ref.no || ''} for ${customerName}: advance of ₹${fmtNum(advance)} — ${parts.join(', ')}.`,
+      jeType: 'preinvoice_reversal',
+      ledgerAdjust: typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(invoice.paymentAccountId),
+      partyName: customerName
+    };
+    const idx = postedEntries.findIndex(e => String(e.id) === String(entryId));
+    if (idx > -1) postedEntries[idx] = entry;
+    else postedEntries.unshift(entry);
+    window.postedEntries = postedEntries;
+    if (!silent) refreshAllReports();
+    return entryId;
   }
 
   // Sales journal entries are derived from the posted sales vouchers, and a restore drops
@@ -1069,6 +1256,9 @@
       || invoice.customerName
       || ((typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => String(l.id) === String(invoice.customerId)) || {}).name
       || 'Customer';
+    // Cash sale (a Cash and Cash Equivalents ledger as the party): the sale itself debits that
+    // account, so there is no separate receipt — or refund — between it and itself
+    const cashSale = !!party && party.type === 'ledger' && party.sgId === 'sg-cce';
 
     let execText = '';
     if (invoice.salesExecutiveId && typeof ohEmployees !== 'undefined') {
@@ -1077,6 +1267,11 @@
     }
     const prefix = isRet ? 'SR-' : 'SV-';
     const voucherNo = (invoice.invoiceNo.startsWith(prefix) || invoice.invoiceNo.startsWith('INV-')) ? invoice.invoiceNo : `${prefix}${invoice.invoiceNo}`;
+
+    // Reversal of a pre-invoice: no sale to undo, only its advance to settle
+    if (isRet && invoice.reversedPreInvoice) {
+      return postPreInvoiceReversalJournal(invoice, customerName, voucherNo, silent);
+    }
 
     if (isRet) {
       // ── SALES REVERSAL / RETURN ───────────────────────────────────────
@@ -1124,13 +1319,18 @@
         journalRows.push({ id: journalRows.length + 1, type: 'To', particular: adjName, debit: '', credit: Math.abs(adj).toFixed(2) });
       }
 
-      const netReceivableCredit = (parseFloat(invoice.total) || 0) - paidAmount;
+      // The part applied to the customer's unpaid invoices (Invoice Balance — the account, or
+      // its Multi Refund row) isn't paid out: it stays with the customer, allocated to them
+      const appliedAmt = typeof getCreditAdjustPortion === 'function'
+        ? getCreditAdjustPortion(invoice.paymentAccountId, invoice.paymentSplits, paidAmount) : 0;
+      const cashRefund = cashSale ? 0 : Math.max(0, Math.round((paidAmount - appliedAmt) * 100) / 100);
+      const netReceivableCredit = (parseFloat(invoice.total) || 0) - cashRefund;
       if (netReceivableCredit > 0) {
         journalRows.push({ id: journalRows.length + 1, type: 'To', particular: customerName, debit: '', credit: netReceivableCredit.toFixed(2) });
       }
 
-      if (paidAmount > 0) {
-        getSalesPaymentSplitRows(invoice, paidAmount).forEach(p => {
+      if (cashRefund > 0) {
+        getSalesPaymentSplitRows(invoice, paidAmount, () => []).forEach(p => {
           journalRows.push({ id: journalRows.length + 1, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) });
         });
       }
@@ -1212,7 +1412,7 @@
         firstParticular: customerName || trName,
         amount:          fmtNum(invTotal),
         allRows:         invoiceJERows,
-        narration:       `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`.trim(),
+        narration:       `${cashSale ? `Cash sale — Sales Invoice No. ${invoice.invoiceNo} received in full in ${customerName}.` : `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.`}${execText} ${invoice.notes || ''}`.trim(),
         jeType:          'invoice',
       };
       if (typeof postedEntries !== 'undefined') {
@@ -1276,7 +1476,8 @@
       // ── Create / Update JE-3 (Payment Receipt) ──────────────────────
       let paymentJEId = '';
       let paymentVoucherNo = '';
-      if (paidAmount > 0) {
+      // A cash sale has no separate receipt: the sale already debited the cash account
+      if (paidAmount > 0 && !cashSale) {
         if (invoice.paymentJournalEntryId && typeof postedEntries !== 'undefined') {
           postedEntries = postedEntries.filter(e => e.id !== invoice.paymentJournalEntryId);
         }
@@ -1295,7 +1496,7 @@
           paymentVoucherNo = `JV-${yr}-001`;
         }
 
-        const payAccountName = getSalesPaymentSplitRows(invoice, paidAmount)[0].name;
+        const payAccountName = (getSalesPaymentSplitRows(invoice, paidAmount)[0] || { name: 'Cash Account' }).name;
 
         // Check if this invoice was converted from a Proforma with advance payment
         const convertedProformaId = invoice.convertedFromProformaId || window._pendingConvertProformaId;
@@ -1303,7 +1504,11 @@
         if (convertedProformaId && typeof window.KYA_STORE !== 'undefined' && Array.isArray(window.KYA_STORE.proformaInvoices)) {
           prof = window.KYA_STORE.proformaInvoices.find(p => String(p.id) === String(convertedProformaId));
         }
-        const profAdvanceAmt = prof ? (parseFloat(prof.advancePaidAmount) || 0) : (parseFloat(invoice.advancePaidAmount) || 0);
+        // The advance the invoice took over (the part of the proforma's advance still free
+        // when it was converted); older invoices fall back to the proforma's figure
+        const profAdvanceAmt = (invoice.advancePaidAmount !== undefined && invoice.advancePaidAmount !== null)
+          ? (parseFloat(invoice.advancePaidAmount) || 0)
+          : (prof ? (parseFloat(prof.advancePaidAmount) || 0) : 0);
         const advPortion = (profAdvanceAmt > 0) ? Math.min(profAdvanceAmt, paidAmount) : 0;
         const cashPortion = Math.max(0, paidAmount - advPortion);
 
@@ -1368,6 +1573,17 @@
         } else if (advPortion > 0) {
           payNarration = `Advance payment ₹${fmtNum(advPortion)} adjusted from Proforma ${prof?.proformaNo || ''} against Invoice No. ${invoice.invoiceNo}.`.trim();
         }
+        // Settled without Cash / Bank
+        const payAdjustLedger = typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(invoice.paymentAccountId);
+        const creditPortion = typeof getCreditAdjustPortion === 'function'
+          ? Math.min(cashPortion, getCreditAdjustPortion(invoice.paymentAccountId, invoice.paymentSplits, cashPortion)) : 0;
+        if (creditPortion > 0) {
+          // Invoice Balance — all of it, or one row of a Multi Payment beside cash / bank
+          const receivedNow = Math.round((cashPortion - creditPortion) * 100) / 100;
+          payNarration = `Invoice No. ${invoice.invoiceNo} of ${customerName}: ${receivedNow > 0 ? `₹${fmtNum(receivedNow)} received and ` : ''}₹${fmtNum(creditPortion)} adjusted against the customer's balance (${typeof describeAdjustments === 'function' ? describeAdjustments(invoice.creditAdjustments) : ''})${advPortion > 0 ? `; advance ₹${fmtNum(advPortion)} from ${prof?.proformaNo || 'the pre-invoice'}` : ''}.`;
+        } else if (payAdjustLedger && cashPortion > 0) {
+          payNarration = `Invoice No. ${invoice.invoiceNo} of ${customerName}: ₹${fmtNum(cashPortion)} adjusted with ${payAccountName}${advPortion > 0 ? `; advance ₹${fmtNum(advPortion)} from ${prof?.proformaNo || 'the pre-invoice'}` : ''}.`;
+        }
 
         const paymentEntry = {
           id:              paymentJEId,
@@ -1381,6 +1597,9 @@
           allRows:         payJERows,
           narration:       payNarration,
           jeType:          'payment',
+          // Set off against another party's ledger: that party's statement shows it
+          ledgerAdjust:    payAdjustLedger,
+          partyName:       customerName,
         };
         if (partyCredit <= 0) {
           // The advance covered the whole payment: no receipt to post
@@ -1414,10 +1633,13 @@
       preparedBy:      'Sales Module',
       departmentId:    '',
       isBudget:        false,
-      firstParticular: customerName || ((paidAmount > 0) ? getSalesPaymentSplitRows(invoice, paidAmount)[0].name : 'Trade Receivables'),
+      firstParticular: customerName || (((paidAmount > 0) && getSalesPaymentSplitRows(invoice, paidAmount, () => [])[0]) || { name: 'Trade Receivables' }).name,
       amount:          fmtNum(invoice.total),
       allRows:         journalRows,
-      narration:       `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText} ${invoice.notes || ''}`.trim(),
+      narration:       `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText}${typeof usesCreditAdjust === 'function' && usesCreditAdjust(invoice.paymentAccountId, invoice.paymentSplits) && typeof describeApplications === 'function' ? ` Credit applied to ${describeApplications(invoice.creditApplications)}.` : ''} ${invoice.notes || ''}`.trim(),
+      // A refund set off against another party's ledger: that party's statement shows it
+      ledgerAdjust:    typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(invoice.paymentAccountId),
+      partyName:       customerName,
     };
 
     if (typeof postedEntries !== 'undefined') {

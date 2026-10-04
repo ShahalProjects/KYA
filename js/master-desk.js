@@ -6790,10 +6790,12 @@
           });
         }
         if (rowGroupSel) {
-          rowGroupSel.addEventListener('change', () => {
+          rowGroupSel.addEventListener('change', (e) => {
             setActiveLedgerRow(idx);
             updateAdditionalInfoVisibility();
-            openLedgerAddlModal();
+            // Only a group picked here opens the popup — not one preset by the screen that
+            // sent the user here (e.g. Trade Receivables from a voucher's Customer box)
+            if (!(e && e.detail && e.detail.preset)) openLedgerAddlModal();
           });
         }
       };
@@ -15027,7 +15029,8 @@
           if (triggerText && opt) {
             triggerText.textContent = opt.textContent.trim().replace(/^📁\s*/, '');
           }
-          groupSel.dispatchEvent(new Event('change', { bubbles: true }));
+          // A preset group: the Additional Details button shows, but its popup stays shut
+          groupSel.dispatchEvent(new CustomEvent('change', { bubbles: true, detail: { preset: true } }));
         }
       }
       if (options.saveAs === 'customer' || options.saveAs === 'supplier') {

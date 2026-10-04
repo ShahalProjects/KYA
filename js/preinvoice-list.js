@@ -67,6 +67,7 @@
 
     // Saved documents plus drafts, newest first
     function getAll() {
+      if (typeof window.healPreInvoiceReversals === 'function') window.healPreInvoiceReversals();
       const S = store();
       const map = new Map();
       S[cfg.storeKey].forEach(d => map.set(String(d.id), { ...d, isDraft: false }));
@@ -120,6 +121,10 @@
     function setStatus(id, newStatus) {
       const { doc, isDraft } = findStored(id);
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
+      if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(doc, `${cfg.kind} ${doc[cfg.noField] || ''}`)) return;
+      // Cancelling gives the advance back — not while part of it paid other documents
+      if (newStatus === 'Cancelled' && typeof blockIfCreditUsed === 'function'
+          && blockIfCreditUsed([`adv:${cfg.storeKey}:${doc.id}`], `${cfg.kind} ${doc[cfg.noField] || ''}`, 'cancelled')) return;
       if (doc.status === 'Completed' && newStatus === 'Active') {
         showToast(`Completed ${cfg.plural.toLowerCase()} cannot be reopened.`, 'warning');
         return;
@@ -144,6 +149,9 @@
     function remove(id) {
       const { doc } = findStored(id);
       const docNo = doc ? (doc[cfg.noField] || cfg.noun) : cfg.noun;
+      if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(doc, `${cfg.kind} ${docNo}`)) return;
+      if (doc && typeof blockIfCreditUsed === 'function'
+          && blockIfCreditUsed([`adv:${cfg.storeKey}:${doc.id}`], `${cfg.kind} ${docNo}`, 'deleted')) return;
       if (doc && doc.status === 'Completed') {
         showToast(`Completed ${cfg.plural.toLowerCase()} cannot be deleted.`, 'warning');
         return;
@@ -171,6 +179,7 @@
     function edit(id) {
       const doc = getAll().find(d => String(d.id) === String(id));
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
+      if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(findStored(id).doc, `${cfg.kind} ${doc[cfg.noField] || ''}`)) return;
       if (doc.status === 'Completed') {
         showToast(`Completed ${cfg.plural.toLowerCase()} cannot be edited.`, 'warning');
         return;
@@ -194,7 +203,7 @@
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
       if (typeof loadSalesInvoice !== 'function') return;
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = kyaLocalIso();
       const inv = {
         id: Date.now(),
         customerId: doc.customerId,
@@ -220,6 +229,8 @@
         subTotal: doc.subTotal,
         total: doc.total,
         rows: Array.isArray(doc.rows) ? JSON.parse(JSON.stringify(doc.rows)) : [],
+        // Customer details changed on the document carry over to the invoice
+        partyOverride: doc.partyOverride ? JSON.parse(JSON.stringify(doc.partyOverride)) : null,
         uploadedDoc: doc.document ? {
           fileName: doc.document.name,
           fileSize: doc.document.size ? `${(doc.document.size / 1024).toFixed(1)} KB` : '',
@@ -228,6 +239,8 @@
         mode: 'Auto',
         [cfg.convertField]: doc.id
       };
+      // Only the advance still free comes across (Invoice Balance may have used some)
+      if (typeof getConvertedAdvanceFields === 'function') Object.assign(inv, getConvertedAdvanceFields(cfg.storeKey, doc));
 
       if (typeof showSalesPreInvoiceCard === 'function') showSalesPreInvoiceCard('salesVoucherFormCard');
       currentSalesVoucherSubtype = 'Invoice';
@@ -437,8 +450,10 @@
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
 
       const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
-      const customer = (typeof findPartyById === 'function' ? findPartyById(doc.customerId, 'Customer') : null) ||
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(doc.customerId, 'Customer') : null) ||
                        { name: doc.customerName || 'Customer' };
+      // With the customer details changed for this document only (Customer Details card)
+      const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, doc.partyOverride) : masterCustomer;
       const partyName = customer.name || doc.customerName || 'Customer';
       const cityPin = [customer.city, customer.pincode].filter(Boolean).join(' - ');
       const stateCountry = [customer.state, customer.country || 'India'].filter(Boolean).join(', ');

@@ -612,13 +612,40 @@
       const vDate = v.date || '';
       const total = parseFloat(v.total) || 0;
 
-      if (v.isReturn) {
-        // Sales Reversal / Return
-        const refundPaid = (v.paymentStatus === 'Full Refund')
-          ? total
+      if (v.isReturn && v.reversedPreInvoice) {
+        // Reversal of a pre-invoice: no sale is reversed; only the advance paid back shows
+        // (a part not refunded stays as a credit — still owed to the party)
+        // Money paid back (applying the advance to unpaid invoices pays nothing out)
+        const advReturned = (v.paymentStatus === 'Full Refund' || v.paymentStatus === 'Partial Refund') ? (parseFloat(v.paymentAmount) || 0) : 0;
+        const advRefunded = Math.max(0, advReturned - (typeof getCreditAdjustPortion === 'function'
+          ? getCreditAdjustPortion(v.paymentAccountId, v.paymentSplits, advReturned) : 0));
+        if (advRefunded > 0) {
+          if (dateFrom && vDate < dateFrom) {
+            preInvoiced += advRefunded;
+          } else if ((!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo)) {
+            periodInvoiced += advRefunded;
+            transactions.push({
+              id: v.journalEntryId || v.id,
+              date: vDate,
+              voucherNo: v.invoiceNo || 'SR-' + v.id,
+              particulars: `Advance Refunded (${v.reversedPreInvoice.no || 'Pre Invoice'} reversed)`,
+              debit: advRefunded,
+              credit: 0,
+              isSales: true
+            });
+          }
+        }
+      } else if (v.isReturn) {
+        // Sales Reversal / Return. Money paid back: a full refund is capped at what was
+        // received, so the stored amount is used; credit applied to unpaid invoices
+        // (Invoice Balance — the account, or its Multi Refund row) is not paid out at all
+        const refundGiven = (v.paymentStatus === 'Full Refund')
+          ? ((parseFloat(v.paymentAmount) || 0) > 0 ? parseFloat(v.paymentAmount) : total)
           : ((v.refundedAmount !== undefined && v.refundedAmount !== '' && !isNaN(Number(v.refundedAmount)))
             ? parseFloat(v.refundedAmount)
             : (parseFloat(v.paymentAmount) || 0));
+        const refundPaid = Math.max(0, refundGiven - (typeof getCreditAdjustPortion === 'function'
+          ? getCreditAdjustPortion(v.paymentAccountId, v.paymentSplits, refundGiven) : 0));
 
         if (dateFrom && vDate < dateFrom) {
           preReceived += total;
@@ -640,7 +667,9 @@
               id: (v.refundJournalEntryIds && v.refundJournalEntryIds[0]) || v.id,
               date: vDate,
               voucherNo: (v.invoiceNo || 'SR-' + v.id) + ' (Ref)',
-              particulars: 'Refund Paid',
+              particulars: (typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(v.paymentAccountId))
+                ? `Refund adjusted with ${((typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => String(l.id) === String(v.paymentAccountId)) || {}).name || 'ledger'}`
+                : 'Refund Paid',
               debit: refundPaid,
               credit: 0,
               isSales: true
@@ -668,9 +697,16 @@
           : null;
         const advJEId = (prof && prof.advanceJournalEntryId) || v.advanceJournalEntryId;
         const advAdjusted = (advJEId && advanceEntryIds.has(String(advJEId)))
-          ? Math.min(parseFloat(prof ? prof.advancePaidAmount : v.advancePaidAmount) || 0, paid)
+          ? Math.min((v.advancePaidAmount !== undefined && v.advancePaidAmount !== null) ? (parseFloat(v.advancePaidAmount) || 0) : (parseFloat(prof ? prof.advancePaidAmount : 0) || 0), paid)
           : 0;
-        const received = paid - advAdjusted;
+        // Paid from credit the customer already had (Invoice Balance — the account, or its
+        // Multi Payment row): that credit is already on this statement, so it isn't a new receipt
+        const creditAdjusted = (typeof usesCreditAdjust === 'function' && usesCreditAdjust(v.paymentAccountId, v.paymentSplits))
+          ? (v.creditAdjustments || []).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0) : 0;
+        const received = Math.max(0, paid - advAdjusted - creditAdjusted);
+        const receivedLabel = (typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(v.paymentAccountId))
+          ? `Adjusted with ${((typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => String(l.id) === String(v.paymentAccountId)) || {}).name || 'ledger'}`
+          : 'Payment Received';
 
         if (dateFrom && vDate < dateFrom) {
           preInvoiced += grossAmount;
@@ -758,7 +794,7 @@
                 id: v.paymentJournalEntryId || v.id,
                 date: vDate,
                 voucherNo: payVoucherNo,
-                particulars: 'Payment Received',
+                particulars: receivedLabel,
                 debit: 0,
                 credit: received,
                 isSales: true
@@ -769,7 +805,9 @@
 
         // Advance above the invoice value paid back to the customer (the part not refunded
         // stays as a credit here — it is owed to them, held in Refund Payable)
-        const advRefunded = (v.advanceRefund && v.advanceRefundJournalEntryId) ? (parseFloat(v.advanceRefund.amount) || 0) : 0;
+        const excessReturned = (v.advanceRefund && v.advanceRefundJournalEntryId) ? (parseFloat(v.advanceRefund.amount) || 0) : 0;
+        const advRefunded = Math.max(0, excessReturned - (typeof getCreditAdjustPortion === 'function'
+          ? getCreditAdjustPortion(v.advanceRefund && v.advanceRefund.accountId, v.advanceRefund && v.advanceRefund.splits, excessReturned) : 0));
         if (advRefunded > 0) {
           if (dateFrom && vDate < dateFrom) {
             preInvoiced += advRefunded;
@@ -792,8 +830,11 @@
     postedEntries.forEach(entry => {
       if (!entry) return;
       if (advanceEntryIds.has(String(entry.id))) {
-        const advAmt = (entry.allRows || []).reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
-        if (advAmt <= 0) return;
+        // An advance paid from credit the customer already had (Invoice
+        // Balance) is already on this statement — only fresh money counts
+        const advAmt = (entry.allRows || []).reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0)
+          - (parseFloat(entry.creditFunded) || 0);
+        if (advAmt <= 0.009) return;
         if (dateFrom && entry.date < dateFrom) {
           preReceived += advAmt;
         } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
@@ -810,14 +851,19 @@
         }
         return;
       }
-      // Skip entries originating from Sales Module or linked to sales vouchers
-      if (entry.preparedBy === 'Sales Module') return;
-      if (entry.jeType === 'invoice' || entry.jeType === 'tds' || entry.jeType === 'payment') return;
-      if (salesJournalEntryIds.has(String(entry.id))) return;
+      // Another party's voucher settled against this customer's ledger (⇄ Adjust with
+      // Ledger) — it isn't on this customer's own vouchers, so it shows from the entry
+      const contraFromOther = !!entry.ledgerAdjust && (entry.partyName || '').trim().toLowerCase() !== custNameLower;
+      if (!contraFromOther) {
+        // Skip entries originating from Sales Module or linked to sales vouchers
+        if (entry.preparedBy === 'Sales Module') return;
+        if (entry.jeType === 'invoice' || entry.jeType === 'tds' || entry.jeType === 'payment') return;
+        if (salesJournalEntryIds.has(String(entry.id))) return;
 
-      const vNo = (entry.voucherNo || '').toLowerCase();
-      if (vNo.startsWith('sv-') || vNo.startsWith('sr-') || vNo.startsWith('so-') || vNo.startsWith('pay-') || vNo.startsWith('tds-')) return;
-      if (salesVoucherNos.has(vNo)) return;
+        const vNo = (entry.voucherNo || '').toLowerCase();
+        if (vNo.startsWith('sv-') || vNo.startsWith('sr-') || vNo.startsWith('so-') || vNo.startsWith('pay-') || vNo.startsWith('tds-')) return;
+        if (salesVoucherNos.has(vNo)) return;
+      }
 
       (entry.allRows || []).forEach(row => {
         const rowPart = (row.particular || '').trim().toLowerCase();

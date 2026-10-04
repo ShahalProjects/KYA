@@ -109,6 +109,9 @@
     if (index === -1) return;
     const invoice = list[index];
     const isRet = !!invoice.isReturn;
+    // A reversal / an advance above the invoice value whose credit paid other documents stays
+    if (typeof blockIfCreditUsed === 'function'
+        && blockIfCreditUsed([`rev:${invoice.id}`, `park:${invoice.id}`], `${isRet ? 'Sales Reversal' : 'Invoice'} ${invoice.invoiceNo}`, 'deleted')) return;
     
     let titleText = isRet ? 'Delete Reversal?' : 'Delete Invoice?';
     let messageText = isRet 

@@ -1938,7 +1938,9 @@
       r2.getCell(6).alignment = { vertical: 'middle', horizontal: 'right' };
 
       // Row 3: Customer & Date
-      const customer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == quote.customerId) : null) || { name: quote.customerName || 'Customer' };
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == quote.customerId) : null) || { name: quote.customerName || 'Customer' };
+      // With the customer details changed for this document only (Customer Details card)
+      const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, quote.partyOverride) : masterCustomer;
       const partyName = customer.name || quote.customerName || 'Customer';
       const r3 = sheet.addRow([`Quotation For: ${partyName}`, '', '', '', `Quotation Date: ${formatRptDate(quote.date) || '—'}`]);
       r3.height = 18;
@@ -2192,9 +2194,11 @@
       r2.getCell(6).alignment = { vertical: 'middle', horizontal: 'right' };
 
       // Row 3: Customer & Date
-      const customer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, 'Customer') : null) ||
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, 'Customer') : null) ||
                        (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) ||
                        { name: proforma.customerName || 'Customer' };
+      // With the customer details changed for this document only (Customer Details card)
+      const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, proforma.partyOverride) : masterCustomer;
       const partyName = customer.name || proforma.customerName || 'Customer';
       const r3 = sheet.addRow([`${L.forLabel}: ${partyName}`, '', '', '', `Date: ${formatRptDate(proforma.date) || '—'}`]);
       r3.height = 18;

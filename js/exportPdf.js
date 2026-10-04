@@ -2246,7 +2246,9 @@
       doc.line(14, 26.5, pageWidth - 14, 26.5);
 
       // Metadata Info Box
-      const customer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == quote.customerId) : null) || { name: quote.customerName || 'Unknown Customer' };
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == quote.customerId) : null) || { name: quote.customerName || 'Unknown Customer' };
+      // With the customer details changed for this document only (Customer Details card)
+      const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, quote.partyOverride) : masterCustomer;
       const partyName = customer.name || quote.customerName || 'Unknown Customer';
       const partyAddr = customer.address || '';
       const partyGstin = customer.gstin || '';
@@ -2487,7 +2489,9 @@
       doc.line(14, 26.5, pageWidth - 14, 26.5);
 
       // Metadata Info Box
-      const customer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) || { name: proforma.customerName || 'Unknown Customer' };
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) || { name: proforma.customerName || 'Unknown Customer' };
+      // With the customer details changed for this document only (Customer Details card)
+      const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, proforma.partyOverride) : masterCustomer;
       const partyName = customer.name || proforma.customerName || 'Unknown Customer';
       const partyAddr = customer.address || '';
       const partyGstin = customer.gstin || '';

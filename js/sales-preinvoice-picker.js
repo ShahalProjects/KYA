@@ -41,6 +41,7 @@
 
   // Every still-open pre-invoice: saved ones that are Active, plus drafts
   function getActivePreInvoices() {
+    if (typeof window.healPreInvoiceReversals === 'function') window.healPreInvoiceReversals();
     const S = window.KYA_STORE || {};
     const out = [];
     SOURCES.forEach(src => {
@@ -291,6 +292,10 @@
 
   window.refreshSalesPreInvoicePicker = refreshSalesPreInvoicePicker;
   window.getActivePreInvoices = getActivePreInvoices;
+  // Shared with the Sales Reversal "Original Doc" list (sales-preinvoice-reversal.js)
+  window._preInvoiceSources = SOURCES;
+  window.showPreInvoiceDetailsCard = showDetailsCard;
+  window.hidePreInvoiceDetailsCard = hideDetailsCard;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', wire);

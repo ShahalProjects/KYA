@@ -795,12 +795,68 @@
     refreshSalesCustomerAlterPencil();
   })();
 
+  // ── The same Customer pencil on the pre-invoice forms ──
+  // prefix: 'quote' | 'proforma' | 'order' | 'challan' — the form's <prefix>Customer select,
+  // <prefix>CustomerSelectTriggerText and <prefix>CustomerAlterBtn.
+  function getPreInvoiceCustomerMaster(prefix) {
+    const val = (document.getElementById(`${prefix}Customer`) || {}).value;
+    if (!val) return null;
+    const cust = (typeof getKyaCustomers === 'function' ? getKyaCustomers() : []).find(c => String(c.id) === String(val));
+    if (cust) return { tab: 'customers', id: cust.id };
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      const l = coaLedgers.find(x => String(x.id) === String(val));
+      if (l) return { tab: 'ledger', id: l.id };
+    }
+    return null;
+  }
+
+  function refreshPreInvoiceCustomerAlterPencil(prefix) {
+    const btn = document.getElementById(`${prefix}CustomerAlterBtn`);
+    const text = document.getElementById(`${prefix}CustomerSelectTriggerText`);
+    const show = !!getPreInvoiceCustomerMaster(prefix);
+    if (btn) btn.hidden = !show;
+    // Keep a long name clear of the pencil
+    if (text) {
+      text.style.paddingRight = show ? '26px' : '';
+      text.style.overflow = 'hidden';
+      text.style.textOverflow = 'ellipsis';
+      text.style.whiteSpace = 'nowrap';
+    }
+  }
+  window.refreshPreInvoiceCustomerAlterPencil = refreshPreInvoiceCustomerAlterPencil;
+
+  // populate(filter) / select(id): the form's own customer list functions, used to show the
+  // altered party when Master Desk comes back
+  function wirePreInvoiceCustomerAlterPencil(prefix, populate, select) {
+    const btn = document.getElementById(`${prefix}CustomerAlterBtn`);
+    if (!btn || btn._wired) return;
+    btn._wired = true;
+    btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const m = getPreInvoiceCustomerMaster(prefix);
+      if (m) goAlter(m.tab, m.id, { type: 'preCustomer', prefix, populate, select });
+    });
+    refreshPreInvoiceCustomerAlterPencil(prefix);
+  }
+  window.wirePreInvoiceCustomerAlterPencil = wirePreInvoiceCustomerAlterPencil;
+
   window.onVoucherMasterAltered = function (tab, record) {
     const pending = _pendingAlter;
     _pendingAlter = null;
     if (!pending || !record) return;
     setTimeout(() => {
-      if (pending.type === 'customer') {
+      if (pending.type === 'preCustomer') {
+        // A pre-invoice form: same party, refreshed name / state / details. Its cached copy of
+        // the party is dropped so it rebuilds from the altered master — unless it was edited
+        // for this document on purpose (as on the Sales Invoice)
+        const ov = typeof getPartyOverride === 'function' ? getPartyOverride(pending.prefix) : null;
+        if (ov && String(ov.partyId) === String(record.id) && !ov.isOverridden) setPartyOverride(pending.prefix, null);
+        if (typeof pending.populate === 'function') pending.populate('');
+        if (typeof pending.select === 'function') pending.select(record.id);
+        refreshPreInvoiceCustomerAlterPencil(pending.prefix);
+      } else if (pending.type === 'customer') {
         // Same customer, refreshed name/details. The voucher's cached copy of the party is
         // dropped so it rebuilds from the altered master — unless it was edited for this
         // invoice on purpose.
@@ -1229,11 +1285,18 @@
     return currentSalesVoucherSubtype === 'Return' ? 'return' : 'invoice';
   }
 
+  // Default prefix per kind: invoices / reversals, and the pre-invoice documents
+  // (Quotation, Proforma Invoice, Sales Order, Delivery Challan — see doc-numbering.js)
+  const SALES_NUMBER_DEFAULT_CODES = {
+    invoice: 'INV', return: 'REV', quotation: 'QT', proforma: 'PI', salesOrder: 'SO', deliveryChallan: 'DC'
+  };
+
   function getSalesNumberingSettings(kind) {
     const year = new Date().getFullYear();
-    const defaults = kind === 'return'
-      ? { prefix: `REV-${year}-`, start: 1, digits: 3 }
-      : { prefix: `INV-${year}-`, start: 1, digits: 3 };
+    // 'reversal': the prefix put in front of the Original Doc number (REV-INV-2026-001)
+    const defaults = kind === 'reversal'
+      ? { prefix: 'REV-', start: 1, digits: 3 }
+      : { prefix: `${SALES_NUMBER_DEFAULT_CODES[kind] || 'INV'}-${year}-`, start: 1, digits: 3 };
     const saved = ((window.KYA_STORE || {}).salesNumbering || {})[kind];
     if (!saved) return defaults;
     return {
@@ -1324,6 +1387,38 @@
   // Pencil popup: set the invoice number prefix, starting number and digits.
   function openSalesInvoiceNumberingModal() {
     const kind = 'invoice';
+    openKyaNumberingModal({
+      kind,
+      noun: 'Invoice',
+      getUsed: () => getUsedSalesInvoiceNos(kind),
+      onSaved: () => {
+        // Re-number the open voucher unless it's a posted invoice being edited
+        const editing = window._editingSalesInvoice;
+        const invNoEl = document.getElementById('salesInvoiceNo');
+        const chipEl = document.getElementById('salesVoucherChipDisplay');
+        if (invNoEl) {
+          const saved = getSalesNumberingSettings(kind);
+          invNoEl.placeholder = formatSalesInvoiceNo(saved, saved.start);
+        }
+        if (invNoEl && !(editing && !editing.isDraft)) {
+          invNoEl.value = getNextAutoInvoiceNumber(kind);
+          if (chipEl) chipEl.textContent = invNoEl.value;
+        }
+        validateSalesInvoiceNoField();
+      }
+    });
+  }
+  window.openSalesInvoiceNumberingModal = openSalesInvoiceNumberingModal;
+
+  // Number-format popup shared by the Sales Invoice and the pre-invoice documents:
+  // prefix, starting number and digits, with a live preview of the next free number.
+  // opts: { kind, noun ('Invoice', 'Quotation'…), getUsed() → Set of used numbers
+  //         (lower-case), onSaved() → re-number the open form }
+  function openKyaNumberingModal(opts) {
+    const kind = opts.kind;
+    const noun = opts.noun || 'Invoice';
+    const nounLower = noun.toLowerCase();
+    const getUsed = typeof opts.getUsed === 'function' ? opts.getUsed : () => new Set();
     const s = getSalesNumberingSettings(kind);
     document.getElementById('salesNumberingOverlay')?.remove();
 
@@ -1338,13 +1433,13 @@
     overlay.innerHTML = `
       <div role="dialog" aria-modal="true" aria-labelledby="salesNumberingTitle" style="background:#fff; border-radius:16px; width:100%; max-width:440px; box-shadow:0 24px 48px -12px rgba(0,0,0,.35); font-family:var(--font-main, Inter, sans-serif); overflow:hidden;">
         <div style="padding:20px 22px 6px;">
-          <div id="salesNumberingTitle" style="font-size:16px; font-weight:700; color:var(--slate-900);">Invoice Number Format</div>
-          <div style="font-size:12.5px; color:var(--slate-500); margin-top:3px;">New invoices are numbered from this prefix. Numbers already used are skipped automatically.</div>
+          <div id="salesNumberingTitle" style="font-size:16px; font-weight:700; color:var(--slate-900);">${noun} Number Format</div>
+          <div style="font-size:12.5px; color:var(--slate-500); margin-top:3px;">${opts.subtitle || `New ${nounLower}s are numbered from this prefix. Numbers already used are skipped automatically.`}</div>
         </div>
         <div style="padding:14px 22px 4px;">
           <label for="salesNumPrefix" style="${lbl}">Prefix</label>
-          <input id="salesNumPrefix" type="text" maxlength="30" style="${inpStyle}" placeholder="e.g. INV-2026-" />
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
+          <input id="salesNumPrefix" type="text" maxlength="30" style="${inpStyle}" placeholder="e.g. ${ohEsc(s.prefix)}" />
+          <div style="display:${opts.prefixOnly ? 'none' : 'grid'}; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
             <div>
               <label for="salesNumStart" style="${lbl}">Starting Number</label>
               <input id="salesNumStart" type="number" min="1" step="1" style="${inpStyle}" />
@@ -1357,7 +1452,7 @@
             </div>
           </div>
           <div style="margin-top:16px; padding:12px 14px; background:var(--slate-50, #f8fafc); border:1.5px dashed var(--slate-200); border-radius:10px;">
-            <div style="font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--slate-500);">Next invoice number</div>
+            <div style="font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--slate-500);">${opts.previewLabel || `Next ${nounLower} number`}</div>
             <div id="salesNumPreview" style="font-size:17px; font-weight:800; color:var(--blue-700, #1d4ed8); margin-top:4px; word-break:break-all;"></div>
             <div id="salesNumPreviewNote" style="font-size:11.5px; color:#b45309; margin-top:4px; display:none;"></div>
           </div>
@@ -1384,9 +1479,24 @@
       start: Math.max(1, parseInt(startInp.value, 10) || 1),
       digits: parseInt(digitsSel.value, 10) || 3
     });
+    const saveBtn = overlay.querySelector('#salesNumSave');
     const refreshPreview = () => {
       const f = readForm();
-      const used = getUsedSalesInvoiceNos(kind);
+      // A prefix that can't be left empty (prefix-only formats)
+      const missing = !!opts.requirePrefix && !f.prefix;
+      saveBtn.disabled = missing;
+      saveBtn.style.opacity = missing ? '0.5' : '';
+      saveBtn.style.cursor = missing ? 'not-allowed' : '';
+      if (typeof opts.preview === 'function') {
+        // The caller builds the number (e.g. prefix + Original Doc for a reversal)
+        const p = opts.preview(f) || {};
+        preview.textContent = p.text || '';
+        const note = missing ? 'Enter a prefix.' : (p.note || '');
+        previewNote.style.display = note ? 'block' : 'none';
+        previewNote.textContent = note;
+        return;
+      }
+      const used = getUsed();
       let n = f.start;
       while (used.has(formatSalesInvoiceNo(f, n).toLowerCase())) n++;
       preview.textContent = formatSalesInvoiceNo(f, n);
@@ -1403,22 +1513,12 @@
       document.removeEventListener('keydown', onKey, true);
     };
     const save = () => {
-      saveSalesNumberingSettings(kind, readForm());
+      if (saveBtn.disabled) return;
+      const f = readForm();
+      saveSalesNumberingSettings(kind, opts.prefixOnly ? { prefix: f.prefix } : f);
       close();
-      // Re-number the open voucher unless it's a posted invoice being edited
-      const editing = window._editingSalesInvoice;
-      const invNoEl = document.getElementById('salesInvoiceNo');
-      const chipEl = document.getElementById('salesVoucherChipDisplay');
-      if (invNoEl) {
-        const saved = getSalesNumberingSettings(kind);
-        invNoEl.placeholder = formatSalesInvoiceNo(saved, saved.start);
-      }
-      if (invNoEl && !(editing && !editing.isDraft)) {
-        invNoEl.value = getNextAutoInvoiceNumber(kind);
-        if (chipEl) chipEl.textContent = invNoEl.value;
-      }
-      validateSalesInvoiceNoField();
-      if (typeof showToast === 'function') showToast('Invoice number format saved.', 'success');
+      if (typeof opts.onSaved === 'function') opts.onSaved();
+      if (typeof showToast === 'function') showToast(`${noun} number format saved.`, 'success');
     };
     const onKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); close(); }
@@ -1431,7 +1531,9 @@
     prefixInp.focus();
     prefixInp.select();
   }
-  window.openSalesInvoiceNumberingModal = openSalesInvoiceNumberingModal;
+  window.openKyaNumberingModal = openKyaNumberingModal;
+  window.getSalesNumberingSettings = getSalesNumberingSettings;
+  window.formatSalesInvoiceNo = formatSalesInvoiceNo;
 
   function setInvoiceNoMode(mode) {
     currentSalesInvoiceMode = 'Auto';
@@ -1439,6 +1541,12 @@
     const chipEl = document.getElementById('salesVoucherChipDisplay');
     
     if (!invNoEl || !chipEl) return;
+
+    // A Sales Reversal takes its number from the Original Doc
+    if (currentSalesVoucherSubtype === 'Return' && typeof refreshSalesReversalNo === 'function') {
+      refreshSalesReversalNo(true);
+      return;
+    }
 
     if (mode === 'Auto') {
       invNoEl.value = getNextAutoInvoiceNumber();
@@ -1469,40 +1577,49 @@
     if (!custSelect) return;
     
     custSelect.innerHTML = '<option value="">&mdash; Select Customer &mdash;</option>';
-    
-    const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
-    const addedNames = new Set();
-    
-    customers.forEach(c => {
+
+    // Each <optgroup> is a section of the list: Cash and Cash Equivalents first (a cash sale,
+    // paid in full into that account), then Customers, then Trade Receivables ledgers
+    const addParty = (group, p) => {
       const opt = document.createElement('option');
-      opt.value = c.id;
-      const akaStr = c.aliases && c.aliases.length > 0 ? ` [A.K.A: ${c.aliases.join(', ')}]` : '';
-      opt.textContent = c.name + akaStr;
-      if (selectedId && String(c.id) === String(selectedId)) {
+      opt.value = p.id;
+      const akaStr = p.aliases && p.aliases.length > 0 ? ` [A.K.A: ${p.aliases.join(', ')}]` : '';
+      opt.textContent = p.name + akaStr;
+      if (selectedId && String(p.id) === String(selectedId)) {
         opt.selected = true;
       }
-      custSelect.appendChild(opt);
+      group.appendChild(opt);
+    };
+    const newGroup = label => {
+      const group = document.createElement('optgroup');
+      group.label = label;
+      return group;
+    };
+
+    const cashGroup = newGroup('Cash and Cash Equivalents');
+    getSalesCashEquivalentLedgers().forEach(l => addParty(cashGroup, l));
+
+    const custGroup = newGroup('Customers');
+    const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+    const addedNames = new Set();
+    customers.forEach(c => {
+      addParty(custGroup, c);
       addedNames.add((c.name || '').trim().toLowerCase());
     });
 
-    // Also include ledgers created under Trade Receivables group in Master Desk → Ledgers
+    // Ledgers created under Trade Receivables in Master Desk → Ledgers
+    const ledgerGroup = newGroup('Ledgers');
     if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
       coaLedgers.forEach(l => {
         if (l.type === 'ledger' && l.sgId === 'sg-tr' && l.name && l.name.trim().toLowerCase() !== 'trade receivables') {
           if (!addedNames.has(l.name.trim().toLowerCase())) {
-            const opt = document.createElement('option');
-            opt.value = l.id;
-            const akaStr = l.aliases && l.aliases.length > 0 ? ` [A.K.A: ${l.aliases.join(', ')}]` : '';
-            opt.textContent = l.name + akaStr;
-            if (selectedId && String(l.id) === String(selectedId)) {
-              opt.selected = true;
-            }
-            custSelect.appendChild(opt);
+            addParty(ledgerGroup, l);
             addedNames.add(l.name.trim().toLowerCase());
           }
         }
       });
     }
+    [cashGroup, custGroup, ledgerGroup].forEach(group => { if (group.children.length) custSelect.appendChild(group); });
 
     const control = getSalesCustSearchControl();
     if (control) control.refresh();
@@ -1620,10 +1737,64 @@
 
     const multiOpt = document.createElement('option');
     multiOpt.value = SALES_MULTI_PAYMENT_VALUE;
-    multiOpt.textContent = 'Multi Payment';
+    multiOpt.textContent = currentSalesVoucherSubtype === 'Return' ? 'Multi Refund' : 'Multi Payment';
     if (String(selectedId) === SALES_MULTI_PAYMENT_VALUE) multiOpt.selected = true;
     paySelect.appendChild(multiOpt);
+
+    // Invoice Balance, between the accounts and Multi Payment (sales-credit-adjust.js)
+    if (typeof appendAdjustOptions === 'function') appendAdjustOptions(paySelect, selectedId);
   }
+
+  // ── Adjusting a payment / refund without Cash or Bank ──
+  // Pays the invoice from the customer's credits ('pay'), or applies a refund — a reversal's,
+  // or an advance above the invoice value — to the customer's unpaid invoices ('apply').
+  let _salesAdjust = null;
+  function getSalesAdjust() {
+    if (_salesAdjust || typeof createAdjustController !== 'function') return _salesAdjust;
+    const isApplyMode = () => currentSalesVoucherSubtype === 'Return'
+      || (typeof getSalesAdvanceExcess === 'function' && getSalesAdvanceExcess(getSalesGrandTotalForPayment()) > 0);
+    _salesAdjust = createAdjustController({
+      selectId: 'salesPaymentAccount',
+      summaryAfterId: 'salesMultiPaymentSummary',
+      getMode: () => (isApplyMode() ? 'apply' : 'pay'),
+      getCustomerId: () => document.getElementById('salesCustomer')?.value || '',
+      purpose: () => (isApplyMode() ? 'refund' : 'payment'),
+      getRequired: () => {
+        const status = getSalesPaymentStatus();
+        if (status === 'Not Paid' || status === 'No Refund') return 0;
+        const max = getSalesPaymentMax(getSalesGrandTotalForPayment());
+        if (status === 'Full Payment' || status === 'Full Refund') return max;
+        const typed = parseFloat(document.getElementById('salesPaymentAmount')?.value) || 0;
+        return typed > 0 ? Math.min(typed, max) : max;
+      },
+      getCtx: () => getSalesAdjustCtx(),
+      // Fewer credits / invoices chosen than the amount: the payment becomes that amount
+      onAmount: (total) => {
+        const partBtn = document.getElementById('salesPaymentStatusPartial');
+        if (partBtn && !partBtn.classList.contains('active')) partBtn.click();
+        const amt = document.getElementById('salesPaymentAmount');
+        if (amt) amt.value = total.toFixed(2);
+        recalculateSalesTotals();
+      },
+      repopulate: (selectedId) => populateSalesPaymentAccounts(selectedId)
+    });
+    return _salesAdjust;
+  }
+  window.getSalesAdjust = getSalesAdjust;
+
+  // What the adjustment must leave out: this voucher's own use of credits (when editing it),
+  // the advance of the pre-invoice it is billed from, and the invoice giving a refund
+  function getSalesAdjustCtx() {
+    const editing = window._editingSalesInvoice;
+    const ctx = { excludeVoucherId: (editing && !editing.isDraft) ? editing.id : null, excludeKeys: [] };
+    [['_pendingConvertProformaId', 'proformaInvoices'], ['_pendingConvertSalesOrderId', 'salesOrders'],
+     ['_pendingConvertDeliveryChallanId', 'deliveryChallans']].forEach(([key, storeKey]) => {
+      if (window[key]) ctx.excludeKeys.push(`adv:${storeKey}:${window[key]}`);
+    });
+    if (currentSalesVoucherSubtype !== 'Return' && editing && editing.id) ctx.excludeInvoiceId = editing.id;
+    return ctx;
+  }
+  window.getSalesAdjustCtx = getSalesAdjustCtx;
 
   // ── Multi Payment: split one receipt across several cash & cash equivalent accounts ──
   const SALES_MULTI_PAYMENT_VALUE = 'multi-payment';
@@ -1674,18 +1845,26 @@
   // Shared by the Sales Voucher and the Proforma advance: the caller supplies the amount
   // to split, the account list, and what to do with the saved rows. Rows are edited on a
   // draft copy so Cancel / Esc leaves the saved split untouched.
-  //   cfg = { typeLabel, getTarget(), getAccounts(), splits, onSave(rows), onCancel() }
+  //   cfg = { typeLabel, getTarget(), getAccounts(), splits, onSave(rows), onCancel(),
+  //           adjust } — adjust: the form's Invoice Balance controller (sales-credit-adjust.js);
+  //           with it, one row can be "Invoice Balance" and its credits / invoices are chosen
+  //           for that row's amount
   let _multiPayModal = null;
+  const MULTI_PAY_CREDIT_VALUE = 'credit-adjust';
 
   function openMultiPaymentModal(cfg) {
     closeMultiPaymentModal();
 
+    const draft = ((cfg && cfg.splits) || []).map(split => ({
+      accountId: split.accountId,
+      amount: split.amount
+    }));
     _multiPayModal = {
       cfg: cfg || {},
-      draft: ((cfg && cfg.splits) || []).map(split => ({
-        accountId: split.accountId,
-        amount: split.amount
-      }))
+      draft,
+      // The Invoice Balance row's credits / invoices, edited on a copy like the rows
+      allocations: (cfg && cfg.adjust && draft.some(s => String(s.accountId) === MULTI_PAY_CREDIT_VALUE))
+        ? cfg.adjust.get() : []
     };
     while (_multiPayModal.draft.length < 2) {
       _multiPayModal.draft.push({ accountId: '', amount: '' });
@@ -1726,7 +1905,8 @@
 
         <h2 style="margin:0 0 4px; font-size:17px; font-weight:700; color:#0f172a;">Multi ${typeLabel}</h2>
         <p style="margin:0 0 16px; font-size:12.5px; color:#64748b; line-height:1.45;">
-          Split this ${typeLabel.toLowerCase()} across two or more cash &amp; cash equivalent accounts.
+          Split this ${typeLabel.toLowerCase()} across two or more cash &amp; cash equivalent accounts${!(cfg && cfg.adjust) ? ''
+            : (cfg.adjust.getMode() === 'apply' ? ' — one part can go to the customer\'s unpaid invoices through Invoice Balance' : ' — one part can come from the customer\'s Invoice Balance')}.
         </p>
 
         <div style="
@@ -1801,9 +1981,12 @@
     const accounts = (typeof _multiPayModal.cfg.getAccounts === 'function')
       ? (_multiPayModal.cfg.getAccounts() || [])
       : [];
+    const adjust = _multiPayModal.cfg.adjust || null;
     wrap.innerHTML = '';
 
     _multiPayModal.draft.forEach((split, idx) => {
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex; flex-direction:column; gap:4px; width:100%;';
       const row = document.createElement('div');
       row.style.cssText = 'display:flex; align-items:center; gap:8px; width:100%;';
 
@@ -1821,7 +2004,24 @@
         if (String(a.id) === String(split.accountId)) opt.selected = true;
         sel.appendChild(opt);
       });
-      sel.addEventListener('change', () => { split.accountId = sel.value; });
+      if (adjust) {
+        const creditOpt = document.createElement('option');
+        creditOpt.value = MULTI_PAY_CREDIT_VALUE;
+        creditOpt.textContent = 'Invoice Balance';
+        if (String(split.accountId) === MULTI_PAY_CREDIT_VALUE) creditOpt.selected = true;
+        sel.appendChild(creditOpt);
+      }
+      sel.addEventListener('change', () => {
+        const prev = split.accountId;
+        split.accountId = sel.value;
+        if (sel.value === MULTI_PAY_CREDIT_VALUE) {
+          pickMultiPaymentCredit(split, prev);
+        } else if (String(prev) === MULTI_PAY_CREDIT_VALUE) {
+          // The Invoice Balance row became an account: its credits / invoices go
+          _multiPayModal.allocations = [];
+          renderMultiPaymentModalRows();
+        }
+      });
 
       const amt = document.createElement('input');
       amt.type = 'number';
@@ -1846,6 +2046,7 @@
       del.innerHTML = '&times;';
       del.style.cssText = 'height:38px; width:36px; flex-shrink:0; border:1.5px solid #e2e8f0; background:#fff; color:#94a3b8; border-radius:9px; font-size:18px; font-weight:700; line-height:1; cursor:pointer; transition:all .15s;';
       del.addEventListener('click', () => {
+        if (String(split.accountId) === MULTI_PAY_CREDIT_VALUE) _multiPayModal.allocations = [];
         _multiPayModal.draft.splice(idx, 1);
         if (_multiPayModal.draft.length === 0) _multiPayModal.draft.push({ accountId: '', amount: '' });
         renderMultiPaymentModalRows();
@@ -1854,10 +2055,90 @@
       row.appendChild(sel);
       row.appendChild(amt);
       row.appendChild(del);
-      wrap.appendChild(row);
+      item.appendChild(row);
+
+      // The Invoice Balance row: what it is made of; click to choose again
+      if (adjust && String(split.accountId) === MULTI_PAY_CREDIT_VALUE) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.dataset.role = 'multiPayCreditChip';
+        chip.title = 'Choose the balances for this row';
+        chip.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; padding:5px 9px; background:#f0fdfa; border:1px solid #99f6e4; border-radius:6px; font-size:11.5px; font-weight:600; color:#0f766e; cursor:pointer; font-family:inherit; box-sizing:border-box; text-align:left;';
+        chip._split = split;
+        chip.addEventListener('click', () => pickMultiPaymentCredit(split, MULTI_PAY_CREDIT_VALUE));
+        item.appendChild(chip);
+      }
+      wrap.appendChild(item);
     });
 
     updateMultiPaymentModalTotals();
+  }
+
+  // Recap of the Invoice Balance row: green when its credits / invoices add up to its amount
+  function paintMultiPayCreditChips() {
+    if (!_multiPayModal || !_multiPayModal.cfg.adjust) return;
+    const apply = _multiPayModal.cfg.adjust.getMode() === 'apply';
+    const used = (_multiPayModal.allocations || []).filter(a => (parseFloat(a.amount) || 0) > 0);
+    const total = Math.round(used.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0) * 100) / 100;
+    document.querySelectorAll('#multiPayRows [data-role="multiPayCreditChip"]').forEach(chip => {
+      const balanced = Math.abs(total - (parseFloat(chip._split.amount) || 0)) < 0.01;
+      const noun = apply ? 'invoice' : 'balance';
+      chip.innerHTML = used.length
+        ? `<span>⇄ ${used.length} ${noun}${used.length > 1 ? 's' : ''} &middot; <span style="color:${balanced ? '#059669' : '#dc2626'};">₹ ${fmtNum(total)}</span>${balanced ? '' : ' <span style="color:#dc2626;">— doesn\'t match this row</span>'}</span><span style="color:var(--blue-600);">Edit</span>`
+        : `<span style="color:#dc2626;">${apply ? 'No invoices chosen yet' : 'No balances chosen yet'}</span><span style="color:var(--blue-600);">Choose</span>`;
+    });
+  }
+
+  // Choosing "Invoice Balance" for a row (or clicking its recap): pick the credits — or, for
+  // a refund, the unpaid invoices — for that row's amount
+  function pickMultiPaymentCredit(split, prevAccount) {
+    const modal = _multiPayModal;
+    if (!modal || !modal.cfg.adjust) return;
+    const typeLabel = (modal.cfg.typeLabel || 'Payment').toLowerCase();
+    const revertRow = () => {
+      if (String(prevAccount) !== MULTI_PAY_CREDIT_VALUE) split.accountId = prevAccount || '';
+      renderMultiPaymentModalRows();
+    };
+    if (modal.draft.some(other => other !== split && String(other.accountId) === MULTI_PAY_CREDIT_VALUE)) {
+      showToast('Invoice Balance can be used in one row only.', 'warning');
+      split.accountId = String(prevAccount) === MULTI_PAY_CREDIT_VALUE ? '' : (prevAccount || '');
+      renderMultiPaymentModalRows();
+      return;
+    }
+    // No amount on the row yet: it takes whatever is still unallocated
+    const target = getMultiPaymentModalTarget();
+    if (!((parseFloat(split.amount) || 0) > 0)) {
+      const others = modal.draft.reduce((sum, other) => sum + (other === split ? 0 : (parseFloat(other.amount) || 0)), 0);
+      const rest = Math.round((target - others) * 100) / 100;
+      if (rest > 0) {
+        split.amount = rest.toFixed(2);
+        renderMultiPaymentModalRows();
+      }
+    }
+    const required = Math.round((parseFloat(split.amount) || 0) * 100) / 100;
+    if (required <= 0) {
+      showToast(target <= 0
+        ? `Enter the ${typeLabel} amount before splitting it.`
+        : 'Nothing is left unallocated — lower another row\'s amount first.', 'warning');
+      revertRow();
+      return;
+    }
+    modal.cfg.adjust.pick({
+      required,
+      current: modal.allocations,
+      onSave: (list, total) => {
+        if (_multiPayModal !== modal) return;
+        modal.allocations = list;
+        // Fewer chosen than the row: the row takes that amount
+        if (total < required - 0.01) split.amount = total.toFixed(2);
+        renderMultiPaymentModalRows();
+      },
+      onCancel: () => {
+        if (_multiPayModal !== modal) return;
+        if (!modal.allocations.length) revertRow();
+        else renderMultiPaymentModalRows();
+      }
+    });
   }
 
   // The split can never add up to more than the amount being split: anything typed beyond
@@ -1907,6 +2188,7 @@
       balanceEl.textContent = '₹ ' + fmtNum(balance);
       balanceEl.style.color = Math.abs(balance) < 0.01 ? '#059669' : '#dc2626';
     }
+    paintMultiPayCreditChips();
   }
 
   function saveMultiPaymentModal() {
@@ -1948,12 +2230,32 @@
       return;
     }
 
+    // The Invoice Balance row needs its credits / invoices, adding up to its amount
+    const adjust = _multiPayModal.cfg.adjust || null;
+    const creditRow = rows.find(split => String(split.accountId) === MULTI_PAY_CREDIT_VALUE);
+    const allocations = (creditRow && adjust)
+      ? (_multiPayModal.allocations || []).filter(a => (parseFloat(a.amount) || 0) > 0)
+      : [];
+    if (creditRow && adjust) {
+      const apply = adjust.getMode() === 'apply';
+      const chosen = Math.round(allocations.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0) * 100) / 100;
+      if (!allocations.length) {
+        showToast(apply ? 'Choose the invoices for the Invoice Balance row.' : 'Choose the balances for the Invoice Balance row.', 'warning');
+        return;
+      }
+      if (Math.abs(chosen - (parseFloat(creditRow.amount) || 0)) > 0.01) {
+        showToast(`The Invoice Balance row is ₹${fmtNum(parseFloat(creditRow.amount) || 0)} but ₹${fmtNum(chosen)} is chosen — click its recap to choose again.`, 'warning');
+        return;
+      }
+    }
+
     const saved = rows.map(split => ({
       accountId: split.accountId,
       amount: String(split.amount)
     }));
     const onSave = _multiPayModal.cfg.onSave;
     closeMultiPaymentModal();
+    if (adjust) adjust.set(allocations);
     if (typeof onSave === 'function') onSave(saved);
     showToast(`Multi ${typeLabel} split across ${saved.length} accounts saved.`, 'success');
   }
@@ -1982,6 +2284,7 @@
       typeLabel: isRefund ? 'Refund' : 'Payment',
       getTarget: getSalesMultiPaymentTarget,
       getAccounts: getSalesCashEquivalentLedgers,
+      adjust: (typeof getSalesAdjust === 'function') ? getSalesAdjust() : null,
       splits: salesMultiPayments,
       onSave: rows => {
         window.salesMultiPayments = rows;
@@ -2004,6 +2307,8 @@
 
   // Compact recap under the Payment Account dropdown; click it to reopen the modal.
   function updateSalesMultiPaymentUI() {
+    // The Invoice Balance recap sits with this one
+    if (typeof getSalesAdjust === 'function' && getSalesAdjust()) getSalesAdjust().refreshSummary();
     const summaryBtn = document.getElementById('salesMultiPaymentSummary');
     if (!summaryBtn) return;
 
@@ -2220,6 +2525,7 @@
       const itemInp = tr.querySelector('.sales-row-item');
       if (itemInp) {
         const attachPortal = () => {
+          if (itemInp.readOnly) return; // a reversal's lines come from the Original Doc
           _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
             applySalesMasterItemToRow(index, tr, selectedItem);
@@ -2246,6 +2552,8 @@
       attachVoucherRowUnitPicker(tr.querySelector('.sales-row-unit'));
       attachVoucherRowAlterButtons(tr, () => salesRows[index]);
     });
+    // Sales Reversal: rows follow the Original Doc (see applySalesReversalRowLocks)
+    if (typeof applySalesReversalRowLocks === 'function') applySalesReversalRowLocks();
   }
 
   function handlePortalKeydown(e, portal) {
@@ -2758,6 +3066,8 @@
       }
     }
     if (typeof updateSalesAdvanceInfo === 'function') updateSalesAdvanceInfo(total);
+    // A cash sale stays Full Payment into its own account (the line above unlocks Partial)
+    if (typeof applySalesCashCustomerLock === 'function') applySalesCashCustomerLock();
     
     // Show/hide Refund Info Message banner
     const refundInfoEl = document.getElementById('salesRefundInfoMessage');
@@ -2784,6 +3094,7 @@
     const invoiceNoInputWrap = document.getElementById('salesInvoiceNoInputWrap');
     const selectWrap = document.getElementById('salesInvoiceSelectWrap');
     const invoiceNoContainer = document.getElementById('salesInvoiceNoContainer');
+    const origDocField = document.getElementById('salesOriginalDocField');
     const postSalesBtn = document.getElementById('btnPostSales');
 
     if (invoiceNoLabel) invoiceNoLabel.textContent = 'Invoice No.';
@@ -2812,9 +3123,16 @@
     const orderCard = document.getElementById('salesOrderFormCard');
     const challanCard = document.getElementById('salesDeliveryChallanFormCard');
 
+    const customersBtn = document.getElementById('btnSalesCustomers');
+    const customersCard = document.getElementById('salesCustomersCard');
+    const customersListCard = document.getElementById('salesCustomersListCard');
+
     deactiveBtn(newSalesBtn);
     deactiveBtn(preInvoiceBtn);
     deactiveBtn(returnBtn);
+    deactiveBtn(customersBtn);
+    if (customersCard) customersCard.style.display = 'none';
+    if (customersListCard) customersListCard.style.display = 'none';
 
     if (quoteListCard) quoteListCard.style.display = 'none';
     if (typeof hidePreInvoiceDocListCards === 'function') hidePreInvoiceDocListCards();
@@ -2825,7 +3143,17 @@
     if (orderCard) orderCard.style.display = 'none';
     if (challanCard) challanCard.style.display = 'none';
 
-    if (currentSalesVoucherSubtype === 'PreInvoice') {
+    if (currentSalesVoucherSubtype === 'Customers') {
+      // Customers: Overview / Customer Details / Customer Balances (sales-customers.js)
+      activeBtn(customersBtn);
+      if (formCard) formCard.style.display = 'none';
+      if (preInvCard) preInvCard.style.display = 'none';
+      if (customersCard) {
+        customersCard.style.display = 'block';
+        // Shows Overview here, or swaps to the full-screen Customer Details / Balances
+        if (typeof renderSalesCustomersHub === 'function') renderSalesCustomersHub();
+      }
+    } else if (currentSalesVoucherSubtype === 'PreInvoice') {
       activeBtn(preInvoiceBtn);
       if (formCard) formCard.style.display = 'none';
       if (preInvCard) {
@@ -2842,14 +3170,17 @@
         activeBtn(returnBtn);
         if (cardTitle) cardTitle.textContent = 'Sales Reversal';
         if (cardSubtitle) cardSubtitle.textContent = 'Record sales reversals and customer credits';
-        if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
-        if (invoiceNoLabel) invoiceNoLabel.textContent = 'Original Doc';
-        if (invoiceNoInputWrap) invoiceNoInputWrap.style.display = 'none';
-        else if (invoiceNoInput) invoiceNoInput.style.display = 'none';
+        // Original Doc picker + a Reversal No. that is generated from it
+        if (origDocField) origDocField.style.display = '';
         if (selectWrap) {
           selectWrap.style.display = 'block';
           refreshSalesInvoiceDropdownOptions();
         }
+        if (invoiceNoContainer) invoiceNoContainer.style.display = ''; // keep the .je-field layout (label above the box)
+        if (invoiceNoLabel) invoiceNoLabel.textContent = 'Reversal No.';
+        if (invoiceNoInputWrap) invoiceNoInputWrap.style.display = 'block';
+        if (invoiceNoInput) invoiceNoInput.style.display = 'block';
+        if (typeof refreshSalesReversalNo === 'function') refreshSalesReversalNo();
         if (postSalesBtn) {
           postSalesBtn.innerHTML = `<svg viewBox="0 0 15 15" fill="none" style="width:14px; height:14px; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Post Reversal`;
         }
@@ -2857,13 +3188,25 @@
         activeBtn(newSalesBtn);
         if (cardTitle) cardTitle.textContent = 'Sales Invoice';
         if (cardSubtitle) cardSubtitle.textContent = 'Record sales transactions and customer receivables';
-        if (invoiceNoContainer) invoiceNoContainer.style.display = 'block';
+        if (invoiceNoContainer) invoiceNoContainer.style.display = ''; // keep the .je-field layout (label above the box)
+        if (invoiceNoLabel) invoiceNoLabel.textContent = 'Invoice No.';
         if (invoiceNoInputWrap) invoiceNoInputWrap.style.display = 'block';
         if (invoiceNoInput) {
           invoiceNoInput.style.display = 'block';
+          invoiceNoInput.readOnly = false;
+          invoiceNoInput.style.background = '';
+          invoiceNoInput.style.cursor = '';
+          invoiceNoInput.title = '';
           const s = getSalesNumberingSettings('invoice');
           invoiceNoInput.placeholder = formatSalesInvoiceNo(s, s.start);
         }
+        const fmtBtn = document.getElementById('btnSalesInvoiceNoFormat');
+        if (fmtBtn) {
+          fmtBtn.style.display = '';
+          fmtBtn.title = 'Set invoice number prefix';
+          fmtBtn.setAttribute('aria-label', 'Set invoice number prefix');
+        }
+        if (origDocField) origDocField.style.display = 'none';
         if (selectWrap) selectWrap.style.display = 'none';
         if (postSalesBtn) {
           postSalesBtn.innerHTML = `<svg viewBox="0 0 15 15" fill="none" style="width:14px; height:14px; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Post Invoice`;
@@ -2881,7 +3224,7 @@
 
     optionsList.innerHTML = '';
     
-    // Get all posted invoices that are NOT returns and NOT completely returned
+    // Posted invoices with something left to reverse, newest first
     const invoices = (window.KYA_STORE.salesVouchers || []).filter(v => {
       if (v.isReturn) return false;
       const remainingRows = getInvoiceRemainingRows(v);
@@ -2890,84 +3233,118 @@
       } else {
         return remainingRows.some(row => row.baseAmount > 0);
       }
-    });
-    
+    }).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (Number(b.id) || 0) - (Number(a.id) || 0));
+
     const query = filter.toLowerCase().trim();
     let matchCount = 0;
-    
+    // Shown like the pre-invoices below: number + type, details in a hover card
+    const invoiceSrc = { type: 'Invoice', noField: 'invoiceNo', color: '#0f766e', bg: '#f0fdfa' };
+
     invoices.forEach(inv => {
-      const custName = inv.customerId ? ((coaLedgers.find(l => l.id == inv.customerId) || { name: 'Customer' }).name) : 'No Customer';
-      const text = `${inv.invoiceNo} - ${custName} (${inv.date}) - ₹${fmtNum(inv.total)}`;
-      if (query && !text.toLowerCase().includes(query)) {
+      const custName = (typeof getSalesPartyName === 'function') ? getSalesPartyName(inv.customerId, inv.customerName) : (inv.customerName || '');
+      const searchText = [inv.invoiceNo, custName, inv.date, String(inv.total || '')]
+        .concat((inv.rows || []).map(r => r.item || r.serviceName || '')).join(' ').toLowerCase();
+      if (query && !searchText.includes(query)) {
         return;
       }
+      if (matchCount === 0) {
+        const header = document.createElement('div');
+        header.style.cssText = 'padding: 6px 10px 2px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate-400);';
+        header.textContent = 'Invoices';
+        optionsList.appendChild(header);
+      }
       matchCount++;
-      
+
       const item = document.createElement('div');
-      item.style.padding = '8px 12px';
-      item.style.fontSize = '13px';
-      item.style.borderRadius = '6px';
-      item.style.cursor = 'pointer';
-      item.style.fontWeight = '500';
-      item.style.color = 'var(--slate-700)';
-      item.style.whiteSpace = 'nowrap';
-      item.style.overflow = 'hidden';
-      item.style.textOverflow = 'ellipsis';
-      
-      item.textContent = text;
-      
-      item.addEventListener('mouseover', () => {
+      item.setAttribute('role', 'option');
+      item.style.cssText = 'padding: 8px 12px; font-size: 13px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px;';
+      item.innerHTML = `
+        <span style="font-family: monospace; font-weight: 800; color: var(--slate-800); white-space: nowrap;">${ohEsc(inv.invoiceNo || '—')}</span>
+        <span style="flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: ${invoiceSrc.color}; background: ${invoiceSrc.bg}; text-transform: uppercase;">Invoice</span>`;
+      const cardDoc = Object.assign({}, inv, { customerName: custName, status: 'Posted', advancePaidAmount: 0 });
+
+      item.addEventListener('mouseenter', () => {
         item.style.background = 'var(--slate-50)';
+        if (typeof showPreInvoiceDetailsCard === 'function') showPreInvoiceDetailsCard(item, invoiceSrc, cardDoc, false);
       });
-      item.addEventListener('mouseout', () => {
+      item.addEventListener('mouseleave', () => {
         item.style.background = 'transparent';
+        if (typeof hidePreInvoiceDetailsCard === 'function') hidePreInvoiceDetailsCard();
       });
       
       item.addEventListener('click', () => {
-        triggerText.textContent = inv.invoiceNo;
-        
-        autoFillFormFromInvoice(inv);
-        
+        if (typeof hidePreInvoiceDetailsCard === 'function') hidePreInvoiceDetailsCard();
         const dropdown = document.getElementById('salesInvoiceSelectDropdown');
         if (dropdown) dropdown.style.display = 'none';
+
+        const load = () => {
+          window._salesReversalPreInvoice = null;
+          triggerText.textContent = inv.invoiceNo;
+          autoFillFormFromInvoice(inv);
+        };
+        // Confirm first, as for a pre-invoice
+        if (typeof confirmInvoiceForReversal === 'function') confirmInvoiceForReversal(inv, custName, load);
+        else load();
       });
       
       optionsList.appendChild(item);
     });
-    
+
+    // Active Quotations / Proformas / Sales Orders / Delivery Challans can be reversed too
+    if (typeof appendReversalPreInvoiceOptions === 'function') {
+      matchCount += appendReversalPreInvoiceOptions(optionsList, filter);
+    }
+
     if (matchCount === 0) {
       const noResult = document.createElement('div');
       noResult.style.padding = '8px 12px';
       noResult.style.fontSize = '12px';
       noResult.style.color = 'var(--slate-400)';
       noResult.style.textAlign = 'center';
-      noResult.textContent = 'No matching invoices';
+      noResult.textContent = 'No matching invoices or pre invoices';
       optionsList.appendChild(noResult);
     }
   }
 
   function autoFillFormFromInvoice(inv) {
+    // The customer details as the invoice had them (its Customer Details edit, if any)
+    window._salesPartyOverride = inv.partyOverride ? JSON.parse(JSON.stringify(inv.partyOverride)) : null;
+    if (typeof hidePartyHoverCard === 'function') hidePartyHoverCard();
     const custEl = document.getElementById('salesCustomer');
     if (custEl) {
-      custEl.value = inv.customerId;
       populateSalesCustomers(inv.customerId);
+      // The stored id can be missing from the list (party re-created): match by name
+      if (!custEl.value && inv.customerName) {
+        const wanted = String(inv.customerName).trim().toLowerCase();
+        const match = Array.from(custEl.options).find(o =>
+          o.value && o.textContent.split(' [A.K.A:')[0].trim().toLowerCase() === wanted);
+        if (match) populateSalesCustomers(match.value);
+      }
     }
-    
+
     const execEl = document.getElementById('salesExecutive');
     if (execEl) {
+      populateSalesExecutives(inv.salesExecutiveId || '');
       execEl.value = inv.salesExecutiveId || '';
-      populateSalesExecutives(inv.salesExecutiveId);
     }
-    
+
     const supplyTypeEl = document.getElementById('salesSupplyType');
     if (supplyTypeEl) {
       supplyTypeEl.value = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
     }
-    
+
     const notesEl = document.getElementById('salesNotes');
     if (notesEl) {
-      notesEl.value = `Return against invoice ${inv.invoiceNo}. ${inv.notes || ''}`;
+      notesEl.value = `Reversal of Invoice ${inv.invoiceNo}.`;
     }
+
+    // Refund starts at "Not Refunded"; the account is picked again
+    document.getElementById('salesPaymentStatusNotPaid')?.click();
+    if (typeof resetSalesMultiPayments === 'function') resetSalesMultiPayments();
+    populateSalesPaymentAccounts('');
+    if (typeof getSalesAdjust === 'function' && getSalesAdjust()) getSalesAdjust().reset();
+    const payAmtInp = document.getElementById('salesPaymentAmount');
+    if (payAmtInp) payAmtInp.value = '';
     
     const adjEl = document.getElementById('salesAdjustments');
     if (adjEl) {
@@ -2977,10 +3354,11 @@
     const noneBtn = document.getElementById('salesTdsTcsNone');
     const tdsBtn = document.getElementById('salesTdsTcsTds');
     const tcsBtn = document.getElementById('salesTdsTcsTcs');
+    if (typeof unlockSalesTdsTcsButtons === 'function') unlockSalesTdsTcsButtons();
     if (inv.tdsTcsMode === 'TDS' && tdsBtn) tdsBtn.click();
     else if (inv.tdsTcsMode === 'TCS' && tcsBtn) tcsBtn.click();
     else if (noneBtn) noneBtn.click();
-    
+
     const rateSelect = document.getElementById('salesTdsTcsRateSelect');
     const customInput = document.getElementById('salesTdsTcsRateCustom');
     const customWrap = document.getElementById('salesTdsTcsRateCustomWrap');
@@ -2995,7 +3373,10 @@
         if (customWrap) customWrap.style.display = 'flex';
       }
     }
-    
+
+    // Reversal No. follows the chosen invoice
+    if (typeof refreshSalesReversalNo === 'function') refreshSalesReversalNo();
+
     currentSalesType = inv.type;
     const prodBtn = document.getElementById('salesTypeProduct');
     const servBtn = document.getElementById('salesTypeService');
@@ -3037,6 +3418,8 @@
   }
 
   function initSalesForm() {
+    window._salesReversalPreInvoice = null;
+    if (typeof getSalesAdjust === 'function' && getSalesAdjust()) getSalesAdjust().reset();
     window._pendingConvertQuotationId = null;
     window._pendingConvertProformaId = null;
     window._pendingConvertSalesOrderId = null;
@@ -3097,7 +3480,9 @@
     }
     
     const triggerText = document.getElementById('salesInvoiceSelectTriggerText');
-    if (triggerText) triggerText.textContent = 'Select Invoice';
+    if (triggerText) triggerText.textContent = '— Select —';
+    // A new reversal has no Original Doc yet, so no number either
+    if (currentSalesVoucherSubtype === 'Return' && typeof refreshSalesReversalNo === 'function') refreshSalesReversalNo(true);
 
     _salesCodePortal.close();
     _salesUnitPortal.close();
