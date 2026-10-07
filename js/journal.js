@@ -3102,6 +3102,21 @@
   }
   window.executeVoucherDeskPostAll = executeVoucherDeskPostAll;
 
+  // Last day of the financial year today falls in (its start month from Settings → Books
+  // of Accounts, April by default)
+  let _vdRangeOpened = false;
+  function getCurrentFinancialYearEnd() {
+    let startMonth = parseInt(window._kyaFyStartMonth, 10);
+    if (!startMonth) {
+      try { startMonth = parseInt(localStorage.getItem('kya_fy_start_month'), 10); } catch (_) { startMonth = 0; }
+    }
+    if (!(startMonth >= 1 && startMonth <= 12)) startMonth = 4;
+    const now = new Date();
+    const startYear = (now.getMonth() + 1) >= startMonth ? now.getFullYear() : now.getFullYear() - 1;
+    const end = new Date(startYear, startMonth - 1 + 12, 0);
+    return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+  }
+
   function renderVoucherDeskPanel() {
     const wrap = document.getElementById('voucherDeskWrap');
     if (!wrap) return;
@@ -3120,7 +3135,9 @@
     postedEntries.forEach(e => {
       let type = 'Journal';
       const vNo = e.voucherNo || '';
-      if (vNo.startsWith('SR-') || vNo.startsWith('REV-')) {
+      // A reversal's own entries (its TDS reversal and refund carry JV numbers)
+      const reversalEntry = ['reversal', 'tds_reversal', 'refund', 'preinvoice_reversal'].includes(e.jeType);
+      if (vNo.startsWith('SR-') || vNo.startsWith('REV-') || reversalEntry) {
         type = 'Reversal';
       } else if (vNo.startsWith('SO-')) {
         type = 'Order';
@@ -3264,6 +3281,13 @@
     const toInp   = document.getElementById('vdDateTo');
     if (fromInp && !fromInp.value) fromInp.value = _globalDateFrom || '2024-04-01';
     if (toInp   && !toInp.value)   toInp.value   = _globalDateTo || '2025-03-31';
+    // The first time it opens, the range runs at least to the end of the current financial
+    // year — otherwise everything posted this year is filtered out of view
+    if (!_vdRangeOpened && toInp) {
+      _vdRangeOpened = true;
+      const fyEnd = getCurrentFinancialYearEnd();
+      if (!toInp.value || toInp.value < fyEnd) toInp.value = fyEnd;
+    }
 
     const dateFrom = fromInp ? fromInp.value : '';
     const dateTo   = toInp ? toInp.value : '';

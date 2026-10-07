@@ -92,7 +92,8 @@
         price: itemPrice,
         location: itemWh,
         warehouse: itemWh,
-        gst: typeof item.gst === 'number' ? item.gst : 18
+        gst: typeof item.gst === 'number' ? item.gst : 18,
+        aliases: Array.isArray(item.aliases) ? item.aliases : []
       };
     });
   }
@@ -546,6 +547,605 @@
         justify-content: flex-end;
         gap: 10px;
       }
+
+      /* ── Stock Overview dashboard (Overview → Details) ── */
+      .sho { display: flex; flex-direction: column; gap: 18px; }
+      .sho-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+        gap: 18px;
+      }
+      .sho-card {
+        background: #ffffff;
+        border: 1px solid var(--slate-200);
+        border-radius: 14px;
+        padding: 18px 20px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        min-width: 0;
+      }
+      .sho-card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .sho-card-title { font-size: 14px; font-weight: 700; color: var(--slate-800); }
+      .sho-card-sub { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+      .sho-subhead {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--slate-500);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 16px 0 6px;
+        padding-top: 14px;
+        border-top: 1px solid var(--slate-100);
+      }
+      .sho-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: none;
+        border: none;
+        padding: 4px 0;
+        font: 600 12px var(--font-main);
+        color: var(--blue-600);
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .sho-link:hover { color: var(--blue-800); text-decoration: underline; }
+      .sho-link:focus-visible, .sho-btn:focus-visible, .sho-seg button:focus-visible, .sho-tile.clickable:focus-visible, .sho-col:focus-visible {
+        outline: 2px solid var(--blue-500);
+        outline-offset: 2px;
+      }
+      .sho-more { margin-top: 10px; }
+      .sho-trunc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .sho-muted-empty {
+        font-size: 12.5px;
+        color: var(--slate-400);
+        text-align: center;
+        padding: 22px 8px;
+        background: var(--slate-50);
+        border-radius: 10px;
+      }
+
+      /* Buttons */
+      .sho-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .sho-btn {
+        height: 36px;
+        padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: 600 13px var(--font-main);
+        border-radius: 9px;
+        border: 1.5px solid var(--slate-200);
+        background: #ffffff;
+        color: var(--slate-700);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+      }
+      .sho-btn:hover { border-color: var(--blue-300); color: var(--blue-700); }
+      .sho-btn.primary {
+        background: var(--blue-600);
+        border-color: var(--blue-600);
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+      }
+      .sho-btn.primary:hover { background: var(--blue-700); border-color: var(--blue-700); color: #ffffff; }
+      .sho-btn.sm { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 8px; }
+
+      /* Hero */
+      .sho-hero {
+        border-radius: 16px;
+        padding: 22px 24px 18px;
+        background: linear-gradient(135deg, var(--blue-50) 0%, #ffffff 65%);
+        border: 1px solid var(--blue-100);
+      }
+      .sho-hero-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .sho-eyebrow {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--slate-500);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .sho-dot-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--slate-300); }
+      .sho-hero-val {
+        font-size: 40px;
+        font-weight: 800;
+        color: var(--slate-900);
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+      }
+      .sho-hero-val .sho-cur { font-size: 26px; font-weight: 700; color: var(--slate-500); margin-right: 4px; }
+      .sho-hero-val .sho-dec { font-size: 22px; font-weight: 700; color: var(--slate-400); }
+      .sho-hero-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        margin-top: 8px;
+        font-size: 12.5px;
+        color: var(--slate-600);
+      }
+      .sho-hero-meta strong { color: var(--slate-900); font-weight: 700; }
+      .sho-health { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--blue-100); }
+      .sho-health-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--slate-700);
+        margin-bottom: 8px;
+      }
+      .sho-health-head span:last-child { font-weight: 500; color: var(--slate-500); }
+      .sho-health-head strong { color: var(--slate-900); font-weight: 700; }
+      .sho-meter {
+        display: flex;
+        gap: 2px;
+        height: 10px;
+        border-radius: 5px;
+        overflow: hidden;
+        background: var(--slate-100);
+      }
+      .sho-meter > span { display: block; height: 100%; min-width: 4px; }
+      .sho-meter.abc { margin-bottom: 12px; }
+      .sho-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--slate-600);
+      }
+      .sho-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+      .sho-legend-item strong { color: var(--slate-900); font-weight: 700; }
+      .sho-status-ico {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        flex-shrink: 0;
+      }
+      .sho-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+
+      /* Stat tiles */
+      .sho-tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr));
+        gap: 12px;
+      }
+      .sho-tile {
+        background: #ffffff;
+        border: 1px solid var(--slate-200);
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      }
+      .sho-tile.clickable { cursor: pointer; }
+      .sho-tile.clickable:hover { border-color: var(--blue-300); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+      .sho-tile-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--slate-500); }
+      .sho-tile-ico {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sho-tile-val {
+        font-size: 21px;
+        font-weight: 800;
+        color: var(--slate-900);
+        margin-top: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sho-tile-sub { font-size: 11.5px; color: var(--slate-500); line-height: 1.4; }
+      .sho-delta { font-weight: 600; }
+      .sho-delta.good { color: var(--emerald-700); }
+      .sho-delta.bad { color: var(--red-700); }
+      .sho-delta.neutral { color: var(--slate-600); }
+
+      /* All-clear note */
+      .sho-ok {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 14px;
+        border-radius: 10px;
+        background: var(--emerald-50);
+        border: 1px solid var(--emerald-100);
+        font-size: 12.5px;
+        color: var(--slate-600);
+      }
+      .sho-ok strong { display: block; color: var(--emerald-800); font-weight: 700; }
+      .sho-ok-ico {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--emerald-500);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      /* Needs attention */
+      .sho-att-list { display: flex; flex-direction: column; }
+      .sho-att-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--slate-100);
+      }
+      .sho-att-row:first-child { padding-top: 0; }
+      .sho-att-row:last-child { border-bottom: none; padding-bottom: 0; }
+      .sho-att-main { flex: 1; min-width: 0; }
+      .sho-att-name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--slate-800); }
+      .sho-pill { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; }
+      .sho-pill.out { background: var(--red-50); color: var(--red-700); border: 1px solid var(--red-200); }
+      .sho-pill.low { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+      .sho-mini-meter { height: 6px; border-radius: 3px; overflow: hidden; margin: 7px 0 5px; }
+      .sho-mini-meter > span { display: block; height: 100%; border-radius: 3px; }
+      .sho-mini-meter.low { background: #fef3c7; }
+      .sho-mini-meter.low > span { background: var(--warning); }
+      .sho-mini-meter.out { background: var(--red-100); }
+      .sho-att-qty { font-size: 11.5px; color: var(--slate-500); }
+
+      /* Insights */
+      .sho-insights { display: flex; flex-direction: column; gap: 8px; }
+      .sho-insight {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        font-size: 12.5px;
+        line-height: 1.5;
+        color: var(--slate-600);
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--slate-50);
+        border: 1px solid var(--slate-100);
+      }
+      .sho-insight strong { color: var(--slate-900); font-weight: 700; }
+      .sho-insight-ico {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sho-insight-ico.warn { background: #fffbeb; color: #b45309; }
+      .sho-insight-ico.info { background: var(--blue-50); color: var(--blue-700); }
+      .sho-insight-ico.muted { background: var(--slate-100); color: var(--slate-600); }
+
+      /* Purchases vs sales chart */
+      .sho-chart { position: relative; }
+      .sho-plot {
+        position: relative;
+        height: 150px;
+        margin-left: 46px;
+        border-bottom: 1px solid var(--slate-300);
+      }
+      .sho-grid-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--slate-100); }
+      .sho-ytick {
+        position: absolute;
+        left: -46px;
+        width: 40px;
+        text-align: right;
+        font-size: 10.5px;
+        color: var(--slate-400);
+        transform: translateY(50%);
+        font-variant-numeric: tabular-nums;
+      }
+      .sho-cols { position: absolute; inset: 0; display: flex; }
+      .sho-col {
+        flex: 1;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 2px;
+        border-radius: 6px 6px 0 0;
+        outline-offset: -2px;
+        cursor: default;
+      }
+      .sho-col:hover, .sho-col:focus-visible { background: rgba(37, 99, 235, 0.06); }
+      .sho-bar { display: block; width: min(14px, 32%); border-radius: 4px 4px 0 0; }
+      .sho-plot-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 16px;
+        font-size: 12px;
+        color: var(--slate-400);
+        pointer-events: none;
+      }
+      .sho-xlabels { display: flex; margin-left: 46px; }
+      .sho-xlabels span {
+        flex: 1;
+        text-align: center;
+        font-size: 10.5px;
+        color: var(--slate-400);
+        padding-top: 6px;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .sho-tip {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: translate(-50%, calc(-100% - 6px));
+        background: var(--slate-900);
+        color: #ffffff;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 11.5px;
+        box-shadow: var(--shadow-lg);
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.12s ease;
+        z-index: 5;
+      }
+      .sho-tip.show { opacity: 1; }
+      .sho-tip-head { font-weight: 700; margin-bottom: 4px; color: var(--slate-200); }
+      .sho-tip-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; line-height: 1.7; }
+      .sho-tip-row > span { display: inline-flex; align-items: center; gap: 6px; }
+      .sho-table-wrap { overflow-x: auto; }
+      .sho-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .sho-table th {
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--slate-500);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--slate-200);
+      }
+      .sho-table td { padding: 6px 8px; border-bottom: 1px solid var(--slate-100); color: var(--slate-700); white-space: nowrap; }
+      .sho-table th:first-child, .sho-table td:first-child { padding-left: 0; }
+      .sho-table th:last-child, .sho-table td:last-child { padding-right: 0; }
+      .sho-table tfoot td { font-weight: 700; color: var(--slate-900); border-bottom: none; border-top: 1px solid var(--slate-200); }
+      .sho-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+      /* Top movers */
+      .sho-rank-list { display: flex; flex-direction: column; }
+      .sho-rank-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--slate-100);
+      }
+      .sho-rank-row:first-child { padding-top: 0; }
+      .sho-rank-row:last-child { border-bottom: none; padding-bottom: 0; }
+      .sho-rank-n {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: var(--slate-100);
+        color: var(--slate-600);
+        font-size: 11px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sho-rank-main { flex: 1; min-width: 0; }
+      .sho-rank-name { font-size: 13px; font-weight: 600; color: var(--slate-800); }
+      .sho-rank-sub { font-size: 11.5px; color: var(--slate-500); margin-top: 1px; }
+      .sho-cover {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 20px;
+        background: var(--slate-100);
+        color: var(--slate-600);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .sho-cover.warn { background: #fffbeb; color: #b45309; }
+
+      /* Where the value sits */
+      .sho-seg { display: inline-flex; background: var(--slate-100); border-radius: 8px; padding: 3px; gap: 2px; flex-shrink: 0; }
+      .sho-seg button {
+        border: none;
+        background: transparent;
+        font: 600 12px var(--font-main);
+        color: var(--slate-600);
+        padding: 5px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .sho-seg button:hover { color: var(--slate-900); }
+      .sho-seg button.active { background: #ffffff; color: var(--blue-700); box-shadow: var(--shadow-sm); }
+      .sho-card > .sho-seg { margin-bottom: 14px; }
+      .sho-hbars { display: flex; flex-direction: column; gap: 12px; }
+      .sho-hbar-row { font-size: 12.5px; }
+      .sho-hbar-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
+      .sho-hbar-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--slate-800); font-weight: 600; }
+      .sho-hbar-name .muted { color: var(--slate-500); font-weight: 500; }
+      .sho-hbar-count { font-size: 11px; font-weight: 500; color: var(--slate-400); white-space: nowrap; flex-shrink: 0; }
+      .sho-hbar-track { height: 8px; min-width: 0; }
+      .sho-hbar-track > span { display: block; height: 100%; min-width: 2px; background: ${SHO_CLR_IN}; border-radius: 0 4px 4px 0; }
+      .sho-hbar-val { font-weight: 700; color: var(--slate-800); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; flex-shrink: 0; }
+      .sho-hbar-val span { font-weight: 500; color: var(--slate-400); margin-left: 2px; }
+
+      /* Value concentration */
+      .sho-abc-rows { display: flex; flex-direction: column; gap: 6px; }
+      .sho-abc-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+      .sho-abc-k { font-weight: 700; color: var(--slate-800); width: 56px; }
+      .sho-abc-n { color: var(--slate-500); flex: 1; }
+      .sho-abc-v { font-weight: 700; color: var(--slate-800); font-variant-numeric: tabular-nums; }
+      .sho-abc-v span { font-weight: 500; color: var(--slate-400); margin-left: 2px; }
+      .sho-top-list { display: flex; flex-direction: column; }
+      .sho-top-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 0;
+        font-size: 12.5px;
+        border-bottom: 1px solid var(--slate-100);
+      }
+      .sho-top-row:last-child { border-bottom: none; padding-bottom: 0; }
+      .sho-top-row .sho-trunc { flex: 1; font-weight: 600; color: var(--slate-800); }
+      .sho-abc-badge {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        color: #ffffff;
+        font-size: 10.5px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sho-top-qty { color: var(--slate-500); font-size: 11.5px; white-space: nowrap; }
+      .sho-top-val { font-weight: 700; color: var(--slate-900); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+
+      /* Recent activity */
+      .sho-act-list { display: flex; flex-direction: column; }
+      .sho-act-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--slate-100);
+      }
+      .sho-act-row:first-child { padding-top: 0; }
+      .sho-act-row:last-child { border-bottom: none; padding-bottom: 0; }
+      .sho-act-ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sho-act-main { flex: 1; min-width: 0; }
+      .sho-act-title { font-size: 13px; font-weight: 600; color: var(--slate-800); }
+      .sho-act-sub { font-size: 11.5px; color: var(--slate-500); margin-top: 1px; }
+      .sho-act-right { text-align: right; flex-shrink: 0; }
+      .sho-act-val { font-size: 13px; font-weight: 700; color: var(--slate-900); font-variant-numeric: tabular-nums; }
+      .sho-act-date { font-size: 11px; color: var(--slate-400); margin-top: 1px; }
+
+      /* Empty (no stock items yet) */
+      .sho-empty {
+        text-align: center;
+        padding: 40px 24px;
+        border: 1.5px dashed var(--slate-200);
+        border-radius: 16px;
+        background: linear-gradient(180deg, var(--blue-50) 0%, #ffffff 55%);
+      }
+      .sho-empty-ico {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: #ffffff;
+        color: var(--blue-600);
+        border: 1px solid var(--blue-100);
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.12);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 14px;
+      }
+      .sho-empty-title { font-size: 18px; font-weight: 800; color: var(--slate-900); }
+      .sho-empty-sub { font-size: 13px; color: var(--slate-500); max-width: 440px; margin: 6px auto 22px; line-height: 1.5; }
+      .sho-empty-steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+        gap: 10px;
+        margin: 0 auto 22px;
+        max-width: 640px;
+        text-align: left;
+      }
+      .sho-step {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        background: #ffffff;
+        border: 1px solid var(--slate-200);
+        border-radius: 12px;
+        padding: 12px;
+        font-size: 12px;
+        color: var(--slate-500);
+      }
+      .sho-step strong { display: block; font-size: 13px; color: var(--slate-800); margin-bottom: 2px; }
+      .sho-step-n {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--blue-600);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      /* The overview sizes itself to its own width (sidebar state changes it), not the window's */
+      .sho { container-type: inline-size; }
+      @container (max-width: 520px) {
+        .sho-hero { padding: 16px; }
+        .sho-hero-val { font-size: 30px; }
+        .sho-hero-val .sho-cur { font-size: 20px; }
+        .sho-hero-val .sho-dec { font-size: 18px; }
+        .sho-hero-top > .sho-actions { width: 100%; }
+        .sho-hero-top > .sho-actions .sho-btn { flex: 1 1 auto; justify-content: center; padding: 0 10px; }
+        .sho-card { padding: 16px; }
+        .sho-card-head { flex-wrap: wrap; }
+        .sho-top-qty { display: none; }
+      }
+      @container (max-width: 360px) {
+        .sho-hero-val { font-size: 24px; white-space: nowrap; }
+        .sho-hero-top > .sho-actions .sho-btn { flex-basis: 100%; }
+        .sho-health-head { flex-direction: column; gap: 2px; }
+        .sho-top-val { min-width: 0; }
+        .sho-act-ico { display: none; }
+        .sho-seg { display: flex; }
+        .sho-seg button { flex: 1; padding: 5px 4px; }
+      }
+      @media (max-width: 600px) {
+        #panel-stock-hub .je-form-card > .sho-shell-body { padding: 14px !important; }
+        #panel-stock-hub #stockHubContentArea { padding: 12px !important; }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -696,240 +1296,853 @@
   }
 
   // ==========================================
-  // SUB-TAB 1: DETAILS VIEW
+  // SUB-TAB 1: DETAILS VIEW (Stock Overview dashboard)
   // ==========================================
-  function renderDetailsSubtab(stockItems) {
-    const totalVal = stockItems.reduce((sum, i) => sum + (i.qty * i.cost), 0);
-    const totalSellingVal = stockItems.reduce((sum, i) => sum + (i.qty * i.price), 0);
-    const lowStockCount = stockItems.filter(i => i.qty > 0 && i.qty <= i.reorder).length;
-    const outStockCount = stockItems.filter(i => i.qty <= 0).length;
-    const inStockCount = stockItems.filter(i => i.qty > i.reorder).length;
+  // Breakdown dimension for the "Where the value sits" card: 'group' | 'category' | 'warehouse'
+  let _shoBreakdown = 'group';
+  // The weekly purchases-vs-sales card shows a table instead of the chart when true
+  let _shoFlowAsTable = false;
 
-    const inStockPct = stockItems.length ? Math.round((inStockCount / stockItems.length) * 100) : 0;
-    const lowStockPct = stockItems.length ? Math.round((lowStockCount / stockItems.length) * 100) : 0;
-    const outStockPct = stockItems.length ? Math.max(0, 100 - inStockPct - lowStockPct) : 0;
+  const SHO_DAY_MS = 86400000;
+  const SHO_FLOW_WEEKS = 8;
+  const SHO_IDLE_DAYS = 90;
+  // Chart series (validated pair) and ABC ordinal ramp (validated light→dark on white)
+  const SHO_CLR_IN = '#2563eb';
+  const SHO_CLR_OUT = '#eb6834';
+  const SHO_CLR_ABC = { A: '#1e3a8a', B: '#2563eb', C: '#60a5fa' };
 
-    // Group valuation by Category
-    const catMap = {};
-    stockItems.forEach(i => {
-      const c = i.category || 'General';
-      if (!catMap[c]) catMap[c] = { name: c, count: 0, val: 0 };
-      catMap[c].count++;
-      catMap[c].val += (i.qty * i.cost);
+  const SHO_ICONS = {
+    box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    down: '<path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/>',
+    up: '<path d="M12 21V8"/><polyline points="6 13 12 7 18 13"/><path d="M4 3h16"/>',
+    alert: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>',
+    x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    bang: '<line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    bulb: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
+    pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+    tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+    home: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-8a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8"/>',
+    cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+    receipt: '<path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="14" y2="13"/>',
+    undo: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+    arrow: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>'
+  };
+
+  function shoIcon(name, size, strokeWidth) {
+    const s = size || 16;
+    return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth || 2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SHO_ICONS[name] || ''}</svg>`;
+  }
+
+  // Voucher dates are YYYY-MM-DD (movements add " HH:MM"); anything else falls back to Date parsing.
+  function shoParseDate(val) {
+    if (val === null || val === undefined || val === '') return null;
+    if (typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    const s = String(val).trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    const d = new Date(s);
+    return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function shoDaysAgo(date, today) {
+    return Math.round((today - date) / SHO_DAY_MS);
+  }
+
+  function shoCompactInr(val) {
+    const n = Number(val) || 0;
+    const a = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    const trim = x => (x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2)).replace(/\.0+$|(\.\d*[1-9])0+$/, '$1');
+    if (a >= 1e7) return sign + '₹' + trim(a / 1e7) + ' Cr';
+    if (a >= 1e5) return sign + '₹' + trim(a / 1e5) + ' L';
+    if (a >= 1e3) return sign + '₹' + trim(a / 1e3) + 'K';
+    return sign + '₹' + Math.round(a).toLocaleString('en-IN');
+  }
+
+  // Whole rupees for tiles; crores switch to the compact form so the tile never overflows.
+  function shoTileInr(val) {
+    const n = Number(val) || 0;
+    return Math.abs(n) >= 1e7 ? shoCompactInr(n) : '₹' + Math.round(n).toLocaleString('en-IN');
+  }
+
+  function shoFmtQty(q) {
+    return (Number(q) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  }
+
+  function shoShortDate(d) {
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  }
+
+  function shoRelDate(d, today) {
+    const n = shoDaysAgo(d, today);
+    if (n < 0) return shoShortDate(d);
+    if (n === 0) return 'Today';
+    if (n === 1) return 'Yesterday';
+    if (n < 7) return n + ' days ago';
+    return shoShortDate(d);
+  }
+
+  function shoNiceMax(v) {
+    if (v <= 0) return 1;
+    const pow = Math.pow(10, Math.floor(Math.log10(v)));
+    const n = v / pow;
+    const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+    return step * pow;
+  }
+
+  function shoVendorName(v) {
+    const id = String(v.vendorId || '');
+    const store = window.KYA_STORE || {};
+    const sup = (store.suppliers || []).find(s => String(s.id) === id);
+    if (sup && sup.name) return sup.name;
+    const led = (Array.isArray(window.coaLedgers) ? window.coaLedgers : []).find(l => String(l.id) === id);
+    if (led && led.name) return led.name;
+    return (v.partyOverride && v.partyOverride.name) || '';
+  }
+
+  // Everything the overview shows, derived from stock items, posted sales/purchase
+  // vouchers (rows linked to a stock item) and the movement log.
+  function computeStockOverview(stockItems) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const store = window.KYA_STORE || {};
+    const salesVouchers = Array.isArray(store.salesVouchers) ? store.salesVouchers : [];
+    const purchaseVouchers = Array.isArray(store.purchaseVouchers) ? store.purchaseVouchers : [];
+
+    const byId = new Map();
+    const byName = new Map();
+    const bySku = new Map();
+    stockItems.forEach(it => {
+      byId.set(String(it.id), it);
+      bySku.set(String(it.sku).toLowerCase(), it);
+      [it.name].concat(it.aliases || []).forEach(n => {
+        const k = String(n || '').toLowerCase().trim();
+        if (k && !byName.has(k)) byName.set(k, it);
+      });
     });
-    const catList = Object.values(catMap).sort((a, b) => b.val - a.val);
+    const matchRow = row => {
+      if (!row) return null;
+      if (row.stockItemId && byId.has(String(row.stockItemId))) return byId.get(String(row.stockItemId));
+      if (row.itemType && row.itemType !== 'Product') return null;
+      return byName.get(String(row.item || '').toLowerCase().trim()) || null;
+    };
 
-    // Group valuation by Warehouse
-    const whMap = {};
-    stockItems.forEach(i => {
-      const w = i.location || i.warehouse || 'Default Godown';
-      if (!whMap[w]) whMap[w] = { name: w, count: 0, totalQty: 0, val: 0 };
-      whMap[w].count++;
-      whMap[w].totalQty += i.qty;
-      whMap[w].val += (i.qty * i.cost);
+    const perItem = new Map();
+    const stat = it => {
+      let s = perItem.get(it.id);
+      if (!s) { s = { out30: 0, lastActive: null }; perItem.set(it.id, s); }
+      return s;
+    };
+    // Idle = no purchase, sale/return or movement at all, so raw materials that are
+    // bought in but never sold are not flagged just for lacking sales.
+    let hasActivityData = false;
+    const touch = (it, d) => {
+      const s = stat(it);
+      hasActivityData = true;
+      if (!s.lastActive || d > s.lastActive) s.lastActive = d;
+      return s;
+    };
+
+    const flowStart = new Date(today.getTime() - (SHO_FLOW_WEEKS * 7 - 1) * SHO_DAY_MS);
+    const weeks = Array.from({ length: SHO_FLOW_WEEKS }, (_, i) => {
+      const start = new Date(flowStart.getFullYear(), flowStart.getMonth(), flowStart.getDate() + i * 7);
+      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+      return { start, end, inVal: 0, outVal: 0 };
     });
-    const whList = Object.values(whMap).sort((a, b) => b.val - a.val);
+    const weekOf = d => {
+      const idx = Math.floor(Math.round((d - flowStart) / SHO_DAY_MS) / 7);
+      return (idx >= 0 && idx < SHO_FLOW_WEEKS) ? weeks[idx] : null;
+    };
 
+    const sales = { cur: 0, prev: 0, items: new Set() };
+    const purch = { cur: 0, prev: 0, items: new Set() };
+    const activity = [];
+
+    salesVouchers.forEach(v => {
+      const d = shoParseDate(v.date) || shoParseDate(v.postedAt);
+      if (!d) return;
+      const age = shoDaysAgo(d, today);
+      const sign = v.isReturn ? -1 : 1;
+      let val = 0, qty = 0, lines = 0;
+      (v.rows || []).forEach(row => {
+        const it = matchRow(row);
+        if (!it) return;
+        const q = (parseFloat(row.qty) || 0) * sign;
+        val += (parseFloat(row.amount) || 0) * sign;
+        qty += q;
+        lines++;
+        const s = touch(it, d);
+        if (age >= 0 && age < 30) {
+          s.out30 += q;
+          if (!v.isReturn) sales.items.add(it.id);
+        }
+      });
+      if (!lines) return;
+      if (age >= 0 && age < 30) sales.cur += val;
+      else if (age >= 30 && age < 60) sales.prev += val;
+      const w = weekOf(d);
+      if (w) w.outVal += val;
+      activity.push({
+        kind: v.isReturn ? 'return' : 'sale', date: d, ts: Number(v.postedAt) || 0,
+        title: (v.isReturn ? 'Sales return ' : 'Sales invoice ') + (v.invoiceNo || ''),
+        party: v.customerName || '', lines, val: Math.abs(val)
+      });
+    });
+
+    purchaseVouchers.forEach(v => {
+      if (v.isDraft) return;
+      const d = shoParseDate(v.date) || shoParseDate(v.postedAt);
+      if (!d) return;
+      const age = shoDaysAgo(d, today);
+      let val = 0, lines = 0;
+      (v.rows || []).forEach(row => {
+        const it = matchRow(row);
+        if (!it) return;
+        val += parseFloat(row.amount) || 0;
+        lines++;
+        if (age >= 0 && age < 30) purch.items.add(it.id);
+        touch(it, d);
+      });
+      if (!lines) return;
+      if (age >= 0 && age < 30) purch.cur += val;
+      else if (age >= 30 && age < 60) purch.prev += val;
+      const w = weekOf(d);
+      if (w) w.inVal += val;
+      activity.push({
+        kind: 'purchase', date: d, ts: Number(v.postedAt) || 0,
+        title: 'Purchase ' + (v.invoiceNo || ''), party: shoVendorName(v), lines, val
+      });
+    });
+
+    _stockMovements.forEach(m => {
+      const d = shoParseDate(m.date);
+      if (!d) return;
+      const it = bySku.get(String(m.sku || '').toLowerCase()) || byName.get(String(m.itemName || '').toLowerCase().trim());
+      const age = shoDaysAgo(d, today);
+      if (it) {
+        const s = touch(it, d);
+        if (m.type === 'outward' && age >= 0 && age < 30) s.out30 += Math.abs(Number(m.qty) || 0);
+      }
+      activity.push({
+        kind: 'movement', type: m.type, date: d, ts: parseInt(String(m.id || '').replace(/\D/g, ''), 10) || 0,
+        title: (m.typeLabel || 'Stock movement') + (m.refNo ? ' ' + m.refNo : ''),
+        party: m.itemName || '', qty: Number(m.qty) || 0, uom: it ? it.uom : '', val: Number(m.totalVal) || 0
+      });
+    });
+
+    // Stock position
+    const valueOf = it => Math.max(0, it.qty) * it.cost;
+    const totalVal = stockItems.reduce((s, it) => s + valueOf(it), 0);
+    const outItems = stockItems.filter(it => it.qty <= 0);
+    const lowItems = stockItems.filter(it => it.qty > 0 && it.reorder > 0 && it.qty <= it.reorder);
+    const inCount = stockItems.length - outItems.length - lowItems.length;
+    const noReorder = stockItems.filter(it => !(it.reorder > 0));
+    const noGodown = stockItems.filter(it => !it.warehouse);
+
+    const coverDays = it => {
+      const s = perItem.get(it.id);
+      if (!s || !(s.out30 > 0) || it.qty <= 0) return null;
+      return it.qty / (s.out30 / 30);
+    };
+
+    const attention = outItems.concat(lowItems).map(it => ({ it, cover: coverDays(it) })).sort((a, b) => {
+      const ao = a.it.qty <= 0 ? 0 : 1, bo = b.it.qty <= 0 ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      if (ao === 0) return valueOf(b.it) - valueOf(a.it) || a.it.name.localeCompare(b.it.name);
+      return (a.it.qty / a.it.reorder) - (b.it.qty / b.it.reorder);
+    });
+
+    const movers = stockItems
+      .map(it => ({ it, out: (perItem.get(it.id) || {}).out30 || 0 }))
+      .filter(x => x.out > 0)
+      .map(x => ({ ...x, outVal: x.out * x.it.cost, cover: coverDays(x.it) }))
+      .sort((a, b) => b.outVal - a.outVal || b.out - a.out);
+
+    const idleItems = hasActivityData ? stockItems.filter(it => {
+      if (it.qty <= 0) return false;
+      const s = perItem.get(it.id);
+      return !s || !s.lastActive || shoDaysAgo(s.lastActive, today) >= SHO_IDLE_DAYS;
+    }) : [];
+    const idleVal = idleItems.reduce((s, it) => s + valueOf(it), 0);
+
+    // Value breakdowns
+    const breakdown = {};
+    [['group', it => it.group || 'General'], ['category', it => it.category || 'Uncategorised'], ['warehouse', it => it.warehouse || 'No godown']].forEach(([key, fn]) => {
+      const map = {};
+      stockItems.forEach(it => {
+        const k = fn(it);
+        if (!map[k]) map[k] = { name: k, count: 0, val: 0 };
+        map[k].count++;
+        map[k].val += valueOf(it);
+      });
+      breakdown[key] = Object.values(map).sort((a, b) => b.val - a.val || b.count - a.count);
+    });
+
+    // ABC: an item's class is set by the cumulative share *before* it, so the item that
+    // crosses 70% is still A and a single dominant item is never pushed into C.
+    const byValue = stockItems.map(it => ({ it, val: valueOf(it) })).sort((a, b) => b.val - a.val);
+    const abc = { A: { count: 0, val: 0 }, B: { count: 0, val: 0 }, C: { count: 0, val: 0 } };
+    let cum = 0;
+    byValue.forEach(x => {
+      const before = totalVal > 0 ? (cum / totalVal) * 100 : 100;
+      x.cls = x.val <= 0 ? 'C' : before < 70 ? 'A' : before < 90 ? 'B' : 'C';
+      cum += x.val;
+      abc[x.cls].count++;
+      abc[x.cls].val += x.val;
+    });
+
+    activity.sort((a, b) => (b.date - a.date) || (b.ts - a.ts));
+
+    return {
+      today, totalVal, inCount, lowItems, outItems, noReorder, noGodown,
+      sales, purch, weeks, hasActivityData, attention, movers, idleItems, idleVal,
+      breakdown, byValue, abc, activity,
+      groupsCount: breakdown.group.length,
+      godownCount: breakdown.warehouse.filter(w => w.name !== 'No godown').length
+    };
+  }
+
+  function shoDeltaHtml(cur, prev, upIsGood) {
+    if (!(prev > 0)) return '';
+    const pct = ((cur - prev) / prev) * 100;
+    if (Math.abs(pct) < 0.5) return `<span class="sho-delta neutral">No change vs prior 30d</span>`;
+    const up = pct > 0;
+    const tone = upIsGood === null ? 'neutral' : (up === upIsGood ? 'good' : 'bad');
+    return `<span class="sho-delta ${tone}">${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0)}% vs prior 30d</span>`;
+  }
+
+  function shoRenderEmpty() {
     return `
-      <!-- Top KPI Summary Cards -->
-      <div class="stock-kpi-grid">
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #eff6ff; color: #2563eb;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-              <line x1="12" y1="22.08" x2="12" y2="12"></line>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Total SKUs</div>
-            <div class="stock-kpi-val">${stockItems.length}</div>
-            <div class="stock-kpi-sub">Active catalog items</div>
-          </div>
+      <div class="sho-empty">
+        <div class="sho-empty-ico">${shoIcon('box', 28, 1.8)}</div>
+        <div class="sho-empty-title">Set up your stock</div>
+        <div class="sho-empty-sub">Create your first stock item and this overview fills in with stock value, health, reorder alerts and movement trends.</div>
+        <div class="sho-empty-steps">
+          <div class="sho-step"><span class="sho-step-n">1</span><div><strong>Add stock items</strong><span>Name, code, unit, rate and reorder level</span></div></div>
+          <div class="sho-step"><span class="sho-step-n">2</span><div><strong>Assign godowns</strong><span>Know where every rupee of stock sits</span></div></div>
+          <div class="sho-step"><span class="sho-step-n">3</span><div><strong>Record movements</strong><span>Receipts, dispatches, transfers and adjustments</span></div></div>
         </div>
-
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #ecfdf5; color: #059669;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23"></line>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Total Stock Value</div>
-            <div class="stock-kpi-val">₹ ${formatInr(totalVal)}</div>
-            <div class="stock-kpi-sub">Selling: ₹ ${formatInr(totalSellingVal)}</div>
-          </div>
-        </div>
-
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #fffbeb; color: #d97706;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Low Stock Alerts</div>
-            <div class="stock-kpi-val" style="color: #d97706;">${lowStockCount} Items</div>
-            <div class="stock-kpi-sub">At or below reorder level</div>
-          </div>
-        </div>
-
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #fef2f2; color: #dc2626;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="15" y1="9" x2="9" y2="15"></line>
-              <line x1="9" y1="9" x2="15" y2="15"></line>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Out of Stock</div>
-            <div class="stock-kpi-val" style="color: #dc2626;">${outStockCount} Items</div>
-            <div class="stock-kpi-sub">Zero available quantity</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Details Section Grid -->
-      <div class="stock-details-grid">
-        
-        <!-- Category-wise Valuation Card -->
-        <div class="stock-section-card">
-          <div class="stock-section-title">
-            <span>Category Distribution & Valuation</span>
-            <span style="font-size: 12px; font-weight: 500; color: var(--slate-500);">${catList.length} Categories</span>
-          </div>
-
-          <!-- Health proportion bar -->
-          <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 2px;">
-            <span>Stock Status Health</span>
-            <span>${inStockPct}% Optimal</span>
-          </div>
-          <div class="stock-progress-bar">
-            <div class="stock-progress-segment" style="width: ${inStockPct}%; background: #10b981;" title="In Stock: ${inStockCount}"></div>
-            <div class="stock-progress-segment" style="width: ${lowStockPct}%; background: #f59e0b;" title="Low Stock: ${lowStockCount}"></div>
-            <div class="stock-progress-segment" style="width: ${outStockPct}%; background: #ef4444;" title="Out of Stock: ${outStockCount}"></div>
-          </div>
-          <div style="display: flex; gap: 14px; font-size: 11px; color: var(--slate-500); margin-bottom: 16px;">
-            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span> In Stock (${inStockCount})</span>
-            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span> Low (${lowStockCount})</span>
-            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span> Out (${outStockCount})</span>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            ${catList.length === 0 ? `
-              <div style="text-align: center; color: var(--slate-400); font-size: 12.5px; padding: 18px 0;">No stock items recorded yet.</div>
-            ` : catList.map(c => {
-              const pct = Math.round((c.val / (totalVal || 1)) * 100);
-              return `
-                <div>
-                  <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
-                    <span style="font-weight: 600; color: var(--slate-800);">${ohEscapeHtml(c.name)} <span style="font-weight: 400; color: var(--slate-400);">(${c.count} items)</span></span>
-                    <span style="font-weight: 700; color: var(--slate-900);">₹ ${formatInr(c.val)} <span style="font-size: 11px; color: var(--slate-400); font-weight: normal;">(${pct}%)</span></span>
-                  </div>
-                  <div style="height: 5px; background: #f1f5f9; border-radius: 3px; overflow: hidden;">
-                    <div style="height: 100%; width: ${pct}%; background: #3b82f6; border-radius: 3px;"></div>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-
-        <!-- Warehouse Storage Card -->
-        <div class="stock-section-card">
-          <div class="stock-section-title">
-            <span>Warehouses & Godowns</span>
-            <span style="font-size: 12px; font-weight: 500; color: var(--slate-500);">${whList.length} Active Godowns</span>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            ${whList.length === 0 ? `
-              <div style="text-align: center; color: var(--slate-400); font-size: 12.5px; padding: 18px 0;">No warehouses or stock recorded yet.</div>
-            ` : whList.map(w => {
-              return `
-                <div style="border: 1px solid var(--slate-150, #e2e8f0); border-radius: 9px; padding: 12px 14px; background: #fafafa;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <span style="font-weight: 700; font-size: 13px; color: var(--slate-800);">${ohEscapeHtml(w.name)}</span>
-                    <span class="stock-category-badge" style="background: #eff6ff; color: #1d4ed8;">${w.count} SKUs</span>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--slate-500); margin-top: 6px;">
-                    <span>Stored Units: <strong>${w.totalQty.toLocaleString('en-IN')}</strong></span>
-                    <span>Valuation: <strong style="color: var(--slate-800);">₹ ${formatInr(w.val)}</strong></span>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Recent Movement Snapshot -->
-      <div class="stock-section-card">
-        <div class="stock-section-title">
-          <span>Recent Stock Movement Activity</span>
-          <button type="button" class="btn-stock-action" id="btnDetailsViewAllMovements" style="height: 30px; padding: 0 10px; font-size: 11.5px;">
-            View All Log &rarr;
-          </button>
-        </div>
-
-        <div style="overflow-x: auto;">
-          <table class="stock-table" style="font-size: 12.5px;">
-            <thead>
-              <tr>
-                <th>Date & Time</th>
-                <th>Ref #</th>
-                <th>Type</th>
-                <th>Item & SKU</th>
-                <th>Movement Path</th>
-                <th style="text-align: right;">Qty</th>
-                <th style="text-align: right;">Valuation</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${_stockMovements.length === 0 ? `
-                <tr>
-                  <td colspan="7" class="stock-empty-state" style="text-align: center; padding: 24px; color: var(--slate-400);">
-                    No recent movement records found.
-                  </td>
-                </tr>
-              ` : _stockMovements.slice(0, 4).map(m => {
-                const isPositive = m.qty > 0;
-                let typeBg = '#ecfdf5', typeClr = '#047857';
-                if (m.type === 'outward') { typeBg = '#eff6ff'; typeClr = '#1d4ed8'; }
-                else if (m.type === 'transfer') { typeBg = '#f5f3ff'; typeClr = '#6d28d9'; }
-                else if (m.type === 'adjustment') { typeBg = '#fffbeb'; typeClr = '#b45309'; }
-
-                return `
-                  <tr>
-                    <td style="color: var(--slate-500); font-size: 11.5px;">${m.date}</td>
-                    <td style="font-family: monospace; font-weight: 600;">${m.refNo}</td>
-                    <td>
-                      <span style="font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: ${typeBg}; color: ${typeClr};">
-                        ${m.typeLabel}
-                      </span>
-                    </td>
-                    <td>
-                      <div style="font-weight: 600; color: var(--slate-800);">${ohEscapeHtml(m.itemName)}</div>
-                      <div style="font-size: 10.5px; color: var(--slate-400);">${m.sku}</div>
-                    </td>
-                    <td style="font-size: 11.5px; color: var(--slate-600);">${ohEscapeHtml(m.fromLoc)} &rarr; ${ohEscapeHtml(m.toLoc)}</td>
-                    <td style="text-align: right; font-weight: 700; color: ${isPositive ? '#047857' : '#dc2626'};">
-                      ${isPositive ? '+' : ''}${m.qty}
-                    </td>
-                    <td style="text-align: right; font-weight: 600; color: var(--slate-800);">₹ ${formatInr(m.totalVal)}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
+        <div class="sho-actions" style="justify-content: center;">
+          <button type="button" class="sho-btn primary" data-sho-act="new-item">${shoIcon('plus', 14, 2.2)} New stock item</button>
+          <button type="button" class="sho-btn" data-sho-act="new-godown">${shoIcon('home', 14)} Add godown</button>
         </div>
       </div>
     `;
+  }
+
+  function shoRenderHero(o, stockItems) {
+    const total = stockItems.length;
+    const outN = o.outItems.length, lowN = o.lowItems.length, inN = o.inCount;
+    const pct = n => total ? (n / total) * 100 : 0;
+    const healthPct = Math.round(pct(inN));
+    const parts = formatInr(o.totalVal).split('.');
+    const seg = (n, color, label) => n > 0 ? `<span style="flex: ${n} 1 0; background: ${color};" title="${label}: ${n} of ${total}"></span>` : '';
+    const asOf = o.today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    return `
+      <section class="sho-hero" aria-label="Stock value and health">
+        <div class="sho-hero-top">
+          <div style="min-width: 0;">
+            <div class="sho-eyebrow">Stock value at cost <span class="sho-dot-sep"></span> as of ${asOf}</div>
+            <div class="sho-hero-val"><span class="sho-cur">₹</span>${parts[0]}<span class="sho-dec">.${parts[1] || '00'}</span></div>
+            <div class="sho-hero-meta">
+              <span><strong>${total}</strong> ${total === 1 ? 'item' : 'items'}</span>
+              <span><strong>${o.groupsCount}</strong> ${o.groupsCount === 1 ? 'group' : 'groups'}</span>
+              <span><strong>${o.godownCount}</strong> ${o.godownCount === 1 ? 'godown' : 'godowns'}</span>
+              <span><strong>${_stockMovements.length}</strong> ${_stockMovements.length === 1 ? 'movement' : 'movements'} logged</span>
+            </div>
+          </div>
+          <div class="sho-actions">
+            <button type="button" class="sho-btn primary" data-sho-act="record">${shoIcon('swap', 14, 2.2)} Record movement</button>
+            <button type="button" class="sho-btn" data-sho-act="list">${shoIcon('list', 14)} Stock list</button>
+            <button type="button" class="sho-btn" data-sho-act="new-item">${shoIcon('plus', 14, 2.2)} New item</button>
+          </div>
+        </div>
+
+        <div class="sho-health">
+          <div class="sho-health-head">
+            <span>Stock health</span>
+            <span><strong>${healthPct}%</strong> of items in stock</span>
+          </div>
+          <div class="sho-meter" role="img" aria-label="${inN} in stock, ${lowN} running low, ${outN} out of stock">
+            ${seg(inN, 'var(--emerald-500)', 'In stock')}${seg(lowN, 'var(--warning)', 'Running low')}${seg(outN, 'var(--danger)', 'Out of stock')}
+          </div>
+          <div class="sho-legend">
+            <span class="sho-legend-item"><span class="sho-status-ico" style="background: var(--emerald-500);">${shoIcon('check', 10, 3.2)}</span>In stock <strong>${inN}</strong></span>
+            <span class="sho-legend-item"><span class="sho-status-ico" style="background: var(--warning);">${shoIcon('bang', 10, 3.2)}</span>Running low <strong>${lowN}</strong></span>
+            <span class="sho-legend-item"><span class="sho-status-ico" style="background: var(--danger);">${shoIcon('x', 10, 3.2)}</span>Out of stock <strong>${outN}</strong></span>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function shoRenderTiles(o) {
+    const needN = o.outItems.length + o.lowItems.length;
+    const tile = (opts) => `
+      <div class="sho-tile ${opts.act ? 'clickable' : ''}" ${opts.act ? `data-sho-act="${opts.act}" role="button" tabindex="0"` : ''} title="${opts.title || ''}">
+        <div class="sho-tile-head">
+          <span class="sho-tile-ico" style="background: ${opts.bg}; color: ${opts.fg};">${shoIcon(opts.icon, 14, 2.2)}</span>
+          <span>${opts.label}</span>
+        </div>
+        <div class="sho-tile-val" ${opts.valColor ? `style="color: ${opts.valColor};"` : ''}>${opts.value}</div>
+        <div class="sho-tile-sub">${opts.sub}</div>
+        ${opts.delta ? `<div class="sho-tile-sub">${opts.delta}</div>` : ''}
+      </div>
+    `;
+    return `
+      <div class="sho-tiles">
+        ${tile({
+          label: 'Purchases · 30d', icon: 'down', bg: 'var(--blue-50)', fg: 'var(--blue-600)',
+          value: shoTileInr(o.purch.cur), title: '₹ ' + formatInr(o.purch.cur),
+          sub: o.purch.items.size ? `${o.purch.items.size} ${o.purch.items.size === 1 ? 'item' : 'items'} bought in` : 'No stock items purchased',
+          delta: shoDeltaHtml(o.purch.cur, o.purch.prev, null)
+        })}
+        ${tile({
+          label: 'Sales · 30d', icon: 'up', bg: '#fff4ed', fg: '#c2410c',
+          value: shoTileInr(o.sales.cur), title: '₹ ' + formatInr(o.sales.cur),
+          sub: o.sales.items.size ? `${o.sales.items.size} ${o.sales.items.size === 1 ? 'item' : 'items'} sold` : 'No stock items sold',
+          delta: shoDeltaHtml(o.sales.cur, o.sales.prev, true)
+        })}
+        ${tile({
+          label: 'Needs reorder', icon: 'alert', bg: '#fffbeb', fg: '#d97706', act: 'analysis',
+          value: `${needN} ${needN === 1 ? 'item' : 'items'}`, valColor: needN ? '#b45309' : '',
+          sub: needN ? `${o.outItems.length} out of stock · ${o.lowItems.length} running low` : 'Everything above reorder level'
+        })}
+        ${tile({
+          label: `Idle · ${SHO_IDLE_DAYS}d+`, icon: 'clock', bg: 'var(--slate-100)', fg: 'var(--slate-600)',
+          value: o.hasActivityData ? shoTileInr(o.idleVal) : '—', title: o.hasActivityData ? '₹ ' + formatInr(o.idleVal) : '',
+          sub: o.hasActivityData
+            ? (o.idleItems.length ? `${o.idleItems.length} ${o.idleItems.length === 1 ? 'item' : 'items'} with no purchase, sale or movement` : 'Every stocked item has recent activity')
+            : 'Shows once purchases, sales or movements are recorded'
+        })}
+      </div>
+    `;
+  }
+
+  function shoRenderAttention(o) {
+    const rows = o.attention.slice(0, 5);
+    const more = o.attention.length - rows.length;
+    return `
+      <section class="sho-card" aria-label="Needs attention">
+        <div class="sho-card-head">
+          <div>
+            <div class="sho-card-title">Needs attention</div>
+            <div class="sho-card-sub">Out of stock or at reorder level</div>
+          </div>
+          ${o.attention.length ? `<button type="button" class="sho-link" data-sho-act="analysis">Replenishment plan ${shoIcon('arrow', 12, 2.2)}</button>` : ''}
+        </div>
+        ${rows.length === 0 ? `
+          <div class="sho-ok">
+            <span class="sho-ok-ico">${shoIcon('check', 16, 2.6)}</span>
+            <div><strong>All items are above their reorder level.</strong><span>Nothing to restock right now.</span></div>
+          </div>
+        ` : `
+          <div class="sho-att-list">
+            ${rows.map(({ it, cover }) => {
+              const isOut = it.qty <= 0;
+              const fill = isOut ? 0 : Math.min(100, (it.qty / it.reorder) * 100);
+              const coverTxt = cover !== null ? ` · ≈ ${Math.max(1, Math.round(cover))} ${Math.round(cover) <= 1 ? 'day' : 'days'} left` : '';
+              return `
+                <div class="sho-att-row">
+                  <div class="sho-att-main">
+                    <div class="sho-att-name">
+                      <span class="sho-pill ${isOut ? 'out' : 'low'}">${isOut ? 'Out' : 'Low'}</span>
+                      <span class="sho-trunc" title="${ohEscapeHtml(it.name)}">${ohEscapeHtml(it.name)}</span>
+                    </div>
+                    <div class="sho-mini-meter ${isOut ? 'out' : 'low'}"><span style="width: ${fill}%;"></span></div>
+                    <div class="sho-att-qty">${isOut ? 'None on hand' : `${shoFmtQty(it.qty)} ${ohEscapeHtml(it.uom)} on hand · reorder at ${shoFmtQty(it.reorder)}`}${coverTxt}</div>
+                  </div>
+                  <button type="button" class="sho-btn sm btn-quick-move" data-id="${ohEscapeHtml(it.id)}" title="Record a receipt for ${ohEscapeHtml(it.name)}">${shoIcon('plus', 12, 2.4)} Restock</button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          ${more > 0 ? `<button type="button" class="sho-link sho-more" data-sho-act="analysis">+ ${more} more ${more === 1 ? 'item' : 'items'} need attention</button>` : ''}
+        `}
+      </section>
+    `;
+  }
+
+  function shoRenderInsights(o, stockItems) {
+    const list = [];
+    const total = stockItems.length;
+
+    const soonest = o.movers.filter(m => m.cover !== null && m.cover < 14 && m.it.qty > m.it.reorder).sort((a, b) => a.cover - b.cover)[0];
+    if (soonest) {
+      const d = Math.max(1, Math.round(soonest.cover));
+      list.push({ icon: 'clock', tone: 'warn', html: `<strong>${ohEscapeHtml(soonest.it.name)}</strong> runs out in about <strong>${d} ${d === 1 ? 'day' : 'days'}</strong> at the last 30 days' pace, before it reaches its reorder level.` });
+    }
+    if (total >= 4 && o.totalVal > 0) {
+      const top = o.byValue.slice(0, 3).reduce((s, x) => s + x.val, 0);
+      const share = Math.round((top / o.totalVal) * 100);
+      if (share >= 50) list.push({ icon: 'pie', tone: 'info', html: `Your top 3 items hold <strong>${share}%</strong> of stock value. Count and insure these first.` });
+    }
+    if (o.hasActivityData && o.idleItems.length && o.totalVal > 0) {
+      const share = Math.round((o.idleVal / o.totalVal) * 100);
+      list.push({ icon: 'clock', tone: 'muted', html: `<strong>${shoCompactInr(o.idleVal)}</strong> (${share}% of stock value) across ${o.idleItems.length} ${o.idleItems.length === 1 ? 'item has' : 'items have'} had no purchase, sale or movement in ${SHO_IDLE_DAYS}+ days.` });
+    }
+    if (o.noReorder.length) {
+      list.push({ icon: 'bang', tone: 'warn', html: `<strong>${o.noReorder.length} ${o.noReorder.length === 1 ? 'item has' : 'items have'} no reorder level</strong>, so low-stock alerts can't fire for ${o.noReorder.length === 1 ? 'it' : 'them'}. Set one in Master Desk.` });
+    }
+    if (o.noGodown.length && o.noGodown.length < total) {
+      list.push({ icon: 'home', tone: 'muted', html: `<strong>${o.noGodown.length} ${o.noGodown.length === 1 ? 'item is' : 'items are'}</strong> not assigned to a godown.` });
+    } else if (o.noGodown.length && o.noGodown.length === total && total > 0) {
+      list.push({ icon: 'home', tone: 'muted', html: `No item is assigned to a godown yet. Assign godowns to see where stock sits.` });
+    }
+
+    const shown = list.slice(0, 4);
+    return `
+      <section class="sho-card" aria-label="Insights">
+        <div class="sho-card-head">
+          <div>
+            <div class="sho-card-title">Insights</div>
+            <div class="sho-card-sub">Spotted in your stock and voucher data</div>
+          </div>
+        </div>
+        ${shown.length === 0 ? `
+          <div class="sho-ok">
+            <span class="sho-ok-ico">${shoIcon('check', 16, 2.6)}</span>
+            <div><strong>Nothing unusual.</strong><span>Reorder levels, godowns and movement all look healthy.</span></div>
+          </div>
+        ` : `
+          <div class="sho-insights">
+            ${shown.map(i => `
+              <div class="sho-insight">
+                <span class="sho-insight-ico ${i.tone}">${shoIcon(i.icon, 14, 2.2)}</span>
+                <div>${i.html}</div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </section>
+    `;
+  }
+
+  function shoRenderFlow(o) {
+    const weeks = o.weeks;
+    const peak = Math.max(0, ...weeks.map(w => Math.max(w.inVal, w.outVal)));
+    const max = shoNiceMax(peak);
+    const hasData = peak > 0;
+    const range = w => `${shoShortDate(w.start)} – ${shoShortDate(w.end)}`;
+    const totalIn = weeks.reduce((s, w) => s + w.inVal, 0);
+    const totalOut = weeks.reduce((s, w) => s + w.outVal, 0);
+
+    const chart = `
+      <div class="sho-chart" id="shoFlowChart">
+        <div class="sho-plot">
+          ${[1, 0.5, 0].map(f => `
+            <div class="sho-grid-line" style="bottom: ${f * 100}%;"></div>
+            <div class="sho-ytick" style="bottom: ${f * 100}%;">${hasData ? shoCompactInr(max * f) : (f === 0 ? '₹0' : '')}</div>
+          `).join('')}
+          <div class="sho-cols">
+            ${weeks.map((w, i) => `
+              <div class="sho-col" tabindex="0" data-idx="${i}"
+                   data-range="${range(w)}" data-in="${formatInr(w.inVal)}" data-out="${formatInr(w.outVal)}"
+                   aria-label="Week ${range(w)}: purchases ₹${formatInr(w.inVal)}, sales ₹${formatInr(w.outVal)}">
+                <span class="sho-bar" style="height: ${hasData ? (Math.max(0, w.inVal) / max) * 100 : 0}%; background: ${SHO_CLR_IN};"></span>
+                <span class="sho-bar" style="height: ${hasData ? (Math.max(0, w.outVal) / max) * 100 : 0}%; background: ${SHO_CLR_OUT};"></span>
+              </div>
+            `).join('')}
+          </div>
+          ${hasData ? '' : `<div class="sho-plot-empty">No purchase or sales vouchers with stock items in the last ${SHO_FLOW_WEEKS} weeks.</div>`}
+          <div class="sho-tip" id="shoFlowTip" role="tooltip"></div>
+        </div>
+        <div class="sho-xlabels">
+          ${weeks.map((w, i) => `<span>${i % 2 === 1 || i === weeks.length - 1 ? '' : shoShortDate(w.start)}</span>`).join('')}
+        </div>
+      </div>
+    `;
+
+    const table = `
+      <div class="sho-table-wrap">
+        <table class="sho-table">
+          <thead><tr><th>Week</th><th class="num">Purchases</th><th class="num">Sales</th></tr></thead>
+          <tbody>
+            ${weeks.slice().reverse().map(w => `
+              <tr><td>${range(w)}</td><td class="num">${shoTileInr(w.inVal)}</td><td class="num">${shoTileInr(w.outVal)}</td></tr>
+            `).join('')}
+          </tbody>
+          <tfoot><tr><td>Total</td><td class="num">${shoTileInr(totalIn)}</td><td class="num">${shoTileInr(totalOut)}</td></tr></tfoot>
+        </table>
+      </div>
+    `;
+
+    return `
+      <section class="sho-card" aria-label="Purchases versus sales">
+        <div class="sho-card-head">
+          <div>
+            <div class="sho-card-title">Purchases vs sales</div>
+            <div class="sho-card-sub">Weekly value of stock items · last ${SHO_FLOW_WEEKS} weeks</div>
+          </div>
+          <button type="button" class="sho-link" data-sho-act="flow-view">${_shoFlowAsTable ? 'Chart' : 'Table'}</button>
+        </div>
+        <div class="sho-legend" style="margin: -4px 0 12px;">
+          <span class="sho-legend-item"><span class="sho-swatch" style="background: ${SHO_CLR_IN};"></span>Purchases <strong>${shoCompactInr(totalIn)}</strong></span>
+          <span class="sho-legend-item"><span class="sho-swatch" style="background: ${SHO_CLR_OUT};"></span>Sales <strong>${shoCompactInr(totalOut)}</strong></span>
+        </div>
+        ${_shoFlowAsTable ? table : chart}
+      </section>
+    `;
+  }
+
+  function shoRenderMovers(o) {
+    const rows = o.movers.slice(0, 5);
+    return `
+      <section class="sho-card" aria-label="Top movers">
+        <div class="sho-card-head">
+          <div>
+            <div class="sho-card-title">Top movers</div>
+            <div class="sho-card-sub">Most stock out by value · last 30 days</div>
+          </div>
+        </div>
+        ${rows.length === 0 ? `
+          <div class="sho-muted-empty">No sales or dispatches of stock items in the last 30 days.</div>
+        ` : `
+          <div class="sho-rank-list">
+            ${rows.map((m, i) => {
+              const c = m.cover !== null ? Math.round(m.cover) : null;
+              const tone = c === null ? '' : c < 7 ? 'warn' : '';
+              return `
+                <div class="sho-rank-row">
+                  <span class="sho-rank-n">${i + 1}</span>
+                  <div class="sho-rank-main">
+                    <div class="sho-trunc sho-rank-name" title="${ohEscapeHtml(m.it.name)}">${ohEscapeHtml(m.it.name)}</div>
+                    <div class="sho-rank-sub">${shoFmtQty(m.out)} ${ohEscapeHtml(m.it.uom)} out · ${shoCompactInr(m.outVal)} at cost</div>
+                  </div>
+                  <span class="sho-cover ${tone}" title="Days the current stock lasts at the last 30 days' pace">${c === null ? 'No stock left' : `≈ ${Math.max(1, c)} ${c <= 1 ? 'day' : 'days'} cover`}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </section>
+    `;
+  }
+
+  function shoRenderBreakdown(o) {
+    const dims = [['group', 'Group'], ['category', 'Category'], ['warehouse', 'Godown']];
+    const all = o.breakdown[_shoBreakdown] || [];
+    const LIMIT = 6;
+    let rows = all.slice(0, LIMIT);
+    if (all.length > LIMIT) {
+      const rest = all.slice(LIMIT - 1);
+      rows = all.slice(0, LIMIT - 1).concat([{
+        name: `Other (${rest.length})`, count: rest.reduce((s, r) => s + r.count, 0), val: rest.reduce((s, r) => s + r.val, 0), other: true
+      }]);
+    }
+    const maxVal = Math.max(0, ...rows.map(r => r.val));
+    const label = dims.find(d => d[0] === _shoBreakdown)[1].toLowerCase();
+
+    return `
+      <section class="sho-card" aria-label="Where the value sits">
+        <div class="sho-card-head">
+          <div>
+            <div class="sho-card-title">Where the value sits</div>
+            <div class="sho-card-sub">Stock value at cost by ${label}</div>
+          </div>
+        </div>
+        <div class="sho-seg" role="tablist" aria-label="Break down by">
+          ${dims.map(([k, l]) => `<button type="button" role="tab" aria-selected="${_shoBreakdown === k}" class="${_shoBreakdown === k ? 'active' : ''}" data-sho-dim="${k}">${l}</button>`).join('')}
+        </div>
+        <div class="sho-hbars">
+          ${rows.map(r => {
+            const pct = o.totalVal > 0 ? (r.val / o.totalVal) * 100 : 0;
+            const w = maxVal > 0 ? (r.val / maxVal) * 100 : 0;
+            return `
+              <div class="sho-hbar-row" title="${ohEscapeHtml(r.name)}: ₹ ${formatInr(r.val)} · ${r.count} ${r.count === 1 ? 'item' : 'items'}">
+                <div class="sho-hbar-line">
+                  <div class="sho-hbar-name">
+                    <span class="sho-trunc ${r.other ? 'muted' : ''}">${ohEscapeHtml(r.name)}</span>
+                    <span class="sho-hbar-count">${r.count} ${r.count === 1 ? 'item' : 'items'}</span>
+                  </div>
+                  <div class="sho-hbar-val">${shoCompactInr(r.val)} <span>${pct < 1 && pct > 0 ? '<1' : Math.round(pct)}%</span></div>
+                </div>
+                <div class="sho-hbar-track"><span style="width: ${w}%;"></span></div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </section>
+    `;
+  }
+
+  function shoRenderConcentration(o) {
+    const classes = ['A', 'B', 'C'];
+    const share = k => o.totalVal > 0 ? (o.abc[k].val / o.totalVal) * 100 : 0;
+    const top = o.byValue.filter(x => x.val > 0).slice(0, 5);
+
+    return `
+      <section class="sho-card" aria-label="Value concentration">
+        <div class="sho-card-head">
+          <div>
+            <div class="sho-card-title">Value concentration</div>
+            <div class="sho-card-sub">ABC classes by share of stock value</div>
+          </div>
+          <button type="button" class="sho-link" data-sho-act="analysis">ABC analysis ${shoIcon('arrow', 12, 2.2)}</button>
+        </div>
+        <div class="sho-meter abc" role="img" aria-label="${classes.map(k => `Class ${k}: ${o.abc[k].count} items, ${Math.round(share(k))}% of value`).join('; ')}">
+          ${o.totalVal > 0 ? classes.map(k => o.abc[k].val > 0 ? `<span style="flex: ${o.abc[k].val} 1 0; background: ${SHO_CLR_ABC[k]};" title="Class ${k}: ${Math.round(share(k))}% of value"></span>` : '').join('') : ''}
+        </div>
+        <div class="sho-abc-rows">
+          ${classes.map(k => `
+            <div class="sho-abc-row">
+              <span class="sho-swatch" style="background: ${SHO_CLR_ABC[k]};"></span>
+              <span class="sho-abc-k">Class ${k}</span>
+              <span class="sho-abc-n">${o.abc[k].count} ${o.abc[k].count === 1 ? 'item' : 'items'}</span>
+              <span class="sho-abc-v">${shoCompactInr(o.abc[k].val)} <span>${Math.round(share(k))}%</span></span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="sho-subhead">Highest value items</div>
+        ${top.length === 0 ? `<div class="sho-muted-empty">No stock on hand yet.</div>` : `
+          <div class="sho-top-list">
+            ${top.map(x => `
+              <div class="sho-top-row">
+                <span class="sho-abc-badge" style="background: ${SHO_CLR_ABC[x.cls]};">${x.cls}</span>
+                <span class="sho-trunc" title="${ohEscapeHtml(x.it.name)}">${ohEscapeHtml(x.it.name)}</span>
+                <span class="sho-top-qty">${shoFmtQty(x.it.qty)} ${ohEscapeHtml(x.it.uom)}</span>
+                <span class="sho-top-val">₹ ${formatInr(x.val)}</span>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </section>
+    `;
+  }
+
+  function shoRenderActivity(o) {
+    const rows = o.activity.slice(0, 6);
+    const look = a => {
+      if (a.kind === 'purchase') return { icon: 'cart', bg: 'var(--blue-50)', fg: 'var(--blue-700)' };
+      if (a.kind === 'sale') return { icon: 'receipt', bg: '#fff4ed', fg: '#c2410c' };
+      if (a.kind === 'return') return { icon: 'undo', bg: 'var(--slate-100)', fg: 'var(--slate-600)' };
+      if (a.type === 'outward') return { icon: 'up', bg: '#fff4ed', fg: '#c2410c' };
+      if (a.type === 'transfer') return { icon: 'swap', bg: '#f5f3ff', fg: '#6d28d9' };
+      if (a.type === 'adjustment') return { icon: 'tag', bg: '#fffbeb', fg: '#b45309' };
+      return { icon: 'down', bg: 'var(--blue-50)', fg: 'var(--blue-700)' };
+    };
+    return `
+      <section class="sho-card" aria-label="Recent activity">
+        <div class="sho-card-head">
+          <div>
+            <div class="sho-card-title">Recent activity</div>
+            <div class="sho-card-sub">Vouchers and movements that touched stock items</div>
+          </div>
+          <button type="button" class="sho-link" data-sho-act="movement">Movement log ${shoIcon('arrow', 12, 2.2)}</button>
+        </div>
+        ${rows.length === 0 ? `<div class="sho-muted-empty">No stock activity yet. Purchases, sales and movements of stock items will show here.</div>` : `
+          <div class="sho-act-list">
+            ${rows.map(a => {
+              const l = look(a);
+              const sub = a.kind === 'movement'
+                ? `${ohEscapeHtml(a.party)} · ${a.qty > 0 ? '+' : ''}${shoFmtQty(a.qty)} ${ohEscapeHtml(a.uom || '')}`
+                : `${a.party ? ohEscapeHtml(a.party) + ' · ' : ''}${a.lines} stock ${a.lines === 1 ? 'line' : 'lines'}`;
+              return `
+                <div class="sho-act-row">
+                  <span class="sho-act-ico" style="background: ${l.bg}; color: ${l.fg};">${shoIcon(l.icon, 15, 2.1)}</span>
+                  <div class="sho-act-main">
+                    <div class="sho-trunc sho-act-title">${ohEscapeHtml(a.title.trim())}</div>
+                    <div class="sho-trunc sho-act-sub">${sub}</div>
+                  </div>
+                  <div class="sho-act-right">
+                    <div class="sho-act-val">₹ ${formatInr(a.val)}</div>
+                    <div class="sho-act-date">${shoRelDate(a.date, o.today)}</div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </section>
+    `;
+  }
+
+  function renderDetailsSubtab(stockItems) {
+    if (stockItems.length === 0) return `<div class="sho">${shoRenderEmpty()}</div>`;
+    const o = computeStockOverview(stockItems);
+    return `
+      <div class="sho">
+        ${shoRenderHero(o, stockItems)}
+        ${shoRenderTiles(o)}
+        <div class="sho-grid-2">
+          ${shoRenderAttention(o)}
+          ${shoRenderInsights(o, stockItems)}
+        </div>
+        <div class="sho-grid-2">
+          ${shoRenderFlow(o)}
+          ${shoRenderMovers(o)}
+        </div>
+        <div class="sho-grid-2">
+          ${shoRenderBreakdown(o)}
+          ${shoRenderConcentration(o)}
+        </div>
+        ${shoRenderActivity(o)}
+      </div>
+    `;
+  }
+
+  // Overview interactions: quick actions, breakdown toggle, chart/table toggle and the chart tooltip.
+  function attachStockOverviewEvents(panel) {
+    const root = panel.querySelector('.sho');
+    if (!root) return;
+
+    const runAct = act => {
+      if (act === 'record') openRecordMovementModal();
+      else if (act === 'new-item') openCreateStockItemModal();
+      else if (act === 'new-godown') openCreateStockWarehouseModal();
+      else if (act === 'list') { _activeLeftSubtab = 'items'; renderStockHubPanel(); }
+      else if (act === 'analysis') { _activeLeftSubtab = 'analysis'; renderStockHubPanel(); }
+      else if (act === 'movement') { _activeLeftSubtab = 'movement'; renderStockHubPanel(); }
+      else if (act === 'flow-view') { _shoFlowAsTable = !_shoFlowAsTable; renderStockHubPanel(); }
+    };
+    root.querySelectorAll('[data-sho-act]').forEach(el => {
+      el.addEventListener('click', () => runAct(el.dataset.shoAct));
+      if (el.getAttribute('role') === 'button') {
+        el.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); runAct(el.dataset.shoAct); }
+        });
+      }
+    });
+
+    root.querySelectorAll('[data-sho-dim]').forEach(btn => {
+      btn.addEventListener('click', () => { _shoBreakdown = btn.dataset.shoDim; renderStockHubPanel(); });
+    });
+
+    const tip = root.querySelector('#shoFlowTip');
+    const plot = tip ? tip.parentElement : null;
+    if (tip && plot) {
+      const show = col => {
+        tip.innerHTML = `
+          <div class="sho-tip-head">${col.dataset.range}</div>
+          <div class="sho-tip-row"><span><span class="sho-swatch" style="background: ${SHO_CLR_IN};"></span>Purchases</span><strong>₹ ${col.dataset.in}</strong></div>
+          <div class="sho-tip-row"><span><span class="sho-swatch" style="background: ${SHO_CLR_OUT};"></span>Sales</span><strong>₹ ${col.dataset.out}</strong></div>
+        `;
+        const pr = plot.getBoundingClientRect();
+        const cr = col.getBoundingClientRect();
+        const half = tip.offsetWidth / 2;
+        const x = Math.min(Math.max(cr.left - pr.left + cr.width / 2, half), pr.width - half);
+        tip.style.left = x + 'px';
+        tip.classList.add('show');
+      };
+      const hide = () => tip.classList.remove('show');
+      root.querySelectorAll('.sho-col').forEach(col => {
+        col.addEventListener('mouseenter', () => show(col));
+        col.addEventListener('focus', () => show(col));
+        col.addEventListener('mouseleave', hide);
+        col.addEventListener('blur', hide);
+      });
+    }
   }
 
   // ==========================================
@@ -1183,18 +2396,17 @@
   // SUB-TAB 4: ANALYSIS & VALUATION VIEW (Full Screen with Back Button)
   // ==========================================
   function renderAnalysisSubtab(stockItems) {
-    const totalVal = stockItems.reduce((sum, i) => sum + (i.qty * i.cost), 0);
-    const sortedByVal = [...stockItems].sort((a, b) => (b.qty * b.cost) - (a.qty * a.cost));
+    const totalVal = stockItems.reduce((sum, i) => sum + (Math.max(0, i.qty) * i.cost), 0);
+    const sortedByVal = [...stockItems].sort((a, b) => (Math.max(0, b.qty) * b.cost) - (Math.max(0, a.qty) * a.cost));
 
-    // ABC Pareto Analysis
+    // ABC Pareto Analysis: class is set by the cumulative share before the item (same rule as the overview)
     let cumulative = 0;
     const abcItems = sortedByVal.map(item => {
-      const val = item.qty * item.cost;
+      const val = Math.max(0, item.qty) * item.cost;
+      const before = totalVal > 0 ? (cumulative / totalVal) * 100 : 100;
       cumulative += val;
       const cumPct = (cumulative / (totalVal || 1)) * 100;
-      let category = 'A';
-      if (cumPct > 90) category = 'C';
-      else if (cumPct > 70) category = 'B';
+      const category = val <= 0 ? 'C' : before < 70 ? 'A' : before < 90 ? 'B' : 'C';
       return { ...item, val, cumPct, abcClass: category };
     });
 
@@ -1756,7 +2968,7 @@
           </div>
 
           <!-- Card Body -->
-          <div style="padding: 24px 28px;">
+          <div class="sho-shell-body" style="padding: 24px 28px;">
             ${bodyContentHtml}
           </div>
 
@@ -1910,6 +3122,8 @@
     if (createWhBtn) {
       createWhBtn.addEventListener('click', () => openCreateStockWarehouseModal());
     }
+
+    attachStockOverviewEvents(panel);
   }
 
   // ==========================================
@@ -2007,10 +3221,17 @@
         typeLabel = 'Stock Adjustment';
       }
 
-      // Update item quantity in array
-      if (item) {
-        if (type === 'inward') item.qty += qty;
-        else if (type === 'outward') item.qty = Math.max(0, item.qty - qty);
+      // Update item quantity on the master record (getStockItems() hands out copies)
+      if (item && (type === 'inward' || type === 'outward')) {
+        item.qty = type === 'inward' ? item.qty + qty : Math.max(0, item.qty - qty);
+        const master = Array.isArray(window._masterStockItems)
+          ? window._masterStockItems.find(i => String(i.id) === String(item.id))
+          : null;
+        if (master) {
+          master.qty = item.qty;
+          if (typeof window.saveMasterStockItems === 'function') window.saveMasterStockItems();
+          else saveStockHubStorage(KYA_STOCK_ITEMS_KEY, window._masterStockItems);
+        }
       }
 
       // Prepend to movements log

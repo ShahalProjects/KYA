@@ -646,27 +646,43 @@
             : (parseFloat(v.paymentAmount) || 0));
         const refundPaid = Math.max(0, refundGiven - (typeof getCreditAdjustPortion === 'function'
           ? getCreditAdjustPortion(v.paymentAccountId, v.paymentSplits, refundGiven) : 0));
+        // Mirrors the invoice: the reversal at its full value, then the TDS reversed
+        const retTds = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0) ? parseFloat(v.tdsTcsAmount) : 0;
+        const grossReversed = total + retTds;
 
         if (dateFrom && vDate < dateFrom) {
-          preReceived += total;
+          preReceived += grossReversed;
+          if (retTds > 0) preInvoiced += retTds;
           if (refundPaid > 0) preInvoiced += refundPaid;
         } else if ((!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo)) {
-          periodReceived += total;
+          periodReceived += grossReversed;
           transactions.push({
             id: v.journalEntryId || v.id,
             date: vDate,
             voucherNo: v.invoiceNo || 'SR-' + v.id,
             particulars: 'Sales Reversal',
             debit: 0,
-            credit: total,
+            credit: grossReversed,
             isSales: true
           });
+          if (retTds > 0) {
+            periodInvoiced += retTds;
+            transactions.push({
+              id: v.tdsJournalEntryId || v.id,
+              date: vDate,
+              voucherNo: v.tdsVoucherNo || (v.invoiceNo || 'SR-' + v.id) + ' (TDS)',
+              particulars: 'TDS Reversed',
+              debit: retTds,
+              credit: 0,
+              isSales: true
+            });
+          }
           if (refundPaid > 0) {
             periodInvoiced += refundPaid;
             transactions.push({
-              id: (v.refundJournalEntryIds && v.refundJournalEntryIds[0]) || v.id,
+              id: v.paymentJournalEntryId || (v.refundJournalEntryIds && v.refundJournalEntryIds[0]) || v.id,
               date: vDate,
-              voucherNo: (v.invoiceNo || 'SR-' + v.id) + ' (Ref)',
+              voucherNo: v.paymentVoucherNo || (v.invoiceNo || 'SR-' + v.id) + ' (Ref)',
               particulars: (typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(v.paymentAccountId))
                 ? `Refund adjusted with ${((typeof coaLedgers !== 'undefined' ? coaLedgers : []).find(l => String(l.id) === String(v.paymentAccountId)) || {}).name || 'ledger'}`
                 : 'Refund Paid',

@@ -635,6 +635,32 @@
       outline-offset: 2px;
     }
 
+    /* × in the Sales Invoice's Pre Invoice No. box: removes the loaded document */
+    .kya-preinv-clear-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      margin-left: auto;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--slate-400);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background .15s, color .15s;
+    }
+    .kya-preinv-clear-btn:hover {
+      background: var(--red-50, #fef2f2);
+      color: var(--red-600, #dc2626);
+    }
+    .kya-preinv-clear-btn:focus-visible {
+      outline: 2px solid var(--blue-300);
+      outline-offset: 1px;
+    }
+
     /* Toggle icons: smooth crossfade + rotate instead of display:none */
     .sidebar-toggle-btn .toggle-icon-expand,
     .sidebar-toggle-btn .toggle-icon-collapse {

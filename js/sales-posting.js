@@ -1,4 +1,9 @@
   function loadSalesInvoice(inv, isDraft = false) {
+    // Loaded from the Pre Invoice No. box: a document with no Sales Executive leaves the one
+    // already chosen on the invoice (sales-preinvoice-picker.js)
+    const keepExec = window._salesInvoiceKeepExecutive;
+    window._salesInvoiceKeepExecutive = null;
+    if (keepExec && !inv.isReturn && !inv.salesExecutiveId) inv.salesExecutiveId = keepExec;
     // Editing a stored voucher (posted or draft) vs. filling a fresh conversion — set first,
     // so numbering, refund limits and the like see the right voucher while it loads
     const store = window.KYA_STORE || {};
@@ -689,14 +694,12 @@
     if (jeResult) {
       if (typeof jeResult === 'object') {
         if (jeResult.invoiceJEId) invoiceData.journalEntryId        = jeResult.invoiceJEId;
-        if (jeResult.tdsJEId) {
-          invoiceData.tdsJournalEntryId = jeResult.tdsJEId;
-          if (jeResult.tdsVoucherNo) invoiceData.tdsVoucherNo = jeResult.tdsVoucherNo;
-        }
-        if (jeResult.paymentJEId) {
-          invoiceData.paymentJournalEntryId = jeResult.paymentJEId;
-          if (jeResult.paymentVoucherNo) invoiceData.paymentVoucherNo = jeResult.paymentVoucherNo;
-        }
+        // An entry no longer needed (no TDS / nothing received or refunded) was removed —
+        // its id and number go with it
+        invoiceData.tdsJournalEntryId = jeResult.tdsJEId || '';
+        invoiceData.tdsVoucherNo = jeResult.tdsJEId ? (jeResult.tdsVoucherNo || invoiceData.tdsVoucherNo || '') : '';
+        invoiceData.paymentJournalEntryId = jeResult.paymentJEId || '';
+        invoiceData.paymentVoucherNo = jeResult.paymentJEId ? (jeResult.paymentVoucherNo || invoiceData.paymentVoucherNo || '') : '';
         invoiceData.advanceRefundJournalEntryId = jeResult.advanceRefundJEId || '';
         invoiceData.advanceRefundVoucherNo = jeResult.advanceRefundVoucherNo || '';
       } else {
@@ -1186,7 +1189,7 @@
       firstParticular: rows[0].particular,
       amount: fmtNum(ref.inPartyLedger ? paidOutAmt : advance),
       allRows: rows,
-      narration: `Sales Reversal No. ${invoice.invoiceNo} of ${ref.type || 'Pre Invoice'} ${ref.no || ''} for ${customerName}: advance of ₹${fmtNum(advance)} — ${parts.join(', ')}.`,
+      narration: `Sales Reversal No. ${invoice.invoiceNo} of ${ref.type || 'Pre Invoice'} ${ref.no || ''} for ${customerName}: advance of ₹${fmtNum(advance)}${ref.advanceVoucherNo ? ` (receipt ${ref.advanceVoucherNo})` : ''} reversed — ${parts.join(', ')}.`,
       jeType: 'preinvoice_reversal',
       ledgerAdjust: typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(invoice.paymentAccountId),
       partyName: customerName
@@ -1273,6 +1276,11 @@
       return postPreInvoiceReversalJournal(invoice, customerName, voucherNo, silent);
     }
 
+    // A reversal mirrors the invoice's entries: the sale (with GST / TCS) here, then its own
+    // TDS reversal and refund entries after it
+    let reversalNote = '';   // TCS reversed in the main entry, for its narration
+    let retTdsAmt = 0;       // → TDS reversal entry: Dr Customer / Cr TDS Receivable
+    let retCashRefund = 0;   // → refund entry: Dr Customer / Cr Cash / Bank
     if (isRet) {
       // ── SALES REVERSAL / RETURN ───────────────────────────────────────
       getSalesRevenueLines(invoice).forEach(line => {
@@ -1308,6 +1316,16 @@
         }
       }
 
+      // TDS / TCS on the invoice is reversed with it: the TCS collected comes off TCS
+      // Payable here, and the TDS the customer deducted comes off TDS Receivable below
+      const retTds = (invoice.tdsTcsMode === 'TDS' && parseFloat(invoice.tdsTcsAmount) > 0) ? parseFloat(invoice.tdsTcsAmount) : 0;
+      const retTcs = (invoice.tdsTcsMode === 'TCS' && parseFloat(invoice.tdsTcsAmount) > 0) ? parseFloat(invoice.tdsTcsAmount) : 0;
+      if (retTcs > 0) {
+        const tcsLedgerId = getOrCreateSystemLedger('TCS Payable', 'sg-ocl');
+        const tcsName = (coaLedgers.find(l => l.id == tcsLedgerId) || { name: 'TCS Payable' }).name;
+        journalRows.push({ id: journalRows.length + 1, type: 'By', particular: tcsName, debit: retTcs.toFixed(2), credit: '' });
+      }
+
       const adj = parseFloat(invoice.adjustments) || 0;
       if (adj > 0) {
         const adjLedgerId = getOrCreateSystemLedger('Adjustments Account', 'sg-oe');
@@ -1323,17 +1341,17 @@
       // its Multi Refund row) isn't paid out: it stays with the customer, allocated to them
       const appliedAmt = typeof getCreditAdjustPortion === 'function'
         ? getCreditAdjustPortion(invoice.paymentAccountId, invoice.paymentSplits, paidAmount) : 0;
-      const cashRefund = cashSale ? 0 : Math.max(0, Math.round((paidAmount - appliedAmt) * 100) / 100);
-      const netReceivableCredit = (parseFloat(invoice.total) || 0) - cashRefund;
-      if (netReceivableCredit > 0) {
-        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: customerName, debit: '', credit: netReceivableCredit.toFixed(2) });
-      }
+      // A cash sale has no receipt to reverse: the sale itself credits the cash account
+      retCashRefund = cashSale ? 0 : Math.max(0, Math.round((paidAmount - appliedAmt) * 100) / 100);
+      retTdsAmt = retTds;
 
-      if (cashRefund > 0) {
-        getSalesPaymentSplitRows(invoice, paidAmount, () => []).forEach(p => {
-          journalRows.push({ id: journalRows.length + 1, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) });
-        });
+      // The customer is credited with the whole invoice value (as the invoice debited them);
+      // the TDS reversal and refund entries then debit them back
+      const grossCredit = Math.round(((parseFloat(invoice.total) || 0) + retTds) * 100) / 100;
+      if (grossCredit > 0) {
+        journalRows.push({ id: journalRows.length + 1, type: 'To', particular: customerName, debit: '', credit: grossCredit.toFixed(2) });
       }
+      reversalNote = retTcs > 0 ? ` TCS ₹${fmtNum(retTcs)} reversed.` : '';
 
     } else {
       // ── REGULAR SALES INVOICE (3 Linked Journal Entries) ─────────────
@@ -1465,6 +1483,7 @@
           allRows:         tdsJERows,
           narration:       `TDS deducted by customer ${customerName} against Invoice No. ${invoice.invoiceNo} @ ${invoice.tdsTcsRate}%.`.trim(),
           jeType:          'tds',
+          customerName,
         };
         if (typeof postedEntries !== 'undefined') {
           postedEntries.unshift(tdsEntry);
@@ -1597,6 +1616,7 @@
           allRows:         payJERows,
           narration:       payNarration,
           jeType:          'payment',
+          customerName,
           // Set off against another party's ledger: that party's statement shows it
           ledgerAdjust:    payAdjustLedger,
           partyName:       customerName,
@@ -1624,7 +1644,7 @@
       };
     }
 
-    // ── Return: single combined journal entry ─────────────────────────
+    // ── Return: the reversal entry, then its TDS reversal and refund entries ──
     const entryId = invoice.journalEntryId || Date.now();
     const entry = {
       id:              entryId,
@@ -1633,12 +1653,12 @@
       preparedBy:      'Sales Module',
       departmentId:    '',
       isBudget:        false,
-      firstParticular: customerName || (((paidAmount > 0) && getSalesPaymentSplitRows(invoice, paidAmount, () => [])[0]) || { name: 'Trade Receivables' }).name,
-      amount:          fmtNum(invoice.total),
+      firstParticular: (journalRows[0] && journalRows[0].particular) || customerName,
+      amount:          fmtNum((parseFloat(invoice.total) || 0) + retTdsAmt),
       allRows:         journalRows,
-      narration:       `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText}${typeof usesCreditAdjust === 'function' && usesCreditAdjust(invoice.paymentAccountId, invoice.paymentSplits) && typeof describeApplications === 'function' ? ` Credit applied to ${describeApplications(invoice.creditApplications)}.` : ''} ${invoice.notes || ''}`.trim(),
-      // A refund set off against another party's ledger: that party's statement shows it
-      ledgerAdjust:    typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(invoice.paymentAccountId),
+      narration:       `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText}${reversalNote}${typeof usesCreditAdjust === 'function' && usesCreditAdjust(invoice.paymentAccountId, invoice.paymentSplits) && typeof describeApplications === 'function' ? ` Credit applied to ${describeApplications(invoice.creditApplications)}.` : ''} ${invoice.notes || ''}`.trim(),
+      jeType:          'reversal',
+      customerName,
       partyName:       customerName,
     };
 
@@ -1651,8 +1671,62 @@
         postedEntries.unshift(entry);
       }
     }
+
+    // Keeps a linked entry's id and JV number across edits; drops it when no longer needed
+    const placeLinkedEntry = (oldId, oldNo, fallbackId, build) => {
+      if (typeof postedEntries === 'undefined') return { id: '', voucherNo: '' };
+      const prev = oldId ? postedEntries.find(e => String(e.id) === String(oldId)) : null;
+      if (oldId) postedEntries = postedEntries.filter(e => String(e.id) !== String(oldId));
+      if (!build) return { id: '', voucherNo: '' };
+      const id = oldId || fallbackId;
+      const no = (prev && String(prev.voucherNo || '').startsWith('JV-')) ? prev.voucherNo
+        : (oldNo && String(oldNo).startsWith('JV-') ? oldNo
+          : (typeof getNextJournalVoucherNo === 'function' ? getNextJournalVoucherNo(invoice.date) : `JV-${String(invoice.date || '').slice(0, 4)}-001`));
+      postedEntries.unshift(Object.assign({
+        id, date: invoice.date, voucherNo: no, preparedBy: 'Sales Module', departmentId: '', isBudget: false,
+        customerName, partyName: customerName
+      }, build()));
+      return { id, voucherNo: no };
+    };
+
+    // TDS reversal — the mirror of the invoice's TDS entry (Dr TDS Receivable / Cr Customer)
+    const tdsRes = placeLinkedEntry(invoice.tdsJournalEntryId, invoice.tdsVoucherNo, Number(entryId) + 1, retTdsAmt > 0 ? () => {
+      const tdsLedgerId = getOrCreateSystemLedger('TDS Receivable', 'sg-stla');
+      const tdsName = (coaLedgers.find(l => l.id == tdsLedgerId) || { name: 'TDS Receivable' }).name;
+      return {
+        firstParticular: customerName,
+        amount: fmtNum(retTdsAmt),
+        allRows: [
+          { id: 1, type: 'By', particular: customerName, debit: retTdsAmt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: tdsName, debit: '', credit: retTdsAmt.toFixed(2) }
+        ],
+        narration: `TDS of ₹${fmtNum(retTdsAmt)} reversed for customer ${customerName} on Sales Reversal No. ${invoice.invoiceNo}${invoice.returnAgainstInvoice ? ` (Invoice No. ${invoice.returnAgainstInvoice})` : ''}${invoice.tdsTcsRate ? ` @ ${invoice.tdsTcsRate}%` : ''}.`,
+        jeType: 'tds_reversal'
+      };
+    } : null);
+
+    // Refund — the mirror of the invoice's receipt (Dr Cash / Bank / Cr Customer)
+    const refundRes = placeLinkedEntry(invoice.paymentJournalEntryId, invoice.paymentVoucherNo, Number(entryId) + 2, retCashRefund > 0 ? () => {
+      const payRows = getSalesPaymentSplitRows(invoice, paidAmount, () => []);
+      return {
+        firstParticular: customerName,
+        amount: fmtNum(retCashRefund),
+        allRows: [{ id: 1, type: 'By', particular: customerName, debit: retCashRefund.toFixed(2), credit: '' }]
+          .concat(payRows.map((p, i) => ({ id: i + 2, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) }))),
+        narration: `Refund of ₹${fmtNum(retCashRefund)} paid to customer ${customerName} against Sales Reversal No. ${invoice.invoiceNo}${invoice.returnAgainstInvoice ? ` (Invoice No. ${invoice.returnAgainstInvoice})` : ''}.`,
+        jeType: 'refund',
+        // A refund set off against another party's ledger: that party's statement shows it
+        ledgerAdjust: typeof isAdjustLedgerAccount === 'function' && isAdjustLedgerAccount(invoice.paymentAccountId)
+      };
+    } : null);
+
+    if (typeof window !== 'undefined') window.postedEntries = postedEntries;
     if (!silent) refreshAllReports();
-    return entryId;
+    return {
+      invoiceJEId: entryId,
+      tdsJEId: tdsRes.id, tdsVoucherNo: tdsRes.voucherNo,
+      paymentJEId: refundRes.id, paymentVoucherNo: refundRes.voucherNo
+    };
   }
 
   // ── Global Window Exports ──

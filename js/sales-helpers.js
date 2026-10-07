@@ -543,6 +543,7 @@
       (excludeReturnId === null || v.id !== excludeReturnId)
     );
     const remainingRows = JSON.parse(JSON.stringify(origInv.rows));
+    const reduced = new Set();
     postedReturns.forEach(ret => {
       if (!ret.rows) return;
       ret.rows.forEach(retRow => {
@@ -553,6 +554,7 @@
             if (match.discountType !== 'pct') {
               match.discount = Math.max(0, match.discount - (retRow.discount || 0));
             }
+            reduced.add(match);
           }
         } else {
           const match = remainingRows.find(r => r.revenueLedgerId == retRow.revenueLedgerId);
@@ -561,9 +563,19 @@
             if (match.discountType !== 'pct') {
               match.discount = Math.max(0, match.discount - (retRow.discount || 0));
             }
+            reduced.add(match);
           }
         }
       });
+    });
+    // A line partly reversed already: its amount is for what is left, not the whole line —
+    // otherwise the next reversal would carry the full line value
+    reduced.forEach(r => {
+      const base = origInv.type === 'Product'
+        ? (parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0)
+        : (parseFloat(r.baseAmount) || 0);
+      const discAmt = r.discountType === 'pct' ? base * ((parseFloat(r.discount) || 0) / 100) : (parseFloat(r.discount) || 0);
+      r.amount = Math.round(Math.max(0, base - discAmt) * (1 + (parseFloat(r.tax) || 0) / 100) * 100) / 100;
     });
     return remainingRows;
   }
@@ -972,10 +984,12 @@
   }
 
   function updateSalesReturnLockState() {
-    // The base sets every control afresh — the cash-sale lock goes back on top of it
+    // The base sets every control afresh — the cash-sale lock and a loaded pre-invoice's
+    // customer / executive lock (sales-preinvoice-picker.js) go back on top of it
     clearSalesCashCustomerFlags();
     updateSalesReturnLockStateBase();
     applySalesCashCustomerLock();
+    if (typeof window.applySalesPreInvoiceLock === 'function') window.applySalesPreInvoiceLock();
   }
 
   // ── Cash sale: a Cash and Cash Equivalents ledger picked as the customer ──

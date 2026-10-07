@@ -308,7 +308,7 @@
     salesRows = Array.isArray(doc.rows) ? JSON.parse(JSON.stringify(doc.rows)) : [];
     if (!salesRows.length && typeof addSalesRow === 'function') addSalesRow();
 
-    // Refund starts at "No Refund"
+    // Refund starts clear …
     $('salesPaymentStatusNotPaid')?.click();
     if (typeof resetSalesMultiPayments === 'function') resetSalesMultiPayments();
     if (typeof populateSalesPaymentAccounts === 'function') populateSalesPaymentAccounts('');
@@ -319,6 +319,12 @@
     renderSalesRows();
     updateSalesReturnLockState();
     recalculateSalesTotals();
+    // … then the advance goes back the way it came: Full Refund through the account (or
+    // Multi Payment split) it was received in — the reverse of its receipt entry. No
+    // Refund instead keeps it as the customer's credit (Refund Payable / their ledger).
+    if (typeof presetSalesRefundAccount === 'function') {
+      presetSalesRefundAccount(doc.paymentAccountId, doc.paymentSplits, getDocAdvance(doc, src.store));
+    }
     if (typeof updateSalesMultiPaymentUI === 'function') updateSalesMultiPaymentUI();
   }
 

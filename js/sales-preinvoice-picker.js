@@ -191,7 +191,13 @@
       if (typeof showToast === 'function') showToast(`${src.type} could not be loaded.`, 'error');
       return;
     }
-    const run = () => fn(doc.id);
+    // A document with no Sales Executive leaves the one already chosen on the invoice
+    // (loadSalesInvoice reads it while the converter fills the invoice)
+    const keepExec = $('salesExecutive') ? $('salesExecutive').value : '';
+    const run = () => {
+      window._salesInvoiceKeepExecutive = keepExec;
+      try { fn(doc.id); } finally { window._salesInvoiceKeepExecutive = null; }
+    };
     if (typeof showKyaConfirm !== 'function') { run(); return; }
 
     // Always confirm, showing what will come in
@@ -251,6 +257,98 @@
       trigger.title = 'Bill an active Quotation, Proforma Invoice, Sales Order or Delivery Challan';
       trigger.style.cursor = 'pointer';
     }
+    // × to take the document off again — not on a posted invoice, which keeps it
+    const clearBtn = $('salesPreInvoiceClearBtn');
+    if (clearBtn) clearBtn.style.display = (linked && !linked.locked) ? '' : 'none';
+    applySalesPreInvoiceLock();
+  }
+
+  // ── Remove the loaded pre-invoice: everything it filled in goes (customer, Sales
+  // Executive, items, tax, payment / advance, notes, attachment) and the invoice is blank
+  // again, keeping only its own date and number — and the draft it is, when editing one ──
+  function removeLinkedPreInvoice() {
+    const linked = getLinkedPreInvoice();
+    if (!linked || linked.locked) return;
+    closeDropdown();
+    const run = () => {
+      const dateEl = $('salesDate');
+      const noEl = $('salesInvoiceNo');
+      const keepDate = dateEl ? dateEl.value : '';
+      const keepNo = noEl ? noEl.value : '';
+      if (typeof initSalesForm === 'function') initSalesForm(); // also drops the link
+      if (dateEl && keepDate) {
+        dateEl.value = keepDate;
+        if ($('salesDueDate')) $('salesDueDate').value = keepDate;
+      }
+      if (noEl && keepNo) {
+        noEl.value = keepNo;
+        if ($('salesVoucherChipDisplay')) $('salesVoucherChipDisplay').textContent = keepNo;
+        if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
+      }
+      if (typeof recalculateSalesTotals === 'function') recalculateSalesTotals();
+      refreshSalesPreInvoicePicker();
+      if (typeof showToast === 'function') showToast(`${linked.src.type} ${linked.docNo || ''} removed from this invoice.`, 'info');
+    };
+    if (typeof showKyaConfirm !== 'function') { run(); return; }
+    showKyaConfirm({
+      title: 'Remove Pre Invoice?',
+      message: `Remove ${linked.src.type} <strong>${safeEsc(linked.docNo || '')}</strong> from this invoice?<br>Everything it filled in — customer, Sales Executive, items, tax, payment and advance, notes — will be cleared.`,
+      confirmLabel: 'Remove',
+      okBg: 'var(--red-600)',
+      onConfirm: run
+    });
+  }
+
+  // ── A loaded pre-invoice fixes the invoice's customer, and its Sales Executive when it
+  // names one. Re-applied after updateSalesReturnLockState, which sets the boxes afresh;
+  // undoes only what it locked (data-pre-inv-locked). ──
+  function setPreInvoiceSelectLock(el, locked, title) {
+    if (!el) return;
+    if (locked) {
+      el.disabled = true;
+      el.style.backgroundColor = 'var(--slate-50)';
+      el.style.cursor = 'not-allowed';
+      el.title = title;
+      el.dataset.preInvLocked = '1';
+    } else if (el.dataset.preInvLocked) {
+      el.disabled = false;
+      el.style.backgroundColor = '';
+      el.style.cursor = '';
+      el.title = '';
+      delete el.dataset.preInvLocked;
+    }
+  }
+
+  function applySalesPreInvoiceLock() {
+    const custEl = $('salesCustomer');
+    const custTrigger = $('salesCustomerSelectTrigger');
+    const execEl = $('salesExecutive');
+    // A reversal has its own locks (updateSalesReturnLockStateBase): just forget ours
+    if (typeof currentSalesVoucherSubtype !== 'undefined' && currentSalesVoucherSubtype === 'Return') {
+      [custEl, custTrigger, execEl].forEach(el => { if (el) delete el.dataset.preInvLocked; });
+      return;
+    }
+    const linked = getLinkedPreInvoice();
+    const from = linked ? `${linked.src.type} ${linked.docNo || ''}`.trim() : '';
+    setPreInvoiceSelectLock(custEl, !!linked, `Customer of ${from}`);
+    setPreInvoiceSelectLock(execEl, !!(linked && linked.doc && linked.doc.salesExecutiveId), `Sales Executive of ${from}`);
+    if (custTrigger) {
+      if (linked) {
+        // Same look as a reversal's locked box; hovering still shows the Customer Details card
+        if (typeof guardSalesCustomerTrigger === 'function') guardSalesCustomerTrigger(custTrigger);
+        custTrigger.dataset.locked = '1';
+        custTrigger.dataset.preInvLocked = '1';
+        custTrigger.style.backgroundColor = 'var(--slate-50)';
+        custTrigger.style.cursor = 'default';
+        custTrigger.style.opacity = '0.7';
+      } else if (custTrigger.dataset.preInvLocked) {
+        custTrigger.dataset.locked = '';
+        delete custTrigger.dataset.preInvLocked;
+        custTrigger.style.backgroundColor = '#fff';
+        custTrigger.style.cursor = 'pointer';
+        custTrigger.style.opacity = '1';
+      }
+    }
   }
 
   function wire() {
@@ -266,8 +364,20 @@
       else openDropdown();
     });
     trigger.addEventListener('keydown', e => {
+      if (e.target !== trigger) return; // keys on the × are its own
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeLinkedPreInvoice(); }
     });
+    const clearBtn = $('salesPreInvoiceClearBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', e => {
+        e.stopPropagation(); // not the box's own click, which opens the list
+        hideDetailsCard();
+        removeLinkedPreInvoice();
+      });
+      // Over the × the details card would cover what it removes
+      clearBtn.addEventListener('mouseenter', hideDetailsCard);
+    }
     // Hovering the box shows the linked pre-invoice's details (not while the list is open)
     trigger.addEventListener('mouseenter', () => {
       if (dd.style.display === 'flex') return;
@@ -291,6 +401,7 @@
   }
 
   window.refreshSalesPreInvoicePicker = refreshSalesPreInvoicePicker;
+  window.applySalesPreInvoiceLock = applySalesPreInvoiceLock;
   window.getActivePreInvoices = getActivePreInvoices;
   // Shared with the Sales Reversal "Original Doc" list (sales-preinvoice-reversal.js)
   window._preInvoiceSources = SOURCES;

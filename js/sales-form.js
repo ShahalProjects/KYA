@@ -3338,7 +3338,7 @@
       notesEl.value = `Reversal of Invoice ${inv.invoiceNo}.`;
     }
 
-    // Refund starts at "Not Refunded"; the account is picked again
+    // Refund starts clear; presetSalesReversalRefund (below) fills it in once the rows are in
     document.getElementById('salesPaymentStatusNotPaid')?.click();
     if (typeof resetSalesMultiPayments === 'function') resetSalesMultiPayments();
     populateSalesPaymentAccounts('');
@@ -3415,7 +3415,52 @@
     renderSalesRows();
     updateSalesReturnLockState();
     recalculateSalesTotals();
+    presetSalesReversalRefund(inv);
   }
+
+  // A reversal of an invoice that was paid gives the money back the way it came: Full
+  // Refund through the account (or Multi Payment split) it was received in. The user can
+  // still choose No Refund — the amount then stays as the customer's credit — Partial
+  // Refund or Invoice Balance.
+  function presetSalesReversalRefund(inv) {
+    const payAmtEl = document.getElementById('salesPaymentAmount');
+    const refundable = payAmtEl ? (parseFloat(payAmtEl.dataset.refundable) || 0) : 0;
+    if (!inv || refundable <= 0) return; // nothing received, or already refunded
+    // A cash sale is refunded in full by its own lock
+    if (typeof getSalesCashCustomerLedger === 'function' && getSalesCashCustomerLedger()) return;
+    presetSalesRefundAccount(inv.paymentAccountId, inv.paymentSplits, getSalesPaymentMax(getSalesGrandTotalForPayment()));
+  }
+
+  // Full Refund through `accountId` (a cash / bank account, or Multi Payment with `splits`
+  // adding up to `amount`). Nothing changes when that can't be matched — e.g. money that
+  // came from the customer's own credit (Invoice Balance), which simply stays their credit.
+  function presetSalesRefundAccount(accountId, splits, amount) {
+    const acc = String(accountId || '');
+    if (!acc || acc === 'credit-adjust' || !(amount > 0)) return false;
+    const fullBtn = document.getElementById('salesPaymentStatusFull');
+    const paySelect = document.getElementById('salesPaymentAccount');
+    if (!fullBtn || fullBtn.disabled || !paySelect) return false;
+
+    let multiSplits = null;
+    if (acc === SALES_MULTI_PAYMENT_VALUE) {
+      // The same split, when all of it comes back; otherwise the accounts are chosen again
+      multiSplits = (splits || []).filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0);
+      const splitTotal = multiSplits.reduce((sum, sp) => sum + (parseFloat(sp.amount) || 0), 0);
+      if (!multiSplits.length || multiSplits.some(sp => String(sp.accountId) === 'credit-adjust')
+          || Math.abs(splitTotal - amount) > 0.01) return false;
+    } else if (!getSalesCashEquivalentLedgers().some(l => String(l.id) === acc)) {
+      return false; // not a cash / bank account (e.g. an older "Adjust with Ledger" one)
+    }
+
+    if (!fullBtn.classList.contains('active')) fullBtn.click();
+    populateSalesPaymentAccounts(acc);
+    paySelect.value = acc;
+    window._salesPaymentAccountPrev = acc;
+    if (multiSplits) setSalesMultiPayments(multiSplits);
+    updateSalesMultiPaymentUI();
+    return true;
+  }
+  window.presetSalesRefundAccount = presetSalesRefundAccount;
 
   function initSalesForm() {
     window._salesReversalPreInvoice = null;
