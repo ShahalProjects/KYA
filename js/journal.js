@@ -1402,12 +1402,13 @@
 
   // ── Save Draft ────────────────────────────────────────────────────
   document.getElementById('btnSaveDraft').addEventListener('click', () => {
-    // Require at least one field filled to avoid blank drafts
+    // A draft needs at least one line with an amount — the date and voucher no. are filled in
+    // on every new entry, so they don't count
     const dateVal    = document.getElementById('jeDate').value;
     const voucherVal = document.getElementById('jeVoucherNo').value;
-    const hasRow     = jeRows.some(r => r.particular.trim() || parseAmt(r.debit) || parseAmt(r.credit));
-    if (!dateVal && !voucherVal && !hasRow) {
-      showToast('Nothing to save — please fill in at least one field.', 'error');
+    const hasAmount  = jeRows.some(r => parseAmt(r.debit) > 0 || parseAmt(r.credit) > 0);
+    if (!hasAmount) {
+      showToast('Amount must be greater than zero. Please enter an amount on at least one line.', 'error');
       return;
     }
     const firstRow = jeRows[0] || {};
@@ -3676,7 +3677,9 @@
           if (entry) showFullJournalModal(entry, isDraft);
         } else if (type === 'Invoice' || type === 'Reversal' || type === 'Order') {
           if (isDraft) {
-            if (typeof editSalesDraft === 'function') editSalesDraft(id);
+            // The draft as an invoice (marked DRAFT), with Edit and Post
+            if (typeof window.viewSalesTaxInvoice === 'function') window.viewSalesTaxInvoice(id);
+            else if (typeof editSalesDraft === 'function') editSalesDraft(id);
           } else {
             let sInv = (window.KYA_STORE?.salesVouchers || []).find(v => v.id === id || v.journalEntryId === id);
             if (!sInv) {

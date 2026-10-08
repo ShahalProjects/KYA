@@ -126,6 +126,8 @@
 
   // ── Initialize Quotation Form ──
   function initQuotationForm(quoteData) {
+    // Save Draft only for a new quotation or a draft (doc-numbering.js)
+    if (typeof syncDocDraftButton === 'function') syncDocDraftButton('quotation', quoteData && quoteData.id);
     // The party edit saved with this document (none for a new one)
     if (typeof setPartyOverride === 'function') setPartyOverride('quote', (quoteData && quoteData.partyOverride) ? JSON.parse(JSON.stringify(quoteData.partyOverride)) : null);
     const today = kyaLocalIso();
@@ -835,6 +837,7 @@
 
   function saveQuotation(isDraft) {
     const data = getQuotationFormData();
+    if (isDraft && typeof checkDocDraftAllowed === 'function' && !checkDocDraftAllowed('quotation', data.id)) return;
 
     if (!data.customerId) {
       showToast('Please select a Customer for the quotation.', 'warning');
@@ -847,7 +850,8 @@
       return;
     }
 
-    if (!isDraft && !(data.total > 0)) {
+    // A draft too: a quotation of ₹0 is not worth keeping
+    if (!(data.total > 0)) {
       showToast('Quotation total must be greater than zero. Please enter rates / amounts for the line items.', 'warning');
       return;
     }

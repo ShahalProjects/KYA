@@ -1111,7 +1111,8 @@
   function savePurchase(isDraft = false) {
     const vendorSelect = document.getElementById('purchaseVendor');
     const vendorId = vendorSelect ? vendorSelect.value : '';
-    if (!vendorId && !isDraft) {
+    // A draft too needs the vendor and at least one line — nothing to come back to otherwise
+    if (!vendorId) {
       if (vendorSelect) {
         vendorSelect.focus();
         vendorSelect.style.borderColor = 'var(--red-500)';
@@ -1122,7 +1123,7 @@
     if (vendorSelect) vendorSelect.style.borderColor = '';
 
     const validRows = purchaseRows.filter(r => (r.item && r.item.trim() !== '') || (r.rate && r.rate > 0));
-    if (validRows.length === 0 && !isDraft) {
+    if (validRows.length === 0) {
       if (typeof showToast === 'function') showToast('Please add at least one line item with description and amount.', 'error');
       return;
     }
@@ -1157,6 +1158,11 @@
     if (tdsTcsMode === 'TCS') total += tdsTcsAmount;
     total += adjustments;
     total = Math.max(0, total);
+    // Draft or posted, a purchase of ₹0 is not worth keeping
+    if (!(total > 0)) {
+      if (typeof showToast === 'function') showToast('Amount must be greater than zero. Please enter rates / amounts for the line items.', 'error');
+      return;
+    }
 
     const purchaseVoucher = {
       id: _editingPurchaseVoucher ? _editingPurchaseVoucher.id : Date.now(),

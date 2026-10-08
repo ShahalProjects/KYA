@@ -378,6 +378,14 @@
   }
 
   // ── The printable sheet ──────────────────────────────────────────
+  // A saved draft, not posted: shown, printed and exported with a DRAFT mark
+  function isSalesInvoiceDraft(inv) {
+    if (!inv) return false;
+    const S = window.KYA_STORE || {};
+    if ((S.salesVouchers || []).some(v => String(v.id) === String(inv.id))) return false;
+    return (S.salesVouchersDrafts || []).some(d => String(d.id) === String(inv.id));
+  }
+
   function renderSalesTaxInvoiceHTML(inv) {
     const co = getInvoiceCompany();
     const parties = getInvoiceParties(inv);
@@ -385,6 +393,7 @@
     const rows = getInvoiceLineRows(inv);
     const taxMode = getInvoiceTaxMode(inv);
     const isReturn = !!inv.isReturn;
+    const isDraft = isSalesInvoiceDraft(inv);
     const docTitle = isReturn ? 'Credit Note' : 'Tax Invoice';
 
     const subTotal = rows.reduce((s, r) => s + r.taxable, 0);
@@ -565,7 +574,10 @@
     }).join('');
 
     return `
-      <div id="${SALES_INVOICE_SHEET_ID}" style="background:#fff; color:#0f172a; font-family:Inter, system-ui, sans-serif; padding:26px 28px; box-sizing:border-box;">
+      <div id="${SALES_INVOICE_SHEET_ID}" style="position:relative; background:#fff; color:#0f172a; font-family:Inter, system-ui, sans-serif; padding:26px 28px; box-sizing:border-box;">
+        ${isDraft ? `<div aria-hidden="true" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:5; overflow:hidden;">
+          <span style="transform:rotate(-28deg); font-size:120px; font-weight:900; letter-spacing:.14em; color:rgba(217,119,6,.14); border:7px solid rgba(217,119,6,.14); border-radius:18px; padding:2px 30px; -webkit-print-color-adjust:exact; print-color-adjust:exact;">DRAFT</span>
+        </div>` : ''}
         <style>
           /* One uniform grid for the line items and the GST summary: every cell — header
              cells included — draws the same line, so the frame never breaks.
@@ -608,7 +620,7 @@
           </div>
           <div style="text-align:right; flex-shrink:0;">
             <div style="font-size:22px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; color:#1d4ed8;">${docTitle}</div>
-            <div style="font-size:${FS.note}; color:#64748b; font-weight:600; margin-top:2px;">${isReturn ? 'Against Invoice ' + siEsc(inv.returnAgainstInvoice || '') : 'Original for Recipient'}</div>
+            <div style="font-size:${FS.note}; color:#64748b; font-weight:600; margin-top:2px;">${isReturn ? 'Against Invoice ' + siEsc(inv.returnAgainstInvoice || '') : (isDraft ? 'Draft — not posted' : 'Original for Recipient')}</div>
             <div style="margin-top:8px; font-size:${FS.body}; color:#0f172a; line-height:1.7;">
               <div><span style="color:#64748b; font-weight:600;">Invoice No.:</span> <strong>${siEsc(inv.invoiceNo)}</strong></div>
               <div><span style="color:#64748b; font-weight:600;">Date:</span> <strong>${siEsc(siDate(inv.date))}</strong></div>
@@ -733,13 +745,15 @@
     if (paidAmount > 0) payLines.push({ label: 'Paid (' + (inv.paymentStatus || '') + ')', value: siNum(paidAmount) });
     if (!isFullyPaid) payLines.push({ label: 'Balance Due', value: siNum(balanceDue) });
 
-    const docTitle = isReturn ? 'Credit Note' : 'Tax Invoice';
+    // A draft's exports say so in their title (and file name)
+    const isDraft = isSalesInvoiceDraft(inv);
+    const docTitle = (isDraft ? 'Draft ' : '') + (isReturn ? 'Credit Note' : 'Tax Invoice');
     return {
       inv, co, parties, bank, rows, taxMode, isReturn, docTitle,
       companyName: getInvoiceCompanyName(co),
       companySeal: getInvoiceCompanySeal(co),
       signatureImage: co.signatureImage || '',
-      subtitle: isReturn ? 'Against Invoice ' + (inv.returnAgainstInvoice || '') : 'Original for Recipient',
+      subtitle: isReturn ? 'Against Invoice ' + (inv.returnAgainstInvoice || '') : (isDraft ? 'Draft — not posted' : 'Original for Recipient'),
       subTotal, grossTotal, totalTax, totalDiscount, adjustments, tdsTcsAmount, grandTotal,
       paidAmount, balanceDue, isFullyPaid, placeOfSupply, gstLines, payLines,
       amountInWords: siAmountInWords(grandTotal),
@@ -749,13 +763,16 @@
   }
 
   // ── Preview modal ────────────────────────────────────────────────
+  // A posted invoice, or a draft — the same invoice, marked DRAFT, with Edit and Post
   function viewSalesTaxInvoice(id) {
-    const list = (window.KYA_STORE && window.KYA_STORE.salesVouchers) || [];
-    const inv = list.find(v => String(v.id) === String(id));
+    const S = window.KYA_STORE || {};
+    const inv = (S.salesVouchers || []).find(v => String(v.id) === String(id))
+      || (S.salesVouchersDrafts || []).find(v => String(v.id) === String(id));
     if (!inv) {
       if (typeof showToast === 'function') showToast('Invoice not found.', 'warning');
       return;
     }
+    const isDraft = isSalesInvoiceDraft(inv);
 
     const stale = document.getElementById('salesTaxInvoiceOverlay');
     if (stale) stale.remove();
@@ -782,8 +799,20 @@
       </style>
       <div class="inv-modal-card" style="padding:0; max-width:900px; width:94%;">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1.5px solid var(--slate-100); background:var(--slate-50); border-radius:20px 20px 0 0;">
-          <div style="font-weight:700; color:var(--slate-800);">${inv.isReturn ? 'Credit Note' : 'Tax Invoice'} &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${siEsc(inv.invoiceNo)}</span></div>
-          <div style="display:flex; gap:8px; align-items:center;">
+          <div style="font-weight:700; color:var(--slate-800); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span>${inv.isReturn ? 'Credit Note' : 'Tax Invoice'} &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${siEsc(inv.invoiceNo || 'Draft')}</span></span>
+            ${isDraft ? '<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">Draft</span>' : ''}
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+            ${isDraft ? `
+            <button class="btn btn-secondary" id="btnSalesInvoiceEditDraft" type="button" style="padding:7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
+              Edit
+            </button>
+            <button class="btn btn-success" id="btnSalesInvoicePostDraft" type="button" style="padding:7px 16px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 15 15" fill="none"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Post
+            </button>` : ''}
             <button class="btn btn-secondary" id="btnSalesInvoicePrint" type="button" style="padding:7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -837,6 +866,18 @@
 
     const closeBtn = overlay.querySelector('#btnSalesInvoiceClose');
     if (closeBtn) closeBtn.addEventListener('click', () => overlay.remove());
+
+    // Draft: open it on the form to change it, or post it as it is (sales-records.js)
+    const editDraftBtn = overlay.querySelector('#btnSalesInvoiceEditDraft');
+    if (editDraftBtn) editDraftBtn.addEventListener('click', () => {
+      overlay.remove();
+      if (typeof window.editSalesDraft === 'function') window.editSalesDraft(inv.id);
+    });
+    const postDraftBtn = overlay.querySelector('#btnSalesInvoicePostDraft');
+    if (postDraftBtn) postDraftBtn.addEventListener('click', () => {
+      overlay.remove();
+      if (typeof window.postSalesDraft === 'function') window.postSalesDraft(inv.id);
+    });
 
     const printBtn = overlay.querySelector('#btnSalesInvoicePrint');
     if (printBtn) printBtn.addEventListener('click', () => {

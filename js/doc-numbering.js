@@ -183,6 +183,39 @@
     refreshDocNoPlaceholder(kind);
   }
 
+  // ── Save Draft is for a new document or a draft. One already saved (Active, Cancelled…)
+  // is changed with Save: turning it back into a draft would leave the saved copy showing
+  // (the draft hidden behind it) and take its advance out of the books. ──
+  const DRAFT_BUTTONS = {
+    quotation: 'btnSaveQuoteDraft',
+    proforma: 'btnSaveProformaDraft',
+    salesOrder: 'btnSaveOrderDraft',
+    deliveryChallan: 'btnSaveChallanDraft'
+  };
+
+  function isSavedDoc(kind, id) {
+    const cfg = DOC_KINDS[kind];
+    if (!cfg || id === null || id === undefined || id === '') return false;
+    return ((window.KYA_STORE || {})[cfg.store] || []).some(d => d && String(d.id) === String(id));
+  }
+
+  // Shows Save Draft on the form unless the document open on it is already saved
+  function syncDocDraftButton(kind, docId) {
+    const btn = $(DRAFT_BUTTONS[kind]);
+    if (btn) btn.style.display = isSavedDoc(kind, docId) ? 'none' : '';
+  }
+
+  // On Save Draft: refused for a saved document
+  function checkDocDraftAllowed(kind, docId) {
+    if (!isSavedDoc(kind, docId)) return true;
+    if (typeof showToast === 'function') {
+      showToast(`This ${DOC_KINDS[kind].noun} is already saved — use Save to keep the changes.`, 'warning');
+    }
+    return false;
+  }
+
+  window.syncDocDraftButton = syncDocDraftButton;
+  window.checkDocDraftAllowed = checkDocDraftAllowed;
   window.getNextDocNo = getNextDocNo;
   window.isDocNoUsed = isDocNoUsed;
   window.registerDocNo = registerDocNo;

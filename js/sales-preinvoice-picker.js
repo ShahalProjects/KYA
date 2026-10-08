@@ -122,7 +122,7 @@
       });
       item.addEventListener('click', () => {
         closeDropdown();
-        pick(src, doc);
+        pick(src, doc, isDraft);
       });
       list.appendChild(item);
     });
@@ -148,7 +148,7 @@
     const itemsText = rows.length
       ? rows.slice(0, 3).map(r => safeEsc(r.item)).join(', ') + (rows.length > 3 ? ` +${rows.length - 3} more` : '')
       : '—';
-    const adv = parseFloat(doc.advancePaidAmount) || 0;
+    const adv = isDraft ? 0 : (parseFloat(doc.advancePaidAmount) || 0); // a draft has no advance in the books
     const total = parseFloat(doc.total) || 0;
     const line = (label, value) => `<div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 4px;"><span style="color: var(--slate-500);">${label}</span><span style="font-weight: 600; text-align: right;">${value}</span></div>`;
     card.innerHTML = `
@@ -185,7 +185,7 @@
       .some(inp => (inp.value || '').trim());
   }
 
-  function pick(src, doc) {
+  function pick(src, doc, isDraft) {
     const fn = window[src.convert];
     if (typeof fn !== 'function') {
       if (typeof showToast === 'function') showToast(`${src.type} could not be loaded.`, 'error');
@@ -201,7 +201,7 @@
     if (typeof showKyaConfirm !== 'function') { run(); return; }
 
     // Always confirm, showing what will come in
-    const adv = parseFloat(doc.advancePaidAmount) || 0;
+    const adv = isDraft ? 0 : (parseFloat(doc.advancePaidAmount) || 0); // a draft has no advance in the books
     const notes = [];
     if (adv > 0) notes.push(`Advance of ₹${safeFmtNum(adv)} will be adjusted.`);
     if (invoiceHasContent()) notes.push('The lines already entered will be replaced.');

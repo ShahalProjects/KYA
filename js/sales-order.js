@@ -87,6 +87,8 @@
 
   // ── Initialize Sales Order Form ──
   function initSalesOrderForm(orderData) {
+    // Save Draft only for a new order or a draft (doc-numbering.js)
+    if (typeof syncDocDraftButton === 'function') syncDocDraftButton('salesOrder', orderData && orderData.id);
     // The party edit saved with this document (none for a new one)
     if (typeof setPartyOverride === 'function') setPartyOverride('order', (orderData && orderData.partyOverride) ? JSON.parse(JSON.stringify(orderData.partyOverride)) : null);
     const today = kyaLocalIso();
@@ -888,6 +890,7 @@
 
   function saveSalesOrder(isDraft) {
     const data = getOrderFormData();
+    if (isDraft && typeof checkDocDraftAllowed === 'function' && !checkDocDraftAllowed('salesOrder', data.id)) return;
 
     if (!data.customerId) {
       showToast('Please select a Customer for the sales order.', 'warning');
@@ -897,6 +900,12 @@
     const validRows = data.rows.filter(r => (r.item && r.item.trim()) || (r.amount && r.amount > 0));
     if (validRows.length === 0) {
       showToast('Please add at least one line item to the sales order.', 'warning');
+      return;
+    }
+
+    // Saved or draft, an order of ₹0 is not worth keeping
+    if (!(data.total > 0)) {
+      showToast('Sales order total must be greater than zero. Please enter rates / amounts for the line items.', 'warning');
       return;
     }
 

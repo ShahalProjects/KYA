@@ -1317,13 +1317,22 @@
     return settings.prefix + String(n).padStart(settings.digits, '0');
   }
 
-  // Every number ever posted for this kind: the register plus the invoices on file.
+  // Every number in use for this kind: the register of numbers ever posted, the invoices on
+  // file, and the numbers drafts hold (so a new voucher doesn't take a draft's number) —
+  // leaving out the draft open on the form, which keeps its own
   function getUsedSalesInvoiceNos(kind) {
     const store = window.KYA_STORE || {};
     const used = new Set(((store.salesUsedInvoiceNos || {})[kind] || []).map(n => String(n).toLowerCase()));
     (store.salesVouchers || []).forEach(v => {
       if (!v.invoiceNo) return;
       if ((kind === 'return') === !!v.isReturn) used.add(v.invoiceNo.trim().toLowerCase());
+    });
+    const editing = window._editingSalesInvoice;
+    (store.salesVouchersDrafts || []).forEach(d => {
+      const no = (d.invoiceNo || '').trim();
+      if (!no || no === 'Draft') return;
+      if (editing && editing.isDraft && String(editing.id) === String(d.id)) return;
+      if ((kind === 'return') === !!d.isReturn) used.add(no.toLowerCase());
     });
     return used;
   }
@@ -1345,7 +1354,7 @@
     if (!no) return false;
     const editing = window._editingSalesInvoice;
     if (editing && !editing.isDraft) {
-      const orig = ((window.KYA_STORE || {}).salesVouchers || []).find(v => v.id === editing.id);
+      const orig = ((window.KYA_STORE || {}).salesVouchers || []).find(v => String(v.id) === String(editing.id));
       if (orig && (orig.invoiceNo || '').trim().toLowerCase() === no) return false;
     }
     return getUsedSalesInvoiceNos(kind || getSalesNumberKind()).has(no);
@@ -3144,13 +3153,13 @@
     if (challanCard) challanCard.style.display = 'none';
 
     if (currentSalesVoucherSubtype === 'Customers') {
-      // Customers: Overview / Customer Details / Customer Balances (sales-customers.js)
+      // Customers: Overview / Customer Docs — Invoice / Balance (sales-customers.js)
       activeBtn(customersBtn);
       if (formCard) formCard.style.display = 'none';
       if (preInvCard) preInvCard.style.display = 'none';
       if (customersCard) {
         customersCard.style.display = 'block';
-        // Shows Overview here, or swaps to the full-screen Customer Details / Balances
+        // Shows Overview here, or swaps to the full-screen Customer Docs
         if (typeof renderSalesCustomersHub === 'function') renderSalesCustomersHub();
       }
     } else if (currentSalesVoucherSubtype === 'PreInvoice') {
@@ -3215,7 +3224,18 @@
     }
     // Pre Invoice No. box: invoices only, showing any linked pre-invoice
     if (typeof window.refreshSalesPreInvoicePicker === 'function') window.refreshSalesPreInvoicePicker();
+    refreshSalesDraftButton();
   }
+
+  // Save Draft is for a new voucher or a draft: a posted one is edited and posted again,
+  // never turned back into a draft (that would leave a second copy with the same number)
+  function refreshSalesDraftButton() {
+    const btn = document.getElementById('btnSaveSalesDraft');
+    if (!btn) return;
+    const editing = window._editingSalesInvoice;
+    btn.style.display = (editing && !editing.isDraft) ? 'none' : '';
+  }
+  window.refreshSalesDraftButton = refreshSalesDraftButton;
 
   function refreshSalesInvoiceDropdownOptions(filter = '') {
     const optionsList = document.getElementById('salesInvoiceSelectOptionsList');
@@ -3471,6 +3491,10 @@
     window._pendingConvertDeliveryChallanId = null;
     window._pendingConvertProformaAdvance = null;
     window._salesPartyOverride = null;
+    // Clear the last voucher's payment amount first: the resets below recalculate the totals,
+    // and a leftover amount would be "adjusted" with a warning over the posted / saved message
+    const staleAmtEl = document.getElementById('salesPaymentAmount');
+    if (staleAmtEl) staleAmtEl.value = '';
     updateVoucherSubtypeUI();
     // Local date — toISOString() is UTC and gives yesterday before 05:30 IST
     const now = new Date();

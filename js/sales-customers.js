@@ -5,13 +5,16 @@
  *
  *   Overview           (in the Customers card) totals — receivable, overdue, refund balance,
  *                      advances — receivable ageing, and the largest balances either way
- *   Customer Details   (full screen) per customer: invoices, quotations, proformas, sales orders,
- *                      delivery challans and reversals raised, and the last sale date; a click
- *                      opens that customer's page — its invoices, active pre-invoices and
- *                      reversals with their dates
- *   Customer Balances  (full screen) per customer: Receivable, Overdue, Refund Balance, Advance,
- *                      On-account credit and Net Balance, opening to the unpaid invoices and
- *                      credits behind them
+ *   Customer Details   (full screen) name, GSTIN, phone, bank, account no., IFSC; hovering a name shows the
+ *                      rest — address, contact, PAN, opening balance — in the party card (coa.js)
+ *   Customer Docs      (full screen) with an Invoice / Balance slider in its title card:
+ *     Invoice          per customer: invoices, quotations, proformas, sales orders, delivery
+ *                      challans and reversals raised, and the last sale date; a click opens
+ *                      that customer's page — its invoices, active pre-invoices and reversals
+ *                      with their dates
+ *     Balance          per customer: Receivable, Overdue, Refund Balance, Advance, On-account
+ *                      credit and Net Balance, opening to the unpaid invoices and credits
+ *                      behind them
  *
  * Nothing is stored here: every figure comes from the same sources as the rest of Sales —
  * getInvoiceOutstanding / getCustomerCreditSources (sales-credit-adjust.js) and the customer
@@ -47,6 +50,7 @@
 
   const state = {
     tab: 'overview',
+    infoQuery: '',
     detailsQuery: '',
     balancesQuery: '',
     balancesFilter: 'all',
@@ -215,13 +219,19 @@
       .kch-link.kch-ov-more { display: inline-block; margin-top: 10px; font-size: 12.5px; }
       .kch-empty { padding: 26px 12px; text-align: center; font-size: 13px; color: var(--slate-500); }
       .kch-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-      .kch-search { height: 36px; padding: 0 12px; border: 1.5px solid var(--slate-200); border-radius: 8px; font-size: 13px; min-width: 240px; flex: 1; max-width: 360px; font-family: inherit; }
-      .kch-search:focus { outline: none; border-color: var(--blue-500); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
-      .kch-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-      .kch-chip { height: 30px; padding: 0 11px; border-radius: 999px; border: 1.5px solid var(--slate-200); background: #fff; font-size: 12px; font-weight: 600; color: var(--slate-600); cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+      /* Search and filter pills in the Back row — the look of the Pre Invoice lists' search and pills */
+      .kch-search-wrap { position: relative; flex: 1 1 260px; min-width: 200px; max-width: 440px; }
+      .kch-search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none; }
+      .kch-search { width: 100%; height: 38px; padding: 0 34px 0 38px; border: 1.5px solid var(--slate-200); border-radius: 10px; background: #fff; font-size: 13.5px; font-family: inherit; color: var(--slate-800); box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.03); transition: border-color .2s, box-shadow .2s; }
+      .kch-search:focus { outline: none; border-color: var(--blue-500); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+      .kch-search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--slate-400); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+      .kch-search-clear:hover { background: var(--slate-100); color: var(--slate-600); }
+      .kch-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+      .kch-chip { height: 38px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--slate-200); background: #fff; font-size: 13px; font-weight: 700; color: var(--slate-600); cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.02); transition: all .15s; white-space: nowrap; }
       .kch-chip:hover { border-color: var(--slate-300); }
-      .kch-chip.active { background: var(--blue-700); border-color: var(--blue-700); color: #fff; }
-      .kch-chip .kch-count { font-size: 11px; opacity: .8; }
+      .kch-chip.active { background: var(--blue-50); border-color: var(--blue-600); color: var(--blue-700); }
+      .kch-chip .kch-count { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--slate-100); color: var(--slate-600); }
+      .kch-chip.active .kch-count { background: var(--blue-200); color: var(--blue-800); }
       .kch-btn { height: 32px; padding: 0 12px; border-radius: 8px; border: 1.5px solid var(--slate-200); background: #fff; font-size: 12px; font-weight: 600; color: var(--slate-700); cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
       .kch-btn:hover { background: var(--slate-50); border-color: var(--slate-300); }
       .kch-btn-primary { background: var(--blue-700); border-color: var(--blue-700); color: #fff; }
@@ -252,19 +262,30 @@
       .kch-mini table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
       .kch-mini th { padding: 7px 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--slate-500); text-align: left; white-space: nowrap; }
       .kch-mini td { padding: 7px 12px; border-top: 1px solid var(--slate-100); white-space: normal; }
-      .kch-mini td.kch-nowrap { white-space: nowrap; }
+      .kch-nowrap, .kch-mini td.kch-nowrap { white-space: nowrap; }
       .kch-link { background: none; border: none; padding: 0; color: var(--blue-700); font-weight: 600; cursor: pointer; font-family: inherit; font-size: inherit; }
       .kch-link:hover { text-decoration: underline; }
       .kch-note { font-size: 12px; color: var(--slate-500); }
       .kch-tip { position: fixed; z-index: 10200; pointer-events: none; background: #0f172a; color: #fff; font-size: 12px; padding: 7px 10px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); display: none; white-space: nowrap; }
       .kch-tip strong { font-variant-numeric: tabular-nums; }
+      .kch-mono { font-family: monospace; font-size: 12px; color: var(--slate-700); }
+      .kch-info-cell { cursor: default; }
+      .kch-info-name { font-weight: 700; color: var(--slate-800); border-bottom: 1px dashed var(--slate-300); }
+      .kch-info-cell:hover .kch-info-name { color: var(--blue-700); border-bottom-color: var(--blue-300); }
+      /* Invoice / Balance slider in the Customer Docs title card */
+      .kch-mode-switch { position: relative; display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.28); flex-shrink: 0; }
+      .kch-mode-thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 7px; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.2); transition: transform .28s cubic-bezier(.34,1.56,.64,1); }
+      .kch-mode-switch[data-mode="balances"] .kch-mode-thumb { transform: translateX(100%); }
+      .kch-mode-btn { position: relative; z-index: 1; width: 84px; height: 30px; padding: 0; border: none; border-radius: 7px; background: none; font-family: inherit; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.9); cursor: pointer; transition: color .2s; }
+      .kch-mode-btn[aria-pressed="true"] { color: var(--blue-700); cursor: default; }
+      .kch-mode-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+      @media (prefers-reduced-motion: reduce) { .kch-mode-thumb { transition: none; } }
     `;
     document.head.appendChild(s);
   }
 
   const ICONS = {
     plus: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
-    invoice: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l4 4v8H3V2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6 9h4M6 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     alert: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="7" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
     chev: '<svg class="kch-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>'
   };
@@ -372,20 +393,67 @@
   }
 
   // ══════════════════════════════════════════════════════════════════
-  //  Customer Details
+  //  Customer Docs
   // ══════════════════════════════════════════════════════════════════
   function detailsMatch(s, q) {
     if (!q) return true;
     const p = s.party;
-    return [p.name, (p.aliases || []).join(' '), p.gstin, p.pan, p.contactName, p.city, p.state]
+    return [p.name, (p.aliases || []).join(' '), p.gstin, p.pan, p.contactName, p.city, p.state, p.phone, p.mobile, p.bankName, p.accountNo, p.ifsc]
       .some(v => lower(v).includes(q));
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  Customer Details
+  // ══════════════════════════════════════════════════════════════════
+  // Name, GSTIN, phone, bank, account no. and IFSC; hovering a name shows the rest (address, contact, PAN,
+  // opening balance) in the same card as the Sales Invoice's customer list
+  function renderInfo(all) {
+    const rows = all.filter(s => detailsMatch(s, lower(state.infoQuery)));
+    const dash = '<span class="kch-muted">—</span>';
+    // A code / number column: monospace, or a quiet dash when blank
+    const mono = v => v ? `<span class="kch-mono">${esc(v)}</span>` : dash;
+    const body = rows.length ? rows.map(s => {
+      const p = s.party;
+      // The bank's name only (branch and the rest are in the hover card)
+      const bank = p.bankName ? esc(p.bankName) : dash;
+      return `<tr>
+        <td class="kch-info-cell" data-party-id="${esc(p.id)}" style="min-width: 180px;">
+          <span class="kch-info-name">${esc(p.name)}</span>
+          ${p.aliases && p.aliases.length ? `<div class="kch-meta">A.K.A: ${esc(p.aliases.join(', '))}</div>` : ''}
+        </td>
+        <td class="kch-nowrap">${mono(p.gstin)}</td>
+        <td class="kch-nowrap">${mono(p.phone || p.mobile)}</td>
+        <td class="kch-nowrap">${bank}</td>
+        <td class="kch-nowrap">${mono(p.accountNo)}</td>
+        <td class="kch-nowrap">${mono(p.ifsc)}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="6" class="kch-empty">${all.length ? 'No customer matches your search.' : 'No customers yet.'}</td></tr>`;
+
+    return `<div class="kch-wrap">
+      <div class="kch-table-wrap">
+        <table class="kch-table">
+          <thead><tr><th>Customer Name</th><th>GSTIN</th><th>Phone No.</th><th>Bank Name</th><th>Account No.</th><th>IFSC Code</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  // The hover card for each name just drawn (coa.js)
+  function bindInfoHover(area, all) {
+    if (typeof bindPartyListItemPreview !== 'function') return;
+    const byId = new Map(all.map(s => [String(s.party.id), s.party]));
+    area.querySelectorAll('.kch-info-cell[data-party-id]').forEach(el => {
+      const p = byId.get(el.dataset.partyId);
+      if (p) bindPartyListItemPreview(el, p, 'Customer');
+    });
   }
 
   // A document number that opens its preview
   const docLink = d => `<button type="button" class="kch-link" data-act="view-doc" data-kind="${d.kind}" data-id="${esc(d.id)}" title="View ${esc(d.no)}">${esc(d.no || '—')}</button>`;
 
   // ══════════════════════════════════════════════════════════════════
-  //  One customer (opened from Customer Details)
+  //  One customer (opened from Customer Docs)
   // ══════════════════════════════════════════════════════════════════
   // Their invoices, open pre-invoices and reversals, each with its date — full screen
   function renderCustomerPage(s) {
@@ -468,10 +536,6 @@
     }).join('') : `<tr><td colspan="8" class="kch-empty">${all.length ? 'No customer matches your search.' : 'No customers yet.'}</td></tr>`;
 
     return `<div class="kch-wrap">
-      <div class="kch-toolbar">
-        <input type="search" class="kch-search" id="kchDetailsSearch" placeholder="Search customer…" value="${esc(state.detailsQuery)}" aria-label="Search customers" />
-        <span class="kch-note">${q ? `${rows.length} of ${all.length}` : `${all.length} customer${all.length === 1 ? '' : 's'}`}</span>
-      </div>
       <div class="kch-table-wrap">
         <table class="kch-table">
           <thead><tr><th>Customer</th><th class="kch-num">Invoices</th><th class="kch-num">Quotation</th><th class="kch-num">Proforma</th><th class="kch-num">Sales Order</th><th class="kch-num">Delivery Challan</th><th class="kch-num">Reversal</th><th class="kch-num">Last Sale</th></tr></thead>
@@ -482,7 +546,7 @@
   }
 
   // ══════════════════════════════════════════════════════════════════
-  //  Customer Balances
+  //  Customer Docs — Balance
   // ══════════════════════════════════════════════════════════════════
   const BALANCE_FILTERS = [
     { key: 'all', label: 'All', test: () => true },
@@ -520,10 +584,7 @@
         <div class="kch-mini"><div class="kch-mini-title"><span>Unpaid Invoices</span><span>${money(s.receivable)}</span></div>${unpaid}</div>
         <div class="kch-mini"><div class="kch-mini-title"><span>Refunds, Advances &amp; Credits</span><span>${money(s.refund + s.advance + s.onAccount)}</span></div>${credits}</div>
       </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
-        <span class="kch-note">A credit can pay an invoice: choose <strong>Invoice Balance</strong> as the Payment Account. A refund can go to unpaid invoices the same way.</span>
-        <button type="button" class="kch-btn kch-btn-primary" data-act="new-invoice" data-id="${esc(s.party.id)}">${ICONS.invoice} New Invoice</button>
-      </div>
+      <div class="kch-note" style="margin-top: 12px;">A credit can pay an invoice: choose <strong>Invoice Balance</strong> as the Payment Account. A refund can go to unpaid invoices the same way.</div>
     </div>`;
   }
 
@@ -533,9 +594,6 @@
     const filter = BALANCE_FILTERS.find(f => f.key === state.balancesFilter) || BALANCE_FILTERS[0];
     const rows = searched.filter(filter.test);
     const t = totalsOf(rows);
-
-    const chips = BALANCE_FILTERS.map(f => `<button type="button" class="kch-chip${f.key === filter.key ? ' active' : ''}" data-act="filter" data-filter="${f.key}" aria-pressed="${f.key === filter.key}">
-        ${f.label}<span class="kch-count">${searched.filter(f.test).length}</span></button>`).join('');
 
     const body = rows.length ? rows.map(s => {
       const open = String(state.expandedId) === String(s.party.id);
@@ -561,10 +619,6 @@
       </tr></tfoot>` : '';
 
     return `<div class="kch-wrap">
-      <div class="kch-toolbar">
-        <input type="search" class="kch-search" id="kchBalancesSearch" placeholder="Search customer…" value="${esc(state.balancesQuery)}" aria-label="Search customer balances" />
-        <div class="kch-chips" role="group" aria-label="Show">${chips}</div>
-      </div>
       <div class="kch-table-wrap">
         <table class="kch-table">
           <thead><tr>
@@ -584,13 +638,77 @@
     </div>`;
   }
 
+  // ── Search row, beside Back: the search, then the count (Customer Details, Invoice) or the
+  // filter pills (Balance); nothing on one customer's page. Each view keeps its own search. ──
+  const SEARCHES = {
+    info: { key: 'infoQuery', id: 'kchInfoSearch' },
+    details: { key: 'detailsQuery', id: 'kchDetailsSearch' },
+    balances: { key: 'balancesQuery', id: 'kchBalancesSearch' }
+  };
+  function setSearch(tab, value) {
+    const s = SEARCHES[tab];
+    if (!s) return;
+    state[s.key] = value;
+    if (tab === 'balances') state.expandedId = null;
+  }
+
+  function renderFullToolbar(all) {
+    const bar = $('custHubFullToolbar');
+    if (!bar) return;
+    const search = SEARCHES[state.tab];
+    if (!search) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+    bar.style.display = '';
+    const query = state[search.key];
+    const searched = all.filter(s => detailsMatch(s, lower(query)));
+    const box = `<div class="kch-search-wrap">
+        <svg class="kch-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input type="text" class="kch-search" id="${search.id}" placeholder="${state.tab === 'info' ? 'Search customer, GSTIN, phone, bank…' : 'Search customer, GSTIN, city…'}" value="${esc(query)}" aria-label="Search customers" autocomplete="off" />
+        ${query ? '<button type="button" class="kch-search-clear" data-act="clear-search" title="Clear search" aria-label="Clear search"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' : ''}
+      </div>`;
+    if (state.tab !== 'balances') {
+      bar.innerHTML = `${box}<span class="kch-note">${query.trim() ? `${searched.length} of ${all.length}` : `${all.length} customer${all.length === 1 ? '' : 's'}`}</span>`;
+    } else {
+      const filter = BALANCE_FILTERS.find(f => f.key === state.balancesFilter) || BALANCE_FILTERS[0];
+      const chips = BALANCE_FILTERS.map(f => `<button type="button" class="kch-chip${f.key === filter.key ? ' active' : ''}" data-act="filter" data-filter="${f.key}" aria-pressed="${f.key === filter.key}">
+          <span>${f.label}</span><span class="kch-count">${searched.filter(f.test).length}</span></button>`).join('');
+      bar.innerHTML = `${box}<div class="kch-chips" role="group" aria-label="Show">${chips}</div>`;
+    }
+    if (bar._kchWired) return;
+    bar._kchWired = true;
+    // Typing redraws the table; the cursor stays in the box
+    bar.addEventListener('input', e => {
+      const id = e.target && e.target.id;
+      const search = SEARCHES[state.tab];
+      if (!search || id !== search.id) return;
+      setSearch(state.tab, e.target.value);
+      const pos = e.target.selectionStart;
+      renderSalesCustomersHub(state.tab);
+      const again = $(id);
+      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (_) {} }
+    });
+    bar.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && e.target.classList.contains('kch-search') && e.target.value) {
+        e.preventDefault();
+        bar.querySelector('[data-act="clear-search"]')?.click();
+      }
+    });
+    bar.addEventListener('click', e => {
+      const el = e.target.closest('[data-act]');
+      if (!el) return;
+      if (el.dataset.act === 'filter') {
+        state.balancesFilter = el.dataset.filter;
+        renderSalesCustomersHub('balances');
+      } else if (el.dataset.act === 'clear-search') {
+        setSearch(state.tab, '');
+        renderSalesCustomersHub(state.tab);
+        bar.querySelector('.kch-search')?.focus();
+      }
+    });
+  }
+
   // ══════════════════════════════════════════════════════════════════
   //  Actions
   // ══════════════════════════════════════════════════════════════════
-  function findParty(id) {
-    return getParties().find(p => String(p.id) === String(id)) || null;
-  }
-
   // Preview of an invoice / reversal, or of a pre-invoice from its own module
   function viewDoc(kind, id) {
     if (kind === 'invoice' || kind === 'reversal') {
@@ -599,21 +717,6 @@
     }
     const src = PRE_INVOICE_DOCS.find(x => x.kind === kind);
     if (src && typeof window[src.view] === 'function') window[src.view](id);
-  }
-
-  function startInvoiceFor(id) {
-    const p = findParty(id);
-    if (!p) return;
-    currentSalesVoucherSubtype = 'Invoice';
-    window._editingSalesInvoice = null;
-    if (typeof initSalesForm === 'function') initSalesForm();
-    if (typeof populateSalesCustomers === 'function') populateSalesCustomers(p.id);
-    const sel = $('salesCustomer');
-    if (sel) {
-      sel.value = String(p.id);
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    $('salesVoucherFormCard')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 
   function newCustomer() {
@@ -667,9 +770,6 @@
       } else if (act === 'view-doc') {
         e.stopPropagation();
         viewDoc(el.dataset.kind, el.dataset.id);
-      } else if (act === 'filter') {
-        state.balancesFilter = el.dataset.filter;
-        renderSalesCustomersHub('balances');
       } else if (act === 'open-balance') {
         state.balancesQuery = '';
         state.balancesFilter = 'all';
@@ -678,26 +778,12 @@
         document.querySelector('#custHubFullContentArea .kch-row-open')?.scrollIntoView({ block: 'center' });
       } else if (act === 'open-view') {
         renderSalesCustomersHub(el.dataset.view);
-      } else if (act === 'new-invoice') {
-        e.stopPropagation();
-        startInvoiceFor(el.dataset.id);
       } else if (act === 'new-customer') {
         newCustomer();
       } else if (act === 'view-invoice') {
         e.stopPropagation();
         if (typeof window.viewSalesTaxInvoice === 'function') window.viewSalesTaxInvoice(el.dataset.id);
       }
-    });
-    // Searching keeps the cursor in the box while the table below redraws
-    area.addEventListener('input', e => {
-      const id = e.target && e.target.id;
-      if (id !== 'kchDetailsSearch' && id !== 'kchBalancesSearch') return;
-      if (id === 'kchDetailsSearch') state.detailsQuery = e.target.value;
-      else { state.balancesQuery = e.target.value; state.expandedId = null; }
-      const pos = e.target.selectionStart;
-      renderSalesCustomersHub(state.tab);
-      const again = $(id);
-      if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (_) {} }
     });
     area.addEventListener('mousemove', e => {
       const seg = e.target.closest('[data-tip]');
@@ -708,19 +794,24 @@
 
   const TAB_BUTTONS = {
     overview: 'custHubTabOverview',
-    details: 'custHubTabDetails',
-    balances: 'custHubTabBalances'
+    info: 'custHubTabInfo',
+    details: 'custHubTabDetails'
   };
 
-  // Customer Details and Customer Balances open full screen, like the Pre Invoice lists
+  // Customer Details and Customer Docs open full screen, like the Pre Invoice lists; the
+  // slider in Customer Docs' title card switches between Invoice (details) and Balance (balances)
   const FULL_VIEWS = {
-    details: {
+    info: {
       title: 'Customer Details',
+      subtitle: 'GSTIN, phone and bank account of each customer — hover a name for address, contact and PAN'
+    },
+    details: {
+      title: 'Customer Docs',
       subtitle: 'How many invoices, pre-invoices and reversals each customer has'
     },
     balances: {
-      title: 'Customer Balances',
-      subtitle: 'What each customer owes, and the refunds and advances held for them — click a customer for the invoices and credits behind it'
+      title: 'Customer Docs',
+      subtitle: 'What each customer owes, and the refunds and advances held for them'
     },
     // One customer — its title is the customer's name (set when drawn)
     customer: {
@@ -733,15 +824,14 @@
     balances: '<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4.5" width="15" height="11" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 8.5h15" stroke="currentColor" stroke-width="1.6"/><path d="M6 12.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
   };
 
-  // The other full-screen view, as a quick link beside Back (as the Sales Order list does);
-  // on one customer's page, a link to that customer's balance
+  // On one customer's page, a quick link beside Back to that customer's balance (Customer
+  // Docs on Balance); Invoice / Balance themselves switch with the slider in the title card
   function renderFullNav(view) {
     const nav = $('custHubFullNavRight');
     if (!nav) return;
-    const other = view === 'details' ? 'balances' : 'details';
-    const forCustomer = view === 'customer';
-    nav.innerHTML = `<button type="button" class="btn" data-view="${forCustomer ? 'balances' : other}"${forCustomer ? ` data-balance-id="${esc(state.customerId)}"` : ''} title="${forCustomer ? 'Open this customer’s balance' : `Open ${FULL_VIEWS[other].title}`}" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
-        ${NAV_ICONS[forCustomer ? 'balances' : other]}<span>${forCustomer ? 'Customer Balance' : FULL_VIEWS[other].title}</span>
+    if (view !== 'customer') { nav.innerHTML = ''; return; }
+    nav.innerHTML = `<button type="button" class="btn" data-view="balances" data-balance-id="${esc(state.customerId)}" title="Open this customer’s balance" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
+        ${NAV_ICONS.balances}<span>Customer Balance</span>
       </button>`;
     if (!nav._kchWired) {
       nav._kchWired = true;
@@ -758,9 +848,27 @@
     }
   }
 
+  // The Invoice / Balance slider: shown on Customer Docs, not on one customer's page
+  function renderModeSwitch() {
+    const sw = $('custHubModeSwitch');
+    if (!sw) return;
+    const on = state.tab === 'details' || state.tab === 'balances';
+    sw.style.display = on ? 'inline-flex' : 'none';
+    if (!on) return;
+    sw.dataset.mode = state.tab;
+    sw.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === state.tab ? 'true' : 'false'));
+    if (!sw._kchWired) {
+      sw._kchWired = true;
+      sw.addEventListener('click', e => {
+        const btn = e.target.closest('[data-mode]');
+        if (btn && btn.dataset.mode !== state.tab) renderSalesCustomersHub(btn.dataset.mode);
+      });
+    }
+  }
+
   // Draws the Customers module on the chosen view (default: the one last shown). Overview
-  // sits in the Customers card with its side tabs; Customer Details and Customer Balances
-  // take the whole width, with Back to Customers.
+  // sits in the Customers card with its side tabs; Customer Docs (Invoice / Balance) and a
+  // customer's page take the whole width, with Back.
   function renderSalesCustomersHub(tab) {
     injectStyles();
     const wasFull = !!FULL_VIEWS[state.tab];
@@ -783,7 +891,7 @@
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
-    // Back: a customer's page goes back to Customer Details, the lists to Customers
+    // Back: a customer's page goes back to Customer Docs, the lists to Customers
     const backBtn = $('btnCustHubBack');
     if (backBtn && !backBtn._kchWired) {
       backBtn._kchWired = true;
@@ -794,12 +902,14 @@
     }
     // An icon-only button: its tooltip / label says where it goes
     if (backBtn) {
-      const backLabel = state.tab === 'customer' ? 'Back to Customer Details' : 'Back to Customers';
+      const backLabel = state.tab === 'customer' ? 'Back to Customer Docs' : 'Back to Customers';
       backBtn.title = backLabel;
       backBtn.setAttribute('aria-label', backLabel);
     }
 
     hideTip();
+    // A Customer Details hover card left open would point at a name no longer drawn
+    if (typeof hidePartyHoverCard === 'function') hidePartyHoverCard();
     const all = summarizeAll();
     if (full) {
       const view = FULL_VIEWS[state.tab];
@@ -809,11 +919,18 @@
         $('custHubFullSubtitle').textContent = one && one.lastSale ? `${view.subtitle} · Last sale ${dmy(one.lastSale)}` : view.subtitle;
       }
       renderFullNav(state.tab);
+      renderModeSwitch();
+      renderFullToolbar(all);
       const area = $('custHubFullContentArea');
       if (!area) return;
       wireContent(area);
-      area.innerHTML = state.tab === 'details' ? renderDetails(all)
-        : (state.tab === 'customer' ? renderCustomerPage(one) : renderBalances(all));
+      if (state.tab === 'info') {
+        area.innerHTML = renderInfo(all);
+        bindInfoHover(area, all);
+      } else {
+        area.innerHTML = state.tab === 'details' ? renderDetails(all)
+          : (state.tab === 'customer' ? renderCustomerPage(one) : renderBalances(all));
+      }
     } else {
       const area = $('custHubContentArea');
       if (!area) return;

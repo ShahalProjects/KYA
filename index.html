@@ -3065,7 +3065,7 @@
           </div>
         </div><!-- /#salesPreInvoiceCard -->
 
-        <!-- CUSTOMERS CARD (Overview / Customer Details / Customer Balances — js/sales-customers.js) -->
+        <!-- CUSTOMERS CARD (Overview / Customer Details / Customer Docs — js/sales-customers.js) -->
         <div class="table-card" id="salesCustomersCard" style="display: none; padding: 24px 28px;">
           <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
             <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
@@ -3096,6 +3096,16 @@
                 </div>
                 <span class="oh-tab-text">Overview</span>
               </button>
+              <button class="oh-sub-tab" id="custHubTabInfo" role="tab" aria-selected="false" aria-controls="custHubContentArea">
+                <div class="oh-tab-icon-wrap">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <rect x="2.5" y="4" width="15" height="12" rx="2" stroke="currentColor" stroke-width="1.7"/>
+                    <circle cx="7.5" cy="9" r="1.8" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M4.8 13.3c.5-1.3 1.5-2 2.7-2s2.2.7 2.7 2M12 8.5h3M12 11.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <span class="oh-tab-text">Customer Details</span>
+              </button>
               <button class="oh-sub-tab" id="custHubTabDetails" role="tab" aria-selected="false" aria-controls="custHubContentArea">
                 <div class="oh-tab-icon-wrap">
                   <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
@@ -3103,27 +3113,17 @@
                     <path d="M3.5 17c.9-3.2 3.4-4.8 6.5-4.8s5.6 1.6 6.5 4.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
                   </svg>
                 </div>
-                <span class="oh-tab-text">Customer Details</span>
-              </button>
-              <button class="oh-sub-tab" id="custHubTabBalances" role="tab" aria-selected="false" aria-controls="custHubContentArea">
-                <div class="oh-tab-icon-wrap">
-                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                    <rect x="2.5" y="4.5" width="15" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/>
-                    <path d="M2.5 8.5h15" stroke="currentColor" stroke-width="1.7"/>
-                    <path d="M6 12.5h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <span class="oh-tab-text">Customer Balances</span>
+                <span class="oh-tab-text">Customer Docs</span>
               </button>
             </div>
             <div class="oh-content-area" id="custHubContentArea"></div>
           </div>
         </div><!-- /#salesCustomersCard -->
 
-        <!-- CUSTOMER DETAILS / CUSTOMER BALANCES (Full Screen with Back Button — js/sales-customers.js) -->
+        <!-- CUSTOMER DETAILS, CUSTOMER DOCS (Invoice / Balance) and one customer's page (Full Screen with Back Button — js/sales-customers.js) -->
         <div class="table-card" id="salesCustomersListCard" style="display: none; padding: 24px 28px;">
-          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between;">
-            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px;">
+          <div class="je-card-header" style="background: linear-gradient(90deg, var(--blue-700), var(--blue-500)); border-top-left-radius: 12px; border-top-right-radius: 12px; margin: -24px -28px 20px -28px; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div class="je-card-header-left" style="display: flex; align-items: center; gap: 12px; flex: 1 1 0; min-width: 240px;">
               <div class="je-card-icon-wrap" style="background: rgba(255, 255, 255, 0.15); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
                 <svg viewBox="0 0 16 16" fill="none" style="width: 20px; height: 20px; color: var(--white);">
                   <circle cx="6" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4"/>
@@ -3132,19 +3132,27 @@
                 </svg>
               </div>
               <div>
-                <div class="je-card-title-text" id="custHubFullTitle" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Customer Details</div>
+                <div class="je-card-title-text" id="custHubFullTitle" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Customer Docs</div>
                 <div class="je-card-subtitle-text" id="custHubFullSubtitle" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;"></div>
               </div>
+            </div>
+            <!-- Invoice: documents per customer · Balance: what each customer owes or holds -->
+            <div class="kch-mode-switch" id="custHubModeSwitch" role="group" aria-label="Customer Docs view" style="display: none;">
+              <span class="kch-mode-thumb" aria-hidden="true"></span>
+              <button type="button" class="kch-mode-btn" data-mode="details" aria-pressed="true">Invoice</button>
+              <button type="button" class="kch-mode-btn" data-mode="balances" aria-pressed="false">Balance</button>
             </div>
           </div>
 
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <button type="button" class="kya-back-btn" id="btnCustHubBack" title="Back to Customers" aria-label="Back to Customers">
+            <div style="display: flex; align-items: flex-start; gap: 10px; flex: 1 1 auto; min-width: 0;">
+              <button type="button" class="kya-back-btn" id="btnCustHubBack" style="margin-top: 3px;" title="Back to Customers" aria-label="Back to Customers">
                 <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
                   <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
+              <!-- Search, with the count (Invoice) or the filter pills (Balance) — js/sales-customers.js -->
+              <div class="kch-toolbar" id="custHubFullToolbar" style="flex: 1 1 auto; min-width: 0;"></div>
             </div>
             <div id="custHubFullNavRight" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"></div>
           </div>
@@ -5016,11 +5024,11 @@
 
 <script src="js/exportPdf.js?v=20261004_7"></script>
 <script src="js/exportExcel.js?v=20261004_7"></script>
-<script src="js/app-shell.js?v=20261001_4"></script>
+<script src="js/app-shell.js?v=20261008_d1"></script>
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
 <script src="js/master-desk.js?v=20261004_17"></script>
-<script src="js/journal.js?v=20261007_1"></script>
+<script src="js/journal.js?v=20261008_a1"></script>
 <script src="js/coa.js?v=20261004_17"></script>
 <script src="js/reports.js"></script>
 <script src="js/stock-hub.js"></script>
@@ -5035,24 +5043,24 @@
 <script src="js/ledgers.js?v=20261007_1"></script>
 <script src="js/vault-settings.js?v=20260929_1"></script>
 <script src="js/kya-datepicker.js?v=20261004_1"></script>
-<script src="js/sales-form.js?v=20261007_2"></script>
-<script src="js/sales-posting.js?v=20261007_5"></script>
+<script src="js/sales-form.js?v=20261008_d2"></script>
+<script src="js/sales-posting.js?v=20261008_a1"></script>
 <script src="js/sales-helpers.js?v=20261007_2"></script>
-<script src="js/sales-credit-adjust.js?v=20261004_15"></script>
-<script src="js/sales-customers.js?v=20261004_17"></script>
-<script src="js/doc-numbering.js?v=20261004_2"></script>
-<script src="js/sales-records.js?v=20261004_13"></script>
+<script src="js/sales-credit-adjust.js?v=20261008_d1"></script>
+<script src="js/sales-customers.js?v=20261008_11"></script>
+<script src="js/doc-numbering.js?v=20261008_d1"></script>
+<script src="js/sales-records.js?v=20261008_v1"></script>
 <script src="js/sales-print-events.js?v=20261004_19"></script>
-<script src="js/sales-invoice-print.js?v=20260918_6"></script>
+<script src="js/sales-invoice-print.js?v=20261008_v1"></script>
 <script src="js/sales-invoice-export.js?v=20260918_21"></script>
-<script src="js/quotation.js?v=20261004_8"></script>
-<script src="js/proforma.js?v=20261004_15"></script>
+<script src="js/quotation.js?v=20261008_a1"></script>
+<script src="js/proforma.js?v=20261008_a1"></script>
 <script src="js/preinvoice-list.js?v=20261004_15"></script>
-<script src="js/sales-order.js?v=20261004_15"></script>
-<script src="js/delivery-challan.js?v=20261004_15"></script>
-<script src="js/sales-preinvoice-picker.js?v=20261007_3"></script>
+<script src="js/sales-order.js?v=20261008_a1"></script>
+<script src="js/delivery-challan.js?v=20261008_a1"></script>
+<script src="js/sales-preinvoice-picker.js?v=20261008_d1"></script>
 <script src="js/sales-preinvoice-reversal.js?v=20261007_1"></script>
-<script src="js/purchase-form.js?v=20260830_2"></script>
+<script src="js/purchase-form.js?v=20261008_a1"></script>
 <script src="js/company-profile.js?v=20260912_2"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>
 <script src="js/cashline-accounts.js?v=20260827_1"></script>

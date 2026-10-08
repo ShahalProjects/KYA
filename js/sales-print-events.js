@@ -935,7 +935,7 @@
       });
     }
 
-    // Customers: Overview, Customer Details and Customer Balances (sales-customers.js)
+    // Customers: Overview and Customer Docs — Invoice / Balance (sales-customers.js)
     const customersBtn = document.getElementById('btnSalesCustomers');
     if (customersBtn) {
       customersBtn.addEventListener('click', (e) => {

@@ -87,6 +87,8 @@
 
   // ── Initialize Delivery Challan Form ──
   function initDeliveryChallanForm(challanData) {
+    // Save Draft only for a new challan or a draft (doc-numbering.js)
+    if (typeof syncDocDraftButton === 'function') syncDocDraftButton('deliveryChallan', challanData && challanData.id);
     // The party edit saved with this document (none for a new one)
     if (typeof setPartyOverride === 'function') setPartyOverride('challan', (challanData && challanData.partyOverride) ? JSON.parse(JSON.stringify(challanData.partyOverride)) : null);
     const today = kyaLocalIso();
@@ -873,6 +875,7 @@
 
   function saveDeliveryChallan(isDraft) {
     const data = getChallanFormData();
+    if (isDraft && typeof checkDocDraftAllowed === 'function' && !checkDocDraftAllowed('deliveryChallan', data.id)) return;
 
     if (!data.customerId) {
       showToast('Please select a Customer / Consignee for the delivery challan.', 'warning');
@@ -882,6 +885,12 @@
     const validRows = data.rows.filter(r => (r.item && r.item.trim()) || (r.amount && r.amount > 0));
     if (validRows.length === 0) {
       showToast('Please add at least one line item to the delivery challan.', 'warning');
+      return;
+    }
+
+    // Saved or draft, a challan of ₹0 is not worth keeping
+    if (!(data.total > 0)) {
+      showToast('Delivery challan total must be greater than zero. Please enter rates / amounts for the line items.', 'warning');
       return;
     }
 

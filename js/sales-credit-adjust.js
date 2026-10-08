@@ -162,6 +162,20 @@
   // may have paid other documents), and never its "Adjust with Invoice Balance" account —
   // on the invoice that advance is simply the advance
   function getConvertedAdvanceFields(storeKey, doc) {
+    // A draft was never saved, so nothing it shows as paid is in the books: no advance comes
+    // across — its payment is simply the invoice's payment, received when the invoice is posted
+    const S = window.KYA_STORE || {};
+    const isDraft = !(S[storeKey] || []).some(d => d && String(d.id) === String(doc.id));
+    if (isDraft) {
+      const draftFromCredit = usesCreditAdjust(doc.paymentAccountId, doc.paymentSplits);
+      return {
+        paymentAccountId: draftFromCredit ? '' : (doc.paymentAccountId || ''),
+        paymentSplits: draftFromCredit ? [] : (Array.isArray(doc.paymentSplits) ? JSON.parse(JSON.stringify(doc.paymentSplits)) : []),
+        advancePaidAmount: 0,
+        advanceJournalEntryId: null,
+        advanceVoucherNo: null
+      };
+    }
     const full = r2(doc.advancePaidAmount || (doc.paymentStatus === 'Full Payment' ? doc.total : doc.paymentAmount));
     const used = getPreInvoiceAdvanceUsed(storeKey, doc.id);
     const advance = Math.max(0, r2(full - used));

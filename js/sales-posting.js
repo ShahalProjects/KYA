@@ -39,9 +39,14 @@
     const invNoEl = document.getElementById('salesInvoiceNo');
     // A draft saved without a number is stored as "Draft" — that is not a number
     const storedNo = (inv.invoiceNo && inv.invoiceNo.trim() && inv.invoiceNo.trim() !== 'Draft') ? inv.invoiceNo : '';
+    // A draft whose number was taken meanwhile (posted on another voucher) gets the next free one
+    const draftNoTaken = editIsDraft && !!storedNo && typeof isSalesInvoiceNoUsed === 'function'
+      && isSalesInvoiceNoUsed(storedNo, inv.isReturn ? 'return' : 'invoice');
     if (invNoEl) {
-      if (storedNo) {
+      if (storedNo && !draftNoTaken) {
         invNoEl.value = storedNo;
+      } else if (draftNoTaken && !inv.isReturn) {
+        invNoEl.value = getNextAutoInvoiceNumber('invoice');
       } else if (inv.isReturn) {
         // setInvoiceNoMode already built it from the Original Doc
       } else if (inv.mode === 'Auto' || inv._isFromQuotation || inv.convertedFromQuotationId || inv._isFromProforma || inv.convertedFromProformaId) {
@@ -228,12 +233,21 @@
     }
     // Now that the edit context is known, flag a number that's already used
     if (typeof validateSalesInvoiceNoField === 'function') validateSalesInvoiceNoField();
+    if (typeof refreshSalesDraftButton === 'function') refreshSalesDraftButton();
     updateSalesDocUI(inv.uploadedDoc || null);
-    
+
     openTab('sales_voucher');
+    if (draftNoTaken && invNoEl && invNoEl.value !== storedNo) {
+      showToast(`${storedNo} was used by another voucher meanwhile — this draft now has ${invNoEl.value}.`, 'info');
+    }
   }
 
   function saveSalesDraft() {
+    // A posted voucher is edited and posted again, not turned back into a draft
+    if (window._editingSalesInvoice && !window._editingSalesInvoice.isDraft) {
+      showToast('This voucher is already posted — use Post to save the changes.', 'warning');
+      return;
+    }
     if (typeof syncSalesRowsFromDOM === 'function') {
       syncSalesRowsFromDOM();
     }
@@ -246,6 +260,19 @@
       }
     }
     const customerId = document.getElementById('salesCustomer').value;
+    // A draft needs something to come back to — the customer and at least one line, as on
+    // the Quotation / Proforma / Sales Order / Delivery Challan drafts (a reversal has both
+    // from its Original Doc)
+    if (!customerId) {
+      showToast('Please select a Customer before saving the draft.', 'warning');
+      return;
+    }
+    const hasLine = (salesRows || []).some(r => r && (((r.item || r.serviceName || '').trim() !== '')
+      || (parseFloat(r.rate) || 0) > 0 || (parseFloat(r.amount) || 0) > 0));
+    if (!hasLine) {
+      showToast('Please add at least one line item before saving the draft.', 'warning');
+      return;
+    }
     const salesExecutiveId = document.getElementById('salesExecutive').value;
     const salesSupplyType = document.getElementById('salesSupplyType').value;
     const invoiceNo = document.getElementById('salesInvoiceNo').value.trim();
@@ -253,13 +280,13 @@
     const dueDate = document.getElementById('salesDueDate').value;
     const notes = document.getElementById('salesNotes').value;
     const adjustments = parseFloat(document.getElementById('salesAdjustments').value) || 0;
-    
+
     let tdsTcsMode = 'None';
     const tdsBtn = document.getElementById('salesTdsTcsTds');
     const tcsBtn = document.getElementById('salesTdsTcsTcs');
     if (tdsBtn && tdsBtn.classList.contains('active')) tdsTcsMode = 'TDS';
     if (tcsBtn && tcsBtn.classList.contains('active')) tdsTcsMode = 'TCS';
-    
+
     const rateSelect = document.getElementById('salesTdsTcsRateSelect');
     let tdsTcsRate = 0;
     if (rateSelect) {
@@ -278,7 +305,12 @@
     if (tdsTcsMode === 'TDS') total = subTotal - tdsTcsAmount;
     else if (tdsTcsMode === 'TCS') total = subTotal + tdsTcsAmount;
     total += adjustments;
-    
+    // A draft of nothing (₹0) is not worth keeping — the lines need their rates / amounts
+    if (!(total > 0)) {
+      showToast('Amount must be greater than zero. Please enter rates / amounts for the line items.', 'warning');
+      return;
+    }
+
     let paymentStatus = getSalesPaymentStatus();
     const paymentAccountId = document.getElementById('salesPaymentAccount').value;
     let paymentAmount = 0;
@@ -360,7 +392,7 @@
     };
     window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
     
-    const existingIndex = window.KYA_STORE.salesVouchersDrafts.findIndex(d => d.id === draftData.id);
+    const existingIndex = window.KYA_STORE.salesVouchersDrafts.findIndex(d => String(d.id) === String(draftData.id));
     if (existingIndex > -1) {
       window.KYA_STORE.salesVouchersDrafts[existingIndex] = draftData;
     } else {
@@ -708,7 +740,7 @@
     }
     
     if (window._editingSalesInvoice && window._editingSalesInvoice.isDraft) {
-      window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts.filter(d => d.id !== window._editingSalesInvoice.id);
+      window.KYA_STORE.salesVouchersDrafts = (window.KYA_STORE.salesVouchersDrafts || []).filter(d => String(d.id) !== String(window._editingSalesInvoice.id));
     }
     
     if (isEditPosted) {

@@ -1962,8 +1962,11 @@
 
 
   // ── State ─────────────────────────────────────────────────────────
-  let jeRows    = [];   // array of row objects {id, type, particular, debit, credit}
-  let jeCounter = 1;   // auto-increment row id
-  let jvCounter = 1;   // voucher number counter
+  // `var`, not `let`: the page can open on Journal Entry (#journal) while this file is still
+  // loading, and the panel's `typeof jeRows` check must then read "undefined" — with `let`
+  // it throws, stopping this file and leaving Journal Entry broken until a reload elsewhere
+  var jeRows    = [];   // array of row objects {id, type, particular, debit, credit}
+  var jeCounter = 1;   // auto-increment row id
+  var jvCounter = 1;   // voucher number counter
 
   // ── Helpers ───────────────────────────────────────────────────────

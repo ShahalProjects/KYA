@@ -124,6 +124,8 @@
 
   // ── Initialize Proforma Form ──
   function initProformaForm(proformaData) {
+    // Save Draft only for a new proforma or a draft (doc-numbering.js)
+    if (typeof syncDocDraftButton === 'function') syncDocDraftButton('proforma', proformaData && proformaData.id);
     // The party edit saved with this document (none for a new one)
     if (typeof setPartyOverride === 'function') setPartyOverride('proforma', (proformaData && proformaData.partyOverride) ? JSON.parse(JSON.stringify(proformaData.partyOverride)) : null);
     const today = kyaLocalIso();
@@ -1170,6 +1172,7 @@
 
   function saveProformaInvoice(isDraft) {
     const data = getProformaFormData();
+    if (isDraft && typeof checkDocDraftAllowed === 'function' && !checkDocDraftAllowed('proforma', data.id)) return;
 
     if (!data.customerId) {
       showToast('Please select a Customer for the proforma invoice.', 'warning');
@@ -1179,6 +1182,12 @@
     const validRows = data.rows.filter(r => (r.item && r.item.trim()) || (r.amount && r.amount > 0));
     if (validRows.length === 0) {
       showToast('Please add at least one line item to the proforma invoice.', 'warning');
+      return;
+    }
+
+    // Saved or draft, a proforma of ₹0 is not worth keeping
+    if (!(data.total > 0)) {
+      showToast('Proforma invoice total must be greater than zero. Please enter rates / amounts for the line items.', 'warning');
       return;
     }
 

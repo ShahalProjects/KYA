@@ -210,8 +210,8 @@
           </td>
           <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: ${totalColor};">₹ ${fmtNum(draft.total)}</td>
           <td style="padding: 14px 16px; text-align: center; display: flex; gap: 8px; justify-content: center;">
-            <button class="btn btn-primary btn-sm" onclick="editSalesDraft(${draft.id})" style="padding: 6px 12px; font-size: 12px;">Edit / Load</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteSalesDraft(${draft.id})" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
+            <button class="btn btn-primary btn-sm" onclick="editSalesDraft('${ohEsc(String(draft.id))}')" style="padding: 6px 12px; font-size: 12px;">Edit / Load</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSalesDraft('${ohEsc(String(draft.id))}')" style="padding: 6px 12px; font-size: 12px; background: var(--red-50); color: var(--red-600); border: 1.5px solid var(--red-100);">Delete</button>
           </td>
         </tr>
       `;
@@ -242,11 +242,31 @@
 
   function editSalesDraft(id) {
     const list = window.KYA_STORE.salesVouchersDrafts || [];
-    const draft = list.find(d => d.id === id);
+    const draft = list.find(d => String(d.id) === String(id));
     if (!draft) return;
     
-    loadSalesInvoice(draft, true);
+    loadSalesInvoice(JSON.parse(JSON.stringify(draft)), true);
   }
+
+  // Post a draft straight from its preview: it is loaded into the Sales Invoice form and
+  // posted from there, with every check the form makes. Once posted, the view it was opened
+  // from comes back (the "posted" message stays on top); if a check fails, the draft stays
+  // open on the form with the reason shown, ready to fix.
+  function postSalesDraft(id) {
+    const list = window.KYA_STORE.salesVouchersDrafts || [];
+    const draft = list.find(d => String(d.id) === String(id));
+    if (!draft) return;
+    const returnTo = (typeof activeTabId !== 'undefined') ? activeTabId : null;
+    loadSalesInvoice(JSON.parse(JSON.stringify(draft)), true);
+    postSalesInvoice();
+    const posted = !(window.KYA_STORE.salesVouchersDrafts || []).some(d => String(d.id) === String(id));
+    if (posted && returnTo && returnTo !== 'sales_voucher' && typeof openTab === 'function') {
+      openTab(returnTo);
+      if (returnTo === 'voucher_desk' && typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+      if (returnTo === 'sales_drafted') renderSalesDraftedPanel();
+    }
+  }
+  window.postSalesDraft = postSalesDraft;
 
   function deleteSalesDraft(id) {
     showKyaConfirm({
@@ -256,7 +276,7 @@
       okBg: 'var(--red-600)',
       onConfirm: () => {
         let list = window.KYA_STORE.salesVouchersDrafts || [];
-        list = list.filter(d => d.id !== id);
+        list = list.filter(d => String(d.id) !== String(id));
         window.KYA_STORE.salesVouchersDrafts = list;
         showToast('Draft deleted successfully.', 'success');
         renderSalesDraftedPanel();
