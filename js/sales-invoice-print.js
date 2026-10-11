@@ -11,7 +11,9 @@
 //                            details when present, else the customer
 //    • Bank Details ........ the payment account's bank ledger, else a
 //                            bank ledger from the Chart of Accounts, else
-//                            the primary bank in Company Profile → Banking
+//                            the primary bank in Company Profile → Banking.
+//                            An invoice paid in full at the sale (or a cash
+//                            sale) shows its Payment Details instead.
 //    • Terms & Conditions .. the voucher's Notes / Terms box
 //
 //  Intra-State supply splits GST into CGST + SGST; Inter-State / SEZ with
@@ -333,6 +335,42 @@
     return null;
   }
 
+  // An invoice paid in full when it was made — Full Payment, or a cash sale (a Cash and
+  // Cash Equivalents ledger as the customer, always paid in full there) — needs no bank
+  // details for payment: the sheet shows how it was paid instead. Returns null otherwise.
+  function getInvoicePaymentDetails(inv, paidAmount) {
+    if (!inv || inv.isReturn) return null;
+    const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
+    const ledgerOf = id => ledgers.find(l => String(l.id) === String(id));
+    const cashLedger = ledgerOf(inv.customerId);
+    const isCashSale = !!cashLedger && cashLedger.type === 'ledger' && cashLedger.sgId === 'sg-cce';
+    if (!isCashSale && inv.paymentStatus !== 'Full Payment') return null;
+
+    const nameOf = id => String(id) === 'credit-adjust'
+      ? 'Invoice Balance (customer credit)'
+      : ((ledgerOf(id) || {}).name || 'Cash Account');
+    const advance = parseFloat(inv.advancePaidAmount) || 0;
+    const receivedNow = Math.max(0, Math.round((paidAmount - advance) * 100) / 100);
+
+    let paidIn = '';
+    if (isCashSale) {
+      paidIn = cashLedger.name;
+    } else if (String(inv.paymentAccountId) === 'multi-payment') {
+      paidIn = (inv.paymentSplits || [])
+        .filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0)
+        .map(sp => `${nameOf(sp.accountId)} ${siNum(sp.amount)}`)
+        .join(', ');
+    } else if (inv.paymentAccountId) {
+      paidIn = nameOf(inv.paymentAccountId);
+    }
+
+    const lines = [{ label: 'Payment', value: isCashSale ? 'Cash Sale — Full Payment' : 'Full Payment' }];
+    if (advance > 0) lines.push({ label: 'Advance Adjusted', value: siNum(advance) + (inv.advanceVoucherNo ? ` (${inv.advanceVoucherNo})` : '') });
+    if (paidIn && (receivedNow > 0 || isCashSale)) lines.push({ label: 'Paid In', value: paidIn });
+    lines.push({ label: 'Amount Paid', value: siNum(paidAmount) });
+    return { lines };
+  }
+
   // ── Row + tax maths (mirrors how the voucher was posted) ─────────
   function getInvoiceLineRows(inv) {
     return (inv.rows || []).map(r => {
@@ -402,9 +440,13 @@
     const totalDiscount = rows.reduce((s, r) => s + r.discAmt, 0);
     const adjustments = parseFloat(inv.adjustments) || 0;
     const tdsTcsAmount = parseFloat(inv.tdsTcsAmount) || 0;
-    const grandTotal = parseFloat(inv.total) || (subTotal + totalTax + adjustments);
+    // TDS is the customer's deduction, not part of the tax invoice: the sheet shows the full
+    // invoice value, while the balance is still against what is left after TDS
+    const tdsAmount = inv.tdsTcsMode === 'TDS' ? tdsTcsAmount : 0;
+    const netTotal = parseFloat(inv.total) || (subTotal + totalTax + adjustments - tdsAmount);
+    const grandTotal = netTotal + tdsAmount;
     const paidAmount = parseFloat(inv.paymentAmount) || 0;
-    const balanceDue = Math.max(0, grandTotal - paidAmount);
+    const balanceDue = Math.max(0, netTotal - paidAmount);
 
     // One type scale shared by the company, Billed/Shipped To, bank and terms blocks
     // so every detail section reads at exactly the same size.
@@ -519,7 +561,15 @@
     if (!isFullyPaid) payLines.push(`<span style="color:#334155;">Balance Due:</span> ${siNum(balanceDue)}`);
     const payLinesHtml = payLines.map((line, i) => `<div${i === 0 ? ' style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"' : ''}>${line}</div>`).join('');
 
-    const bankHtml = `
+    // Paid in full at the sale (or a cash sale): the payment details, no bank details
+    const paidAtSale = getInvoicePaymentDetails(inv, paidAmount || netTotal);
+    const bankHtml = paidAtSale ? `
+      <div style="flex:0 0 auto; min-width:0; border:1px solid #94a3b8; border-radius:8px; padding:10px 12px; background:#f8fafc; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+        <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#2563eb; margin-bottom:6px;">Payment Details</div>
+        <div style="font-size:${FS.body}; color:#0f172a; line-height:1.55;">
+          ${paidAtSale.lines.map(l => `<div><span style="color:#334155;">${siEsc(l.label)}:</span> ${siEsc(l.value)}</div>`).join('')}
+        </div>
+      </div>` : `
       <div style="flex:0 0 auto; min-width:0; border:1px solid #94a3b8; border-radius:8px; padding:10px 12px; background:#f8fafc; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
         <div style="font-size:${FS.label}; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#2563eb; margin-bottom:6px;">Bank Details for Payment</div>
         <div style="display:flex; gap:12px; align-items:flex-start;">
@@ -673,7 +723,6 @@
               ${totalsRow('Taxable Value', siNum(subTotal))}
               ${gstTotalsRows ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${gstTotalsRows}` : ''}
               ${(inv.tdsTcsMode === 'TCS' && tdsTcsAmount) ? totalsRow('TCS @ ' + siNum(inv.tdsTcsRate) + '%', siNum(tdsTcsAmount)) : ''}
-              ${(inv.tdsTcsMode === 'TDS' && tdsTcsAmount) ? totalsRow('TDS @ ' + siNum(inv.tdsTcsRate) + '%', '&minus; ' + siNum(tdsTcsAmount)) : ''}
               ${adjustments !== 0 ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${totalsRow('Round Off', siNum(adjustments))}` : ''}
             </div>
             <div style="flex:0 0 auto; background:var(--blue-600, #2563eb); border:1px solid #1d4ed8; border-radius:6px; padding:6px 12px; box-sizing:border-box; color:#ffffff; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
@@ -713,9 +762,12 @@
     const totalDiscount = rows.reduce((s, r) => s + r.discAmt, 0);
     const adjustments = parseFloat(inv.adjustments) || 0;
     const tdsTcsAmount = parseFloat(inv.tdsTcsAmount) || 0;
-    const grandTotal = parseFloat(inv.total) || (subTotal + totalTax + adjustments);
+    // As on the sheet: the full invoice value, TDS left out
+    const tdsAmount = inv.tdsTcsMode === 'TDS' ? tdsTcsAmount : 0;
+    const netTotal = parseFloat(inv.total) || (subTotal + totalTax + adjustments - tdsAmount);
+    const grandTotal = netTotal + tdsAmount;
     const paidAmount = parseFloat(inv.paymentAmount) || 0;
-    const balanceDue = Math.max(0, grandTotal - paidAmount);
+    const balanceDue = Math.max(0, netTotal - paidAmount);
     const isFullyPaid = balanceDue <= 0.005;
 
     const posFromParty = !!(parties.billed.state || parties.billed.country);
@@ -745,11 +797,14 @@
     if (paidAmount > 0) payLines.push({ label: 'Paid (' + (inv.paymentStatus || '') + ')', value: siNum(paidAmount) });
     if (!isFullyPaid) payLines.push({ label: 'Balance Due', value: siNum(balanceDue) });
 
+    // Paid in full at the sale (or a cash sale): payment details in place of the bank
+    const paymentDetails = getInvoicePaymentDetails(inv, paidAmount || netTotal);
+
     // A draft's exports say so in their title (and file name)
     const isDraft = isSalesInvoiceDraft(inv);
     const docTitle = (isDraft ? 'Draft ' : '') + (isReturn ? 'Credit Note' : 'Tax Invoice');
     return {
-      inv, co, parties, bank, rows, taxMode, isReturn, docTitle,
+      inv, co, parties, bank, paymentDetails, rows, taxMode, isReturn, docTitle,
       companyName: getInvoiceCompanyName(co),
       companySeal: getInvoiceCompanySeal(co),
       signatureImage: co.signatureImage || '',
@@ -763,8 +818,11 @@
   }
 
   // ── Preview modal ────────────────────────────────────────────────
-  // A posted invoice, or a draft — the same invoice, marked DRAFT, with Edit and Post
-  function viewSalesTaxInvoice(id) {
+  // A posted invoice, or a draft — the same invoice, marked DRAFT, with Edit and Post.
+  // opts.compact (after Post): a smaller popup with the invoice shown zoomed out to fit;
+  // the invoice itself, Print and Export are unchanged.
+  function viewSalesTaxInvoice(id, opts) {
+    const compact = !!(opts && opts.compact);
     const S = window.KYA_STORE || {};
     const inv = (S.salesVouchers || []).find(v => String(v.id) === String(id))
       || (S.salesVouchersDrafts || []).find(v => String(v.id) === String(id));
@@ -794,17 +852,18 @@
           #salesTaxInvoiceOverlay { position: absolute !important; top: 0 !important; left: 0 !important; right: auto !important; bottom: auto !important; background: none !important; backdrop-filter: none !important; }
           #salesTaxInvoiceOverlay, #salesTaxInvoiceOverlay * { overflow: visible !important; max-height: none !important; box-shadow: none !important; }
           #${SALES_INVOICE_SHEET_ID} { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; }
+          #salesTaxInvoiceOverlay .si-preview-scale { transform: none !important; width: auto !important; }
+          #salesTaxInvoiceOverlay .si-preview-frame { width: auto !important; height: auto !important; }
           @page { size: A4; margin: 12mm; }
         }
       </style>
-      <div class="inv-modal-card" style="padding:0; max-width:900px; width:94%;">
+      <div class="inv-modal-card" style="padding:0; max-width:${compact ? '640px' : '900px'}; width:94%;${compact ? ' overflow:hidden;' : ''}">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1.5px solid var(--slate-100); background:var(--slate-50); border-radius:20px 20px 0 0;">
           <div style="font-weight:700; color:var(--slate-800); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span>${inv.isReturn ? 'Credit Note' : 'Tax Invoice'} &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${siEsc(inv.invoiceNo || 'Draft')}</span></span>
-            ${isDraft ? '<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">Draft</span>' : ''}
-          </div>
+            ${isDraft && !compact ? '<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">Draft</span>' : ''}          </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
-            ${isDraft ? `
+            ${isDraft && !compact ? `
             <button class="btn btn-secondary" id="btnSalesInvoiceEditDraft" type="button" style="padding:7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
               Edit
@@ -854,15 +913,46 @@
             <button class="btn btn-danger" id="btnSalesInvoiceClose" type="button" style="padding:7px 14px; height:34px; font-size:13px;">Close</button>
           </div>
         </div>
+        ${compact ? `
+        <div class="si-preview-body" style="background:#f1f5f9; padding:16px; display:flex; justify-content:center; overflow:hidden; border-radius:0 0 20px 20px;">
+          <div class="si-preview-frame" style="position:relative; overflow:hidden; background:#fff; box-shadow:0 6px 24px rgba(15,23,42,.12); border-radius:6px; flex-shrink:0;">
+            <div class="si-preview-scale" style="width:820px; transform-origin:top left;">
+              ${renderSalesTaxInvoiceHTML(inv)}
+            </div>
+          </div>
+        </div>` : `
         <div style="max-height:78vh; overflow-y:auto; background:#f1f5f9; padding:16px;">
           <div style="max-width:820px; margin:0 auto; box-shadow:0 6px 24px rgba(15,23,42,.12); border-radius:6px; overflow:hidden;">
             ${renderSalesTaxInvoiceHTML(inv)}
           </div>
-        </div>
+        </div>`}
       </div>`;
 
     document.body.appendChild(overlay);
     overlay.focus();
+
+    // Compact: zoom the invoice out so the whole page fits in the smaller popup
+    if (compact) {
+      const body = overlay.querySelector('.si-preview-body');
+      const frame = overlay.querySelector('.si-preview-frame');
+      const scaleEl = overlay.querySelector('.si-preview-scale');
+      const header = overlay.querySelector('.inv-modal-card > div');
+      const fit = () => {
+        if (!document.body.contains(overlay)) { window.removeEventListener('resize', fit); return; }
+        const sheetW = 820;
+        const sheetH = scaleEl.scrollHeight;
+        const availW = body.clientWidth - 32;
+        const availH = window.innerHeight * 0.9 - (header ? header.offsetHeight : 0) - 32;
+        const s = Math.max(0.2, Math.min(1, availW / sheetW, availH / sheetH));
+        scaleEl.style.transform = `scale(${s})`;
+        frame.style.width = Math.floor(sheetW * s) + 'px';
+        frame.style.height = Math.floor(sheetH * s) + 'px';
+      };
+      fit();
+      window.addEventListener('resize', fit);
+      overlay.querySelectorAll('img').forEach(img => { if (!img.complete) img.addEventListener('load', fit); });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit).catch(() => {});
+    }
 
     const closeBtn = overlay.querySelector('#btnSalesInvoiceClose');
     if (closeBtn) closeBtn.addEventListener('click', () => overlay.remove());

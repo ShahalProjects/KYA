@@ -1123,25 +1123,36 @@
 
   function renderPreInvoiceOverviewTable() {
     window.KYA_STORE = window.KYA_STORE || {};
-    const quotes = (window.KYA_STORE.quotations || []).concat(window.KYA_STORE.quotationsDrafts || []);
-    const quoteActive = quotes.filter(q => q.status === 'Active' || !q.status || q.status === 'Draft').length;
-    const quoteCompleted = quotes.filter(q => q.status === 'Completed').length;
-    const quoteCancelled = quotes.filter(q => q.status === 'Cancelled').length;
+    // Counted as the lists show them: drafts (the drafts store) are left out, and Active is
+    // the saved open documents only, the same as the list's Active pill
+    const countPreInvDocs = (storeKey) => {
+      const saved = window.KYA_STORE[storeKey] || [];
+      return {
+        active: saved.filter(d => d.status === 'Active' || !d.status).length,
+        completed: saved.filter(d => d.status === 'Completed').length,
+        cancelled: saved.filter(d => d.status === 'Cancelled').length
+      };
+    };
 
-    const proformas = (window.KYA_STORE.proformaInvoices || []).concat(window.KYA_STORE.proformaInvoicesDrafts || []);
-    const proformaActive = proformas.filter(p => p.status === 'Active' || !p.status || p.status === 'Draft').length;
-    const proformaCompleted = proformas.filter(p => p.status === 'Completed').length;
-    const proformaCancelled = proformas.filter(p => p.status === 'Cancelled').length;
+    const quoteCounts = countPreInvDocs('quotations');
+    const quoteActive = quoteCounts.active;
+    const quoteCompleted = quoteCounts.completed;
+    const quoteCancelled = quoteCounts.cancelled;
 
-    const orders = (window.KYA_STORE.salesOrders || []).concat(window.KYA_STORE.salesOrdersDrafts || []);
-    const orderActive = orders.filter(o => o.status === 'Active' || !o.status || o.status === 'Draft').length;
-    const orderCompleted = orders.filter(o => o.status === 'Completed').length;
-    const orderCancelled = orders.filter(o => o.status === 'Cancelled').length;
+    const proformaCounts = countPreInvDocs('proformaInvoices');
+    const proformaActive = proformaCounts.active;
+    const proformaCompleted = proformaCounts.completed;
+    const proformaCancelled = proformaCounts.cancelled;
 
-    const challans = (window.KYA_STORE.deliveryChallans || []).concat(window.KYA_STORE.deliveryChallansDrafts || []);
-    const challanActive = challans.filter(c => c.status === 'Active' || !c.status || c.status === 'Draft').length;
-    const challanCompleted = challans.filter(c => c.status === 'Completed').length;
-    const challanCancelled = challans.filter(c => c.status === 'Cancelled').length;
+    const orderCounts = countPreInvDocs('salesOrders');
+    const orderActive = orderCounts.active;
+    const orderCompleted = orderCounts.completed;
+    const orderCancelled = orderCounts.cancelled;
+
+    const challanCounts = countPreInvDocs('deliveryChallans');
+    const challanActive = challanCounts.active;
+    const challanCompleted = challanCounts.completed;
+    const challanCancelled = challanCounts.cancelled;
 
     return `
       <div class="table-card" style="border: 1.5px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: var(--shadow-sm); width: 100%; box-sizing: border-box;">

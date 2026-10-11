@@ -36,6 +36,9 @@
   }
 
   const isOpenStatus = d => d.status === 'Active' || !d.status || d.status === 'Draft';
+  // List pills: drafts have their own, so Active is the saved open documents only
+  const isDraftedDoc = d => d.isDraft || d.status === 'Draft';
+  const isActiveDoc = d => !isDraftedDoc(d) && (d.status === 'Active' || !d.status);
 
   /**
    * cfg: {
@@ -267,6 +270,40 @@
         area.innerHTML = render();
         attachEvents();
       }
+      renderSearch();
+    }
+
+    // ⋮ Select / Delete Selected / Make Active (preinvoice-bulk.js)
+    const NUMBER_KINDS = { salesOrders: 'salesOrder', deliveryChallans: 'deliveryChallan' };
+    function attachBulk() {
+      if (typeof window.attachPreInvoiceBulk !== 'function') return;
+      window.attachPreInvoiceBulk({
+        key: cfg.ids.prefix,
+        areaId: cfg.ids.contentArea,
+        filter: _filter,
+        noun: cfg.noun,
+        plural: cfg.plural.toLowerCase(),
+        storeKey: cfg.storeKey,
+        draftsKey: cfg.draftsKey,
+        noField: cfg.noField,
+        numberKind: NUMBER_KINDS[cfg.storeKey],
+        // The advance is posted as saving the document from its form does
+        advance: {
+          amount: doc => {
+            const total = parseFloat(doc.total) || 0;
+            const advance = doc.paymentStatus === 'Not Paid' ? 0 : (parseFloat(doc.paymentAmount) || 0);
+            return total > 0 ? Math.min(advance, total) : advance;
+          },
+          receiptRows: (doc, amount) => getPreInvoiceAdvanceReceiptRows(doc, amount),
+          info: doc => ({
+            preparedBy: cfg.moduleName,
+            docLabel: cfg.kind,
+            docNo: doc[cfg.noField],
+            extra: { [cfg.linkField]: doc.id }
+          })
+        },
+        reload: () => open(_filter)
+      });
     }
 
     function close() {
@@ -286,12 +323,14 @@
         (Array.isArray(d.rows) && d.rows.some(r => (r.item || '').toLowerCase().includes(term))));
 
       const allCount = all.length;
-      const activeCount = all.filter(isOpenStatus).length;
+      const activeCount = all.filter(isActiveDoc).length;
+      const draftedCount = all.filter(isDraftedDoc).length;
       const completedCount = all.filter(d => d.status === 'Completed').length;
       const cancelledCount = all.filter(d => d.status === 'Cancelled').length;
 
       let list = all;
-      if (_filter === 'active') list = all.filter(isOpenStatus);
+      if (_filter === 'active') list = all.filter(isActiveDoc);
+      else if (_filter === 'drafted') list = all.filter(isDraftedDoc);
       else if (_filter === 'completed') list = all.filter(d => d.status === 'Completed');
       else if (_filter === 'cancelled') list = all.filter(d => d.status === 'Cancelled');
       else {
@@ -350,7 +389,7 @@
             </tr>`;
         }).join('');
 
-        const headerLabel = { active: 'Active', completed: 'Completed', cancelled: 'Cancelled' }[_filter] || 'All';
+        const headerLabel = { active: 'Active', drafted: 'Drafted', completed: 'Completed', cancelled: 'Cancelled' }[_filter] || 'All';
         tableHtml = `
           <div class="table-card" style="border: 1.5px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: var(--shadow-sm); width: 100%;">
             <div style="background: var(--slate-50); border-bottom: 1.5px solid var(--slate-200); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
@@ -380,7 +419,7 @@
 
       const pill = (key, label, dot, on) => {
         const active = _filter === key;
-        const count = { all: allCount, active: activeCount, completed: completedCount, cancelled: cancelledCount }[key];
+        const count = { all: allCount, active: activeCount, drafted: draftedCount, completed: completedCount, cancelled: cancelledCount }[key];
         return `
             <button type="button" class="quote-filter-pill ${active ? 'active' : ''}" data-filter="${key}" style="height: 42px; border: 1.5px solid ${active ? on.border : 'var(--slate-200)'}; background: ${active ? on.bg : '#fff'}; color: ${active ? on.color : 'var(--slate-600)'}; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
               ${dot ? `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${dot};"></span>` : ''}
@@ -391,18 +430,11 @@
 
       return `
         <div class="quotation-list-container" style="width: 100%;">
-          <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-            <div class="pt-search-wrap" style="flex: 1; min-width: 280px; position: relative;">
-              <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
-                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-              <input type="text" id="${P}ListSearchInput" class="pt-search-inp" placeholder="Search ${cfg.noun} #, customer, item, date, amount…" value="${safeEsc(_search)}" style="width: 100%; height: 42px; padding: 10px 38px 10px 42px; font-size: 13.5px; border: 1.5px solid var(--slate-200); border-radius: 10px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
-              ${_search ? `<button type="button" id="btn${P}ListClearSearch" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 15px; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Clear search">✕</button>` : ''}
-            </div>
+          <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 14px; flex-wrap: wrap;">
             <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
               ${pill('all', 'All', '', { border: 'var(--blue-600)', bg: 'var(--blue-50)', color: 'var(--blue-700)', countBg: 'var(--blue-200)', countColor: 'var(--blue-800)' })}
               ${pill('active', 'Active', '#10b981', { border: '#10b981', bg: '#ecfdf5', color: '#047857', countBg: '#a7f3d0', countColor: '#065f46' })}
+              ${pill('drafted', 'Drafted', '#f59e0b', { border: '#f59e0b', bg: '#fef3c7', color: '#b45309', countBg: '#fde68a', countColor: '#92400e' })}
               ${pill('completed', 'Completed', '#3b82f6', { border: 'var(--blue-600)', bg: '#eff6ff', color: '#1d4ed8', countBg: '#bfdbfe', countColor: '#1e40af' })}
               ${pill('cancelled', 'Cancelled', '#94a3b8', { border: 'var(--slate-400)', bg: '#f1f5f9', color: '#334155', countBg: '#cbd5e1', countColor: '#1e293b' })}
             </div>
@@ -411,28 +443,41 @@
         </div>`;
     }
 
-    function rerender(focusSearch) {
+    function rerender() {
       const area = document.getElementById(cfg.ids.contentArea);
       if (!area) return;
       area.innerHTML = render();
       attachEvents();
-      if (focusSearch) {
-        const inp = document.getElementById(`${cfg.ids.prefix}ListSearchInput`);
-        if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-      }
+    }
+
+    // Search box in the back-button row (<prefix>ListSearchSlot); typing redraws only the list
+    function renderSearch() {
+      const P = cfg.ids.prefix;
+      const slot = document.getElementById(`${P}ListSearchSlot`);
+      if (!slot) return;
+      slot.innerHTML = `
+        <div class="pt-search-wrap" style="position: relative; width: 100%;">
+          <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
+            <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input type="text" id="${P}ListSearchInput" class="pt-search-inp" placeholder="Search ${cfg.noun} #, customer, item, date, amount…" value="${safeEsc(_search)}" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
+          <button type="button" id="btn${P}ListClearSearch" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 14px; padding: 4px; display: ${_search ? 'flex' : 'none'}; align-items: center; justify-content: center;" title="Clear search">✕</button>
+        </div>`;
+      const input = slot.querySelector('input');
+      const clearBtn = slot.querySelector('button');
+      const refresh = () => {
+        clearBtn.style.display = _search ? 'flex' : 'none';
+        rerender();
+      };
+      input.addEventListener('input', e => { _search = e.target.value; refresh(); });
+      clearBtn.addEventListener('click', () => { _search = ''; input.value = ''; refresh(); input.focus(); });
     }
 
     function attachEvents() {
       const area = document.getElementById(cfg.ids.contentArea);
       if (!area) return;
       const P = cfg.ids.prefix;
-
-      const searchInput = document.getElementById(`${P}ListSearchInput`);
-      if (searchInput) {
-        searchInput.addEventListener('input', e => { _search = e.target.value; rerender(true); });
-      }
-      const clearBtn = document.getElementById(`btn${P}ListClearSearch`);
-      if (clearBtn) clearBtn.addEventListener('click', () => { _search = ''; rerender(true); });
 
       area.querySelectorAll('[data-filter]').forEach(btn => {
         btn.addEventListener('click', () => open(btn.dataset.filter));
@@ -442,6 +487,7 @@
       });
       const createBtn = document.getElementById(`btn${P}ListCreateFirst`);
       if (createBtn) createBtn.addEventListener('click', () => cfg.openForm(null, 'list'));
+      attachBulk();
     }
 
     // ── Preview ──

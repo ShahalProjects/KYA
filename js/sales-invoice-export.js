@@ -650,16 +650,14 @@
     field('Total Tax', fmla(`N${totalRow}`, totalTax), NUMF);
     const taxRow = r;
     const tcs = inv.tdsTcsMode === 'TCS' ? d.tdsTcsAmount : 0;
+    // TDS is the customer's deduction — not on the tax invoice
     const tds = inv.tdsTcsMode === 'TDS' ? d.tdsTcsAmount : 0;
     field('TCS Rate', inv.tdsTcsMode === 'TCS' ? (parseFloat(inv.tdsTcsRate) || 0) : 0, PCTF);
     field('TCS Amount (+)', tcs, NUMF);
     const tcsRow = r;
-    field('TDS Rate', inv.tdsTcsMode === 'TDS' ? (parseFloat(inv.tdsTcsRate) || 0) : 0, PCTF);
-    field('TDS Amount (−)', tds, NUMF);
-    const tdsRow = r;
     field('Round Off', d.adjustments || 0, NUMF);
     const roRow = r;
-    field('Total Amount', fmla(`C${tvRow}+C${taxRow}+C${tcsRow}-C${tdsRow}+C${roRow}`, d.grandTotal), NUMF);
+    field('Total Amount', fmla(`C${tvRow}+C${taxRow}+C${tcsRow}+C${roRow}`, d.grandTotal), NUMF);
     const grandRow = r;
     [2, 3].forEach(col => {
       const c = ws.getCell(grandRow, col);
@@ -670,7 +668,8 @@
     ws.getRow(grandRow).height = 22;
     field('Amount Paid', d.paidAmount || 0, NUMF);
     const paidRow = r;
-    field('Balance Due', fmla(`MAX(0,C${grandRow}-C${paidRow})`, d.balanceDue), NUMF);
+    // The TDS the customer deducted is settled, not due
+    field('Balance Due', fmla(`MAX(0,C${grandRow}${tds ? '-' + tds : ''}-C${paidRow})`, d.balanceDue), NUMF);
     const balRow = r;
     [2, 3].forEach(col => {
       const c = ws.getCell(balRow, col);
@@ -699,13 +698,19 @@
     field('Email', d.co.email || '');
     field('Website', d.co.website || '');
 
-    section('BANK DETAILS');
-    field('Bank', d.bank.bankName || '');
-    field('Account Holder', d.bank.accountHolder || '');
-    const acc = field('Account No.', d.bank.accountNo ? String(d.bank.accountNo) : '');
-    acc.numFmt = '@';
-    field('IFSC', d.bank.ifsc || '');
-    field('Branch', d.bank.branch || '');
+    if (d.paymentDetails) {
+      // Paid in full at the sale (or a cash sale): how it was paid, no bank details
+      section('PAYMENT DETAILS');
+      d.paymentDetails.lines.forEach(l => field(l.label, l.value));
+    } else {
+      section('BANK DETAILS');
+      field('Bank', d.bank.bankName || '');
+      field('Account Holder', d.bank.accountHolder || '');
+      const acc = field('Account No.', d.bank.accountNo ? String(d.bank.accountNo) : '');
+      acc.numFmt = '@';
+      field('IFSC', d.bank.ifsc || '');
+      field('Branch', d.bank.branch || '');
+    }
 
     // ── Terms ──
     const terms = String(inv.notes || '').split('\n').map(t => t.trim()).filter(Boolean);

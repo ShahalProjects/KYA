@@ -103,8 +103,39 @@
     const contentArea = document.getElementById('proformaListFullContentArea');
     if (contentArea) {
       contentArea.innerHTML = renderProformaList(_proformaFilterStatus);
-      attachProformaListEvents();
+      attachProformaBulk();
     }
+    renderProformaSearch();
+  }
+
+  // ⋮ Select / Delete Selected / Make Active (preinvoice-bulk.js)
+  function attachProformaBulk() {
+    if (typeof window.attachPreInvoiceBulk !== 'function') return;
+    window.attachPreInvoiceBulk({
+      key: 'proforma',
+      areaId: 'proformaListFullContentArea',
+      filter: _proformaFilterStatus,
+      noun: 'proforma invoice',
+      plural: 'proforma invoices',
+      storeKey: 'proformaInvoices',
+      draftsKey: 'proformaInvoicesDrafts',
+      noField: 'proformaNo',
+      numberKind: 'proforma',
+      // The advance is posted as saving the proforma from its form does
+      advance: {
+        amount: doc => doc.paymentStatus === 'Full Payment'
+          ? (parseFloat(doc.total) || 0)
+          : (doc.paymentStatus === 'Partial Payment' ? (parseFloat(doc.paymentAmount) || 0) : 0),
+        receiptRows: (doc, amount) => getProformaAdvanceReceiptRows(doc, amount),
+        info: doc => ({
+          preparedBy: 'Proforma Module',
+          docLabel: 'Proforma Invoice',
+          docNo: doc.proformaNo,
+          extra: { proformaId: doc.id, proformaNo: doc.proformaNo }
+        })
+      },
+      reload: () => openProformaList(_proformaFilterStatus)
+    });
   }
 
   function closeProformaList() {
@@ -2352,14 +2383,20 @@
       });
     };
 
+    // Drafts have their own pill, so Active is the saved open proformas only
+    const isDrafted = p => p.isDraft || p.status === 'Draft';
+    const isActive = p => !isDrafted(p) && (p.status === 'Active' || !p.status);
     const allCount = all.length;
-    const activeCount = all.filter(p => p.status === 'Active' || !p.status || p.status === 'Draft').length;
+    const activeCount = all.filter(isActive).length;
+    const draftedCount = all.filter(isDrafted).length;
     const completedCount = all.filter(p => p.status === 'Completed').length;
     const cancelledCount = all.filter(p => p.status === 'Cancelled').length;
 
     let displayList = all;
     if (_proformaFilterStatus === 'active') {
-      displayList = all.filter(p => p.status === 'Active' || !p.status || p.status === 'Draft');
+      displayList = all.filter(isActive);
+    } else if (_proformaFilterStatus === 'drafted') {
+      displayList = all.filter(isDrafted);
     } else if (_proformaFilterStatus === 'completed') {
       displayList = all.filter(p => p.status === 'Completed');
     } else if (_proformaFilterStatus === 'cancelled') {
@@ -2434,7 +2471,7 @@
             : '—';
 
           return `
-            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='transparent'" onclick="viewPrintProforma(${p.id})" title="Click to view proforma invoice">
+            <tr data-doc-id="${safeEsc(p.id)}" style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='transparent'" onclick="viewPrintProforma(${p.id})" title="Click to view proforma invoice">
               <td style="padding: 12px 16px;">
                 <span style="font-family: monospace; font-weight: 800; color: var(--blue-700);">${safeEsc(p.proformaNo || 'PI-XXXX')}</span>
                 ${p.document && p.document.data ? `<span title="Attachment: ${safeEsc(p.document.name)}" style="margin-left: 6px; color: #3b82f6;">📎</span>` : ''}
@@ -2462,6 +2499,7 @@
 
       let headerLabel = 'All Proforma Invoices';
       if (_proformaFilterStatus === 'active') headerLabel = 'Active Proforma Invoices';
+      else if (_proformaFilterStatus === 'drafted') headerLabel = 'Drafted Proforma Invoices';
       else if (_proformaFilterStatus === 'completed') headerLabel = 'Completed Proforma Invoices';
       else if (_proformaFilterStatus === 'cancelled') headerLabel = 'Cancelled Proforma Invoices';
 
@@ -2499,20 +2537,8 @@
 
     return `
       <div class="quotation-list-container" style="width: 100%;">
-        <!-- Toolbar: Search Bar + Status Filter Pills -->
-        <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-          <!-- Search Bar -->
-          <div class="pt-search-wrap" style="flex: 1; min-width: 280px; position: relative;">
-            <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <input type="text" id="proformaListSearchInput" class="pt-search-inp" placeholder="Search proforma #, customer, item, date, amount…" value="${safeEsc(_proformaSearchQuery)}" style="width: 100%; height: 42px; padding: 10px 38px 10px 42px; font-size: 13.5px; border: 1.5px solid var(--slate-200); border-radius: 10px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
-            ${_proformaSearchQuery ? `
-              <button type="button" id="btnProformaClearSearch" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 15px; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Clear search">✕</button>
-            ` : ''}
-          </div>
-
+        <!-- Toolbar: Status Filter Pills (the search box sits beside the back button) -->
+        <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 14px; flex-wrap: wrap;">
           <!-- Filter Tabs / Pills -->
           <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
             <button type="button" class="quote-filter-pill ${_proformaFilterStatus === 'all' ? 'active' : ''}" onclick="window.openProformaList('all')" style="height: 42px; border: 1.5px solid ${_proformaFilterStatus === 'all' ? 'var(--blue-600)' : 'var(--slate-200)'}; background: ${_proformaFilterStatus === 'all' ? 'var(--blue-50)' : '#fff'}; color: ${_proformaFilterStatus === 'all' ? 'var(--blue-700)' : 'var(--slate-600)'}; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
@@ -2524,6 +2550,12 @@
               <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
               <span>Active</span>
               <span style="background: ${_proformaFilterStatus === 'active' ? '#a7f3d0' : 'var(--slate-100)'}; color: ${_proformaFilterStatus === 'active' ? '#065f46' : 'var(--slate-600)'}; font-size: 11px; padding: 2px 8px; border-radius: 10px;">${activeCount}</span>
+            </button>
+
+            <button type="button" class="quote-filter-pill ${_proformaFilterStatus === 'drafted' ? 'active' : ''}" onclick="window.openProformaList('drafted')" style="height: 42px; border: 1.5px solid ${_proformaFilterStatus === 'drafted' ? '#f59e0b' : 'var(--slate-200)'}; background: ${_proformaFilterStatus === 'drafted' ? '#fef3c7' : '#fff'}; color: ${_proformaFilterStatus === 'drafted' ? '#b45309' : 'var(--slate-600)'}; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
+              <span>Drafted</span>
+              <span style="background: ${_proformaFilterStatus === 'drafted' ? '#fde68a' : 'var(--slate-100)'}; color: ${_proformaFilterStatus === 'drafted' ? '#92400e' : 'var(--slate-600)'}; font-size: 11px; padding: 2px 8px; border-radius: 10px;">${draftedCount}</span>
             </button>
 
             <button type="button" class="quote-filter-pill ${_proformaFilterStatus === 'completed' ? 'active' : ''}" onclick="window.openProformaList('completed')" style="height: 42px; border: 1.5px solid ${_proformaFilterStatus === 'completed' ? 'var(--blue-600)' : 'var(--slate-200)'}; background: ${_proformaFilterStatus === 'completed' ? '#eff6ff' : '#fff'}; color: ${_proformaFilterStatus === 'completed' ? '#1d4ed8' : 'var(--slate-600)'}; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
@@ -2548,38 +2580,31 @@
     `;
   }
 
-  function attachProformaListEvents() {
-    const searchInput = document.getElementById('proformaListSearchInput');
-    if (searchInput && !searchInput._wired) {
-      searchInput._wired = true;
-      searchInput.addEventListener('input', (e) => {
-        _proformaSearchQuery = e.target.value;
-        const container = document.getElementById('proformaListFullContentArea') || document.getElementById('preInvContentArea');
-        if (container) {
-          container.innerHTML = renderProformaList(_proformaFilterStatus);
-          attachProformaListEvents();
-          const updatedSearch = document.getElementById('proformaListSearchInput');
-          if (updatedSearch) {
-            updatedSearch.focus();
-            updatedSearch.setSelectionRange(updatedSearch.value.length, updatedSearch.value.length);
-          }
-        }
-      });
-    }
-
-    const clearBtn = document.getElementById('btnProformaClearSearch');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        _proformaSearchQuery = '';
-        const container = document.getElementById('proformaListFullContentArea') || document.getElementById('preInvContentArea');
-        if (container) {
-          container.innerHTML = renderProformaList(_proformaFilterStatus);
-          attachProformaListEvents();
-          const updatedSearch = document.getElementById('proformaListSearchInput');
-          if (updatedSearch) updatedSearch.focus();
-        }
-      });
-    }
+  // Search box in the back-button row; typing redraws only the list below it
+  function renderProformaSearch() {
+    const slot = document.getElementById('proformaListSearchSlot');
+    if (!slot) return;
+    slot.innerHTML = `
+      <div class="pt-search-wrap" style="position: relative; width: 100%;">
+        <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
+          <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" id="proformaListSearchInput" class="pt-search-inp" placeholder="Search proforma #, customer, item, date, amount…" value="${safeEsc(_proformaSearchQuery)}" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
+        <button type="button" id="btnProformaClearSearch" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 14px; padding: 4px; display: ${_proformaSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center;" title="Clear search">✕</button>
+      </div>`;
+    const input = slot.querySelector('#proformaListSearchInput');
+    const clearBtn = slot.querySelector('#btnProformaClearSearch');
+    const refresh = () => {
+      clearBtn.style.display = _proformaSearchQuery ? 'flex' : 'none';
+      const container = document.getElementById('proformaListFullContentArea');
+      if (container) {
+        container.innerHTML = renderProformaList(_proformaFilterStatus);
+        attachProformaBulk();
+      }
+    };
+    input.addEventListener('input', (e) => { _proformaSearchQuery = e.target.value; refresh(); });
+    clearBtn.addEventListener('click', () => { _proformaSearchQuery = ''; input.value = ''; refresh(); input.focus(); });
   }
 
   // ── Global Exports ──
@@ -2595,7 +2620,6 @@
 
   window.getAllProformaInvoices = getAllProformaInvoices;
   window.renderProformaList = renderProformaList;
-  window.attachProformaListEvents = attachProformaListEvents;
   window.setProformaStatus = setProformaStatus;
   window.deleteProformaItem = deleteProformaItem;
   window.convertProformaToInvoice = convertProformaToInvoice;

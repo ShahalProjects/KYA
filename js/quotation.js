@@ -100,8 +100,27 @@
     const contentArea = document.getElementById('quotationListFullContentArea');
     if (contentArea) {
       contentArea.innerHTML = renderQuotationList(_quoteFilterStatus);
-      attachQuotationListEvents();
+      attachQuotationBulk();
     }
+    renderQuotationSearch();
+  }
+
+  // ⋮ Select / Delete Selected / Make Active (preinvoice-bulk.js)
+  function attachQuotationBulk() {
+    if (typeof window.attachPreInvoiceBulk !== 'function') return;
+    window.attachPreInvoiceBulk({
+      key: 'quote',
+      areaId: 'quotationListFullContentArea',
+      filter: _quoteFilterStatus,
+      noun: 'quotation',
+      plural: 'quotations',
+      storeKey: 'quotations',
+      draftsKey: 'quotationsDrafts',
+      noField: 'quoteNo',
+      numberKind: 'quotation',
+      advance: null,
+      reload: () => openQuotationList(_quoteFilterStatus)
+    });
   }
 
   function closeQuotationList() {
@@ -1829,14 +1848,20 @@
       });
     };
 
+    // Drafts have their own pill, so Active is the saved open quotations only
+    const isDrafted = q => q.isDraft || q.status === 'Draft';
+    const isActive = q => !isDrafted(q) && (q.status === 'Active' || !q.status);
     const allCount = all.length;
-    const activeCount = all.filter(q => q.status === 'Active' || !q.status || q.status === 'Draft').length;
+    const activeCount = all.filter(isActive).length;
+    const draftedCount = all.filter(isDrafted).length;
     const completedCount = all.filter(q => q.status === 'Completed').length;
     const cancelledCount = all.filter(q => q.status === 'Cancelled').length;
 
     let displayList = all;
     if (_quoteFilterStatus === 'active') {
-      displayList = all.filter(q => q.status === 'Active' || !q.status || q.status === 'Draft');
+      displayList = all.filter(isActive);
+    } else if (_quoteFilterStatus === 'drafted') {
+      displayList = all.filter(isDrafted);
     } else if (_quoteFilterStatus === 'completed') {
       displayList = all.filter(q => q.status === 'Completed');
     } else if (_quoteFilterStatus === 'cancelled') {
@@ -1912,7 +1937,7 @@
             : '—';
 
           return `
-            <tr style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='transparent'" onclick="viewPrintQuotation(${q.id})" title="Click to view quotation">
+            <tr data-doc-id="${safeEsc(q.id)}" style="border-bottom: 1px solid var(--slate-100); transition: background 0.15s; cursor: pointer;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='transparent'" onclick="viewPrintQuotation(${q.id})" title="Click to view quotation">
               <td style="padding: 12px 16px;">
                 <span style="font-family: monospace; font-weight: 800; color: var(--blue-700);">${safeEsc(q.quoteNo || 'QT-XXXX')}</span>
                 ${q.document && q.document.data ? `<span title="Attachment: ${safeEsc(q.document.name)}" style="margin-left: 6px; color: #3b82f6;">📎</span>` : ''}
@@ -1939,6 +1964,7 @@
 
       let headerLabel = 'All Quotations';
       if (_quoteFilterStatus === 'active') headerLabel = 'Active Quotations';
+      else if (_quoteFilterStatus === 'drafted') headerLabel = 'Drafted Quotations';
       else if (_quoteFilterStatus === 'completed') headerLabel = 'Completed Quotations';
       else if (_quoteFilterStatus === 'cancelled') headerLabel = 'Cancelled Quotations';
 
@@ -1976,20 +2002,8 @@
 
     return `
       <div class="quotation-list-container" style="width: 100%;">
-        <!-- Toolbar: Big Voucher-Desk Style Search Bar + Status Filter Pills -->
-        <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-          <!-- Big Search Bar (takes flexible wide space like Voucher Desk) -->
-          <div class="pt-search-wrap" style="flex: 1; min-width: 280px; position: relative;">
-            <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
-              <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <input type="text" id="quoteListSearchInput" class="pt-search-inp" placeholder="Search quotation #, customer, item, date, amount…" value="${safeEsc(_quoteSearchQuery)}" style="width: 100%; height: 42px; padding: 10px 38px 10px 42px; font-size: 13.5px; border: 1.5px solid var(--slate-200); border-radius: 10px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
-            ${_quoteSearchQuery ? `
-              <button type="button" id="btnQuoteClearSearch" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 15px; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Clear search">✕</button>
-            ` : ''}
-          </div>
-
+        <!-- Toolbar: Status Filter Pills (the search box sits beside the back button) -->
+        <div class="ptb" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: flex-start; gap: 14px; flex-wrap: wrap;">
           <!-- Filter Tabs / Pills -->
           <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
             <button type="button" class="quote-filter-pill ${_quoteFilterStatus === 'all' ? 'active' : ''}" onclick="window.openQuotationList('all')" style="height: 42px; border: 1.5px solid ${_quoteFilterStatus === 'all' ? 'var(--blue-600)' : 'var(--slate-200)'}; background: ${_quoteFilterStatus === 'all' ? 'var(--blue-50)' : '#fff'}; color: ${_quoteFilterStatus === 'all' ? 'var(--blue-700)' : 'var(--slate-600)'}; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
@@ -2001,6 +2015,12 @@
               <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
               <span>Active</span>
               <span style="background: ${_quoteFilterStatus === 'active' ? '#a7f3d0' : 'var(--slate-100)'}; color: ${_quoteFilterStatus === 'active' ? '#065f46' : 'var(--slate-600)'}; font-size: 11px; padding: 2px 8px; border-radius: 10px;">${activeCount}</span>
+            </button>
+
+            <button type="button" class="quote-filter-pill ${_quoteFilterStatus === 'drafted' ? 'active' : ''}" onclick="window.openQuotationList('drafted')" style="height: 42px; border: 1.5px solid ${_quoteFilterStatus === 'drafted' ? '#f59e0b' : 'var(--slate-200)'}; background: ${_quoteFilterStatus === 'drafted' ? '#fef3c7' : '#fff'}; color: ${_quoteFilterStatus === 'drafted' ? '#b45309' : 'var(--slate-600)'}; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
+              <span>Drafted</span>
+              <span style="background: ${_quoteFilterStatus === 'drafted' ? '#fde68a' : 'var(--slate-100)'}; color: ${_quoteFilterStatus === 'drafted' ? '#92400e' : 'var(--slate-600)'}; font-size: 11px; padding: 2px 8px; border-radius: 10px;">${draftedCount}</span>
             </button>
 
             <button type="button" class="quote-filter-pill ${_quoteFilterStatus === 'completed' ? 'active' : ''}" onclick="window.openQuotationList('completed')" style="height: 42px; border: 1.5px solid ${_quoteFilterStatus === 'completed' ? 'var(--blue-600)' : 'var(--slate-200)'}; background: ${_quoteFilterStatus === 'completed' ? '#eff6ff' : '#fff'}; color: ${_quoteFilterStatus === 'completed' ? '#1d4ed8' : 'var(--slate-600)'}; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
@@ -2025,38 +2045,31 @@
     `;
   }
 
-  function attachQuotationListEvents() {
-    const searchInput = document.getElementById('quoteListSearchInput');
-    if (searchInput && !searchInput._wired) {
-      searchInput._wired = true;
-      searchInput.addEventListener('input', (e) => {
-        _quoteSearchQuery = e.target.value;
-        const container = document.getElementById('quotationListFullContentArea') || document.getElementById('preInvContentArea');
-        if (container) {
-          container.innerHTML = renderQuotationList(_quoteFilterStatus);
-          attachQuotationListEvents();
-          const updatedSearch = document.getElementById('quoteListSearchInput');
-          if (updatedSearch) {
-            updatedSearch.focus();
-            updatedSearch.setSelectionRange(updatedSearch.value.length, updatedSearch.value.length);
-          }
-        }
-      });
-    }
-
-    const clearBtn = document.getElementById('btnQuoteClearSearch');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        _quoteSearchQuery = '';
-        const container = document.getElementById('quotationListFullContentArea') || document.getElementById('preInvContentArea');
-        if (container) {
-          container.innerHTML = renderQuotationList(_quoteFilterStatus);
-          attachQuotationListEvents();
-          const updatedSearch = document.getElementById('quoteListSearchInput');
-          if (updatedSearch) updatedSearch.focus();
-        }
-      });
-    }
+  // Search box in the back-button row; typing redraws only the list below it
+  function renderQuotationSearch() {
+    const slot = document.getElementById('quoteListSearchSlot');
+    if (!slot) return;
+    slot.innerHTML = `
+      <div class="pt-search-wrap" style="position: relative; width: 100%;">
+        <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
+          <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" id="quoteListSearchInput" class="pt-search-inp" placeholder="Search quotation #, customer, item, date, amount…" value="${safeEsc(_quoteSearchQuery)}" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
+        <button type="button" id="btnQuoteClearSearch" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 14px; padding: 4px; display: ${_quoteSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center;" title="Clear search">✕</button>
+      </div>`;
+    const input = slot.querySelector('#quoteListSearchInput');
+    const clearBtn = slot.querySelector('#btnQuoteClearSearch');
+    const refresh = () => {
+      clearBtn.style.display = _quoteSearchQuery ? 'flex' : 'none';
+      const container = document.getElementById('quotationListFullContentArea');
+      if (container) {
+        container.innerHTML = renderQuotationList(_quoteFilterStatus);
+        attachQuotationBulk();
+      }
+    };
+    input.addEventListener('input', (e) => { _quoteSearchQuery = e.target.value; refresh(); });
+    clearBtn.addEventListener('click', () => { _quoteSearchQuery = ''; input.value = ''; refresh(); input.focus(); });
   }
 
   // ── Global Exports ──
@@ -2072,7 +2085,6 @@
 
   window.getAllQuotations = getAllQuotations;
   window.renderQuotationList = renderQuotationList;
-  window.attachQuotationListEvents = attachQuotationListEvents;
   window.setQuotationStatus = setQuotationStatus;
   window.deleteQuotationItem = deleteQuotationItem;
   window.convertQuotationToInvoice = convertQuotationToInvoice;

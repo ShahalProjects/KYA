@@ -538,7 +538,6 @@
     healPreInvoiceReversals();
 
     showToast(`Sales Reversal "${invoiceNo}" posted. ${sel.src.type} ${sel.docNo} cancelled.`, 'success');
-    if (typeof showInvoicePostedModal === 'function') showInvoicePostedModal(invoiceNo, 'Return');
 
     window._salesReversalPreInvoice = null;
     window._editingSalesInvoice = null;
@@ -551,6 +550,13 @@
     if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
     if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
     if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+    // The posted credit note opens in its preview, ready to print or export
+    if (typeof window.viewSalesTaxInvoice === 'function') {
+      window.viewSalesTaxInvoice(voucher.id, { compact: true });
+    } else if (typeof showInvoicePostedModal === 'function') {
+      showInvoicePostedModal(invoiceNo, 'Return');
+    }
   }
 
   window.healPreInvoiceReversals = healPreInvoiceReversals;

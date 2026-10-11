@@ -3529,7 +3529,8 @@
     const supplyTypeEl = document.getElementById('salesSupplyType');
     if (supplyTypeEl) supplyTypeEl.value = 'Intra-State (CGST + SGST)';
     const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
-    if (notPaidBtn) notPaidBtn.click();
+    // A disabled button ignores .click() (a cash sale locks Not Paid); the lock state is applied again below
+    if (notPaidBtn) { notPaidBtn.disabled = false; notPaidBtn.click(); }
     const payAccEl = document.getElementById('salesPaymentAccount');
     if (payAccEl) payAccEl.value = '';
     const payAmtEl = document.getElementById('salesPaymentAmount');

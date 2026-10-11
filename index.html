@@ -3176,16 +3176,20 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage customer quotations and price proposals</div>
               </div>
             </div>
+            <!-- ⋮ Select / Make Active (preinvoice-bulk.js) -->
+            <div id="quoteListMoreSlot"></div>
           </div>
 
           <!-- Navigation row between header and content -->
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
               <button type="button" class="kya-back-btn" id="btnQuoteListBack" onclick="closeQuotationList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
                 <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
                   <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
+              <!-- Search box (quotation.js) -->
+              <div id="quoteListSearchSlot" style="flex: 1; max-width: 560px; min-width: 0;"></div>
             </div>
 
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -3503,16 +3507,20 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage provisional commercial invoices and advance billing</div>
               </div>
             </div>
+            <!-- ⋮ Select / Make Active (preinvoice-bulk.js) -->
+            <div id="proformaListMoreSlot"></div>
           </div>
 
           <!-- Navigation row between header and content -->
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
               <button type="button" class="kya-back-btn" id="btnProformaListBack" onclick="closeProformaList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
                 <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
                   <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
+              <!-- Search box (proforma.js) -->
+              <div id="proformaListSearchSlot" style="flex: 1; max-width: 560px; min-width: 0;"></div>
             </div>
 
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -3911,15 +3919,19 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage confirmed customer orders for fulfillment</div>
               </div>
             </div>
+            <!-- ⋮ Select / Make Active (preinvoice-bulk.js) -->
+            <div id="orderListMoreSlot"></div>
           </div>
 
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
               <button type="button" class="kya-back-btn" onclick="closeSalesOrderList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
                 <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
                   <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
+              <!-- Search box (preinvoice-list.js) -->
+              <div id="orderListSearchSlot" style="flex: 1; max-width: 560px; min-width: 0;"></div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <button type="button" class="btn" onclick="openQuotationList('all')" title="Open Quotation" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
@@ -3957,15 +3969,19 @@
                 <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Create and manage dispatch challans for goods in transit</div>
               </div>
             </div>
+            <!-- ⋮ Select / Make Active (preinvoice-bulk.js) -->
+            <div id="challanListMoreSlot"></div>
           </div>
 
           <div class="quote-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
               <button type="button" class="kya-back-btn" onclick="closeDeliveryChallanList()" title="Back to Pre Invoice" aria-label="Back to Pre Invoice">
                 <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
                   <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
+              <!-- Search box (preinvoice-list.js) -->
+              <div id="challanListSearchSlot" style="flex: 1; max-width: 560px; min-width: 0;"></div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <button type="button" class="btn" onclick="openQuotationList('all')" title="Open Quotation" style="background: var(--slate-50); color: var(--slate-600); border: 1.5px solid var(--slate-200); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12.5px; transition: all 0.2s;" onmouseover="this.style.background='var(--slate-100)'; this.style.color='var(--slate-800)'" onmouseout="this.style.background='var(--slate-50)'; this.style.color='var(--slate-600)'">
@@ -5028,7 +5044,7 @@
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
 <script src="js/master-desk.js?v=20261004_17"></script>
-<script src="js/journal.js?v=20261008_a1"></script>
+<script src="js/journal.js?v=20261011_v1"></script>
 <script src="js/coa.js?v=20261004_17"></script>
 <script src="js/reports.js"></script>
 <script src="js/stock-hub.js"></script>
@@ -5043,23 +5059,24 @@
 <script src="js/ledgers.js?v=20261007_1"></script>
 <script src="js/vault-settings.js?v=20260929_1"></script>
 <script src="js/kya-datepicker.js?v=20261004_1"></script>
-<script src="js/sales-form.js?v=20261008_d2"></script>
-<script src="js/sales-posting.js?v=20261008_a1"></script>
+<script src="js/sales-form.js?v=20261011_v1"></script>
+<script src="js/sales-posting.js?v=20261011_v6"></script>
 <script src="js/sales-helpers.js?v=20261007_2"></script>
 <script src="js/sales-credit-adjust.js?v=20261008_d1"></script>
 <script src="js/sales-customers.js?v=20261008_11"></script>
 <script src="js/doc-numbering.js?v=20261008_d1"></script>
 <script src="js/sales-records.js?v=20261008_v1"></script>
-<script src="js/sales-print-events.js?v=20261004_19"></script>
-<script src="js/sales-invoice-print.js?v=20261008_v1"></script>
-<script src="js/sales-invoice-export.js?v=20260918_21"></script>
-<script src="js/quotation.js?v=20261008_a1"></script>
-<script src="js/proforma.js?v=20261008_a1"></script>
-<script src="js/preinvoice-list.js?v=20261004_15"></script>
+<script src="js/sales-print-events.js?v=20261011_v2"></script>
+<script src="js/sales-invoice-print.js?v=20261011_v7"></script>
+<script src="js/sales-invoice-export.js?v=20261011_v2"></script>
+<script src="js/quotation.js?v=20261011_v4"></script>
+<script src="js/proforma.js?v=20261011_v3"></script>
+<script src="js/preinvoice-bulk.js?v=20261011_v2"></script>
+<script src="js/preinvoice-list.js?v=20261011_v3"></script>
 <script src="js/sales-order.js?v=20261008_a1"></script>
 <script src="js/delivery-challan.js?v=20261008_a1"></script>
 <script src="js/sales-preinvoice-picker.js?v=20261008_d1"></script>
-<script src="js/sales-preinvoice-reversal.js?v=20261007_1"></script>
+<script src="js/sales-preinvoice-reversal.js?v=20261011_v3"></script>
 <script src="js/purchase-form.js?v=20261008_a1"></script>
 <script src="js/company-profile.js?v=20260912_2"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>

@@ -2968,6 +2968,13 @@
     }
   }
 
+  // A sales voucher's amount on the Voucher Desk: the full value, before the customer's TDS
+  function getVoucherDeskSalesAmount(v) {
+    const tds = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0) ? parseFloat(v.tdsTcsAmount) : 0;
+    const amt = (parseFloat(v.total) || 0) + tds;
+    return typeof fmtNum === 'function' ? fmtNum(amt) : amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function getVoucherParticularsName(e, type) {
     if (!e) return '—';
     const isSales = (type === 'Invoice' || type === 'Order' || type === 'Reversal' || type === 'Sales Invoice' || type === 'Sales Order' || type === 'Sales Reversal' || (e.preparedBy === 'Sales Module'));
@@ -3189,7 +3196,7 @@
     const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
     salesDrafts.forEach(d => {
       const vType = d.isReturn ? 'Reversal' : 'Invoice';
-      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const vAmt = getVoucherDeskSalesAmount(d);
 
       list.push({
         id: d.id,
@@ -3218,7 +3225,7 @@
         const vType = v.isReturn ? 'Reversal' : 'Invoice';
         const prefix = v.isReturn ? 'SR-' : 'SV-';
         const vNo = (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-')) ? v.invoiceNo : `${prefix}${v.invoiceNo}`;
-        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const vAmt = getVoucherDeskSalesAmount(v);
 
         list.push({
           id: v.id,
@@ -3785,7 +3792,7 @@
     const salesDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchersDrafts)) ? window.KYA_STORE.salesVouchersDrafts : [];
     salesDrafts.forEach(d => {
       const vType = d.isReturn ? 'Sales Reversal' : 'Sales Invoice';
-      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const vAmt = getVoucherDeskSalesAmount(d);
 
       list.push({
         id: d.id,
@@ -3815,7 +3822,7 @@
         const vType = v.isReturn ? 'Sales Reversal' : 'Sales Invoice';
         const prefix = v.isReturn ? 'SR-' : 'SV-';
         const vNo = (v.invoiceNo && (v.invoiceNo.startsWith(prefix) || v.invoiceNo.startsWith('INV-'))) ? v.invoiceNo : `${prefix}${v.invoiceNo || ''}`;
-        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const vAmt = getVoucherDeskSalesAmount(v);
         
         const status = 'Posted';
 

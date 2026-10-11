@@ -407,8 +407,14 @@
     window._editingSalesInvoice = null;
     currentSalesVoucherSubtype = 'Invoice';
     initSalesForm();
-    openTab('sales_drafted');
+    // Stay on the Sales Invoice form, ready for the next one (drafts are listed in Voucher Desk)
+    openTab('sales_voucher');
     triggerAutoBackup();
+
+    // The saved draft opens in the same small preview popup as after Post
+    if (typeof window.viewSalesTaxInvoice === 'function') {
+      window.viewSalesTaxInvoice(draftData.id, { compact: true });
+    }
   }
 
   function postSalesInvoice() {
@@ -772,7 +778,6 @@
       }
     }
     showToast(successMsg, 'success');
-    showInvoicePostedModal(invoiceNo, _subtypeSnapshot);
 
     // If this invoice was converted from a Quotation, mark that quotation as Completed now
     const convertedQuoteId = window._pendingConvertQuotationId || (invoiceData && invoiceData.convertedFromQuotationId);
@@ -844,9 +849,16 @@
     if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
     if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
     triggerAutoBackup();
+
+    // The posted invoice (or credit note) opens in its preview, ready to print or export
+    if (typeof window.viewSalesTaxInvoice === 'function') {
+      window.viewSalesTaxInvoice(invoiceData.id, { compact: true });
+    } else {
+      showInvoicePostedModal(invoiceNo, _subtypeSnapshot);
+    }
   }
 
-  // ── Invoice Posted Success Modal ──────────────────────────────────────
+  // ── Invoice Posted Success Modal (fallback when the preview isn't loaded) ──
   function showInvoicePostedModal(invoiceNo, subtype) {
     const stale = document.getElementById('salePostedOverlay');
     if (stale) stale.remove();
@@ -1460,7 +1472,8 @@
         departmentId:    '',
         isBudget:        false,
         firstParticular: customerName || trName,
-        amount:          fmtNum(invTotal),
+        // The full invoice value, before the customer's TDS (as the tax invoice shows it)
+        amount:          fmtNum(grossReceivable),
         allRows:         invoiceJERows,
         narration:       `${cashSale ? `Cash sale — Sales Invoice No. ${invoice.invoiceNo} received in full in ${customerName}.` : `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.`}${execText} ${invoice.notes || ''}`.trim(),
         jeType:          'invoice',
