@@ -1,5 +1,9 @@
 // ══════════════════════════════════════════════════════════════════
-//  PURCHASE VOUCHER MODULE (Form, line items, product/expense portal, calculations)
+//  PURCHASE VOUCHER — New Purchase. Works like the Sales Invoice (sales-form.js /
+//  sales-posting.js): the same row pickers (Stock Items at cost + Expense ledgers, HSN/SAC
+//  codes, Unit master, ✎ Alter in Master Desk), the number format and "already used" check
+//  (doc-numbering.js), Not Paid / Full / Partial with Multi Payment, cash purchase, TDS /
+//  TCS and Round off. Posting: purchase-posting.js; preview & export: purchase-print.js.
 // ══════════════════════════════════════════════════════════════════
 
 (function() {
@@ -12,8 +16,17 @@
   if (!window.KYA_STORE.purchaseInvoiceCtr) window.KYA_STORE.purchaseInvoiceCtr = 1;
 
   let purchaseRows = [];
+  // The stored voucher open on the form: { id, isDraft } — null for a new purchase
   let _editingPurchaseVoucher = null;
   let purchaseUploadedDoc = null;
+  let purchaseMultiPayments = [];
+  let _purchasePaymentAccountPrev = '';
+
+  const MULTI_PAYMENT_VALUE = 'multi-payment';
+  const $ = id => document.getElementById(id);
+  const r2 = n => Math.round((parseFloat(n) || 0) * 100) / 100;
+  const fmt = n => (typeof fmtNum === 'function') ? fmtNum(n) : r2(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const toast = (msg, type) => { if (typeof showToast === 'function') showToast(msg, type); };
 
   function ohEsc(s) {
     if (s === null || s === undefined) return '';
@@ -25,443 +38,73 @@
       .replace(/'/g, '&#39;');
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  //  PURCHASE ITEM PORTAL (All / Product / Expense Dropdown)
-  // ══════════════════════════════════════════════════════════════════
-  const _purchaseItemPortal = (() => {
-    let el = document.getElementById('purchase-item-portal-dropdown');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'purchase-item-portal-dropdown';
-      el.style.cssText = `
-        position: fixed;
-        z-index: 99999;
-        background: #ffffff;
-        border: 1.5px solid #e2e8f0;
-        border-radius: 14px;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,.06), 0 12px 32px -4px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.02);
-        max-height: 320px;
-        overflow-y: auto;
-        overflow-x: hidden;
-        display: none;
-        min-width: 280px;
-        font-family: Inter, sans-serif;
-        scrollbar-width: thin;
-        scrollbar-color: #cbd5e1 transparent;
-      `;
-      document.body.appendChild(el);
+  function newPurchaseRow() {
+    return { item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 };
+  }
+
+  // Local date — toISOString() is UTC and gives yesterday before 05:30 IST
+  function localToday() {
+    if (typeof window.kyaLocalIso === 'function') return window.kyaLocalIso(new Date());
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  function isPurchaseZeroTaxSupply() {
+    const v = ($('purchaseSupplyType') || {}).value || '';
+    return v.includes('Zero-Rated') || v.includes('Without Tax');
+  }
+
+  // Amounts typed into the row / round-off boxes may be sums (500+250, 1000*2, 500-10%)
+  function evaluatePurchaseMathExpression(str) {
+    let clean = (str || '').toString().replace(/,/g, '').trim();
+    if (!clean) return 0;
+    clean = clean.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)');
+    if (!/^[0-9.+\-*/()\s]+$/.test(clean)) return NaN;
+    try {
+      const result = Function(`"use strict"; return (${clean})`)();
+      return typeof result === 'number' && isFinite(result) ? result : NaN;
+    } catch (e) {
+      return NaN;
     }
+  }
 
-    if (!document.getElementById('purchase-item-portal-styles')) {
-      const style = document.createElement('style');
-      style.id = 'purchase-item-portal-styles';
-      style.textContent = `
-        #purchase-item-portal-dropdown.open {
-          display: block !important;
-          animation: jeDropIn .14s cubic-bezier(.2,0,.2,1);
-        }
-      `;
-      document.head.appendChild(style);
+  function parsePurchaseAmt(str) {
+    const cleanStr = (str || '').toString().replace(/,/g, '').trim();
+    if (!cleanStr) return 0;
+    if (/[\+\-\*\/\%]/.test(cleanStr)) {
+      const evalVal = evaluatePurchaseMathExpression(cleanStr);
+      if (!isNaN(evalVal)) return evalVal;
     }
-
-    let _activeInp    = null;
-    let _activeCb     = null;
-    let _highlightIdx = -1;
-    let _open         = false;
-    let _activeFilter = 'all'; // 'all', 'product', 'expense'
-
-    function _items() { return el.querySelectorAll('.je-drop-item'); }
-
-    function _setHL(idx) {
-      const items = _items();
-      items.forEach(it => it.classList.remove('highlighted'));
-      _highlightIdx = idx;
-      if (idx >= 0 && idx < items.length) {
-        items[idx].classList.add('highlighted');
-        items[idx].scrollIntoView({ block: 'nearest' });
-      }
-    }
-
-    function _position(inp) {
-      const r          = inp.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - r.bottom - 8;
-      const spaceAbove = r.top - 8;
-      const maxH       = Math.min(320, Math.max(spaceBelow, spaceAbove) - 8);
-      el.style.maxHeight = maxH + 'px';
-      el.style.width     = Math.max(r.width, 320) + 'px';
-      el.style.left      = r.left + 'px';
-      if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
-        el.style.top    = (r.bottom + 6) + 'px';
-        el.style.bottom = 'auto';
-      } else {
-        el.style.top    = 'auto';
-        el.style.bottom = (window.innerHeight - r.top + 6) + 'px';
-      }
-    }
-
-    function getProductsList() {
-      const set = new Set();
-      set.add('Raw Materials');
-      set.add('Stock Item A');
-      set.add('Finished Goods');
-      set.add('Product Goods');
-      set.add('Packaging Materials');
-      set.add('Office Supplies');
-      
-      if (window.KYA_STORE && window.KYA_STORE.purchaseVouchers) {
-        window.KYA_STORE.purchaseVouchers.forEach(v => {
-          if (v.rows) {
-            v.rows.forEach(r => {
-              if (r.item && (!r.itemType || r.itemType === 'Product')) set.add(r.item);
-            });
-          }
-        });
-      }
-      return Array.from(set).map(name => ({ name, type: 'Product' }));
-    }
-
-    function getExpensesList() {
-      const ledgers = typeof coaLedgers !== 'undefined' ? coaLedgers : [];
-      const sgs = typeof COA_SYS_SGS !== 'undefined' && Array.isArray(COA_SYS_SGS) ? COA_SYS_SGS : [];
-      
-      const expenseSgIds = new Set(sgs.filter(s => s.main === 'expense').map(s => s.id));
-      
-      return ledgers
-        .filter(l => {
-          if (l.type === 'group-ledger') return false;
-          if (expenseSgIds.has(l.sgId)) return true;
-          if (l.sgId && (l.sgId.startsWith('sg-e') || l.sgId === 'sg-cmc' || l.sgId === 'sg-pst' || l.sgId === 'sg-cinv' || l.sgId === 'sg-oe' || l.sgId === 'sg-tax')) return true;
-          if (typeof getLedgerMainGroup === 'function' && getLedgerMainGroup(l) === 'expense') return true;
-          return false;
-        })
-        .map(l => ({
-          name: l.name,
-          type: 'Expense',
-          id: l.id,
-          aliases: l.aliases || [],
-          code: l.code || ''
-        }));
-    }
-
-    function open(inp, query, onSelect) {
-      _activeInp    = inp;
-      _activeCb     = onSelect;
-      _highlightIdx = -1;
-      _position(inp);
-      _renderPortalList(query);
-      el.classList.add('open');
-      _open = true;
-    }
-
-    function _renderPortalList(query) {
-      const q = (query || '').toLowerCase().trim();
-      el.innerHTML = '';
-
-      const filterBar = document.createElement('div');
-      filterBar.className = 'je-drop-filter-bar';
-      filterBar.style.cssText = `
-        display: flex; gap: 4px; padding: 6px 8px; background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0; border-radius: 12px 12px 0 0;
-        position: sticky; top: 0; z-index: 10;
-      `;
-      const tabs = [
-        { id: 'all', label: 'All' },
-        { id: 'product', label: 'Product' },
-        { id: 'expense', label: 'Expense' }
-      ];
-      tabs.forEach(t => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = t.label;
-        const isActive = t.id === _activeFilter;
-        let activeBorder = '#3b82f6';
-        let activeBg = '#eff6ff';
-        let activeColor = '#1d4ed8';
-        if (t.id === 'expense' && isActive) {
-          activeBorder = '#ef4444';
-          activeBg = '#fef2f2';
-          activeColor = '#dc2626';
-        }
-        btn.style.cssText = `
-          flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 700;
-          border-radius: 6px; border: 1px solid ${isActive ? activeBorder : '#cbd5e1'};
-          background: ${isActive ? activeBg : '#ffffff'};
-          color: ${isActive ? activeColor : '#475569'};
-          cursor: pointer; font-family: inherit; transition: all 0.12s; text-align: center;
-        `;
-        const handleTabSwitch = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          _activeFilter = t.id;
-          _renderPortalList(_activeInp ? _activeInp.value : '');
-          if (_activeInp) _activeInp.focus();
-        };
-        btn.addEventListener('mousedown', handleTabSwitch);
-        btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
-        filterBar.appendChild(btn);
-      });
-      el.appendChild(filterBar);
-
-      let products = _activeFilter === 'expense' ? [] : getProductsList();
-      let expenses = _activeFilter === 'product' ? [] : getExpensesList();
-
-      if (q) {
-        products = products.filter(p => p.name.toLowerCase().includes(q));
-        expenses = expenses.filter(s => s.name.toLowerCase().includes(q) || (s.aliases && s.aliases.some(a => a.toLowerCase().includes(q))));
-      }
-
-      const queryHighlight = (text, pat) => {
-        if (!pat) return text;
-        const idx = text.toLowerCase().indexOf(pat.toLowerCase());
-        if (idx < 0) return text;
-        return text.slice(0, idx)
-          + `<span class="je-drop-hl">${text.slice(idx, idx + pat.length)}</span>`
-          + text.slice(idx + pat.length);
-      };
-
-      if (!products.length && !expenses.length) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'je-drop-empty';
-        emptyDiv.innerHTML = `
-          <svg class="je-drop-empty-icon" width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
-            <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-          <span class="je-drop-empty-txt">No product or expense found</span>
-          <span class="je-drop-empty-sub">Type custom description directly or filter by category</span>
-        `;
-        el.appendChild(emptyDiv);
-      } else {
-        if (products.length > 0) {
-          const hdr = document.createElement('div');
-          hdr.className = 'je-drop-header';
-          hdr.textContent = 'Products';
-          el.appendChild(hdr);
-          products.forEach(p => {
-            const item = document.createElement('div');
-            item.className = 'je-drop-item';
-            item.innerHTML = `
-              <span class="je-drop-dot" style="background:#3b82f6"></span>
-              <span class="je-drop-name" style="flex:1">${queryHighlight(p.name, q)}</span>
-              <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#eff6ff;color:#2563eb;text-transform:uppercase;">Product</span>
-            `;
-            const handleItemSelect = (e) => {
-              if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-              }
-              const sel = p;
-              const cb = _activeCb;
-              const inp = _activeInp;
-              close();
-              if (inp) inp.value = sel.name;
-              if (cb) cb(sel);
-            };
-            item.addEventListener('mousedown', handleItemSelect);
-            item.addEventListener('click', handleItemSelect);
-            el.appendChild(item);
-          });
-        }
-
-        if (expenses.length > 0) {
-          const hdr = document.createElement('div');
-          hdr.className = 'je-drop-header';
-          hdr.textContent = 'Expense Accounts';
-          el.appendChild(hdr);
-          expenses.forEach(s => {
-            const item = document.createElement('div');
-            item.className = 'je-drop-item';
-            const akaStr = s.aliases && s.aliases.length > 0 ? ` [A.K.A: ${s.aliases.join(', ')}]` : '';
-            item.innerHTML = `
-              <span class="je-drop-dot" style="background:#ef4444"></span>
-              <span class="je-drop-name" style="flex:1">${queryHighlight(s.name, q)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${queryHighlight(akaStr, q)}</span>` : ''}</span>
-              <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#fef2f2;color:#dc2626;text-transform:uppercase;">Expense</span>
-            `;
-            const handleItemSelect = (e) => {
-              if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-              }
-              const sel = s;
-              const cb = _activeCb;
-              const inp = _activeInp;
-              close();
-              if (inp) inp.value = sel.name;
-              if (cb) cb(sel);
-            };
-            item.addEventListener('mousedown', handleItemSelect);
-            item.addEventListener('click', handleItemSelect);
-            el.appendChild(item);
-          });
-        }
-      }
-    }
-
-    function close() {
-      if (!_open) return;
-      el.classList.remove('open');
-      el.style.display = 'none';
-      _open         = false;
-      _activeInp    = null;
-      _activeCb     = null;
-      _highlightIdx = -1;
-    }
-
-    function isOpen() { return _open; }
-
-    function onKey(e) {
-      if (!_open) return false;
-      const items = _items();
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const next = _highlightIdx + 1 >= items.length ? 0 : _highlightIdx + 1;
-        _setHL(next);
-        return true;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prev = _highlightIdx - 1 < 0 ? items.length - 1 : _highlightIdx - 1;
-        _setHL(prev);
-        return true;
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        const targetIdx = _highlightIdx >= 0 ? _highlightIdx : 0;
-        if (items[targetIdx]) {
-          e.preventDefault();
-          items[targetIdx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-          return true;
-        }
-      }
-      if (e.key === 'Escape') {
-        close();
-        return true;
-      }
-      return false;
-    }
-
-    document.addEventListener('mousedown', e => {
-      if (_open && !el.contains(e.target) && e.target !== _activeInp) {
-        close();
-      }
-    });
-
-    window.addEventListener('resize', () => { if (_open && _activeInp) _position(_activeInp); });
-    window.addEventListener('scroll', () => { if (_open && _activeInp) _position(_activeInp); }, true);
-
-    return { open, close, isOpen, onKey, renderList: _renderPortalList };
-  })();
+    const v = parseFloat(cleanStr);
+    return isNaN(v) ? 0 : v;
+  }
 
   // ══════════════════════════════════════════════════════════════════
-  //  FORM INITIALIZATION & DEFAULTS
+  //  NUMBERING — prefix / start / digits (pencil), "already used" check (doc-numbering.js)
   // ══════════════════════════════════════════════════════════════════
+  function getPurchaseOwnId() {
+    return _editingPurchaseVoucher ? _editingPurchaseVoucher.id : null;
+  }
 
   function getNextPurchaseInvoiceNo() {
-    const ctr = window.KYA_STORE.purchaseInvoiceCtr || 1;
-    return `PUR-2026-${String(ctr).padStart(3, '0')}`;
+    if (typeof getNextDocNo === 'function') return getNextDocNo('purchase');
+    return `PUR-${new Date().getFullYear()}-${String(window.KYA_STORE.purchaseInvoiceCtr || 1).padStart(3, '0')}`;
   }
 
-  function initPurchaseForm() {
-    // 1. Date
-    const dateEl = document.getElementById('purchaseDate');
-    if (dateEl) {
-      const today = new Date().toISOString().split('T')[0];
-      dateEl.value = today;
-    }
-
-    // 2. Invoice No & Chip
-    const invNo = getNextPurchaseInvoiceNo();
-    const invNoEl = document.getElementById('purchaseInvoiceNo');
-    if (invNoEl) invNoEl.value = invNo;
-    
-    const chipEl = document.getElementById('purchaseVoucherChipDisplay');
-    if (chipEl) chipEl.textContent = invNo;
-
-    // 3. Populate dropdowns
-    populatePurchaseVendors();
-    populatePurchaseExecutives();
-    populatePurchasePaymentAccounts();
-
-    // 4. Default Supply Type
-    const supplyEl = document.getElementById('purchaseSupplyType');
-    if (supplyEl) supplyEl.value = 'Intra-State (CGST + SGST)';
-
-    // 5. Payment status default
-    setPurchasePaymentStatus('NotPaid');
-
-    // 6. Reset notes and TDS/TCS
-    const notesEl = document.getElementById('purchaseNotes');
-    if (notesEl) notesEl.value = '';
-
-    setPurchaseTdsTcs('None');
-
-    const adjEl = document.getElementById('purchaseAdjustments');
-    if (adjEl) adjEl.value = '';
-
-    // 7. Reset Document upload
-    resetPurchaseDocAttachment();
-
-    // 8. Initialize rows
-    purchaseRows = [
-      { item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0, itemType: 'Product' }
-    ];
-    if (!_editingPurchaseVoucher) {
-      window._purchasePartyOverride = null;
-    }
-    renderPurchaseRows();
-    recalculatePurchaseTotals();
+  function validatePurchaseNoField() {
+    return (typeof validateDocNoField === 'function') ? validateDocNoField('purchase') : true;
   }
 
-  function loadPurchaseVoucher(v, isDraft = false) {
-    if (!v) return;
-    _editingPurchaseVoucher = v;
-    window._purchasePartyOverride = v.partyOverride ? JSON.parse(JSON.stringify(v.partyOverride)) : null;
-
-    const dateEl = document.getElementById('purchaseDate');
-    if (dateEl) dateEl.value = v.date || '';
-
-    const invNoEl = document.getElementById('purchaseInvoiceNo');
-    if (invNoEl) invNoEl.value = v.invoiceNo || '';
-
-    const chipEl = document.getElementById('purchaseVoucherChipDisplay');
-    if (chipEl) chipEl.textContent = v.invoiceNo || 'PUR-XXXX';
-
-    populatePurchaseVendors(v.vendorId);
-    populatePurchaseExecutives(v.executiveId);
-    populatePurchasePaymentAccounts(v.paymentAccountId);
-
-    const supplyEl = document.getElementById('purchaseSupplyType');
-    if (supplyEl) supplyEl.value = v.supplyType || 'Intra-State (CGST + SGST)';
-
-    const notesEl = document.getElementById('purchaseNotes');
-    if (notesEl) notesEl.value = v.notes || '';
-
-    const dueEl = document.getElementById('purchaseDueDate');
-    if (dueEl) dueEl.value = v.dueDate || '';
-
-    const adjEl = document.getElementById('purchaseAdjustments');
-    if (adjEl) adjEl.value = (v.adjustments !== undefined && v.adjustments !== 0) ? v.adjustments : '';
-
-    if (v.paymentStatus === 'Full Payment') setPurchasePaymentStatus('Full');
-    else if (v.paymentStatus === 'Partial Payment') {
-      setPurchasePaymentStatus('Partial');
-      const amtEl = document.getElementById('purchasePaymentAmount');
-      if (amtEl) amtEl.value = v.paymentAmount || '';
-    } else {
-      setPurchasePaymentStatus('NotPaid');
-    }
-
-    if (v.tdsTcsMode === 'TDS') setPurchaseTdsTcs('TDS');
-    else if (v.tdsTcsMode === 'TCS') setPurchaseTdsTcs('TCS');
-    else setPurchaseTdsTcs('None');
-
-    if (v.rows && Array.isArray(v.rows)) {
-      purchaseRows = JSON.parse(JSON.stringify(v.rows));
-      renderPurchaseRows();
-      recalculatePurchaseTotals();
+  // Save Draft is for a new voucher or a draft: a posted one is changed with Save Purchase
+  function refreshPurchaseDraftButton() {
+    if (typeof syncDocDraftButton === 'function') {
+      syncDocDraftButton('purchase', (_editingPurchaseVoucher && !_editingPurchaseVoucher.isDraft) ? _editingPurchaseVoucher.id : null);
     }
   }
-  window.loadPurchaseVoucher = loadPurchaseVoucher;
 
+  // ══════════════════════════════════════════════════════════════════
+  //  VENDOR — Cash and Cash Equivalents (cash purchase), Suppliers, Trade Payables ledgers
+  // ══════════════════════════════════════════════════════════════════
   let _purchVendorSearchControl = null;
   function getPurchVendorSearchControl() {
     if (!_purchVendorSearchControl && typeof initPartySearchableSelect === 'function') {
@@ -470,69 +113,115 @@
     return _purchVendorSearchControl;
   }
 
+  function getCashEquivalentLedgers() {
+    if (typeof getSalesCashEquivalentLedgers === 'function') return getSalesCashEquivalentLedgers();
+    return (typeof coaLedgers !== 'undefined' ? coaLedgers : []).filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
+  }
+
   function populatePurchaseVendors(selectedId = null) {
-    const vendorSelect = document.getElementById('purchaseVendor');
+    const vendorSelect = $('purchaseVendor');
     if (!vendorSelect) return;
 
     vendorSelect.innerHTML = '<option value="">&mdash; Select Vendor &mdash;</option>';
 
+    // Each <optgroup> is a section of the list, as on the Sales Invoice's customer box:
+    // Cash and Cash Equivalents first (a cash purchase, paid in full from that account),
+    // then Suppliers, then Trade Payables ledgers
+    const addParty = (group, p) => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      const akaStr = p.aliases && p.aliases.length > 0 ? ` [A.K.A: ${p.aliases.join(', ')}]` : '';
+      opt.textContent = p.name + akaStr;
+      if (selectedId && String(p.id) === String(selectedId)) opt.selected = true;
+      group.appendChild(opt);
+    };
+    const newGroup = label => {
+      const group = document.createElement('optgroup');
+      group.label = label;
+      return group;
+    };
+
+    const cashGroup = newGroup('Cash and Cash Equivalents');
+    getCashEquivalentLedgers().forEach(l => addParty(cashGroup, l));
+
+    const suppGroup = newGroup('Suppliers');
     const suppliers = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
     const addedNames = new Set();
-
-    suppliers.forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v.id;
-      const akaStr = v.aliases && v.aliases.length > 0 ? ` [A.K.A: ${v.aliases.join(', ')}]` : '';
-      opt.textContent = v.name + akaStr;
-      if (selectedId && String(v.id) === String(selectedId)) {
-        opt.selected = true;
-      }
-      vendorSelect.appendChild(opt);
-      addedNames.add((v.name || '').trim().toLowerCase());
+    suppliers.forEach(s => {
+      addParty(suppGroup, s);
+      addedNames.add((s.name || '').trim().toLowerCase());
     });
 
-    // Also include ledgers created under Trade Payables group in Master Desk → Ledgers
+    // Ledgers created under Trade Payables in Master Desk → Ledgers
+    const ledgerGroup = newGroup('Ledgers');
     if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
       coaLedgers.forEach(l => {
         if (l.type === 'ledger' && l.sgId === 'sg-tp' && l.name && l.name.trim().toLowerCase() !== 'trade payables') {
           if (!addedNames.has(l.name.trim().toLowerCase())) {
-            const opt = document.createElement('option');
-            opt.value = l.id;
-            const akaStr = l.aliases && l.aliases.length > 0 ? ` [A.K.A: ${l.aliases.join(', ')}]` : '';
-            opt.textContent = l.name + akaStr;
-            if (selectedId && String(l.id) === String(selectedId)) {
-              opt.selected = true;
-            }
-            vendorSelect.appendChild(opt);
+            addParty(ledgerGroup, l);
             addedNames.add(l.name.trim().toLowerCase());
           }
         }
       });
     }
+    [cashGroup, suppGroup, ledgerGroup].forEach(group => { if (group.children.length) vendorSelect.appendChild(group); });
 
     const control = getPurchVendorSearchControl();
     if (control) control.refresh();
+    refreshPurchaseVendorAlterPencil();
+  }
+
+  // "Create new" at the bottom of the vendor list: a ledger under Trade Payables (coa.js)
+  function appendPurchasePartyCreateFooter(listEl, query) {
+    if (!listEl) return;
+    const raw = (query || '').trim();
+    const wrap = document.createElement('div');
+    wrap.className = 'kya-party-create-footer';
+    wrap.style.cssText = 'position: sticky; bottom: -8px; z-index: 5; background: #fff; border-top: 1px solid var(--slate-200); margin: 4px -8px -8px; padding: 8px 10px 10px; border-radius: 0 0 12px 12px;';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size: 11px; font-weight: 600; color: var(--slate-500); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+    label.textContent = raw ? `Create "${raw}" as` : 'Create new';
+    wrap.appendChild(label);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'je-drop-create-item';
+    btn.style.cssText = 'width: 100%; justify-content: center; padding: 7px 10px; font-size: 12px;';
+    btn.title = 'Create a ledger under Trade Payables';
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Ledger</span>';
+    btn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dd = $('purchaseVendorSelectDropdown');
+      if (dd) dd.style.display = 'none';
+      if (typeof hidePartyHoverCard === 'function') hidePartyHoverCard();
+      if (typeof window.openMasterDeskCreateLedger === 'function') {
+        window.openMasterDeskCreateLedger({ initialName: raw, groupVal: 'sg:sg-tp', returnTab: 'purchase_voucher', selectId: 'purchaseVendor' });
+      }
+    });
+    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+    wrap.appendChild(btn);
+    listEl.appendChild(wrap);
   }
 
   window.onPartyCreatedForPurchase = function(newParty, partySource) {
     if (!newParty) return;
     populatePurchaseVendors(newParty.id);
     setTimeout(() => {
-      const vendorSelect = document.getElementById('purchaseVendor');
+      const vendorSelect = $('purchaseVendor');
       if (vendorSelect) {
         vendorSelect.value = newParty.id;
         vendorSelect.dispatchEvent(new Event('change', { bubbles: true }));
       }
       const ctrl = getPurchVendorSearchControl();
       if (ctrl) ctrl.refresh();
-      showToast(`${partySource === 'ledger' ? 'Ledger' : 'Supplier'} "${newParty.name}" selected.`, 'success');
+      toast(`${partySource === 'ledger' ? 'Ledger' : 'Supplier'} "${newParty.name}" selected.`, 'success');
     }, 60);
   };
 
   window.onPartyCreationCancelledForPurchase = function(initialName) {
     setTimeout(() => {
-      const dropdown = document.getElementById('purchaseVendorSelectDropdown');
-      const searchInput = document.getElementById('purchaseVendorSelectSearch');
+      const dropdown = $('purchaseVendorSelectDropdown');
+      const searchInput = $('purchaseVendorSelectSearch');
       if (dropdown && searchInput) {
         dropdown.style.display = 'flex';
         if (initialName !== undefined && initialName !== null) {
@@ -544,8 +233,103 @@
     }, 60);
   };
 
+  // Vendor box pencil: shown once a vendor (supplier or ledger) is picked
+  function getPurchaseVendorMaster() {
+    const val = ($('purchaseVendor') || {}).value;
+    if (!val) return null;
+    const supp = (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : []).find(s => String(s.id) === String(val));
+    if (supp) return { tab: 'suppliers', id: supp.id };
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      const l = coaLedgers.find(x => String(x.id) === String(val));
+      if (l) return { tab: 'ledger', id: l.id };
+    }
+    return null;
+  }
+
+  function refreshPurchaseVendorAlterPencil() {
+    const btn = $('btnPurchaseVendorAlter');
+    const text = $('purchaseVendorSelectTriggerText');
+    const show = !!getPurchaseVendorMaster();
+    if (btn) btn.hidden = !show;
+    // Keep a long name clear of the pencil
+    if (text) {
+      text.style.paddingRight = show ? '26px' : '';
+      text.style.overflow = 'hidden';
+      text.style.textOverflow = 'ellipsis';
+      text.style.whiteSpace = 'nowrap';
+    }
+  }
+
+  function onPurchaseVendorAltered(tab, record) {
+    // Same vendor, refreshed name / details. The voucher's copy of the party is dropped so
+    // it rebuilds from the altered master — unless it was edited for this voucher on purpose
+    const ov = window._purchasePartyOverride;
+    if (ov && String(ov.partyId) === String(record.id) && !ov.isOverridden) window._purchasePartyOverride = null;
+    populatePurchaseVendors(record.id);
+    const sel = $('purchaseVendor');
+    if (sel) {
+      sel.value = record.id;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    refreshPurchaseVendorAlterPencil();
+  }
+
+  // ── Cash purchase: a Cash and Cash Equivalents ledger picked as the vendor ──
+  // The money goes out there and then, so the payment is always Full Payment from that same
+  // account; Not Paid / Partial and Multi Payment don't apply (as on a cash sale).
+  function getPurchaseCashVendorLedger() {
+    const id = ($('purchaseVendor') || {}).value;
+    if (!id || typeof coaLedgers === 'undefined' || !Array.isArray(coaLedgers)) return null;
+    return coaLedgers.find(l => l && l.type === 'ledger' && l.sgId === 'sg-cce' && String(l.id) === String(id)) || null;
+  }
+
+  function setPurchaseCashLocked(el, locked) {
+    if (!el) return;
+    el.disabled = locked;
+    el.style.cursor = locked ? 'not-allowed' : '';
+    if (el.tagName === 'SELECT') el.style.backgroundColor = locked ? 'var(--slate-50)' : '';
+    else el.style.opacity = locked ? '0.5' : '';
+    if (locked) el.dataset.cashLocked = '1';
+    else delete el.dataset.cashLocked;
+  }
+
+  const PURCHASE_CASH_LOCK_IDS = ['purchasePaymentStatusNotPaid', 'purchasePaymentStatusPartial', 'purchasePaymentAccount'];
+
+  function applyPurchaseCashVendorLock() {
+    const cash = getPurchaseCashVendorLedger();
+    const fullBtn = $('purchasePaymentStatusFull');
+    const paySel = $('purchasePaymentAccount');
+    if (!cash) {
+      // Another party now: undo only what this lock did
+      PURCHASE_CASH_LOCK_IDS.forEach(id => {
+        const el = $(id);
+        if (el && el.dataset.cashLocked) setPurchaseCashLocked(el, false);
+      });
+      if (paySel) paySel.title = '';
+      return false;
+    }
+    if (fullBtn && !fullBtn.classList.contains('active')) {
+      fullBtn.disabled = false;
+      setPurchasePaymentStatus('Full');
+    }
+    if (fullBtn) { fullBtn.disabled = false; fullBtn.style.cursor = ''; fullBtn.style.opacity = ''; }
+    setPurchaseCashLocked($('purchasePaymentStatusNotPaid'), true);
+    setPurchaseCashLocked($('purchasePaymentStatusPartial'), true);
+    if (paySel) {
+      if (String(paySel.value) !== String(cash.id)) {
+        resetPurchaseMultiPayments();
+        populatePurchasePaymentAccounts(cash.id);
+        paySel.value = String(cash.id);
+        updatePurchaseMultiPaymentUI();
+      }
+      setPurchaseCashLocked(paySel, true);
+      paySel.title = `Cash purchase — paid in full from ${cash.name}`;
+    }
+    return true;
+  }
+
   function populatePurchaseExecutives(selectedId = null) {
-    const execSelect = document.getElementById('purchaseExecutive');
+    const execSelect = $('purchaseExecutive');
     if (!execSelect) return;
 
     execSelect.innerHTML = '<option value="">&mdash; Select Executive &mdash;</option>';
@@ -555,179 +339,196 @@
       const opt = document.createElement('option');
       opt.value = e.id;
       opt.textContent = `${e.name} (${e.code || 'EMP'})`;
-      if (selectedId && e.id == selectedId) {
-        opt.selected = true;
-      }
+      if (selectedId && e.id == selectedId) opt.selected = true;
       execSelect.appendChild(opt);
     });
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  PAYMENT STATUS, ACCOUNTS & MULTI PAYMENT
+  // ══════════════════════════════════════════════════════════════════
   function populatePurchasePaymentAccounts(selectedId = null) {
-    const paySelect = document.getElementById('purchasePaymentAccount');
+    const paySelect = $('purchasePaymentAccount');
     if (!paySelect) return;
 
     paySelect.innerHTML = '<option value="">&mdash; Select &mdash;</option>';
-
-    const ledgers = typeof coaLedgers !== 'undefined' ? coaLedgers : [];
-    const accounts = ledgers.filter(l => l.type === 'ledger' && l.sgId === 'sg-cce');
-    accounts.forEach(a => {
+    getCashEquivalentLedgers().forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.id;
       opt.textContent = a.name;
-      if (selectedId && a.id == selectedId) {
-        opt.selected = true;
-      }
+      if (selectedId && String(a.id) === String(selectedId)) opt.selected = true;
       paySelect.appendChild(opt);
     });
+
+    const multiOpt = document.createElement('option');
+    multiOpt.value = MULTI_PAYMENT_VALUE;
+    multiOpt.textContent = 'Multi Payment';
+    if (String(selectedId) === MULTI_PAYMENT_VALUE) multiOpt.selected = true;
+    paySelect.appendChild(multiOpt);
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  //  PAYMENT STATUS & DUE DATE
-  // ══════════════════════════════════════════════════════════════════
+  function getPurchasePaymentStatus() {
+    if ($('purchasePaymentStatusFull')?.classList.contains('active')) return 'Full Payment';
+    if ($('purchasePaymentStatusPartial')?.classList.contains('active')) return 'Partial Payment';
+    return 'Not Paid';
+  }
 
   function setPurchasePaymentStatus(status) {
-    const notPaidBtn = document.getElementById('purchasePaymentStatusNotPaid');
-    const fullBtn    = document.getElementById('purchasePaymentStatusFull');
-    const partBtn    = document.getElementById('purchasePaymentStatusPartial');
-    const bg         = document.getElementById('purchasePaymentStatusBg');
-
-    const dueDateField = document.getElementById('purchaseDueDateField');
-    const payAcctField = document.getElementById('purchasePaymentAccountField');
-    const payAmtField  = document.getElementById('purchasePaymentAmountField');
-
+    const notPaidBtn = $('purchasePaymentStatusNotPaid');
+    const fullBtn    = $('purchasePaymentStatusFull');
+    const partBtn    = $('purchasePaymentStatusPartial');
+    const bg         = $('purchasePaymentStatusBg');
+    const dueDateField = $('purchaseDueDateField');
+    const payAcctField = $('purchasePaymentAccountField');
+    const payAmtField  = $('purchasePaymentAmountField');
+    const wrapper = $('purchaseDueDateWrapper');
     if (!notPaidBtn || !fullBtn || !partBtn) return;
 
     [notPaidBtn, fullBtn, partBtn].forEach(b => b.classList.remove('active'));
 
-    if (status === 'NotPaid') {
-      notPaidBtn.classList.add('active');
-      if (bg) bg.className = 'sales-paystatus-bg notpaid-active';
-      if (dueDateField) dueDateField.style.display = 'flex';
-      if (payAcctField) payAcctField.style.display = 'none';
-      if (payAmtField)  payAmtField.style.display  = 'none';
-
-      const wrapper = document.getElementById('purchaseDueDateWrapper');
-      if (wrapper) {
-        wrapper.style.flexDirection = 'row';
-        wrapper.style.alignItems = 'center';
-        wrapper.style.gap = '8px';
-      }
-
-      const dueInp = document.getElementById('purchaseDueDate');
-      if (dueInp && !dueInp.value) {
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        dueInp.value = d.toISOString().split('T')[0];
-      }
-      updatePurchaseDueDateDays();
-    } else if (status === 'Full') {
+    if (status === 'Full') {
       fullBtn.classList.add('active');
       if (bg) bg.className = 'sales-paystatus-bg fullpaid-active';
-      if (dueDateField) dueDateField.style.display = 'none';
       if (payAcctField) payAcctField.style.display = 'flex';
-      if (payAmtField)  payAmtField.style.display  = 'none';
-      populatePurchasePaymentAccounts();
+      if (payAmtField) payAmtField.style.display = 'none';
+      if (dueDateField) dueDateField.style.display = 'none';
+      populatePurchasePaymentAccounts($('purchasePaymentAccount')?.value || ''); // keep the account already chosen
     } else if (status === 'Partial') {
       partBtn.classList.add('active');
       if (bg) bg.className = 'sales-paystatus-bg partpaid-active';
-      if (dueDateField) dueDateField.style.display = 'flex';
       if (payAcctField) payAcctField.style.display = 'flex';
-      if (payAmtField)  payAmtField.style.display  = 'flex';
-
-      const wrapper = document.getElementById('purchaseDueDateWrapper');
+      if (payAmtField) payAmtField.style.display = 'flex';
+      if (dueDateField) dueDateField.style.display = 'flex';
       if (wrapper) {
         wrapper.style.flexDirection = 'column';
         wrapper.style.alignItems = 'flex-start';
         wrapper.style.gap = '4px';
       }
-
-      const dueInp = document.getElementById('purchaseDueDate');
-      if (dueInp && !dueInp.value) {
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        dueInp.value = d.toISOString().split('T')[0];
+      updatePurchaseDueDateDays();
+      populatePurchasePaymentAccounts($('purchasePaymentAccount')?.value || ''); // keep the account already chosen
+    } else {
+      notPaidBtn.classList.add('active');
+      if (bg) bg.className = 'sales-paystatus-bg notpaid-active';
+      if (payAcctField) payAcctField.style.display = 'none';
+      if (payAmtField) payAmtField.style.display = 'none';
+      if (dueDateField) dueDateField.style.display = 'flex';
+      if (wrapper) {
+        wrapper.style.flexDirection = 'row';
+        wrapper.style.alignItems = 'center';
       }
       updatePurchaseDueDateDays();
-      populatePurchasePaymentAccounts();
     }
+    recalculatePurchaseTotals();
   }
 
   function updatePurchaseDueDateDays() {
-    const dateEl = document.getElementById('purchaseDate');
-    const dueInp = document.getElementById('purchaseDueDate');
-    const daysEl = document.getElementById('purchaseDueDateDays');
-    if (!dueInp || !daysEl) return;
-
-    const dateVal = dateEl ? dateEl.value : null;
-    const dueVal  = dueInp.value;
-    if (!dueVal) {
+    const dateVal = ($('purchaseDate') || {}).value;
+    const dueVal = ($('purchaseDueDate') || {}).value;
+    const daysEl = $('purchaseDueDateDays');
+    if (!daysEl) return;
+    if (!dateVal || !dueVal) {
       daysEl.textContent = '';
       return;
     }
-
-    const d1 = dateVal ? new Date(dateVal) : new Date();
+    const d1 = new Date(dateVal);
     const d2 = new Date(dueVal);
-    d1.setHours(0,0,0,0);
-    d2.setHours(0,0,0,0);
-
-    const diffTime = d2.getTime() - d1.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
+    d1.setHours(0, 0, 0, 0);
+    d2.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays > 0) {
       daysEl.textContent = `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
       daysEl.style.color = 'var(--blue-600)';
     } else if (diffDays === 0) {
       daysEl.textContent = 'Due today';
-      daysEl.style.color = 'var(--amber-600)';
+      daysEl.style.color = 'var(--slate-500)';
     } else {
-      daysEl.textContent = `${Math.abs(diffDays)} days overdue`;
+      daysEl.textContent = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) > 1 ? 's' : ''}`;
       daysEl.style.color = 'var(--red-600)';
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  //  TDS / TCS CONTROLS
-  // ══════════════════════════════════════════════════════════════════
+  function isPurchaseMultiPaymentSelected() {
+    return ($('purchasePaymentAccount') || {}).value === MULTI_PAYMENT_VALUE;
+  }
 
-  function setPurchaseTdsTcs(mode) {
-    const noneBtn = document.getElementById('purchaseTdsTcsNone');
-    const tdsBtn  = document.getElementById('purchaseTdsTcsTds');
-    const tcsBtn  = document.getElementById('purchaseTdsTcsTcs');
-    const bg      = document.getElementById('purchaseTdsTcsBg');
-    const amtRow  = document.getElementById('purchaseTdsTcsAmountRow');
-    const lbl     = document.getElementById('purchaseTdsTcsAmountLabel');
+  // Amount that has to be distributed across the Multi Payment accounts
+  function getPurchaseMultiPaymentTarget() {
+    const status = getPurchasePaymentStatus();
+    if (status === 'Full Payment') return getPurchaseGrandTotal();
+    if (status === 'Partial Payment') return parseFloat(($('purchasePaymentAmount') || {}).value) || 0;
+    return 0;
+  }
 
-    if (!noneBtn || !tdsBtn || !tcsBtn) return;
-
-    [noneBtn, tdsBtn, tcsBtn].forEach(b => b.classList.remove('active'));
-
-    if (mode === 'None') {
-      noneBtn.classList.add('active');
-      if (bg) bg.className = 'sales-tdstcs-bg none-active';
-      if (amtRow) amtRow.style.display = 'none';
-      const amtInp = document.getElementById('purchaseTdsTcsAmount');
-      if (amtInp) amtInp.value = '';
-    } else {
-      if (mode === 'TDS') {
-        tdsBtn.classList.add('active');
-        if (bg) bg.className = 'sales-tdstcs-bg tds-active';
-        if (lbl) lbl.textContent = 'TDS';
-      } else {
-        tcsBtn.classList.add('active');
-        if (bg) bg.className = 'sales-tdstcs-bg tcs-active';
-        if (lbl) lbl.textContent = 'TCS';
+  function openPurchaseMultiPaymentModal() {
+    if (typeof window.openMultiPaymentModal !== 'function') return;
+    window.openMultiPaymentModal({
+      typeLabel: 'Payment',
+      getTarget: getPurchaseMultiPaymentTarget,
+      getAccounts: getCashEquivalentLedgers,
+      splits: purchaseMultiPayments,
+      onSave: rows => {
+        purchaseMultiPayments = rows;
+        updatePurchaseMultiPaymentUI();
+      },
+      onCancel: () => {
+        // Nothing saved yet? Fall back to the account picked before Multi Payment.
+        if (purchaseMultiPayments.length === 0) {
+          const paySelect = $('purchasePaymentAccount');
+          if (paySelect) paySelect.value = _purchasePaymentAccountPrev || '';
+        }
+        updatePurchaseMultiPaymentUI();
       }
-      if (amtRow) amtRow.style.display = 'block';
+    });
+  }
+
+  // Compact recap under the Payment Account dropdown; click it to reopen the modal
+  function updatePurchaseMultiPaymentUI() {
+    const summaryBtn = $('purchaseMultiPaymentSummary');
+    if (!summaryBtn) return;
+    const accField = $('purchasePaymentAccountField');
+    const accFieldVisible = accField && accField.style.display !== 'none';
+    if (!accFieldVisible || !isPurchaseMultiPaymentSelected()) {
+      summaryBtn.style.display = 'none';
+      return;
     }
-    recalculatePurchaseTotals();
+    const splits = purchaseMultiPayments.filter(sp => sp.accountId && (parseFloat(sp.amount) || 0) > 0);
+    const allocated = splits.reduce((sum, sp) => sum + (parseFloat(sp.amount) || 0), 0);
+    const balanced = Math.abs(getPurchaseMultiPaymentTarget() - allocated) < 0.01;
+    summaryBtn.style.display = 'flex';
+    summaryBtn.innerHTML = splits.length
+      ? `<span>${splits.length} account${splits.length > 1 ? 's' : ''} &middot; <span style="color:${balanced ? '#059669' : '#dc2626'}">₹ ${fmt(allocated)}</span></span><span style="color:var(--blue-600);">Edit</span>`
+      : `<span style="color:#dc2626;">No accounts selected</span><span style="color:var(--blue-600);">Set up</span>`;
+  }
+
+  function getPurchaseMultiPaymentSplits() {
+    if (!isPurchaseMultiPaymentSelected()) return [];
+    return purchaseMultiPayments
+      .filter(sp => sp.accountId && (parseFloat(sp.amount) || 0) > 0)
+      .map(sp => ({ accountId: sp.accountId, amount: parseFloat(sp.amount) || 0 }));
+  }
+
+  function setPurchaseMultiPayments(splits) {
+    purchaseMultiPayments = (Array.isArray(splits) ? splits : []).map(sp => ({
+      accountId: sp.accountId ? String(sp.accountId) : '',
+      amount: (sp.amount || sp.amount === 0) ? String(sp.amount) : ''
+    }));
+  }
+
+  function resetPurchaseMultiPayments() {
+    purchaseMultiPayments = [];
+    _purchasePaymentAccountPrev = '';
+    if (typeof window.closeMultiPaymentModal === 'function' && typeof window.isMultiPaymentModalOpen === 'function' && window.isMultiPaymentModalOpen()) {
+      window.closeMultiPaymentModal();
+    }
+    const summaryBtn = $('purchaseMultiPaymentSummary');
+    if (summaryBtn) summaryBtn.style.display = 'none';
   }
 
   // ══════════════════════════════════════════════════════════════════
-  //  LINE ITEMS RENDERING & ROW UPDATES
+  //  LINE ITEMS — the Sales Invoice's rows (.sales-row-* classes and shared pickers)
   // ══════════════════════════════════════════════════════════════════
-
   function renderPurchaseHeaders() {
-    const hdr = document.getElementById('purchaseTableHeader');
+    const hdr = $('purchaseTableHeader');
     if (!hdr) return;
     hdr.innerHTML = `
       <th class="col-item" style="text-align: left; padding-left: 8px;">Description (Product / Expense)</th>
@@ -742,212 +543,183 @@
     `;
   }
 
-  // Math expression evaluation helper for calculator behavior (e.g. 500+250, 1000*2, 200/4, 500-10%)
-  function evaluatePurchaseMathExpression(str) {
-    let clean = (str || '').toString().replace(/,/g, '').trim();
-    if (!clean) return 0;
-    clean = clean.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)');
-    if (!/^[0-9.+\-*/()\s]+$/.test(clean)) {
-      return NaN;
-    }
-    try {
-      const result = Function(`"use strict"; return (${clean})`)();
-      return typeof result === 'number' && isFinite(result) ? result : NaN;
-    } catch (e) {
-      return NaN;
-    }
-  }
-
-  function parsePurchaseAmt(str) {
-    const cleanStr = (str || '').toString().replace(/,/g, '').trim();
-    if (!cleanStr) return 0;
-    if (/[\+\-\*\/\%]/.test(cleanStr)) {
-      const evalVal = evaluatePurchaseMathExpression(cleanStr);
-      if (!isNaN(evalVal)) {
-        return evalVal;
-      }
-    }
-    const v = parseFloat(cleanStr);
-    return isNaN(v) ? 0 : v;
-  }
-
-  function parseAmt(v) {
-    return parsePurchaseAmt(v);
-  }
-
   function renderPurchaseRows() {
     renderPurchaseHeaders();
-    const body = document.getElementById('purchaseItemBody');
+    const body = $('purchaseItemBody');
     if (!body) return;
-
     body.innerHTML = '';
 
-    const supplyTypeEl = document.getElementById('purchaseSupplyType');
-    const isZeroTax = supplyTypeEl && (supplyTypeEl.value.includes('Zero-Rated') || supplyTypeEl.value.includes('Without Tax'));
+    const isZeroTax = isPurchaseZeroTaxSupply();
 
     purchaseRows.forEach((row, index) => {
-      if (isZeroTax) row.tax = 0;
+      if (isZeroTax) {
+        row.tax = 0;
+        const base = (row.qty || 1) * (row.rate || 0);
+        const discAmt = row.discountType === 'pct' ? (base * ((row.discount || 0) / 100)) : (row.discount || 0);
+        row.amount = Math.max(0, base - discAmt);
+      }
 
-      const tr = document.createElement('tr');
-      tr.className = 'sales-row';
-      tr.dataset.rowIndex = index;
-
-      tr.innerHTML = `
-        <td class="sales-cell-item" style="padding: 4px 8px;">
-          <div style="position: relative; display: flex; align-items: center; width: 100%;">
-            <input type="text" class="purchase-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Select or type Description (Product / Expense)" style="border: none; background: transparent; box-shadow: none; padding: 0 18px 0 0; width: 100%; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none;" autocomplete="off" />
-            <span class="sales-row-drop-arrow" style="position: absolute; right: 2px; pointer-events: none; color: var(--slate-400); font-size: 10px;">▼</span>
-          </div>
-        </td>
-        <td class="sales-cell-hsn" style="width: 90px; padding: 4px 6px;">
-          <input type="text" class="purchase-row-hsn je-input" value="${ohEsc(row.hsn || '')}" placeholder="HSN/SAC" style="border: none; background: transparent; box-shadow: none; padding: 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" />
-        </td>
-        <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
-          <input type="number" class="purchase-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
-        </td>
-        <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
-          <input type="text" class="purchase-row-unit je-input" value="${ohEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" />
-        </td>
-        <td class="sales-cell-rate" style="width: 100px; padding: 4px 6px;">
-          <input type="text" inputmode="decimal" class="purchase-row-rate je-input" value="${row.rate === 0 || row.rate === undefined ? '' : (typeof row.rate === 'number' ? row.rate.toFixed(2) : row.rate)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
-        </td>
-        <td class="sales-cell-disc" style="width: 105px; padding: 4px 6px;">
-          <div style="display: flex; gap: 2px; align-items: center; justify-content: flex-end;">
-            <input type="text" inputmode="decimal" class="purchase-row-discount je-input" value="${row.discount === 0 || row.discount === undefined ? '' : (typeof row.discount === 'number' ? row.discount.toFixed(2) : row.discount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 55px; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none;" />
-            <select class="purchase-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 22px; padding: 0; font-weight: 700; cursor: pointer; text-align: center; text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none; font-size: 12px; color: var(--blue-600); outline: none;">
-              <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
-              <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
+      const trHtml = `
+        <tr class="sales-row" data-row-index="${index}">
+          <td class="sales-cell-item" style="padding: 4px 8px;">
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="text" class="sales-row-item je-input" value="${ohEsc(row.item || '')}" placeholder="Select or type Description (Product / Expense)" style="border: none; background: transparent; box-shadow: none; padding: 0 18px 0 0; width: 100%; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none;" autocomplete="off" />
+              <span class="sales-row-drop-arrow" style="position: absolute; right: 2px; pointer-events: none; color: var(--slate-400); font-size: 10px;">▼</span>
+            </div>
+          </td>
+          <td class="sales-cell-hsn" style="width: 90px; padding: 4px 6px;">
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="text" class="sales-row-hsn je-input" value="${ohEsc(row.hsn || '')}" placeholder="HSN/SAC" title="${ohEsc(row.hsnDesc || 'Search the HSN / SAC code master')}" style="border: none; background: transparent; box-shadow: none; padding: 0 14px 0 0; font-size: 12.5px; font-family: monospace, inherit; font-weight: 600; color: var(--slate-700); outline: none; width: 100%;" autocomplete="off" />
+              <span class="sales-row-drop-arrow" style="position: absolute; right: 0; pointer-events: none; color: var(--slate-400); font-size: 9px;">▼</span>
+            </div>
+          </td>
+          <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
+            <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
+          </td>
+          <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
+            <input type="text" class="sales-row-unit je-input" value="${ohEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" />
+          </td>
+          <td class="sales-cell-rate" style="width: 100px; padding: 4px 6px;">
+            <input type="text" inputmode="decimal" class="sales-row-rate je-input" value="${row.rate === 0 || row.rate === undefined ? '' : (typeof row.rate === 'number' ? row.rate.toFixed(2) : row.rate)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
+          </td>
+          <td class="sales-cell-disc" style="width: 105px; padding: 4px 6px;">
+            <div style="display: flex; gap: 2px; align-items: center; justify-content: flex-end;">
+              <input type="text" inputmode="decimal" class="sales-row-discount je-input" value="${row.discount === 0 || row.discount === undefined ? '' : (typeof row.discount === 'number' ? row.discount.toFixed(2) : row.discount)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; width: 55px; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none;" />
+              <select class="sales-row-discount-type je-input" style="border: none; background: transparent; box-shadow: none; width: 22px; padding: 0; font-weight: 700; cursor: pointer; text-align: center; text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none; font-size: 12px; color: var(--blue-600); outline: none;">
+                <option value="val" ${row.discountType === 'val' || !row.discountType ? 'selected' : ''}>₹</option>
+                <option value="pct" ${row.discountType === 'pct' ? 'selected' : ''}>%</option>
+              </select>
+            </div>
+          </td>
+          <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
+            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${isZeroTax ? 'disabled' : ''}>
+              <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
+              <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
+              <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
+              <option value="18" ${row.tax === 18 || row.tax === undefined ? 'selected' : ''}>18%</option>
+              <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
             </select>
-          </div>
-        </td>
-        <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
-          <select class="purchase-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${isZeroTax ? 'disabled' : ''}>
-            <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
-            <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
-            <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
-            <option value="18" ${row.tax === 18 || row.tax === undefined ? 'selected' : ''}>18%</option>
-            <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
-          </select>
-        </td>
-        <td class="sales-cell-amt" style="width: 110px; padding: 4px 6px;">
-          <input type="text" inputmode="decimal" class="purchase-row-amount-input je-input" value="${row.amount === 0 || row.amount === undefined ? '' : Number(row.amount).toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 700; width: 100%; font-size: 13.5px; color: var(--slate-900); outline: none;" />
-        </td>
-        <td class="sales-del-cell" style="width: 36px; padding: 2px; text-align: center; border: none !important; background: transparent !important; box-shadow: none !important;">
-          <button type="button" class="purchase-del-row" style="background: none; border: none !important; outline: none !important; box-shadow: none !important; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; margin: 0 auto; transition: background 0.15s;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
-            <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px;">
-              <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </td>
+          </td>
+          <td class="sales-cell-amt" style="width: 110px; padding: 4px 6px;">
+            <input type="text" inputmode="decimal" class="sales-row-amount-input je-input" value="${row.amount === 0 || row.amount === undefined ? '' : Number(row.amount).toFixed(2)}" placeholder="0.00" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 700; width: 100%; font-size: 13.5px; color: var(--slate-900); outline: none;" />
+          </td>
+          <td class="sales-del-cell" style="width: 36px; padding: 2px; text-align: center; border: none !important; background: transparent !important; box-shadow: none !important;">
+            <button type="button" class="sales-del-row purchase-del-row" style="background: none; border: none !important; outline: none !important; box-shadow: none !important; color: var(--red-600); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; margin: 0 auto; transition: background 0.15s;" onmouseover="this.style.backgroundColor='var(--red-50)'" onmouseout="this.style.backgroundColor='transparent'">
+              <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px;">
+                <path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </td>
+        </tr>
       `;
 
+      const tempBody = document.createElement('tbody');
+      tempBody.innerHTML = trHtml;
+      const tr = tempBody.firstElementChild;
       body.appendChild(tr);
 
-      // Attach Portal Autocomplete
-      const itemInp = tr.querySelector('.purchase-row-item');
-      if (itemInp) {
+      // Description: Stock Items (at cost) and Expense ledgers, with Create / ✎ Alter
+      const itemInp = tr.querySelector('.sales-row-item');
+      if (itemInp && typeof _salesItemPortal !== 'undefined') {
         const attachPortal = () => {
-          _purchaseItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
+          _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
-            purchaseRows[index].item = selectedItem.name;
-            purchaseRows[index].itemType = selectedItem.type;
-            if (selectedItem.type === 'Expense' && selectedItem.id) {
-              purchaseRows[index].expenseLedgerId = selectedItem.id;
-            }
-            recalculatePurchaseTotals();
-          });
+            applyPurchaseMasterItemToRow(index, tr, selectedItem);
+          }, { purchase: true });
         };
-
         itemInp.addEventListener('focus', attachPortal);
         itemInp.addEventListener('click', attachPortal);
         itemInp.addEventListener('input', () => {
           purchaseRows[index].item = itemInp.value;
-          attachPortal();
-        });
-        itemInp.addEventListener('keydown', e => {
-          _purchaseItemPortal.onKey(e);
-        });
-      }
-
-      // Input listeners for live calculation
-      const qtyInp = tr.querySelector('.purchase-row-qty');
-      const rateInp = tr.querySelector('.purchase-row-rate');
-      const discInp = tr.querySelector('.purchase-row-discount');
-      const discTypeSel = tr.querySelector('.purchase-row-discount-type');
-      const taxSel = tr.querySelector('.purchase-row-tax');
-      const amtInp = tr.querySelector('.purchase-row-amount-input');
-      const hsnInp = tr.querySelector('.purchase-row-hsn');
-      const unitInp = tr.querySelector('.purchase-row-unit');
-      const delBtn = tr.querySelector('.purchase-del-row');
-
-      const updateRow = (triggeredBy) => updatePurchaseRowFromDOM(index, tr, triggeredBy);
-
-      if (hsnInp) hsnInp.addEventListener('input', () => { purchaseRows[index].hsn = hsnInp.value; });
-      if (unitInp) unitInp.addEventListener('input', () => { purchaseRows[index].unit = unitInp.value; });
-      if (qtyInp) qtyInp.addEventListener('input', () => updateRow('qty'));
-      if (rateInp) rateInp.addEventListener('input', () => updateRow('rate'));
-      if (discInp) discInp.addEventListener('input', () => updateRow('discount'));
-      if (discTypeSel) discTypeSel.addEventListener('change', () => updateRow('discType'));
-      if (taxSel) taxSel.addEventListener('change', () => updateRow('tax'));
-      if (amtInp) amtInp.addEventListener('input', () => updateRow('amount'));
-
-      if (delBtn) {
-        delBtn.addEventListener('click', () => {
-          if (purchaseRows.length > 1) {
-            purchaseRows.splice(index, 1);
-            renderPurchaseRows();
-            recalculatePurchaseTotals();
-          } else {
-            purchaseRows[0] = { item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0, itemType: 'Product' };
-            renderPurchaseRows();
+          if (!itemInp.value.trim() && typeof window.clearVoucherRowItemLink === 'function') {
+            window.clearVoucherRowItemLink(purchaseRows[index], tr);
             recalculatePurchaseTotals();
           }
+          attachPortal();
         });
+        if (typeof handlePortalKeydown === 'function') {
+          itemInp.addEventListener('keydown', e => handlePortalKeydown(e, _salesItemPortal));
+        }
+      }
+
+      const hsnInp = tr.querySelector('.sales-row-hsn');
+      if (hsnInp && typeof window.attachVoucherRowCodePicker === 'function') {
+        window.attachVoucherRowCodePicker(hsnInp, () => purchaseRows[index]);
+      }
+      if (typeof window.attachVoucherRowUnitPicker === 'function') {
+        window.attachVoucherRowUnitPicker(tr.querySelector('.sales-row-unit'));
+      }
+      if (typeof window.attachVoucherRowAlterButtons === 'function') {
+        window.attachVoucherRowAlterButtons(tr, () => purchaseRows[index]);
       }
     });
+  }
+
+  function applyPurchaseMasterItemToRow(index, tr, selectedItem) {
+    const row = purchaseRows[index];
+    if (!row) return;
+    if (typeof window.applyMasterItemToVoucherRow === 'function') {
+      window.applyMasterItemToVoucherRow(row, tr, selectedItem, { zeroTax: isPurchaseZeroTaxSupply() });
+    } else {
+      row.item = selectedItem.name;
+      row.itemType = selectedItem.type;
+    }
+    if (tr) updatePurchaseRowFromDOM(index, tr, 'item');
+    recalculatePurchaseTotals();
   }
 
   function updatePurchaseRowFromDOM(index, tr, triggeredBy) {
     const row = purchaseRows[index];
     if (!row) return;
 
-    const amtInput = tr.querySelector('.purchase-row-amount-input');
-    const isAmountTrigger = (triggeredBy === 'amount');
+    const amtInput = tr.querySelector('.sales-row-amount-input');
+    const amountEdited = (triggeredBy === 'amount');
 
-    const qty = parseFloat(tr.querySelector('.purchase-row-qty')?.value) || 0;
-    let rate = Math.round(parsePurchaseAmt(tr.querySelector('.purchase-row-rate')?.value || '0') * 100) / 100;
-    let discount = parsePurchaseAmt(tr.querySelector('.purchase-row-discount')?.value || '0');
-    const discountType = tr.querySelector('.purchase-row-discount-type')?.value || 'val';
-    const tax = parseFloat(tr.querySelector('.purchase-row-tax')?.value) || 0;
+    const itemEl = tr.querySelector('.sales-row-item');
+    if (itemEl) row.item = itemEl.value;
+    const hsnEl = tr.querySelector('.sales-row-hsn');
+    if (hsnEl) row.hsn = hsnEl.value;
+    const unitEl = tr.querySelector('.sales-row-unit');
+    if (unitEl) row.unit = unitEl.value;
 
-    row.qty = qty;
-    row.discount = discount;
-    row.discountType = discountType;
-    row.tax = tax;
+    const qty = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    let rate = Math.round(parsePurchaseAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
+    const discount = parsePurchaseAmt(tr.querySelector('.sales-row-discount')?.value || '0');
+    row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
+    row.tax = parseFloat(tr.querySelector('.sales-row-tax')?.value) || 0;
 
-    if (isAmountTrigger) {
-      const enteredAmount = Math.round(parsePurchaseAmt(amtInput?.value || '0') * 100) / 100;
-      row.amount = enteredAmount;
-      const taxMultiplier = 1 + (tax / 100);
-      const taxable = taxMultiplier > 0 ? (enteredAmount / taxMultiplier) : enteredAmount;
-      let base = taxable;
-      if (discountType === 'pct' && discount < 100) {
-        base = taxable / (1 - (discount / 100));
-      } else if (discountType === 'val') {
-        base = taxable + discount;
+    if (amountEdited) {
+      const enteredAmount = Math.round(parsePurchaseAmt(amtInput.value) * 100) / 100;
+      if (amtInput && document.activeElement !== amtInput) {
+        amtInput.value = enteredAmount === 0 ? '' : enteredAmount.toFixed(2);
       }
-      row.rate = qty > 0 ? (base / qty) : base;
-      const rateInp = tr.querySelector('.purchase-row-rate');
-      if (rateInp && document.activeElement !== rateInp) {
-        rateInp.value = row.rate === 0 ? '' : row.rate.toFixed(2);
+      const taxFactor = 1 + row.tax / 100;
+      const afterDiscount = enteredAmount / taxFactor;
+      let base;
+      if (row.discountType === 'pct') {
+        const pctFactor = 1 - (discount / 100);
+        base = pctFactor > 0 ? afterDiscount / pctFactor : 0;
+      } else {
+        base = afterDiscount + discount;
+      }
+      rate = Math.round((qty > 0 ? base / qty : 0) * 100) / 100;
+      row.qty = qty;
+      row.rate = rate;
+      row.discount = discount;
+      row.amount = enteredAmount;
+      const rateInput = tr.querySelector('.sales-row-rate');
+      if (rateInput && document.activeElement !== rateInput) {
+        rateInput.value = rate === 0 ? '' : rate.toFixed(2);
       }
     } else {
+      row.qty = qty;
       row.rate = rate;
-      const base = (qty || 1) * rate;
-      const discAmt = discountType === 'pct' ? (base * (discount / 100)) : discount;
-      const taxable = Math.max(0, base - discAmt);
-      const taxAmt = taxable * (tax / 100);
-      row.amount = taxable + taxAmt;
+      row.discount = discount;
+      const base = row.qty * row.rate;
+      const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+      const afterDiscount = Math.max(0, base - discAmt);
+      const taxAmt = afterDiscount * (row.tax / 100);
+      row.amount = Math.round((afterDiscount + taxAmt) * 100) / 100;
       if (amtInput && document.activeElement !== amtInput) {
         amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
       }
@@ -957,96 +729,201 @@
   }
 
   function addPurchaseRow() {
-    purchaseRows.push({ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0, itemType: 'Product' });
+    purchaseRows.push(newPurchaseRow());
     renderPurchaseRows();
     recalculatePurchaseTotals();
   }
 
+  // Reads every row back from the table before a save
+  function syncPurchaseRowsFromDOM() {
+    const body = $('purchaseItemBody');
+    if (!body) return;
+    body.querySelectorAll('tr.sales-row').forEach((tr, index) => {
+      if (!purchaseRows[index]) purchaseRows[index] = newPurchaseRow();
+      const row = purchaseRows[index];
+      const val = sel => tr.querySelector(sel);
+      if (val('.sales-row-item')) row.item = val('.sales-row-item').value;
+      if (val('.sales-row-hsn')) row.hsn = val('.sales-row-hsn').value;
+      if (val('.sales-row-unit')) row.unit = val('.sales-row-unit').value;
+      if (val('.sales-row-qty') && val('.sales-row-qty').value !== '') row.qty = parseFloat(val('.sales-row-qty').value) || 0;
+      if (val('.sales-row-rate') && val('.sales-row-rate').value !== '') row.rate = parsePurchaseAmt(val('.sales-row-rate').value) || 0;
+      if (val('.sales-row-discount') && val('.sales-row-discount').value !== '') row.discount = parsePurchaseAmt(val('.sales-row-discount').value) || 0;
+      if (val('.sales-row-discount-type')) row.discountType = val('.sales-row-discount-type').value || 'val';
+      if (val('.sales-row-tax')) row.tax = parseFloat(val('.sales-row-tax').value) || 0;
+      const amtEl = val('.sales-row-amount-input');
+      if (amtEl && amtEl.value !== '') {
+        row.amount = parsePurchaseAmt(amtEl.value) || 0;
+      } else {
+        const base = (row.qty || 1) * (row.rate || 0);
+        const discAmt = row.discountType === 'pct' ? (base * ((row.discount || 0) / 100)) : (row.discount || 0);
+        row.amount = Math.round((Math.max(0, base - discAmt) * (1 + (row.tax || 0) / 100)) * 100) / 100;
+      }
+    });
+  }
+
   // ══════════════════════════════════════════════════════════════════
-  //  TOTALS & RECALCULATIONS
+  //  TOTALS — TDS / TCS as per law: TDS on the value before GST (CBDT Circular 23/2017),
+  //  TCS on the full bill value including GST (Circular 17/2020)
   // ══════════════════════════════════════════════════════════════════
+  function calculatePurchaseSubtotal() {
+    return r2(purchaseRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0));
+  }
+
+  function getPurchaseTaxableTotal() {
+    if (typeof getPurchaseLineFigures !== 'function') return calculatePurchaseSubtotal();
+    return r2(purchaseRows.reduce((sum, r) => sum + getPurchaseLineFigures(r).taxable, 0));
+  }
+
+  function getPurchaseTdsTcsMode() {
+    if ($('purchaseTdsTcsTds')?.classList.contains('active')) return 'TDS';
+    if ($('purchaseTdsTcsTcs')?.classList.contains('active')) return 'TCS';
+    return 'None';
+  }
+
+  function getPurchaseTdsTcsRate() {
+    if (getPurchaseTdsTcsMode() === 'None') return 0;
+    const rateSelect = $('purchaseTdsTcsRateSelect');
+    if (!rateSelect) return 0;
+    if (rateSelect.value === 'custom') return parseFloat(($('purchaseTdsTcsRateCustom') || {}).value) || 0;
+    return parseFloat(rateSelect.value) || 0;
+  }
+
+  function getPurchaseTdsTcsBase(mode) {
+    return mode === 'TDS' ? getPurchaseTaxableTotal() : calculatePurchaseSubtotal();
+  }
+
+  function getPurchaseGrandTotal() {
+    const subTotal = calculatePurchaseSubtotal();
+    const mode = getPurchaseTdsTcsMode();
+    const tdsTcsAmount = parseFloat(($('purchaseTdsTcsAmount') || {}).value) || 0;
+    const adjustments = parseFloat(($('purchaseAdjustments') || {}).value) || 0;
+    let total = subTotal;
+    if (mode === 'TDS') total = subTotal - tdsTcsAmount;
+    else if (mode === 'TCS') total = subTotal + tdsTcsAmount;
+    return r2(total + adjustments);
+  }
 
   function recalculatePurchaseTotals() {
-    let subTotal = 0;
-    let taxableTotal = 0;
-    let totalGst = 0;
+    const subTotal = calculatePurchaseSubtotal();
+    const subTotalEl = $('purchaseSubTotal');
+    if (subTotalEl) subTotalEl.textContent = '₹ ' + fmt(subTotal);
 
-    purchaseRows.forEach(r => {
-      const qty = r.qty || 1;
-      const rate = r.rate || 0;
-      const base = qty * rate;
-      const disc = r.discountType === 'pct' ? (base * ((r.discount || 0) / 100)) : (r.discount || 0);
-      const taxable = Math.max(0, base - disc);
-      const gst = taxable * ((r.tax || 0) / 100);
-      taxableTotal += taxable;
-      totalGst += gst;
-      subTotal += (r.amount || (taxable + gst));
-    });
-
-    const subTotalEl = document.getElementById('purchaseSubTotal');
-    if (subTotalEl) subTotalEl.textContent = `₹ ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-    // TDS / TCS
-    let tdsTcsAmt = 0;
-    const tdsActive = document.getElementById('purchaseTdsTcsTds')?.classList.contains('active');
-    const tcsActive = document.getElementById('purchaseTdsTcsTcs')?.classList.contains('active');
-
-    if (tdsActive || tcsActive) {
-      const rateSel = document.getElementById('purchaseTdsTcsRateSelect');
-      let ratePct = 0;
-      if (rateSel && rateSel.value === 'custom') {
-        ratePct = parseFloat(document.getElementById('purchaseTdsTcsRateCustom')?.value) || 0;
-      } else if (rateSel) {
-        ratePct = parseFloat(rateSel.value) || 0;
-      }
-
-      const amtInp = document.getElementById('purchaseTdsTcsAmount');
-      if (document.activeElement !== amtInp) {
-        tdsTcsAmt = Math.round((taxableTotal * (ratePct / 100)) * 100) / 100;
-        if (amtInp) amtInp.value = tdsTcsAmt === 0 ? '' : tdsTcsAmt.toFixed(2);
+    const mode = getPurchaseTdsTcsMode();
+    const rateSelect = $('purchaseTdsTcsRateSelect');
+    const customWrap = $('purchaseTdsTcsRateCustomWrap');
+    const customInput = $('purchaseTdsTcsRateCustom');
+    let rate = 0;
+    if (mode !== 'None' && rateSelect) {
+      if (rateSelect.value === 'custom') {
+        if (customWrap) customWrap.style.display = 'flex';
+        rate = customInput ? (parseFloat(customInput.value) || 0) : 0;
       } else {
-        tdsTcsAmt = parseFloat(amtInp.value) || 0;
+        if (customWrap) customWrap.style.display = 'none';
+        rate = parseFloat(rateSelect.value) || 0;
       }
     }
 
-    // Adjustments / Round off
-    const adjInp = document.getElementById('purchaseAdjustments');
-    const adjustments = parseFloat(adjInp?.value) || 0;
+    const amountInput = $('purchaseTdsTcsAmount');
+    const base = getPurchaseTdsTcsBase(mode);
+    // Amount is editable only for a Custom rate; preset rates derive it from the base
+    const isCustomRate = !!rateSelect && rateSelect.value === 'custom';
+    if (amountInput) {
+      amountInput.readOnly = !isCustomRate;
+      amountInput.title = isCustomRate ? '' : 'Select "Custom" rate to edit the amount';
+    }
+    // Custom rate with a typed amount: the amount drives the percentage instead
+    const isManualAmount = isCustomRate && !!amountInput && amountInput.dataset.manual === '1';
+    if (isManualAmount && mode !== 'None') {
+      const manualAmt = parseFloat(amountInput.value) || 0;
+      if (customInput && base > 0) {
+        rate = Math.round((manualAmt / base) * 100 * 100) / 100;
+        customInput.value = rate ? String(rate) : '';
+      }
+    } else if (amountInput && !(isCustomRate && document.activeElement === amountInput)) {
+      amountInput.value = mode !== 'None' ? r2(base * (rate / 100)).toFixed(2) : '';
+    }
 
-    let grandTotal = subTotal;
-    if (tdsActive) grandTotal -= tdsTcsAmt;
-    if (tcsActive) grandTotal += tdsTcsAmt;
-    grandTotal += adjustments;
-    grandTotal = Math.max(0, grandTotal);
+    const adjustmentsInput = $('purchaseAdjustments');
+    const adjustments = adjustmentsInput ? (parseFloat(adjustmentsInput.value) || 0) : 0;
+    const btnAuto = $('btnPurchaseAutoRoundOff');
+    if (btnAuto) {
+      if (adjustmentsInput && adjustmentsInput.value.trim() !== '' && adjustments !== 0) btnAuto.classList.add('active');
+      else if (!adjustmentsInput || adjustmentsInput.value.trim() === '') btnAuto.classList.remove('active');
+    }
 
-    const totalEl = document.getElementById('purchaseTotal');
-    if (totalEl) totalEl.textContent = `₹ ${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const total = getPurchaseGrandTotal();
+    const totalEl = $('purchaseTotal');
+    if (totalEl) totalEl.textContent = '₹ ' + fmt(total);
 
-    // Update payment amount field placeholder
-    const payAmtInp = document.getElementById('purchasePaymentAmount');
-    if (payAmtInp && !payAmtInp.value) {
-      payAmtInp.placeholder = grandTotal.toFixed(2);
+    // The payment can never be more than the Grand Total
+    const payAmtEl = $('purchasePaymentAmount');
+    if (payAmtEl && payAmtEl.value && total > 0) {
+      const currentVal = parseFloat(payAmtEl.value) || 0;
+      if (currentVal > total) {
+        payAmtEl.value = total.toFixed(2);
+        toast(`Payment Amount adjusted to ₹${fmt(total)} to not exceed the Grand Total.`, 'warning');
+      }
+    }
+
+    // A cash purchase stays Full Payment from its own account
+    applyPurchaseCashVendorLock();
+    updatePurchaseMultiPaymentUI();
+  }
+
+  // Round off: rounds the total to the nearest rupee; clicking again takes it off
+  function autoCalculatePurchaseRoundOff() {
+    const btnAuto = $('btnPurchaseAutoRoundOff');
+    const adjEl = $('purchaseAdjustments');
+    if (btnAuto && btnAuto.classList.contains('active') && adjEl && adjEl.value.trim() !== '') {
+      adjEl.value = '';
+      btnAuto.classList.remove('active');
+      recalculatePurchaseTotals();
+      return;
+    }
+    const subTotal = calculatePurchaseSubtotal();
+    const mode = getPurchaseTdsTcsMode();
+    const tdsTcsAmount = parsePurchaseAmt(($('purchaseTdsTcsAmount') || {}).value) || 0;
+    let rawTotal = subTotal;
+    if (mode === 'TDS') rawTotal = subTotal - tdsTcsAmount;
+    else if (mode === 'TCS') rawTotal = subTotal + tdsTcsAmount;
+    const roundOffAmt = Math.round((Math.round(rawTotal) - rawTotal) * 100) / 100;
+    if (adjEl) {
+      adjEl.value = roundOffAmt === 0 ? '' : roundOffAmt.toFixed(2);
+      if (btnAuto) btnAuto.classList.add('active');
+      recalculatePurchaseTotals();
     }
   }
 
-  function autoRoundOffPurchase() {
-    let subTotal = 0;
-    purchaseRows.forEach(r => { subTotal += (r.amount || 0); });
+  // TDS / TCS toggle: None / TDS / TCS
+  function setPurchaseTdsTcs(mode) {
+    const noneBtn = $('purchaseTdsTcsNone');
+    const tdsBtn  = $('purchaseTdsTcsTds');
+    const tcsBtn  = $('purchaseTdsTcsTcs');
+    const bg      = $('purchaseTdsTcsBg');
+    const amtRow  = $('purchaseTdsTcsAmountRow');
+    const lbl     = $('purchaseTdsTcsAmountLabel');
+    const amtInp  = $('purchaseTdsTcsAmount');
+    if (!noneBtn || !tdsBtn || !tcsBtn) return;
 
-    const tdsActive = document.getElementById('purchaseTdsTcsTds')?.classList.contains('active');
-    const tcsActive = document.getElementById('purchaseTdsTcsTcs')?.classList.contains('active');
-    const tdsAmt = parseFloat(document.getElementById('purchaseTdsTcsAmount')?.value) || 0;
-
-    let currentTotal = subTotal;
-    if (tdsActive) currentTotal -= tdsAmt;
-    if (tcsActive) currentTotal += tdsAmt;
-
-    const rounded = Math.round(currentTotal);
-    const diff = Math.round((rounded - currentTotal) * 100) / 100;
-
-    const adjInp = document.getElementById('purchaseAdjustments');
-    if (adjInp) {
-      adjInp.value = diff === 0 ? '0.00' : (diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2));
+    [noneBtn, tdsBtn, tcsBtn].forEach(b => b.classList.remove('active'));
+    if (mode === 'TDS') {
+      tdsBtn.classList.add('active');
+      if (bg) bg.className = 'sales-tdstcs-bg tds-active';
+      if (amtRow) amtRow.style.display = 'block';
+      if (lbl) lbl.textContent = 'TDS';
+    } else if (mode === 'TCS') {
+      tcsBtn.classList.add('active');
+      if (bg) bg.className = 'sales-tdstcs-bg tcs-active';
+      if (amtRow) amtRow.style.display = 'block';
+      if (lbl) lbl.textContent = 'TCS';
+    } else {
+      noneBtn.classList.add('active');
+      if (bg) bg.className = 'sales-tdstcs-bg none-active';
+      if (amtRow) amtRow.style.display = 'none';
+      if (amtInp) {
+        amtInp.value = '';
+        delete amtInp.dataset.manual;
+      }
     }
     recalculatePurchaseTotals();
   }
@@ -1054,173 +931,574 @@
   // ══════════════════════════════════════════════════════════════════
   //  DOCUMENT ATTACHMENT
   // ══════════════════════════════════════════════════════════════════
-
-  function resetPurchaseDocAttachment() {
-    purchaseUploadedDoc = null;
-    const fileInp = document.getElementById('purchaseDocFileInput');
-    if (fileInp) fileInp.value = '';
-    const emptyState = document.getElementById('purchaseDocEmptyState');
-    const selectedState = document.getElementById('purchaseDocSelectedState');
-    const badge = document.getElementById('purchaseDocStatusBadge');
-    if (emptyState) emptyState.style.display = 'flex';
-    if (selectedState) selectedState.style.display = 'none';
-    if (badge) badge.style.display = 'none';
+  function formatPurchaseDocBytes(bytes) {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  function handlePurchaseDocSelect(file) {
+  // Older vouchers kept the file as { name, size, dataUrl }
+  function normalizePurchaseDoc(doc) {
+    if (!doc) return null;
+    if (doc.fileData) return doc;
+    if (doc.dataUrl) return { fileName: doc.name || 'Attachment', fileSize: doc.size || '', fileBytes: 0, fileData: doc.dataUrl };
+    return null;
+  }
+
+  function updatePurchaseDocUI(doc) {
+    const emptyState = $('purchaseDocEmptyState');
+    const selectedState = $('purchaseDocSelectedState');
+    const badge = $('purchaseDocStatusBadge');
+    const nameEl = $('purchaseDocFileName');
+    const sizeEl = $('purchaseDocFileSize');
+    const iconEl = $('purchaseDocFileIcon');
+    const previewBtn = $('purchaseDocPreviewBtn');
+    const fileInp = $('purchaseDocFileInput');
+
+    doc = normalizePurchaseDoc(doc);
+    if (!doc) {
+      purchaseUploadedDoc = null;
+      if (emptyState) emptyState.style.display = 'flex';
+      if (selectedState) selectedState.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      if (fileInp) fileInp.value = '';
+      return;
+    }
+
+    purchaseUploadedDoc = doc;
+    if (emptyState) emptyState.style.display = 'none';
+    if (selectedState) selectedState.style.display = 'flex';
+    if (badge) badge.style.display = 'inline-block';
+    if (nameEl) nameEl.textContent = doc.fileName || 'Attachment';
+    if (sizeEl) sizeEl.textContent = doc.fileSize || formatPurchaseDocBytes(doc.fileBytes || 0);
+
+    const ext = (doc.fileName || '').split('.').pop().toUpperCase();
+    if (iconEl) {
+      iconEl.textContent = ext.substring(0, 4) || 'DOC';
+      if (['PDF'].includes(ext)) {
+        iconEl.style.background = '#fee2e2'; iconEl.style.color = '#991b1b';
+      } else if (['JPG', 'JPEG', 'PNG', 'WEBP'].includes(ext)) {
+        iconEl.style.background = '#e0e7ff'; iconEl.style.color = '#3730a3';
+      } else if (['XLS', 'XLSX', 'CSV'].includes(ext)) {
+        iconEl.style.background = '#dcfce7'; iconEl.style.color = '#166534';
+      } else {
+        iconEl.style.background = '#dbeafe'; iconEl.style.color = '#1e40af';
+      }
+    }
+    if (previewBtn) {
+      previewBtn.href = doc.fileData;
+      previewBtn.download = doc.fileName || 'document';
+    }
+  }
+
+  function handlePurchaseDocUpload(file) {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      if (typeof showToast === 'function') showToast('File size must be under 10MB.', 'error');
+      toast('File size exceeds 10MB limit.', 'warning');
       return;
     }
     const reader = new FileReader();
     reader.onload = (e) => {
-      purchaseUploadedDoc = {
-        name: file.name,
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        type: file.type,
-        dataUrl: e.target.result
-      };
-      const emptyState = document.getElementById('purchaseDocEmptyState');
-      const selectedState = document.getElementById('purchaseDocSelectedState');
-      const badge = document.getElementById('purchaseDocStatusBadge');
-      const nameEl = document.getElementById('purchaseDocFileName');
-      const sizeEl = document.getElementById('purchaseDocFileSize');
-      const iconEl = document.getElementById('purchaseDocFileIcon');
-      const prevBtn = document.getElementById('purchaseDocPreviewBtn');
-
-      if (nameEl) nameEl.textContent = file.name;
-      if (sizeEl) sizeEl.textContent = purchaseUploadedDoc.size;
-      if (iconEl) {
-        const ext = file.name.split('.').pop().toUpperCase();
-        iconEl.textContent = ext.slice(0, 4) || 'FILE';
-      }
-      if (prevBtn) prevBtn.href = purchaseUploadedDoc.dataUrl;
-
-      if (emptyState) emptyState.style.display = 'none';
-      if (selectedState) selectedState.style.display = 'flex';
-      if (badge) badge.style.display = 'inline-block';
+      updatePurchaseDocUI({
+        fileName: file.name,
+        fileSize: formatPurchaseDocBytes(file.size),
+        fileBytes: file.size,
+        fileData: e.target.result
+      });
+      toast(`Document "${file.name}" attached.`, 'success');
     };
     reader.readAsDataURL(file);
   }
 
   // ══════════════════════════════════════════════════════════════════
-  //  SAVE & POST PURCHASE VOUCHER
+  //  FORM INIT / LOAD
   // ══════════════════════════════════════════════════════════════════
-
-  function savePurchase(isDraft = false) {
-    const vendorSelect = document.getElementById('purchaseVendor');
-    const vendorId = vendorSelect ? vendorSelect.value : '';
-    // A draft too needs the vendor and at least one line — nothing to come back to otherwise
-    if (!vendorId) {
-      if (vendorSelect) {
-        vendorSelect.focus();
-        vendorSelect.style.borderColor = 'var(--red-500)';
-      }
-      if (typeof showToast === 'function') showToast('Please select a Vendor / Supplier.', 'error');
-      return;
-    }
-    if (vendorSelect) vendorSelect.style.borderColor = '';
-
-    const validRows = purchaseRows.filter(r => (r.item && r.item.trim() !== '') || (r.rate && r.rate > 0));
-    if (validRows.length === 0) {
-      if (typeof showToast === 'function') showToast('Please add at least one line item with description and amount.', 'error');
-      return;
-    }
-
-    const date = document.getElementById('purchaseDate')?.value || new Date().toISOString().split('T')[0];
-    const invoiceNo = document.getElementById('purchaseInvoiceNo')?.value?.trim() || getNextPurchaseInvoiceNo();
-    const supplyType = document.getElementById('purchaseSupplyType')?.value || 'Intra-State (CGST + SGST)';
-    const executiveId = document.getElementById('purchaseExecutive')?.value || '';
-    const notes = document.getElementById('purchaseNotes')?.value || '';
-
-    // Payment status
-    let paymentStatus = 'Not Paid';
-    if (document.getElementById('purchasePaymentStatusFull')?.classList.contains('active')) paymentStatus = 'Full Payment';
-    if (document.getElementById('purchasePaymentStatusPartial')?.classList.contains('active')) paymentStatus = 'Partial Payment';
-
-    const dueDate = document.getElementById('purchaseDueDate')?.value || '';
-    const paymentAccountId = document.getElementById('purchasePaymentAccount')?.value || '';
-    const paymentAmount = parseFloat(document.getElementById('purchasePaymentAmount')?.value) || 0;
-
-    // TDS / TCS
-    let tdsTcsMode = 'None';
-    if (document.getElementById('purchaseTdsTcsTds')?.classList.contains('active')) tdsTcsMode = 'TDS';
-    if (document.getElementById('purchaseTdsTcsTcs')?.classList.contains('active')) tdsTcsMode = 'TCS';
-    const tdsTcsAmount = parseFloat(document.getElementById('purchaseTdsTcsAmount')?.value) || 0;
-    const adjustments = parseFloat(document.getElementById('purchaseAdjustments')?.value) || 0;
-
-    let subTotal = 0;
-    validRows.forEach(r => { subTotal += (r.amount || 0); });
-
-    let total = subTotal;
-    if (tdsTcsMode === 'TDS') total -= tdsTcsAmount;
-    if (tdsTcsMode === 'TCS') total += tdsTcsAmount;
-    total += adjustments;
-    total = Math.max(0, total);
-    // Draft or posted, a purchase of ₹0 is not worth keeping
-    if (!(total > 0)) {
-      if (typeof showToast === 'function') showToast('Amount must be greater than zero. Please enter rates / amounts for the line items.', 'error');
-      return;
-    }
-
-    const purchaseVoucher = {
-      id: _editingPurchaseVoucher ? _editingPurchaseVoucher.id : Date.now(),
-      invoiceNo,
-      date,
-      vendorId,
-      partyOverride: window._purchasePartyOverride ? JSON.parse(JSON.stringify(window._purchasePartyOverride)) : null,
-      supplyType,
-      executiveId,
-      rows: validRows,
-      subTotal,
-      tdsTcsMode,
-      tdsTcsAmount,
-      adjustments,
-      total,
-      paymentStatus,
-      dueDate,
-      paymentAccountId,
-      paymentAmount,
-      notes,
-      document: purchaseUploadedDoc,
-      isDraft,
-      createdAt: _editingPurchaseVoucher ? _editingPurchaseVoucher.createdAt : Date.now(),
-      postedAt: !isDraft ? Date.now() : null
-    };
-
-    if (isDraft) {
-      if (!window.KYA_STORE.purchaseVouchersDrafts) window.KYA_STORE.purchaseVouchersDrafts = [];
-      const idx = window.KYA_STORE.purchaseVouchersDrafts.findIndex(d => d.id === purchaseVoucher.id);
-      if (idx >= 0) window.KYA_STORE.purchaseVouchersDrafts[idx] = purchaseVoucher;
-      else window.KYA_STORE.purchaseVouchersDrafts.push(purchaseVoucher);
-      if (typeof showToast === 'function') showToast(`Purchase Voucher "${invoiceNo}" saved as draft.`, 'success');
-    } else {
-      if (!window.KYA_STORE.purchaseVouchers) window.KYA_STORE.purchaseVouchers = [];
-      const idx = window.KYA_STORE.purchaseVouchers.findIndex(v => v.id === purchaseVoucher.id);
-      if (idx >= 0) window.KYA_STORE.purchaseVouchers[idx] = purchaseVoucher;
-      else {
-        window.KYA_STORE.purchaseVouchers.push(purchaseVoucher);
-        window.KYA_STORE.purchaseInvoiceCtr = (window.KYA_STORE.purchaseInvoiceCtr || 1) + 1;
-      }
-      if (typeof showToast === 'function') showToast(`Purchase Voucher "${invoiceNo}" saved successfully!`, 'success');
-    }
-
+  function initPurchaseForm() {
     _editingPurchaseVoucher = null;
     window._purchasePartyOverride = null;
-    initPurchaseForm();
+    if (typeof hidePartyHoverCard === 'function') hidePartyHoverCard();
+    // Clear the last voucher's payment amount first: the resets below recalculate the
+    // totals, and a leftover amount would be "adjusted" with a warning
+    const staleAmtEl = $('purchasePaymentAmount');
+    if (staleAmtEl) staleAmtEl.value = '';
 
-    if (typeof triggerAutoBackup === 'function') {
-      triggerAutoBackup();
+    const today = localToday();
+    if ($('purchaseDate')) $('purchaseDate').value = today;
+    if ($('purchaseDueDate')) $('purchaseDueDate').value = today;
+
+    const invNo = getNextPurchaseInvoiceNo();
+    if ($('purchaseInvoiceNo')) $('purchaseInvoiceNo').value = invNo;
+    if ($('purchaseVoucherChipDisplay')) $('purchaseVoucherChipDisplay').textContent = invNo;
+    if (typeof refreshDocNoPlaceholder === 'function') refreshDocNoPlaceholder('purchase');
+
+    if ($('purchaseNotes')) $('purchaseNotes').value = '';
+    if ($('purchaseAdjustments')) $('purchaseAdjustments').value = '';
+
+    const rateSelect = $('purchaseTdsTcsRateSelect');
+    if (rateSelect) rateSelect.value = '1';
+    if ($('purchaseTdsTcsRateCustom')) $('purchaseTdsTcsRateCustom').value = '';
+    if ($('purchaseTdsTcsRateCustomWrap')) $('purchaseTdsTcsRateCustomWrap').style.display = 'none';
+
+    populatePurchaseVendors();
+    populatePurchaseExecutives();
+    if ($('purchaseExecutive')) $('purchaseExecutive').value = '';
+    if ($('purchaseSupplyType')) $('purchaseSupplyType').value = 'Intra-State (CGST + SGST)';
+
+    // A cash purchase may have locked these; the lock is applied again when it applies
+    PURCHASE_CASH_LOCK_IDS.forEach(id => setPurchaseCashLocked($(id), false));
+    populatePurchasePaymentAccounts();
+    if ($('purchasePaymentAccount')) $('purchasePaymentAccount').value = '';
+    if ($('purchasePaymentAmount')) $('purchasePaymentAmount').value = '';
+    resetPurchaseMultiPayments();
+
+    if (typeof _salesCodePortal !== 'undefined') _salesCodePortal.close();
+    if (typeof _salesItemPortal !== 'undefined') _salesItemPortal.close();
+    purchaseRows = [newPurchaseRow()];
+    renderPurchaseRows();
+
+    setPurchaseTdsTcs('None');
+    setPurchasePaymentStatus('NotPaid');
+    updatePurchaseDocUI(null);
+    validatePurchaseNoField();
+    refreshPurchaseDraftButton();
+    refreshPurchaseVendorAlterPencil();
+    recalculatePurchaseTotals();
+  }
+
+  function findStoredPurchase(id) {
+    const S = window.KYA_STORE || {};
+    const posted = (S.purchaseVouchers || []).find(v => String(v.id) === String(id));
+    if (posted) return { v: posted, isDraft: false };
+    const draft = (S.purchaseVouchersDrafts || []).find(v => String(v.id) === String(id));
+    if (draft) return { v: draft, isDraft: true };
+    return null;
+  }
+
+  // Opens a stored purchase (posted or draft) on the form. Takes the voucher or its id.
+  function loadPurchaseVoucher(vOrId, isDraft = false) {
+    let v = vOrId;
+    if (v === null || v === undefined) return;
+    if (typeof v !== 'object') {
+      const found = findStoredPurchase(v);
+      if (!found) {
+        toast('Purchase voucher not found.', 'warning');
+        return;
+      }
+      v = found.v;
+      isDraft = found.isDraft;
     }
+    v = JSON.parse(JSON.stringify(v));
+
+    const store = window.KYA_STORE || {};
+    const editIsPosted = !isDraft && (store.purchaseVouchers || []).some(x => String(x.id) === String(v.id));
+    const editIsDraft = isDraft && (store.purchaseVouchersDrafts || []).some(x => String(x.id) === String(v.id));
+    initPurchaseForm();
+    _editingPurchaseVoucher = (editIsPosted || editIsDraft) ? { id: v.id, isDraft: !!isDraft } : null;
+    window._purchasePartyOverride = v.partyOverride ? JSON.parse(JSON.stringify(v.partyOverride)) : null;
+
+    if ($('purchaseDate')) $('purchaseDate').value = v.date || localToday();
+    if ($('purchaseDueDate')) $('purchaseDueDate').value = v.dueDate || v.date || localToday();
+
+    // A draft whose number was taken meanwhile (posted on another voucher) gets the next free one
+    const storedNo = (v.invoiceNo && v.invoiceNo.trim() && v.invoiceNo.trim() !== 'Draft') ? v.invoiceNo.trim() : '';
+    const noTaken = editIsDraft && !!storedNo && typeof isDocNoUsed === 'function' && isDocNoUsed('purchase', storedNo, v.id);
+    const invNoEl = $('purchaseInvoiceNo');
+    if (invNoEl) invNoEl.value = (storedNo && !noTaken) ? storedNo : getNextPurchaseInvoiceNo();
+    if ($('purchaseVoucherChipDisplay')) $('purchaseVoucherChipDisplay').textContent = (invNoEl && invNoEl.value) || 'PUR-XXXX';
+
+    if ($('purchaseNotes')) $('purchaseNotes').value = v.notes || '';
+    const adjEl = $('purchaseAdjustments');
+    if (adjEl) adjEl.value = (v.adjustments !== undefined && v.adjustments !== '' && parseFloat(v.adjustments) !== 0) ? v.adjustments : '';
+
+    // Vendor — the stored id can be missing from the list (party re-created): match by name
+    populatePurchaseVendors(v.vendorId);
+    const vendorSel = $('purchaseVendor');
+    if (vendorSel && !vendorSel.value && v.vendorName) {
+      const wanted = String(v.vendorName).trim().toLowerCase();
+      const match = Array.from(vendorSel.options).find(o => o.value && o.textContent.split(' [A.K.A:')[0].trim().toLowerCase() === wanted);
+      if (match) populatePurchaseVendors(match.value);
+    }
+    populatePurchaseExecutives(v.executiveId);
+    if ($('purchaseSupplyType')) $('purchaseSupplyType').value = v.supplyType || 'Intra-State (CGST + SGST)';
+
+    purchaseRows = (Array.isArray(v.rows) && v.rows.length) ? v.rows : [newPurchaseRow()];
+    renderPurchaseRows();
+
+    // TDS / TCS and its rate (a custom rate keeps its exact saved amount)
+    setPurchaseTdsTcs(v.tdsTcsMode === 'TDS' || v.tdsTcsMode === 'TCS' ? v.tdsTcsMode : 'None');
+    if (v.tdsTcsMode === 'TDS' || v.tdsTcsMode === 'TCS') {
+      const rateSelect = $('purchaseTdsTcsRateSelect');
+      const rateVal = parseFloat(v.tdsTcsRate) || 0;
+      if (rateSelect && rateVal && rateSelect.querySelector(`option[value="${rateVal}"]`)) {
+        rateSelect.value = String(rateVal);
+      } else if (rateSelect) {
+        rateSelect.value = 'custom';
+        if ($('purchaseTdsTcsRateCustom')) $('purchaseTdsTcsRateCustom').value = rateVal || '';
+        const amtEl = $('purchaseTdsTcsAmount');
+        if (amtEl && parseFloat(v.tdsTcsAmount) > 0) {
+          amtEl.value = parseFloat(v.tdsTcsAmount).toFixed(2);
+          amtEl.dataset.manual = '1';
+        }
+      }
+    }
+
+    // Payment
+    if (v.paymentStatus === 'Full Payment') setPurchasePaymentStatus('Full');
+    else if (v.paymentStatus === 'Partial Payment') setPurchasePaymentStatus('Partial');
+    else setPurchasePaymentStatus('NotPaid');
+    populatePurchasePaymentAccounts(v.paymentAccountId);
+    _purchasePaymentAccountPrev = v.paymentAccountId && v.paymentAccountId !== MULTI_PAYMENT_VALUE ? String(v.paymentAccountId) : '';
+    setPurchaseMultiPayments(v.paymentSplits || []);
+    if ($('purchasePaymentAmount')) $('purchasePaymentAmount').value = (v.paymentStatus === 'Partial Payment' && v.paymentAmount) ? v.paymentAmount : '';
+
+    updatePurchaseDocUI(v.uploadedDoc || v.document || null);
+    validatePurchaseNoField();
+    refreshPurchaseDraftButton();
+    refreshPurchaseVendorAlterPencil();
+    updatePurchaseDueDateDays();
+    recalculatePurchaseTotals();
+
+    if (typeof openTab === 'function') openTab('purchase_voucher');
+    if (noTaken && invNoEl && invNoEl.value !== storedNo) {
+      toast(`${storedNo} was used by another voucher meanwhile — this draft now has ${invNoEl.value}.`, 'info');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  SAVE DRAFT / SAVE (POST)
+  // ══════════════════════════════════════════════════════════════════
+  // Everything on the form, as a voucher (no checks)
+  function readPurchaseForm() {
+    syncPurchaseRowsFromDOM();
+    const vendorId = ($('purchaseVendor') || {}).value || '';
+    const party = (typeof getPurchaseParty === 'function') ? getPurchaseParty({ vendorId }) : null;
+    const mode = getPurchaseTdsTcsMode();
+    const subTotal = calculatePurchaseSubtotal();
+    const total = getPurchaseGrandTotal();
+    const paymentStatus = getPurchasePaymentStatus();
+    const paymentAccountId = ($('purchasePaymentAccount') || {}).value || '';
+    let paymentAmount = 0;
+    if (paymentStatus === 'Full Payment') paymentAmount = total;
+    else if (paymentStatus === 'Partial Payment') paymentAmount = parseFloat(($('purchasePaymentAmount') || {}).value) || 0;
+    return {
+      id: _editingPurchaseVoucher ? _editingPurchaseVoucher.id : Date.now(),
+      invoiceNo: (($('purchaseInvoiceNo') || {}).value || '').trim(),
+      date: ($('purchaseDate') || {}).value || localToday(),
+      dueDate: ($('purchaseDueDate') || {}).value || '',
+      vendorId,
+      vendorName: (party && party.name) || '',
+      partyOverride: window._purchasePartyOverride ? JSON.parse(JSON.stringify(window._purchasePartyOverride)) : null,
+      supplyType: ($('purchaseSupplyType') || {}).value || 'Intra-State (CGST + SGST)',
+      executiveId: ($('purchaseExecutive') || {}).value || '',
+      rows: JSON.parse(JSON.stringify(purchaseRows)),
+      subTotal,
+      tdsTcsMode: mode,
+      tdsTcsRate: getPurchaseTdsTcsRate(),
+      tdsTcsAmount: mode !== 'None' ? (parseFloat(($('purchaseTdsTcsAmount') || {}).value) || 0) : 0,
+      adjustments: parseFloat(($('purchaseAdjustments') || {}).value) || 0,
+      total,
+      paymentStatus,
+      paymentAccountId: paymentStatus === 'Not Paid' ? '' : paymentAccountId,
+      paymentAmount: r2(paymentAmount),
+      paymentSplits: paymentStatus === 'Not Paid' ? [] : getPurchaseMultiPaymentSplits(),
+      notes: ($('purchaseNotes') || {}).value || '',
+      uploadedDoc: purchaseUploadedDoc || null
+    };
+  }
+
+  function savePurchaseDraft() {
+    // A posted voucher is changed with Save Purchase, not turned back into a draft
+    if (_editingPurchaseVoucher && !_editingPurchaseVoucher.isDraft) {
+      toast('This purchase is already posted — use Save Purchase to keep the changes.', 'warning');
+      return;
+    }
+    const data = readPurchaseForm();
+    // A draft needs something to come back to — the vendor and at least one line
+    if (!data.vendorId) {
+      toast('Please select a Vendor / Supplier before saving the draft.', 'warning');
+      return;
+    }
+    const hasLine = data.rows.some(r => r && (((r.item || '').trim() !== '') || (parseFloat(r.rate) || 0) > 0 || (parseFloat(r.amount) || 0) > 0));
+    if (!hasLine) {
+      toast('Please add at least one line item before saving the draft.', 'warning');
+      return;
+    }
+    // A draft of nothing (₹0) is not worth keeping
+    if (!(data.total > 0)) {
+      toast('Amount must be greater than zero. Please enter rates / amounts for the line items.', 'warning');
+      return;
+    }
+
+    const draft = Object.assign(data, {
+      invoiceNo: data.invoiceNo || 'Draft',
+      isDraft: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    const drafts = window.KYA_STORE.purchaseVouchersDrafts = window.KYA_STORE.purchaseVouchersDrafts || [];
+    const idx = drafts.findIndex(d => String(d.id) === String(draft.id));
+    if (idx > -1) {
+      draft.createdAt = drafts[idx].createdAt || draft.createdAt;
+      drafts[idx] = draft;
+    } else {
+      drafts.push(draft);
+    }
+
+    toast('Purchase Voucher Draft saved successfully.', 'success');
+    initPurchaseForm();
+    // Stay on the Purchase form, ready for the next one (drafts are listed in Voucher Desk)
+    if (typeof openTab === 'function') openTab('purchase_voucher');
+    if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+    if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    // The saved draft opens in the same small preview popup as after Save
+    if (typeof window.viewPurchaseVoucher === 'function') window.viewPurchaseVoucher(draft.id, { compact: true });
+  }
+
+  function postPurchaseVoucher() {
+    const data = readPurchaseForm();
+
+    if (!data.vendorId) {
+      toast('Please select a Vendor / Supplier.', 'warning');
+      return false;
+    }
+    if (!data.invoiceNo) {
+      toast('Purchase number is required.', 'warning');
+      return false;
+    }
+    // Numbers used by any purchase — including deleted ones — can't be issued again
+    if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('purchase', data.invoiceNo, getPurchaseOwnId())) {
+      return false;
+    }
+
+    // Leave out completely blank rows when at least one row has something
+    let rows = data.rows;
+    if (rows.length > 1) {
+      const nonEmpty = rows.filter(r => (r.item && r.item.trim()) || (r.rate && r.rate > 0) || (r.amount && r.amount > 0));
+      if (nonEmpty.length > 0) rows = nonEmpty;
+    }
+    if (rows.length === 0) {
+      toast('Please add at least one line item.', 'warning');
+      return false;
+    }
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r.item || !r.item.trim()) {
+        toast(`Row #${i + 1}: Please select an item or expense.`, 'warning');
+        return false;
+      }
+      if (!r.qty || parseFloat(r.qty) <= 0) {
+        toast(`Row #${i + 1}: Quantity must be greater than zero.`, 'warning');
+        return false;
+      }
+      if (!r.rate || parseFloat(r.rate) <= 0) {
+        toast(`Row #${i + 1}: Rate must be greater than zero.`, 'warning');
+        return false;
+      }
+    }
+    if (!data.date) {
+      toast('Please select a Date.', 'warning');
+      return false;
+    }
+
+    if (data.paymentStatus !== 'Not Paid') {
+      if (!data.paymentAccountId) {
+        toast('Please select a Payment Account.', 'warning');
+        return false;
+      }
+      if (data.paymentStatus === 'Partial Payment') {
+        if (data.paymentAmount <= 0) {
+          toast('Payment Amount must be greater than zero for Partial Payments.', 'warning');
+          return false;
+        }
+        if (data.paymentAmount > data.total + 0.001) {
+          toast(`Payment Amount cannot exceed the Grand Total of ₹${fmt(data.total)}.`, 'warning');
+          return false;
+        }
+      }
+      if (data.paymentAmount <= 0) {
+        toast('Payment Amount must be greater than zero.', 'warning');
+        return false;
+      }
+      if (data.paymentAccountId === MULTI_PAYMENT_VALUE) {
+        const splits = data.paymentSplits;
+        if (splits.length === 0) {
+          toast('Please select at least one account with an amount for Multi Payment.', 'warning');
+          return false;
+        }
+        const hasDuplicate = splits.some((sp, i) => splits.findIndex(o => String(o.accountId) === String(sp.accountId)) !== i);
+        if (hasDuplicate) {
+          toast('Each Multi Payment account can be selected only once.', 'warning');
+          return false;
+        }
+        const splitTotal = splits.reduce((sum, sp) => sum + sp.amount, 0);
+        if (Math.abs(splitTotal - data.paymentAmount) > 0.01) {
+          toast(`Multi Payment split of ₹${fmt(splitTotal)} must equal the payment amount of ₹${fmt(data.paymentAmount)}.`, 'warning');
+          return false;
+        }
+      }
+    }
+
+    const isEditPosted = !!(_editingPurchaseVoucher && !_editingPurchaseVoucher.isDraft);
+    const existing = isEditPosted ? (window.KYA_STORE.purchaseVouchers || []).find(v => String(v.id) === String(_editingPurchaseVoucher.id)) : null;
+
+    const voucher = Object.assign(data, {
+      rows,
+      isDraft: false,
+      createdAt: (existing && existing.createdAt) || Date.now(),
+      postedAt: (existing && existing.postedAt) || Date.now(),
+      updatedAt: Date.now(),
+      journalEntryId: existing ? (existing.journalEntryId || '') : '',
+      tdsJournalEntryId: existing ? (existing.tdsJournalEntryId || '') : '',
+      tdsVoucherNo: existing ? (existing.tdsVoucherNo || '') : '',
+      paymentJournalEntryId: existing ? (existing.paymentJournalEntryId || '') : '',
+      paymentVoucherNo: existing ? (existing.paymentVoucherNo || '') : ''
+    });
+
+    // Post to the books (flows to Trial Balance, Ledgers, P&L, Balance Sheet, Voucher Desk)
+    const je = (typeof postPurchaseVoucherToJournal === 'function') ? postPurchaseVoucherToJournal(voucher) : null;
+    if (je) {
+      voucher.journalEntryId = je.purchaseJEId;
+      voucher.tdsJournalEntryId = je.tdsJEId || '';
+      voucher.tdsVoucherNo = je.tdsJEId ? je.tdsVoucherNo : '';
+      voucher.paymentJournalEntryId = je.paymentJEId || '';
+      voucher.paymentVoucherNo = je.paymentJEId ? je.paymentVoucherNo : '';
+    }
+
+    if (_editingPurchaseVoucher && _editingPurchaseVoucher.isDraft) {
+      window.KYA_STORE.purchaseVouchersDrafts = (window.KYA_STORE.purchaseVouchersDrafts || []).filter(d => String(d.id) !== String(_editingPurchaseVoucher.id));
+    }
+    const list = window.KYA_STORE.purchaseVouchers = window.KYA_STORE.purchaseVouchers || [];
+    const idx = list.findIndex(v => String(v.id) === String(voucher.id));
+    if (idx > -1) list[idx] = voucher;
+    else list.push(voucher);
+
+    // Once posted, a number is used for good — deleting the voucher won't free it
+    if (typeof registerDocNo === 'function') registerDocNo('purchase', voucher.invoiceNo);
+
+    toast(`Purchase Voucher "${voucher.invoiceNo}" saved successfully.`, 'success');
+    initPurchaseForm();
+    if (typeof openTab === 'function') openTab('purchase_voucher');
+
+    if (typeof refreshAllReports === 'function') refreshAllReports();
+    if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+    if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
+    if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+
+    // The posted purchase opens in its preview, ready to print or export
+    if (typeof window.viewPurchaseVoucher === 'function') window.viewPurchaseVoucher(voucher.id, { compact: true });
+    return true;
+  }
+
+  function editPurchaseDraft(id) {
+    const draft = (window.KYA_STORE.purchaseVouchersDrafts || []).find(d => String(d.id) === String(id));
+    if (!draft) return;
+    loadPurchaseVoucher(draft, true);
+  }
+
+  // Post a draft straight from its preview: it is loaded into the form and posted from
+  // there, with every check the form makes. Once posted, the view it was opened from comes
+  // back; if a check fails, the draft stays open on the form, ready to fix.
+  function postPurchaseDraft(id) {
+    const draft = (window.KYA_STORE.purchaseVouchersDrafts || []).find(d => String(d.id) === String(id));
+    if (!draft) return;
+    const returnTo = (typeof activeTabId !== 'undefined') ? activeTabId : null;
+    loadPurchaseVoucher(draft, true);
+    const posted = postPurchaseVoucher();
+    if (posted && returnTo && returnTo !== 'purchase_voucher' && typeof openTab === 'function') {
+      openTab(returnTo);
+      if (returnTo === 'voucher_desk' && typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  ⋮ MORE MENU — Export (PDF / Excel) of the purchase on the form, Configuration
+  // ══════════════════════════════════════════════════════════════════
+  function wirePurchaseMoreDropdown() {
+    const moreBtn = $('purchaseMoreBtn');
+    const moreDropdown = $('purchaseMoreDropdown');
+    const submenuBtn = $('purchaseExportMenuBtn');
+    const submenu = $('purchaseExportSubmenu');
+    if (!moreBtn || !moreDropdown || moreBtn._isWired) return;
+    moreBtn._isWired = true;
+
+    const closeAll = () => {
+      moreDropdown.classList.remove('active', 'open');
+      if (submenu) submenu.classList.remove('active', 'open');
+    };
+
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = moreDropdown.classList.contains('active') || moreDropdown.classList.contains('open');
+      closeAll();
+      if (!isOpen) moreDropdown.classList.add('active', 'open');
+    });
+
+    if (submenuBtn && submenu) {
+      let closeTimer = null;
+      submenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        submenu.classList.toggle('active');
+        submenu.classList.toggle('open');
+      });
+      const submenuWrap = $('purchaseExportSubmenuWrap');
+      if (submenuWrap) {
+        submenuWrap.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active', 'open');
+        });
+        submenuWrap.addEventListener('mouseleave', () => {
+          closeTimer = setTimeout(() => submenu.classList.remove('active', 'open'), 300);
+        });
+        submenu.addEventListener('mouseenter', () => {
+          if (closeTimer) clearTimeout(closeTimer);
+          submenu.classList.add('active', 'open');
+        });
+      }
+    }
+
+    const runExport = async (kind) => {
+      closeAll();
+      const fn = kind === 'pdf' ? window.exportPurchaseVoucherToPDF : window.exportPurchaseVoucherToExcel;
+      if (typeof fn !== 'function') {
+        toast((kind === 'pdf' ? 'PDF' : 'Excel') + ' export module not loaded.', 'warning');
+        return;
+      }
+      const data = readPurchaseForm();
+      data.invoiceNo = data.invoiceNo || getNextPurchaseInvoiceNo();
+      try {
+        await fn(data);
+      } catch (err) {
+        console.error('Purchase export failed:', err);
+        toast('Could not export: ' + (err && err.message ? err.message : err), 'error');
+      }
+    };
+    $('purchaseExportPdf')?.addEventListener('click', (e) => { e.stopPropagation(); runExport('pdf'); });
+    $('purchaseExportExcel')?.addEventListener('click', (e) => { e.stopPropagation(); runExport('excel'); });
+
+    $('purchaseMoreConfigBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAll();
+      if (typeof openTab === 'function') {
+        openTab('settings');
+        if (typeof switchSettingsTab === 'function') switchSettingsTab('purchase');
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!moreDropdown.contains(e.target) && !moreBtn.contains(e.target)) closeAll();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeAll();
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════
   //  EVENT LISTENERS & BINDINGS
   // ══════════════════════════════════════════════════════════════════
-
   function wirePurchaseEventListeners() {
-    const addRowBtn = document.getElementById('purchaseAddRow');
+    const addRowBtn = $('purchaseAddRow');
     if (addRowBtn && !addRowBtn._wired) {
       addRowBtn._wired = true;
       addRowBtn.addEventListener('click', (e) => {
@@ -1229,193 +1507,245 @@
       });
     }
 
-    // Line items calculator blur and Enter handling
-    const itemBody = document.getElementById('purchaseItemBody');
+    // Line items: live calculation, as on the Sales Invoice
+    const itemBody = $('purchaseItemBody');
     if (itemBody && !itemBody._calcWired) {
       itemBody._calcWired = true;
-      itemBody.addEventListener('blur', (e) => {
-        const isRate = e.target.classList.contains('purchase-row-rate');
-        const isAmt  = e.target.classList.contains('purchase-row-amount-input');
-        const isDisc = e.target.classList.contains('purchase-row-discount');
-        if (!isRate && !isAmt && !isDisc) return;
-
-        const val = parsePurchaseAmt(e.target.value);
-        if (!isNaN(val)) {
-          const clamped = Math.round(val * 100) / 100;
-          e.target.value = clamped === 0 ? '' : clamped.toFixed(2);
-          const tr = e.target.closest('tr');
-          if (tr) {
-            updatePurchaseRowFromDOM(parseInt(tr.dataset.rowIndex), tr, isAmt ? 'amount' : 'rate');
-          }
+      itemBody.addEventListener('input', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const isRate = e.target.classList.contains('sales-row-rate');
+        const isAmt = e.target.classList.contains('sales-row-amount-input');
+        const isDisc = e.target.classList.contains('sales-row-discount');
+        // At most two decimals (unless a sum is being typed)
+        if ((isRate || isAmt || isDisc) && !/[\+\-\*\/\%]/.test(e.target.value) && e.target.value.includes('.')) {
+          const parts = e.target.value.split('.');
+          if (parts[1] && parts[1].length > 2) e.target.value = parts[0] + '.' + parts[1].slice(0, 2);
         }
-      }, true);
-
-      itemBody.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          const isRate = e.target.classList.contains('purchase-row-rate');
-          const isAmt  = e.target.classList.contains('purchase-row-amount-input');
-          const isDisc = e.target.classList.contains('purchase-row-discount');
-          if (isRate || isAmt || isDisc) {
-            e.preventDefault();
-            e.target.blur();
-          }
-        }
+        updatePurchaseRowFromDOM(parseInt(tr.dataset.rowIndex, 10), tr, isAmt ? 'amount' : 'rate');
+      });
+      itemBody.addEventListener('change', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        updatePurchaseRowFromDOM(parseInt(tr.dataset.rowIndex, 10), tr, 'rate');
+      });
+      itemBody.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.sales-del-row');
+        if (!delBtn) return;
+        const tr = delBtn.closest('tr');
+        const index = tr ? parseInt(tr.dataset.rowIndex, 10) : NaN;
+        if (isNaN(index)) return;
+        if (purchaseRows.length > 1) purchaseRows.splice(index, 1);
+        else purchaseRows = [newPurchaseRow()];
+        renderPurchaseRows();
+        recalculatePurchaseTotals();
       });
     }
 
-    const clearBtn = document.getElementById('btnClearPurchase');
+    const clearBtn = $('btnClearPurchase');
     if (clearBtn && !clearBtn._wired) {
       clearBtn._wired = true;
       clearBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        _editingPurchaseVoucher = null;
         initPurchaseForm();
-        if (typeof showToast === 'function') showToast('Purchase form reset.', 'info');
       });
     }
 
-    const newPurchaseBtn = document.getElementById('btnNewPurchase');
+    const newPurchaseBtn = $('btnNewPurchase');
     if (newPurchaseBtn && !newPurchaseBtn._wired) {
       newPurchaseBtn._wired = true;
       newPurchaseBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        _editingPurchaseVoucher = null;
         initPurchaseForm();
       });
     }
 
-    const saveDraftBtn = document.getElementById('btnSavePurchaseDraft');
+    const saveDraftBtn = $('btnSavePurchaseDraft');
     if (saveDraftBtn && !saveDraftBtn._wired) {
       saveDraftBtn._wired = true;
       saveDraftBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        savePurchase(true);
+        savePurchaseDraft();
       });
     }
 
-    const postBtn = document.getElementById('btnPostPurchase');
+    const postBtn = $('btnPostPurchase');
     if (postBtn && !postBtn._wired) {
       postBtn._wired = true;
       postBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        savePurchase(false);
+        postPurchaseVoucher();
       });
     }
 
-    // Payment Status Buttons
-    const notPaidBtn = document.getElementById('purchasePaymentStatusNotPaid');
-    const fullBtn    = document.getElementById('purchasePaymentStatusFull');
-    const partBtn    = document.getElementById('purchasePaymentStatusPartial');
-
-    if (notPaidBtn && !notPaidBtn._wired) {
-      notPaidBtn._wired = true;
-      notPaidBtn.addEventListener('click', () => setPurchasePaymentStatus('NotPaid'));
-    }
-    if (fullBtn && !fullBtn._wired) {
-      fullBtn._wired = true;
-      fullBtn.addEventListener('click', () => setPurchasePaymentStatus('Full'));
-    }
-    if (partBtn && !partBtn._wired) {
-      partBtn._wired = true;
-      partBtn.addEventListener('click', () => setPurchasePaymentStatus('Partial'));
+    // Number: the pencil (format popup) and the "already used" check while typing
+    if (typeof wireDocNumberField === 'function') wireDocNumberField('purchase', getPurchaseOwnId);
+    const invNoEl = $('purchaseInvoiceNo');
+    if (invNoEl && !invNoEl._chipWired) {
+      invNoEl._chipWired = true;
+      invNoEl.addEventListener('input', () => {
+        const chip = $('purchaseVoucherChipDisplay');
+        if (chip) chip.textContent = invNoEl.value.trim() || 'PUR-XXXX';
+      });
     }
 
-    const payAccEl = document.getElementById('purchasePaymentAccount');
+    // Vendor
+    const vendorSel = $('purchaseVendor');
+    if (vendorSel && !vendorSel._wired) {
+      vendorSel._wired = true;
+      vendorSel.addEventListener('change', () => {
+        refreshPurchaseVendorAlterPencil();
+        // A Cash and Cash Equivalents ledger as the vendor: a cash purchase, paid in full there
+        applyPurchaseCashVendorLock();
+      });
+    }
+    const vendorAlterBtn = $('btnPurchaseVendorAlter');
+    if (vendorAlterBtn && !vendorAlterBtn._wired) {
+      vendorAlterBtn._wired = true;
+      vendorAlterBtn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+      vendorAlterBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const m = getPurchaseVendorMaster();
+        if (m && typeof window.openVoucherMasterAlter === 'function') {
+          window.openVoucherMasterAlter(m.tab, m.id, { type: 'vendor', returnTab: 'purchase_voucher', onAltered: onPurchaseVendorAltered });
+        }
+      });
+    }
+
+    const execEl = $('purchaseExecutive');
+    if (execEl && !execEl._wired) {
+      execEl._wired = true;
+      execEl.addEventListener('focus', () => populatePurchaseExecutives(execEl.value));
+    }
+
+    // Payment Status
+    [['purchasePaymentStatusNotPaid', 'NotPaid'], ['purchasePaymentStatusFull', 'Full'], ['purchasePaymentStatusPartial', 'Partial']].forEach(([id, status]) => {
+      const btn = $(id);
+      if (btn && !btn._wired) {
+        btn._wired = true;
+        btn.addEventListener('click', () => setPurchasePaymentStatus(status));
+      }
+    });
+
+    const payAccEl = $('purchasePaymentAccount');
     if (payAccEl && !payAccEl._wired) {
       payAccEl._wired = true;
       payAccEl.addEventListener('focus', () => {
+        _purchasePaymentAccountPrev = payAccEl.value === MULTI_PAYMENT_VALUE ? _purchasePaymentAccountPrev : payAccEl.value;
         populatePurchasePaymentAccounts(payAccEl.value);
+      });
+      payAccEl.addEventListener('change', () => {
+        if (payAccEl.value === MULTI_PAYMENT_VALUE) {
+          openPurchaseMultiPaymentModal();
+        } else {
+          resetPurchaseMultiPayments();
+          _purchasePaymentAccountPrev = payAccEl.value;
+        }
+        updatePurchaseMultiPaymentUI();
       });
     }
 
-    // Due date & invoice date change
-    const dateInp = document.getElementById('purchaseDate');
+    const multiSummaryBtn = $('purchaseMultiPaymentSummary');
+    if (multiSummaryBtn && !multiSummaryBtn._wired) {
+      multiSummaryBtn._wired = true;
+      multiSummaryBtn.addEventListener('click', openPurchaseMultiPaymentModal);
+    }
+
+    const payAmtEl = $('purchasePaymentAmount');
+    if (payAmtEl && !payAmtEl._wired) {
+      payAmtEl._wired = true;
+      payAmtEl.addEventListener('input', () => {
+        const total = getPurchaseGrandTotal();
+        if (total > 0 && parseFloat(payAmtEl.value) > total) {
+          payAmtEl.value = total.toFixed(2);
+          toast(`Payment Amount adjusted to ₹${fmt(total)} to not exceed the Grand Total.`, 'warning');
+        }
+        if (typeof window.isMultiPaymentModalOpen === 'function' && window.isMultiPaymentModalOpen() && typeof window.updateMultiPaymentModalTotals === 'function') {
+          window.updateMultiPaymentModalTotals();
+        }
+        updatePurchaseMultiPaymentUI();
+      });
+    }
+
+    // Date / Due Date: the KYA calendar and "Due Date follows the Date" are wired from the
+    // markup (kya-datepicker.js); the attach call is a no-op when that already happened
+    if (typeof window.attachMarkedKyaDatePickers === 'function') window.attachMarkedKyaDatePickers();
+    const dateInp = $('purchaseDate');
     if (dateInp && !dateInp._dueWired) {
       dateInp._dueWired = true;
       dateInp.addEventListener('change', updatePurchaseDueDateDays);
     }
-
-    const dueDateInp = document.getElementById('purchaseDueDate');
+    const dueDateInp = $('purchaseDueDate');
     if (dueDateInp && !dueDateInp._wired) {
       dueDateInp._wired = true;
-      dueDateInp.addEventListener('input', updatePurchaseDueDateDays);
       dueDateInp.addEventListener('change', updatePurchaseDueDateDays);
     }
 
-    // TDS / TCS buttons
-    const noneBtn = document.getElementById('purchaseTdsTcsNone');
-    const tdsBtn  = document.getElementById('purchaseTdsTcsTds');
-    const tcsBtn  = document.getElementById('purchaseTdsTcsTcs');
+    // TDS / TCS
+    [['purchaseTdsTcsNone', 'None'], ['purchaseTdsTcsTds', 'TDS'], ['purchaseTdsTcsTcs', 'TCS']].forEach(([id, mode]) => {
+      const btn = $(id);
+      if (btn && !btn._wired) {
+        btn._wired = true;
+        btn.addEventListener('click', () => setPurchaseTdsTcs(mode));
+      }
+    });
 
-    if (noneBtn && !noneBtn._wired) {
-      noneBtn._wired = true;
-      noneBtn.addEventListener('click', () => setPurchaseTdsTcs('None'));
-    }
-    if (tdsBtn && !tdsBtn._wired) {
-      tdsBtn._wired = true;
-      tdsBtn.addEventListener('click', () => setPurchaseTdsTcs('TDS'));
-    }
-    if (tcsBtn && !tcsBtn._wired) {
-      tcsBtn._wired = true;
-      tcsBtn.addEventListener('click', () => setPurchaseTdsTcs('TCS'));
-    }
-
-    // Rate select
-    const rateSel = document.getElementById('purchaseTdsTcsRateSelect');
+    const rateSel = $('purchaseTdsTcsRateSelect');
+    const tdsAmtInp = $('purchaseTdsTcsAmount');
     if (rateSel && !rateSel._wired) {
       rateSel._wired = true;
       rateSel.addEventListener('change', () => {
-        const customWrap = document.getElementById('purchaseTdsTcsRateCustomWrap');
-        if (customWrap) {
-          customWrap.style.display = rateSel.value === 'custom' ? 'flex' : 'none';
+        if (tdsAmtInp) delete tdsAmtInp.dataset.manual;
+        const customWrap = $('purchaseTdsTcsRateCustomWrap');
+        if (rateSel.value === 'custom') {
+          if (customWrap) customWrap.style.display = 'flex';
+          $('purchaseTdsTcsRateCustom')?.focus();
+        } else if (customWrap) {
+          customWrap.style.display = 'none';
         }
         recalculatePurchaseTotals();
       });
     }
 
-    const customRateInp = document.getElementById('purchaseTdsTcsRateCustom');
+    const customRateInp = $('purchaseTdsTcsRateCustom');
     if (customRateInp && !customRateInp._wired) {
       customRateInp._wired = true;
-      customRateInp.addEventListener('input', recalculatePurchaseTotals);
+      customRateInp.addEventListener('input', () => {
+        // Typing a percentage makes the rate the source again
+        if (tdsAmtInp) delete tdsAmtInp.dataset.manual;
+        recalculatePurchaseTotals();
+      });
     }
 
-    const tdsAmtInp = document.getElementById('purchaseTdsTcsAmount');
     if (tdsAmtInp && !tdsAmtInp._wired) {
       tdsAmtInp._wired = true;
-      tdsAmtInp.addEventListener('input', recalculatePurchaseTotals);
+      tdsAmtInp.addEventListener('input', () => {
+        if (rateSel && rateSel.value === 'custom') {
+          if (tdsAmtInp.value.trim() !== '') tdsAmtInp.dataset.manual = '1';
+          else delete tdsAmtInp.dataset.manual;
+        }
+        recalculatePurchaseTotals();
+      });
     }
 
     // Round off
-    const roundBtn = document.getElementById('btnPurchaseAutoRoundOff');
+    const roundBtn = $('btnPurchaseAutoRoundOff');
     if (roundBtn && !roundBtn._wired) {
       roundBtn._wired = true;
       roundBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        autoRoundOffPurchase();
+        autoCalculatePurchaseRoundOff();
       });
     }
-
-    const adjInp = document.getElementById('purchaseAdjustments');
+    const adjInp = $('purchaseAdjustments');
     if (adjInp && !adjInp._wired) {
       adjInp._wired = true;
       adjInp.addEventListener('input', recalculatePurchaseTotals);
-      adjInp.addEventListener('blur', () => {
-        const val = parsePurchaseAmt(adjInp.value);
-        if (!isNaN(val)) {
-          adjInp.value = val === 0 ? '' : (val > 0 ? `+${val.toFixed(2)}` : val.toFixed(2));
-          recalculatePurchaseTotals();
-        }
-      });
-      adjInp.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          adjInp.blur();
-        }
-      });
     }
 
-    // Supply type
-    const supplySel = document.getElementById('purchaseSupplyType');
+    // Supply type: a zero-rated supply carries no GST on its lines
+    const supplySel = $('purchaseSupplyType');
     if (supplySel && !supplySel._wired) {
       supplySel._wired = true;
       supplySel.addEventListener('change', () => {
@@ -1424,23 +1754,22 @@
       });
     }
 
-    // Document dropzone
-    const dropzone = document.getElementById('purchaseDocDropzone');
-    const fileInp  = document.getElementById('purchaseDocFileInput');
-    const removeBtn = document.getElementById('purchaseDocRemoveBtn');
-
+    // Document attachment
+    const dropzone = $('purchaseDocDropzone');
+    const fileInp = $('purchaseDocFileInput');
     if (dropzone && fileInp && !dropzone._wired) {
       dropzone._wired = true;
-      dropzone.addEventListener('click', () => fileInp.click());
-      fileInp.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files[0]) {
-          handlePurchaseDocSelect(e.target.files[0]);
-        }
+      dropzone.addEventListener('click', (e) => {
+        if (e.target.closest('#purchaseDocRemoveBtn') || e.target.closest('#purchaseDocPreviewBtn')) return;
+        fileInp.click();
+      });
+      fileInp.addEventListener('change', () => {
+        if (fileInp.files && fileInp.files[0]) handlePurchaseDocUpload(fileInp.files[0]);
       });
       dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropzone.style.borderColor = 'var(--emerald-500)';
-        dropzone.style.background = 'var(--emerald-50)';
+        dropzone.style.borderColor = 'var(--blue-500)';
+        dropzone.style.background = 'var(--blue-50)';
       });
       dropzone.addEventListener('dragleave', () => {
         dropzone.style.borderColor = 'var(--slate-300)';
@@ -1450,28 +1779,36 @@
         e.preventDefault();
         dropzone.style.borderColor = 'var(--slate-300)';
         dropzone.style.background = 'var(--slate-50)';
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-          handlePurchaseDocSelect(e.dataTransfer.files[0]);
-        }
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) handlePurchaseDocUpload(e.dataTransfer.files[0]);
       });
     }
-
+    const removeBtn = $('purchaseDocRemoveBtn');
     if (removeBtn && !removeBtn._wired) {
       removeBtn._wired = true;
       removeBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        resetPurchaseDocAttachment();
+        updatePurchaseDocUI(null);
+        toast('Attached document removed.', 'info');
       });
     }
+
+    wirePurchaseMoreDropdown();
   }
 
   // Export globals
   window.initPurchaseForm = initPurchaseForm;
+  window.loadPurchaseVoucher = loadPurchaseVoucher;
   window.populatePurchaseVendors = populatePurchaseVendors;
   window.populatePurchaseExecutives = populatePurchaseExecutives;
   window.populatePurchasePaymentAccounts = populatePurchasePaymentAccounts;
-  window.purchaseRows = purchaseRows;
+  window.savePurchaseDraft = savePurchaseDraft;
+  window.postPurchaseVoucher = postPurchaseVoucher;
+  window.editPurchaseDraft = editPurchaseDraft;
+  window.postPurchaseDraft = postPurchaseDraft;
+  window.appendPurchasePartyCreateFooter = appendPurchasePartyCreateFooter;
+  // The rows on the form (read live: app-shell only starts a fresh form when there are none)
+  Object.defineProperty(window, 'purchaseRows', { configurable: true, get: () => purchaseRows });
 
   // Auto-init on DOM ready
   document.addEventListener('DOMContentLoaded', () => {

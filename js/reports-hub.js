@@ -10,8 +10,22 @@
   let _gstCycle = 'monthly';            // monthly | quarterly
   let _gstFyStart = null;               // start year of the selected financial year (Apr–Mar)
   let _gstPeriodIdx = null;             // index into the year's months / quarters
-  let _gstView = 'dashboard';           // dashboard | gstr1 | gstr1-b2b | gstr1-b2b-docs | gstr1-b2b-invoice | gstr3b
+  let _gstView = 'dashboard';           // dashboard | gstr1 | gstr1-b2b | gstr1-b2b-docs | gstr1-b2b-invoice | gstr2b | gstr2b-docs | gstr2b-invoice | gstr3b
   let _b2bInvoiceId = null;             // invoice opened from the document wise details
+
+  // GSTR-2B (auto-drafted ITC statement)
+  let _g2bMainTab = 'summary';          // summary | all
+  let _g2bSummaryTab = 'available';     // available | notavailable | reversal | rejected
+  const _g2bExpanded = new Set();       // summary sections opened (all start collapsed, as on the portal)
+  let _g2bAllTable = 'B2B';             // table picked under ALL TABLES
+  let _g2bScope = null;                 // a summary heading opened from its link: { table, tab, rcm, heading }
+  let _g2bDocTab = 'docs';              // docs | suppliers
+  let _g2bSupplier = '';                // supplier GSTIN picked in Supplier wise Details
+  let _g2bSearch = '';
+  let _g2bPageSize = 10;
+  let _g2bPage = 0;
+  const _g2bHiddenCols = new Set();
+  let _g2bInvoiceId = null;             // purchase opened from its invoice number
 
   // B2B document wise details (invoices of one recipient)
   let _b2bDocsGstin = '';
@@ -28,7 +42,8 @@
   let _hsnSortDir = 'asc';              // HSN column sort
 
   // Where the Back button goes from each GST view
-  const GST_VIEW_PARENT = { gstr1: 'dashboard', gstr3b: 'dashboard', 'gstr1-b2b': 'gstr1', 'gstr1-b2b-docs': 'gstr1-b2b', 'gstr1-b2b-invoice': 'gstr1-b2b-docs', 'gstr1-b2cs': 'gstr1', 'gstr1-hsn': 'gstr1', 'gstr1-docs': 'gstr1' };
+  // ('gstr2b-invoice' goes back to whichever GSTR-2B screen opened it — set when it opens)
+  const GST_VIEW_PARENT = { gstr1: 'dashboard', gstr3b: 'dashboard', 'gstr1-b2b': 'gstr1', 'gstr1-b2b-docs': 'gstr1-b2b', 'gstr1-b2b-invoice': 'gstr1-b2b-docs', 'gstr1-b2cs': 'gstr1', 'gstr1-hsn': 'gstr1', 'gstr1-docs': 'gstr1', gstr2b: 'dashboard', 'gstr2b-docs': 'gstr2b', 'gstr2b-invoice': 'gstr2b' };
 
   // GSTR-1 tiles that open a detail view when clicked
   const GSTR1_SECTION_VIEWS = {
@@ -588,6 +603,107 @@
         overflow-wrap: anywhere;
       }
 
+      /* GSTR-2B: auto-drafted ITC statement (GST portal layout) */
+      .g2b-form-title {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+        color: var(--slate-800);
+        margin-bottom: 12px;
+      }
+      .g2b-card { margin-top: 16px; padding: 18px; }
+      .g2b-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 14px 0;
+      }
+      /* Wide enough that the headings stay readable; narrower screens scroll it sideways */
+      .gst-activity-table.g2b-sum-table { min-width: 900px; }
+      .g2b-sum-table th:nth-child(2) { min-width: 280px; }
+      .gst-activity-table.g2b-sum-table th { text-transform: none; letter-spacing: 0; font-size: 12px; padding: 10px; }
+      .gst-activity-table.g2b-sum-table td { padding: 10px; }
+      .g2b-sum-table tr.g2b-part-row td { background: var(--blue-50); color: var(--blue-800, #1e40af); font-weight: 700; }
+      .g2b-sum-table tr.g2b-sec-row td { background: var(--slate-50); color: var(--slate-800); font-weight: 700; }
+      .g2b-sum-table tr.g2b-child-row td.g2b-heading { padding-left: 34px; }
+      .g2b-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .g2b-toggle svg { width: 12px; height: 12px; flex-shrink: 0; transition: transform .15s ease; }
+      .g2b-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+      .g2b-link {
+        padding: 0;
+        font: inherit;
+        font-weight: 600;
+        color: var(--blue-700);
+        text-align: left;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .g2b-link:hover { color: var(--blue-800, #1e40af); }
+      .g2b-link:focus-visible, .g2b-toggle:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; border-radius: 3px; }
+      .g2b-advisory-link { font-size: 12px; white-space: nowrap; }
+      .g2b-table-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+      .g2b-table-pick-label { font-size: 12.5px; font-weight: 600; color: var(--slate-600); }
+      .g2b-table-title { font-size: 13.5px; font-weight: 700; color: var(--slate-800); }
+      .gst-activity-table.g2b-docs-table th { text-transform: none; letter-spacing: 0; font-size: 12px; padding: 10px 8px; white-space: nowrap; }
+      .gst-activity-table.g2b-docs-table td { padding: 10px 8px; }
+      .g2b-cols-menu { max-height: 320px; overflow-y: auto; }
+      .g2b-cols-menu label.is-fixed { opacity: .55; cursor: default; }
+      .b2b-docs-chip .g2b-chip-clear {
+        margin-left: 8px;
+        padding: 0;
+        font-size: 14px;
+        line-height: 1;
+        color: var(--slate-500);
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .b2b-docs-chip .g2b-chip-clear:hover { color: var(--red-600, #dc2626); }
+      .g2b-advisory-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(15,23,42,.55);
+      }
+      .g2b-advisory-card {
+        width: 100%;
+        max-width: 480px;
+        overflow: hidden;
+        background: var(--white, #fff);
+        border-radius: 14px;
+        box-shadow: 0 24px 48px -12px rgba(0,0,0,.35);
+      }
+      .g2b-advisory-head {
+        padding: 14px 18px;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--white, #fff);
+        background: linear-gradient(90deg, var(--blue-700), var(--blue-500));
+      }
+      .g2b-advisory-body { padding: 16px 18px; font-size: 13px; line-height: 1.6; color: var(--slate-700); }
+      .g2b-advisory-foot { display: flex; justify-content: flex-end; padding: 0 18px 16px; }
+
       /* Columns follow the dashboard's own width (the app sidebar narrows it) */
       .gst-dash { container-type: inline-size; }
       @container (max-width: 959px) {
@@ -808,6 +924,8 @@
     const outwardTaxable = g3b.outward.outwardTaxable;
     const outputTax = g3b.outputTax;
     const itc = g3b.itcTotal;
+    // GSTR-2B has only what registered suppliers bill (and imports), as on the portal
+    const g2b = computeGstr2bData(period);
 
     return {
       salesCount: sales.length,
@@ -820,6 +938,9 @@
       lastPurchase: latestDate(purchases),
       lastAny: latestDate(sales.concat(purchases)),
       g3b,
+      g2bItc: g2b.itcTotal,
+      g2bCount: g2b.b2b.length + g2b.impg.length,
+      g2bLast: latestDate(g2b.b2b.concat(g2b.impg).map(d => d.v)),
     };
   }
 
@@ -964,7 +1085,7 @@
 
     const activityRows = [
       { name: 'GSTR-1', hasData: s.salesCount > 0, last: s.lastSales },
-      { name: 'GSTR-2B', hasData: s.purchaseCount > 0, last: s.lastPurchase },
+      { name: 'GSTR-2B', hasData: s.g2bCount > 0, last: s.g2bLast },
       { name: 'GSTR-3B', hasData: (s.salesCount + s.purchaseCount) > 0, last: s.lastAny },
     ];
 
@@ -982,13 +1103,13 @@
           ],
         })}
         ${renderReturnCard({
-          tone: 'violet', icon: GST_ICONS.gstr2b, name: 'GSTR-2B', desc: 'Auto Drafted ITC Statement',
-          hasData: s.purchaseCount > 0,
+          tone: 'violet', icon: GST_ICONS.gstr2b, name: 'GSTR-2B', desc: 'Auto Drafted ITC Statement', detailsView: 'gstr2b',
+          hasData: s.g2bCount > 0,
           metrics: [
-            { label: 'Total ITC Available', value: fmtInr(s.itc) },
-            { label: 'No. of Records', value: fmtCount(s.purchaseCount) },
+            { label: 'Total ITC Available', value: fmtInr(s.g2bItc) },
+            { label: 'No. of Records', value: fmtCount(s.g2bCount) },
             { label: 'Period', value: period, small: true },
-            { label: 'Last Entry', value: fmtDate(s.lastPurchase), small: true },
+            { label: 'Last Entry', value: fmtDate(s.g2bLast), small: true },
           ],
         })}
         ${renderReturnCard({
@@ -1006,7 +1127,7 @@
       <div class="gst-summary-grid">
         ${renderSummaryTile('blue', GST_ICONS.sales, 'Total Sales (Taxable)', fmtInr(s.outwardTaxable))}
         ${renderSummaryTile('emerald', GST_ICONS.rupee, 'Total Output Tax', fmtInr(s.outputTax))}
-        ${renderSummaryTile('violet', GST_ICONS.gstr2b, 'Total ITC (2B)', fmtInr(s.itc))}
+        ${renderSummaryTile('violet', GST_ICONS.gstr2b, 'Total ITC (2B)', fmtInr(s.g2bItc))}
         ${renderSummaryTile('amber', GST_ICONS.scale, 'Net GST Liability (3B)', fmtInr(s.netLiability))}
       </div>
 
@@ -1872,6 +1993,862 @@
     `;
   }
 
+  // ── GSTR-2B: Auto-drafted ITC statement (GST portal layout) ──────────
+  // From the posted Purchase Vouchers: bills of suppliers with a GSTIN are B2B, imports
+  // are IMPG. KYA doesn't record ISD, ECO, reverse charge, credit / debit notes,
+  // amendments, IMS or Rule 37A — those headings show nil.
+
+  const G2B_IMPORT_SUPPLY = 'Import (Customs / Zero-Rated)';
+
+  // Invoice type as the portal names it
+  function g2bInvoiceType(supplyType) {
+    if (supplyType === 'SEZ With Tax') return 'SEZ supplies with payment of tax';
+    if (supplyType === 'SEZ Without Tax') return 'SEZ supplies without payment of tax';
+    if (supplyType === 'Deemed Export') return 'Deemed Exp';
+    return 'Regular';
+  }
+
+  // The supplier as on this purchase (its in-voucher edit, if any, else the vendor master)
+  function g2bSupplierOf(v) {
+    const master = (typeof getPurchaseParty === 'function' ? getPurchaseParty(v) : null) || {};
+    const ov = (v.partyOverride && v.partyOverride.isOverridden) ? v.partyOverride : null;
+    return {
+      gstin: String((ov && ov.gstin) || master.gstin || '').trim().toUpperCase(),
+      name: (ov && ov.name) || master.name || v.vendorName || '',
+      party: Object.assign({}, master, ov || {}),
+    };
+  }
+
+  // A line's rate, taxable value and GST — the same figures the purchase posted to the books
+  function g2bLine(r) {
+    if (typeof getPurchaseLineFigures === 'function') {
+      const f = getPurchaseLineFigures(r);
+      return { rate: f.taxPct, taxable: f.taxable, gst: f.taxAmt };
+    }
+    const t = purchaseRowTaxableAndGst(r);
+    return { rate: parseFloat(r.tax) || 0, taxable: t.taxable, gst: t.gst };
+  }
+
+  // Place of supply of an inward supply: this company's state (the recipient). Without it in
+  // Company Details, an intra-state supply is still in the supplier's own state.
+  function g2bPlaceOfSupply(party, supplyType) {
+    return placeOfSupplyOf(null) || (isIntraStateSupply(supplyType) ? placeOfSupplyOf(party) : '') || '-';
+  }
+
+  function computeGstr2bData(period) {
+    const b2b = [];
+    const impg = [];
+    getPurchaseVouchers().forEach(v => {
+      if (!v || v.isDraft || !inPeriod(v.date, period)) return;
+      let taxable = 0, gst = 0;
+      (v.rows || []).forEach(r => {
+        const l = g2bLine(r);
+        taxable += l.taxable;
+        gst += l.gst;
+      });
+      const dateObj = parseVoucherDate(v.date);
+      if (v.supplyType === G2B_IMPORT_SUPPLY) {
+        // Imports reach GSTR-2B from the bill of entry (ICEGATE), not from a supplier GSTIN
+        impg.push({
+          id: v.id, v, dateObj, refDate: '-', port: '-', boeNo: v.invoiceNo || '', boeDate: dateObj,
+          taxable, igst: gst, cess: 0, amended: '-',
+        });
+        return;
+      }
+      const sup = g2bSupplierOf(v);
+      if (!sup.gstin) return; // an unregistered supplier files no GSTR-1, so it isn't in GSTR-2B
+      const split = gstSplit(gst, v.supplyType);
+      b2b.push({
+        id: v.id, v, dateObj,
+        gstin: sup.gstin, name: sup.name,
+        no: v.invoiceNo || '', type: g2bInvoiceType(v.supplyType), date: dateObj,
+        value: taxable + split.igst + split.cgst + split.sgst,
+        pos: g2bPlaceOfSupply(sup.party, v.supplyType), rcm: 'No',
+        taxable, igst: split.igst, cgst: split.cgst, sgst: split.sgst, cess: 0,
+        period: '-', filed: '-', itc: 'Yes', reason: '-', applicable: '-', source: '-', irn: '-', irnDate: '-',
+      });
+    });
+    const byDate = (a, b) => ((b.dateObj || 0) - (a.dateObj || 0)) || String(b.no || b.boeNo).localeCompare(String(a.no || a.boeNo));
+    b2b.sort(byDate);
+    impg.sort(byDate);
+    const itcTotal = b2b.filter(d => d.itc === 'Yes').reduce((s, d) => s + d.igst + d.cgst + d.sgst + d.cess, 0)
+      + impg.reduce((s, d) => s + d.igst + d.cess, 0);
+    return { b2b, impg, itcTotal };
+  }
+
+  // The documents behind a table: in a summary heading's scope ({ tab, rcm }) or all of them
+  function g2bDocsFor(data, table, scope) {
+    if (table === 'B2B') {
+      if (!scope) return data.b2b;
+      return data.b2b.filter(d => (d.rcm === 'Yes') === !!scope.rcm
+        && ((scope.tab === 'available' && d.itc === 'Yes') || (scope.tab === 'notavailable' && d.itc === 'No')));
+    }
+    if (table === 'IMPG') return (!scope || scope.tab === 'available') ? data.impg : [];
+    return [];
+  }
+
+  // ── Summary: Part A / Part B, sections and headings with their GSTR-3B tables ──
+  const G2B_ADVISORY = {
+    a5: 'If this is positive, credit may be availed under Table 4(A)(5) of FORM GSTR-3B. If this is negative, credit shall be reversed under Table 4(B)(2) of FORM GSTR-3B.',
+    a4: 'If this is positive, credit may be availed under Table 4(A)(4) of FORM GSTR-3B. If this is negative, credit shall be reversed under Table 4(B)(2) of FORM GSTR-3B.',
+    a3: 'These supplies shall be declared in Table 3.1(d) of FORM GSTR-3B for payment of tax. Credit may be availed under Table 4(A)(3) of FORM GSTR-3B on payment of tax.',
+    a1: 'If this is positive, credit may be availed under Table 4(A)(1) of FORM GSTR-3B. If this is negative, credit shall be reversed under Table 4(B)(2) of FORM GSTR-3B.',
+    cn: 'Credit Notes shall be net-off against relevant ITC available tables [Table 4A(3,4,5)].',
+    na: 'Such credit shall not be taken in FORM GSTR-3B and shall be reported in Table 4(D)(2) of FORM GSTR-3B.',
+    naRcm: 'These supplies shall be declared in Table 3.1(d) of FORM GSTR-3B for payment of tax. However, credit will not be available on the same and the same shall be reported in Table 4(D)(2) of FORM GSTR-3B.',
+    r37a: 'Such credit shall be reversed in Table 4(B)(2) of FORM GSTR-3B, on or before the 30th of November following the end of the financial year in which the ITC was availed, where the supplier has not furnished the corresponding FORM GSTR-3B (Rule 37A).',
+    rejected: 'These documents have been rejected on the IMS dashboard. Such credit will not be populated in FORM GSTR-3B.',
+  };
+
+  const g2bRow = (heading, table, src, extra) => Object.assign({ heading, table, src }, extra || {});
+  const G2B_ALL_OTHER_ROWS = t => [
+    g2bRow('B2B - Invoices', t, 'B2B'),
+    g2bRow('B2B - Debit notes', t, 'B2B CDNR'),
+    g2bRow('ECO - Documents', t, 'ECO'),
+    g2bRow('B2B - Invoices (Amendment)', t, 'B2BA'),
+    g2bRow('B2B - Debit notes (Amendment)', t, 'B2B CDNRA'),
+    g2bRow('ECO - Documents (Amendment)', t, 'ECOA'),
+  ];
+  const G2B_ISD_ROWS = t => [g2bRow('ISD - Invoices', t, 'ISD'), g2bRow('ISD - Invoices (Amendment)', t, 'ISDA')];
+  const G2B_RCM_ROWS = t => [
+    g2bRow('B2B - Invoices', t, 'B2B', { rcm: true }),
+    g2bRow('B2B - Debit notes', t, 'B2B CDNR', { rcm: true }),
+    g2bRow('B2B - Invoices (Amendment)', t, 'B2BA', { rcm: true }),
+    g2bRow('B2B - Debit notes (Amendment)', t, 'B2B CDNRA', { rcm: true }),
+  ];
+  const G2B_CN_ROWS = () => [
+    g2bRow('B2B - Credit notes', '4(A)(5)', 'B2B CDNR'),
+    g2bRow('B2B - Credit notes (Amendment)', '4(A)(5)', 'B2B CDNRA'),
+    g2bRow('B2B - Credit notes (Reverse charge)', '4(A)(3)', 'B2B CDNR', { rcm: true }),
+    g2bRow('B2B - Credit notes (Reverse charge) (Amendment)', '4(A)(3)', 'B2B CDNRA', { rcm: true }),
+    g2bRow('ISD - Credit notes', '4(A)(4)', 'ISD'),
+    g2bRow('ISD - Credit notes (Amendment)', '4(A)(4)', 'ISDA'),
+  ];
+
+  const G2B_SUMMARY = {
+    available: {
+      label: 'ITC Available',
+      parts: [
+        {
+          part: 'Part A', title: 'ITC Available - Credit may be claimed in relevant headings in GSTR-3B',
+          sections: [
+            { sno: 'I', heading: 'All other ITC - Supplies from registered persons other than reverse charge', table: '4(A)(5)', advisory: G2B_ADVISORY.a5, rows: G2B_ALL_OTHER_ROWS('4(A)(5)') },
+            { sno: 'II', heading: 'Inward Supplies from ISD', table: '4(A)(4)', advisory: G2B_ADVISORY.a4, rows: G2B_ISD_ROWS('4(A)(4)') },
+            { sno: 'III', heading: 'Inward Supplies liable for reverse charge', table: '3.1(d), 4(A)(3)', advisory: G2B_ADVISORY.a3, rows: G2B_RCM_ROWS('3.1(d), 4(A)(3)') },
+            {
+              sno: 'IV', heading: 'Import of Goods', table: '4(A)(1)', advisory: G2B_ADVISORY.a1,
+              rows: [
+                g2bRow('IMPG - Import of goods from overseas', '4(A)(1)', 'IMPG'),
+                g2bRow('IMPG (Amendment)', '4(A)(1)', 'IMPG (Amendments)'),
+                g2bRow('IMPGSEZ - Import of goods from SEZ', '4(A)(1)', 'IMPGSEZ'),
+                g2bRow('IMPGSEZ (Amendment)', '4(A)(1)', 'IMPGSEZ (Amendments)'),
+              ],
+            },
+          ],
+        },
+        {
+          part: 'Part B', title: 'ITC Available - Credit notes should be net off against relevant ITC available headings in GSTR-3B',
+          sections: [{ sno: 'I', heading: 'Others', table: '4(A)', advisory: G2B_ADVISORY.cn, rows: G2B_CN_ROWS() }],
+        },
+      ],
+    },
+    notavailable: {
+      label: 'ITC not available',
+      parts: [
+        {
+          part: 'Part A', title: 'ITC Not Available',
+          sections: [
+            { sno: 'I', heading: 'All other ITC - Supplies from registered persons other than reverse charge', table: '4(D)(2)', advisory: G2B_ADVISORY.na, rows: G2B_ALL_OTHER_ROWS('4(D)(2)') },
+            { sno: 'II', heading: 'Inward Supplies from ISD', table: '4(D)(2)', advisory: G2B_ADVISORY.na, rows: G2B_ISD_ROWS('4(D)(2)') },
+            { sno: 'III', heading: 'Inward Supplies liable for reverse charge', table: '3.1(d), 4(D)(2)', advisory: G2B_ADVISORY.naRcm, rows: G2B_RCM_ROWS('3.1(d), 4(D)(2)') },
+          ],
+        },
+        {
+          part: 'Part B', title: 'ITC Not Available - Credit notes should be net off against relevant ITC available headings in GSTR-3B',
+          sections: [{ sno: 'I', heading: 'Others', table: '4(A)', advisory: G2B_ADVISORY.cn, rows: G2B_CN_ROWS() }],
+        },
+      ],
+    },
+    reversal: {
+      label: 'ITC Reversal',
+      parts: [
+        {
+          part: 'Part A', title: 'ITC Reversal - Credit shall be reversed in GSTR-3B',
+          sections: [{
+            sno: 'I', heading: 'ITC to be reversed on account of Rule 37A', table: '4(B)(2)', advisory: G2B_ADVISORY.r37a,
+            rows: [
+              g2bRow('B2B - Invoices', '4(B)(2)', 'ITC REVERSED'),
+              g2bRow('B2B - Debit notes', '4(B)(2)', 'B2B DNR'),
+              g2bRow('B2B - Invoices (Amendment)', '4(B)(2)', 'B2BA ITC REVERSAL'),
+              g2bRow('B2B - Debit notes (Amendment)', '4(B)(2)', 'B2B DNRA'),
+            ],
+          }],
+        },
+      ],
+    },
+    rejected: {
+      label: 'ITC Rejected',
+      parts: [
+        {
+          part: 'Part A', title: 'ITC Rejected - Documents rejected on the IMS dashboard',
+          sections: [
+            { sno: 'I', heading: 'All other ITC - Supplies from registered persons other than reverse charge', table: '-', advisory: G2B_ADVISORY.rejected, rows: G2B_ALL_OTHER_ROWS('-') },
+            { sno: 'II', heading: 'Inward Supplies from ISD', table: '-', advisory: G2B_ADVISORY.rejected, rows: G2B_ISD_ROWS('-') },
+            { sno: 'III', heading: 'Inward Supplies liable for reverse charge', table: '-', advisory: G2B_ADVISORY.rejected, rows: G2B_RCM_ROWS('-') },
+          ],
+        },
+        {
+          part: 'Part B', title: 'ITC Rejected - Credit notes rejected on the IMS dashboard',
+          sections: [{ sno: 'I', heading: 'Others', table: '-', advisory: G2B_ADVISORY.rejected, rows: G2B_CN_ROWS() }],
+        },
+      ],
+    },
+  };
+  const G2B_SUMMARY_TABS = ['available', 'notavailable', 'reversal', 'rejected'];
+
+  // ── ALL TABLES: the tables of FORM GSTR-2B and their columns ──
+  // fixed: columns the portal never lets you hide
+  const g2bCol = (key, label, opts) => Object.assign({ key, label }, opts || {});
+  const G2B_TAX_COLS = [
+    g2bCol('igst', 'Integrated Tax (₹)', { num: true, fixed: true }),
+    g2bCol('cgst', 'Central Tax (₹)', { num: true, fixed: true }),
+    g2bCol('sgst', 'State/UT Tax (₹)', { num: true, fixed: true }),
+    g2bCol('cess', 'Cess (₹)', { num: true }),
+  ];
+  const G2B_FILING_COLS = [
+    g2bCol('period', 'GSTR-1/IFF/GSTR-1A/5 Period'),
+    g2bCol('filed', 'GSTR-1/IFF/GSTR-1A/5 Filing Date'),
+    g2bCol('itc', 'ITC Availability'),
+    g2bCol('reason', 'Reason'),
+    g2bCol('applicable', 'Applicable % of Tax Rate'),
+  ];
+  const G2B_B2B_COLS = [
+    g2bCol('gstin', 'GSTIN of Supplier', { fixed: true }),
+    g2bCol('name', 'Trade/Legal Name'),
+    g2bCol('no', 'Invoice Number', { link: true }),
+    g2bCol('type', 'Invoice Type'),
+    g2bCol('date', 'Invoice Date', { date: true }),
+    g2bCol('value', 'Invoice Value (₹)', { num: true }),
+    g2bCol('pos', 'Place of Supply'),
+    g2bCol('rcm', 'Supply Attract Reverse Charge'),
+    g2bCol('taxable', 'Taxable Value (₹)', { num: true, fixed: true }),
+    ...G2B_TAX_COLS,
+    ...G2B_FILING_COLS,
+    g2bCol('source', 'Source'),
+    g2bCol('irn', 'IRN'),
+    g2bCol('irnDate', 'IRN Date'),
+  ];
+  const G2B_NOTE_COLS = [
+    g2bCol('gstin', 'GSTIN of Supplier', { fixed: true }),
+    g2bCol('name', 'Trade/Legal Name'),
+    g2bCol('noteNo', 'Note Number'),
+    g2bCol('noteType', 'Note Type'),
+    g2bCol('noteSupply', 'Note Supply Type'),
+    g2bCol('noteDate', 'Note Date'),
+    g2bCol('noteValue', 'Note Value (₹)', { num: true }),
+    g2bCol('pos', 'Place of Supply'),
+    g2bCol('rcm', 'Supply Attract Reverse Charge'),
+    g2bCol('taxable', 'Taxable Value (₹)', { num: true, fixed: true }),
+    ...G2B_TAX_COLS,
+    ...G2B_FILING_COLS,
+    g2bCol('source', 'Source'),
+    g2bCol('irn', 'IRN'),
+    g2bCol('irnDate', 'IRN Date'),
+  ];
+  const G2B_ECO_COLS = [
+    g2bCol('gstin', 'GSTIN of ECO', { fixed: true }),
+    g2bCol('name', 'Trade/Legal Name'),
+    g2bCol('docNo', 'Document Number'),
+    g2bCol('docType', 'Document Type'),
+    g2bCol('docDate', 'Document Date'),
+    g2bCol('docValue', 'Document Value (₹)', { num: true }),
+    g2bCol('pos', 'Place of Supply'),
+    g2bCol('taxable', 'Taxable Value (₹)', { num: true, fixed: true }),
+    ...G2B_TAX_COLS,
+    g2bCol('period', 'GSTR-1/IFF/GSTR-1A Period'),
+    g2bCol('filed', 'GSTR-1/IFF/GSTR-1A Filing Date'),
+    g2bCol('itc', 'ITC Availability'),
+    g2bCol('reason', 'Reason'),
+  ];
+  const G2B_ISD_COLS = [
+    g2bCol('eligible', 'Eligibility of ITC'),
+    g2bCol('gstin', 'GSTIN of ISD', { fixed: true }),
+    g2bCol('name', 'Trade/Legal Name'),
+    g2bCol('isdType', 'ISD Document Type'),
+    g2bCol('isdNo', 'ISD Document Number'),
+    g2bCol('isdDate', 'ISD Document Date'),
+    g2bCol('origNo', 'Original Invoice Number'),
+    g2bCol('origDate', 'Original Invoice Date'),
+    ...G2B_TAX_COLS,
+    g2bCol('period', 'ISD GSTR-6 Period'),
+    g2bCol('filed', 'ISD GSTR-6 Filing Date'),
+  ];
+  const G2B_IMPG_COLS = [
+    g2bCol('refDate', 'Icegate Reference Date'),
+    g2bCol('port', 'Port Code'),
+    g2bCol('boeNo', 'Bill of Entry Number', { link: true }),
+    g2bCol('boeDate', 'Bill of Entry Date', { date: true }),
+    g2bCol('taxable', 'Taxable Value (₹)', { num: true, fixed: true }),
+    g2bCol('igst', 'Integrated Tax (₹)', { num: true, fixed: true }),
+    g2bCol('cess', 'Cess (₹)', { num: true }),
+    g2bCol('amended', 'Amended (Yes)'),
+  ];
+  const G2B_IMPGSEZ_COLS = [g2bCol('gstin', 'GSTIN of Supplier', { fixed: true }), g2bCol('name', 'Trade/Legal Name')].concat(G2B_IMPG_COLS);
+  const g2bAmended = (cols, origLabels) => origLabels.map(([key, label]) => g2bCol(key, label)).concat(cols);
+
+  // In the order of the portal's "Select table" list
+  const G2B_TABLES = [
+    { id: 'B2B', title: 'Taxable inward supplies received from registered persons', cols: G2B_B2B_COLS, supplierWise: true },
+    { id: 'B2BA', title: 'Amendments to previously filed invoices by supplier', cols: g2bAmended(G2B_B2B_COLS, [['origNo', 'Original Invoice Number'], ['origDate', 'Original Invoice Date']]), supplierWise: true },
+    { id: 'B2B CDNR', title: 'Debit/Credit notes (Original)', cols: G2B_NOTE_COLS, supplierWise: true },
+    { id: 'B2B CDNRA', title: 'Amendments to previously filed Credit/Debit notes by supplier', cols: g2bAmended(G2B_NOTE_COLS, [['origNoteType', 'Note Type (Original)'], ['origNoteNo', 'Note Number (Original)'], ['origNoteDate', 'Note Date (Original)']]), supplierWise: true },
+    { id: 'ISD', title: 'ISD Credits', cols: G2B_ISD_COLS, supplierWise: true },
+    { id: 'ISDA', title: 'Amendments ISD Credits received', cols: g2bAmended(G2B_ISD_COLS, [['origIsdType', 'ISD Document Type (Original)'], ['origIsdNo', 'ISD Document Number (Original)'], ['origIsdDate', 'ISD Document Date (Original)']]), supplierWise: true },
+    { id: 'IMPG', title: 'Import of goods from overseas on bill of entry', cols: G2B_IMPG_COLS, supplierWise: false },
+    { id: 'IMPG (Amendments)', title: 'Amendment to Import of goods from overseas on bill of entry', cols: G2B_IMPG_COLS, supplierWise: false },
+    { id: 'IMPGSEZ', title: 'Import of goods from SEZ units / developers on bill of entry', cols: G2B_IMPGSEZ_COLS, supplierWise: true },
+    { id: 'IMPGSEZ (Amendments)', title: 'Amendment to Import of goods from SEZ units / developers on bill of entry', cols: G2B_IMPGSEZ_COLS, supplierWise: true },
+    { id: 'ECO', title: 'Documents reported by ECO on which ECO is liable to pay tax u/s 9(5)', cols: G2B_ECO_COLS, supplierWise: true },
+    { id: 'ECOA', title: 'Amendment to documents reported by ECO on which ECO is liable to pay tax u/s 9(5)', cols: g2bAmended(G2B_ECO_COLS, [['origDocNo', 'Original Document Number'], ['origDocDate', 'Original Document Date']]), supplierWise: true },
+    { id: 'ITC REVERSED', title: 'ITC Reversal on account of Rule 37A', cols: G2B_B2B_COLS, supplierWise: true },
+    { id: 'B2BA ITC REVERSAL', title: 'ITC Reversal on account of Rule 37A - Amendments to previously filed invoices', cols: G2B_B2B_COLS, supplierWise: true },
+    { id: 'B2B DNR', title: 'ITC Reversal on account of Rule 37A - Debit notes', cols: G2B_NOTE_COLS, supplierWise: true },
+    { id: 'B2B DNRA', title: 'ITC Reversal on account of Rule 37A - Amendments to previously filed Debit notes', cols: G2B_NOTE_COLS, supplierWise: true },
+  ];
+  const G2B_SUPPLIER_COLS = [
+    g2bCol('gstin', 'GSTIN of Supplier', { link: true }),
+    g2bCol('name', 'Trade/Legal Name'),
+    g2bCol('count', 'Number of Documents', { num: true, count: true }),
+    g2bCol('taxable', 'Taxable Value (₹)', { num: true }),
+    ...G2B_TAX_COLS,
+  ];
+
+  function g2bTableOf(id) {
+    return G2B_TABLES.find(t => t.id === id) || G2B_TABLES[0];
+  }
+
+  // The summary heading's scope applies only on the screen it opened; ALL TABLES shows everything
+  function g2bActiveScope() {
+    return _gstView === 'gstr2b-docs' ? _g2bScope : null;
+  }
+
+  function g2bCell(doc, col) {
+    const v = doc[col.key];
+    if (col.date) return v ? fmtDateSlash(v) : '-';
+    if (col.count) return fmtCount(v);
+    if (col.num) return fmtAmt(v);
+    return escHtml(v === undefined || v === null || v === '' ? '-' : v);
+  }
+
+  // Company block at the top, as on the portal
+  function renderGstr2bHeader(period) {
+    const co = typeof getInvoiceCompany === 'function' ? (getInvoiceCompany() || {}) : {};
+    const today = new Date();
+    return `
+      <div class="gst-activity-card" style="padding: 18px;">
+        <div class="g2b-form-title">Form GSTR-2B – Auto Drafted ITC Statement</div>
+        <div class="gst-inv-grid band">
+          ${renderReadonlyField('Financial Year', `${_gstFyStart}-${String(_gstFyStart + 1).slice(-2)}`)}
+          ${renderReadonlyField('Tax Period', period.label)}
+          ${renderReadonlyField('Date of generation', fmtDateSlash(today))}
+        </div>
+        <div class="gst-inv-grid">
+          ${renderReadonlyField('GSTIN', String(co.gstin || '').toUpperCase() || '-')}
+          ${renderReadonlyField('Legal Name', co.name || '-')}
+          ${renderReadonlyField('Trade Name', co.displayName || co.name || '-')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Tax of one summary heading: the documents in its scope added up
+  function g2bRowTotals(data, tab, row) {
+    const t = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
+    g2bDocsFor(data, row.src, { tab, rcm: !!row.rcm }).forEach(d => {
+      t.igst += d.igst || 0;
+      t.cgst += d.cgst || 0;
+      t.sgst += d.sgst || 0;
+      t.cess += d.cess || 0;
+    });
+    return t;
+  }
+
+  const G2B_CHEVRON = `<svg viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 3L7.5 6 4.5 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  function renderGstr2bSummaryTable(data) {
+    const conf = G2B_SUMMARY[_g2bSummaryTab];
+    const amounts = t => ['igst', 'cgst', 'sgst', 'cess'].map(k => `<td class="num">${fmtAmt(t[k])}</td>`).join('');
+    const body = conf.parts.map((part, pi) => {
+      const partRow = `<tr class="g2b-part-row"><td colspan="8">${escHtml(part.part)} &nbsp;—&nbsp; ${escHtml(part.title)}</td></tr>`;
+      const sections = part.sections.map((sec, si) => {
+        const key = `${_g2bSummaryTab}|${pi}|${si}`;
+        const open = _g2bExpanded.has(key);
+        const rowTotals = sec.rows.map(r => g2bRowTotals(data, _g2bSummaryTab, r));
+        const secTotal = rowTotals.reduce((acc, t) => {
+          ['igst', 'cgst', 'sgst', 'cess'].forEach(k => { acc[k] += t[k]; });
+          return acc;
+        }, { igst: 0, cgst: 0, sgst: 0, cess: 0 });
+        const secRow = `
+          <tr class="g2b-sec-row">
+            <td style="text-align: center;">${sec.sno}</td>
+            <td><button type="button" class="g2b-toggle" data-g2b-sec="${key}" aria-expanded="${open}">${G2B_CHEVRON}<span>${escHtml(sec.heading)}</span></button></td>
+            <td class="nowrap">${escHtml(sec.table)}</td>
+            ${amounts(secTotal)}
+            <td><button type="button" class="g2b-link g2b-advisory-link" data-g2b-advisory="${escHtml(sec.advisory)}">View Advisory</button></td>
+          </tr>`;
+        const children = open ? sec.rows.map((r, ri) => `
+          <tr class="g2b-child-row">
+            <td></td>
+            <td class="g2b-heading"><button type="button" class="g2b-link" data-g2b-open="${escHtml(r.src)}" data-g2b-rcm="${r.rcm ? '1' : ''}" data-g2b-heading="${escHtml(r.heading)}">${escHtml(r.heading)}</button></td>
+            <td class="nowrap">${escHtml(r.table)}</td>
+            ${amounts(rowTotals[ri])}
+            <td></td>
+          </tr>`).join('') : '';
+        return secRow + children;
+      }).join('');
+      return partRow + sections;
+    }).join('');
+    return `
+      <div class="gst-activity-scroll">
+        <table class="gst-activity-table gst-grid-table g2b-sum-table">
+          <thead>
+            <tr>
+              <th style="text-align: center; width: 56px;">S.No.</th>
+              <th>Heading</th>
+              <th>GSTR-3B table</th>
+              <th class="num">Integrated Tax (₹)</th>
+              <th class="num">Central Tax (₹)</th>
+              <th class="num">State/UT Tax (₹)</th>
+              <th class="num">Cess (₹)</th>
+              <th>Advisory</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function g2bAllSectionKeys() {
+    const keys = [];
+    G2B_SUMMARY[_g2bSummaryTab].parts.forEach((part, pi) => part.sections.forEach((sec, si) => keys.push(`${_g2bSummaryTab}|${pi}|${si}`)));
+    return keys;
+  }
+
+  // Supplier wise: one row per supplier GSTIN
+  function g2bSupplierRows(docs) {
+    const map = new Map();
+    docs.forEach(d => {
+      if (!d.gstin) return;
+      const s = map.get(d.gstin) || { gstin: d.gstin, name: d.name, count: 0, taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+      s.count += 1;
+      ['taxable', 'igst', 'cgst', 'sgst', 'cess'].forEach(k => { s[k] += d[k] || 0; });
+      map.set(d.gstin, s);
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Table + pager only, so typing in Search keeps focus
+  function renderGstr2bDocsTable() {
+    const { period } = getGstSelection();
+    const data = computeGstr2bData(period);
+    const scope = g2bActiveScope();
+    const table = g2bTableOf(scope ? scope.table : _g2bAllTable);
+    const docs = g2bDocsFor(data, table.id, scope);
+    const suppliersTab = table.supplierWise && _g2bDocTab === 'suppliers';
+    let cols;
+    let rows;
+    if (suppliersTab) {
+      cols = G2B_SUPPLIER_COLS;
+      rows = g2bSupplierRows(docs);
+    } else {
+      cols = table.cols.filter(c => !_g2bHiddenCols.has(c.key));
+      rows = _g2bSupplier ? docs.filter(d => d.gstin === _g2bSupplier) : docs;
+    }
+    const q = _g2bSearch.trim().toLowerCase();
+    if (q) rows = rows.filter(r => cols.some(c => String(g2bCell(r, c)).toLowerCase().includes(q)));
+    const pages = Math.max(1, Math.ceil(rows.length / _g2bPageSize));
+    if (_g2bPage >= pages) _g2bPage = pages - 1;
+    const start = _g2bPage * _g2bPageSize;
+    const pageRows = rows.slice(start, start + _g2bPageSize);
+    const cellHtml = (r, c) => {
+      const text = g2bCell(r, c);
+      if (!c.link || text === '-') return text;
+      if (suppliersTab) return `<button type="button" class="g2b-link" data-g2b-supplier="${escHtml(r.gstin)}" title="Open the documents of ${escHtml(r.name)}">${text}</button>`;
+      return `<button type="button" class="g2b-link" data-g2b-invoice="${escHtml(r.id)}" title="Open tax details">${text}</button>`;
+    };
+    return `
+      <div class="gst-activity-scroll">
+        <table class="gst-activity-table gst-grid-table g2b-docs-table">
+          <thead>
+            <tr>${cols.map(c => `<th class="${c.num ? 'num' : ''}">${c.label}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${pageRows.length ? pageRows.map(r => `
+              <tr>${cols.map(c => `<td class="${c.num ? 'num' : 'nowrap'} ${c.key === 'gstin' && !suppliersTab ? 'gst-ret' : ''}">${cellHtml(r, c)}</td>`).join('')}</tr>
+            `).join('') : `
+              <tr><td colspan="${cols.length || 1}" style="text-align: center; padding: 28px 14px; color: var(--slate-400);">${q ? 'No records match your search.' : 'No record(s) found.'}</td></tr>
+            `}
+          </tbody>
+        </table>
+      </div>
+      <div class="b2b-docs-pager">
+        <span>${rows.length ? `Showing ${start + 1}–${start + pageRows.length} of ${rows.length}` : ''}</span>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary g2b-page-btn" type="button" data-page="${_g2bPage - 1}" ${_g2bPage <= 0 ? 'disabled' : ''}>‹ Prev</button>
+          <button class="btn btn-secondary g2b-page-btn" type="button" data-page="${_g2bPage + 1}" ${_g2bPage >= pages - 1 ? 'disabled' : ''}>Next ›</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Document Details / Supplier wise Details, with Display/Hide Columns, Records per page and Search
+  function renderGstr2bDocsBlock() {
+    const scope = g2bActiveScope();
+    const table = g2bTableOf(scope ? scope.table : _g2bAllTable);
+    const suppliersTab = table.supplierWise && _g2bDocTab === 'suppliers';
+    const tab = (id, label) => `<button type="button" class="gst-subtab ${_g2bDocTab === id ? 'active' : ''}" data-g2b-doctab="${id}" role="tab" aria-selected="${_g2bDocTab === id}">${label}</button>`;
+    let supplierName = '';
+    if (_g2bSupplier) {
+      const { period } = getGstSelection();
+      const doc = computeGstr2bData(period).b2b.find(d => d.gstin === _g2bSupplier);
+      supplierName = doc ? doc.name : '';
+    }
+    return `
+      <div class="b2b-docs-toolbar">
+        ${table.supplierWise ? `
+          <div class="gst-subtabs" role="tablist" aria-label="Document views">
+            ${tab('docs', 'Document Details')}
+            ${tab('suppliers', 'Supplier wise Details')}
+          </div>` : `<div class="gst-subtabs" role="tablist" aria-label="Document views">${tab('docs', 'Document Details')}</div>`}
+        <div class="b2b-docs-controls">
+          ${suppliersTab ? '' : `
+            <div class="b2b-docs-cols-wrap">
+              <button class="btn btn-secondary b2b-docs-cols-btn" type="button" aria-haspopup="true" aria-expanded="false">Display/Hide Columns ▾</button>
+              <div class="b2b-docs-cols-menu g2b-cols-menu" hidden>
+                ${table.cols.map(c => `
+                  <label class="${c.fixed ? 'is-fixed' : ''}"><input type="checkbox" data-g2b-col="${c.key}" ${_g2bHiddenCols.has(c.key) ? '' : 'checked'} ${c.fixed ? 'disabled' : ''}> ${c.label}</label>
+                `).join('')}
+              </div>
+            </div>`}
+          <span class="rpt-filter-select-wrap">
+            <select class="rpt-filter-select" id="g2bPageSize" aria-label="Records per page">
+              ${[10, 25, 50, 100].map(n => `<option value="${n}" ${n === _g2bPageSize ? 'selected' : ''}>${n} per page</option>`).join('')}
+            </select>
+            ${CARET_ICON}
+          </span>
+          <input type="search" class="b2b-docs-search" id="g2bSearch" placeholder="Search..." value="${escHtml(_g2bSearch)}" aria-label="Search documents">
+        </div>
+      </div>
+      ${_g2bSupplier && !suppliersTab ? `
+        <div class="b2b-docs-chips" style="margin-bottom: 12px;">
+          <span class="b2b-docs-chip">${escHtml(_g2bSupplier)}${supplierName ? ` &nbsp;·&nbsp; ${escHtml(supplierName)}` : ''}<button type="button" class="g2b-chip-clear" id="g2bClearSupplier" title="Show all suppliers" aria-label="Show all suppliers">×</button></span>
+        </div>` : ''}
+      <div id="g2bDocsTableWrap">${renderGstr2bDocsTable()}</div>
+    `;
+  }
+
+  function g2bResetDocsState() {
+    _g2bDocTab = 'docs';
+    _g2bSupplier = '';
+    _g2bSearch = '';
+    _g2bPage = 0;
+  }
+
+  function renderGstr2bView() {
+    const { period } = getGstSelection();
+    const data = computeGstr2bData(period);
+    const mainTab = (id, label) => `<button type="button" class="gst-subtab ${_g2bMainTab === id ? 'active' : ''}" data-g2b-main="${id}" role="tab" aria-selected="${_g2bMainTab === id}">${label}</button>`;
+    const sumTab = id => `<button type="button" class="gst-subtab ${_g2bSummaryTab === id ? 'active' : ''}" data-g2b-sum="${id}" role="tab" aria-selected="${_g2bSummaryTab === id}">${G2B_SUMMARY[id].label}</button>`;
+    const allOpen = g2bAllSectionKeys().every(k => _g2bExpanded.has(k));
+    const table = g2bTableOf(_g2bAllTable);
+    return `
+      <div class="gst-dash">
+        ${renderGstr2bHeader(period)}
+        <div class="gst-activity-card g2b-card">
+          <div class="gst-subtabs" role="tablist" aria-label="GSTR-2B">
+            ${mainTab('summary', 'SUMMARY')}
+            ${mainTab('all', 'ALL TABLES')}
+          </div>
+          ${_g2bMainTab === 'summary' ? `
+            <div class="g2b-toolbar">
+              <div class="gst-subtabs" role="tablist" aria-label="Summary">
+                ${G2B_SUMMARY_TABS.map(sumTab).join('')}
+              </div>
+              <button type="button" class="gst-outline-btn" id="g2bExpandAll">${allOpen ? 'Collapse All' : 'Expand All'}</button>
+            </div>
+            ${renderGstr2bSummaryTable(data)}
+          ` : `
+            <div class="g2b-toolbar">
+              <div class="g2b-table-pick">
+                <label class="g2b-table-pick-label" for="g2bTableSelect">Select table</label>
+                <span class="rpt-filter-select-wrap">
+                  <select class="rpt-filter-select" id="g2bTableSelect">
+                    ${G2B_TABLES.map(t => `<option value="${escHtml(t.id)}" ${t.id === _g2bAllTable ? 'selected' : ''}>${escHtml(t.id)}</option>`).join('')}
+                  </select>
+                  ${CARET_ICON}
+                </span>
+                <span class="g2b-table-title">${escHtml(table.title)}</span>
+              </div>
+            </div>
+            ${renderGstr2bDocsBlock()}
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  // A summary heading opened from its link (e.g. B2B - Invoices under ITC Available)
+  function renderGstr2bDocsView() {
+    if (!_g2bScope) return renderGstr2bView();
+    const table = g2bTableOf(_g2bScope.table);
+    return `
+      <div class="gst-dash">
+        <div class="gst-activity-card" style="padding: 18px;">
+          <div class="b2b-docs-chips" style="margin-bottom: 12px;">
+            <span class="b2b-docs-chip">${escHtml(G2B_SUMMARY[_g2bScope.tab].label)}</span>
+            <span class="b2b-docs-chip">${escHtml(_g2bScope.heading)}</span>
+            <span class="b2b-docs-chip">${escHtml(table.title)}</span>
+          </div>
+          ${renderGstr2bDocsBlock()}
+        </div>
+      </div>
+    `;
+  }
+
+  // Tax details of one document (its invoice number / bill of entry link)
+  function renderGstr2bInvoiceView() {
+    const { period } = getGstSelection();
+    const data = computeGstr2bData(period);
+    const doc = data.b2b.concat(data.impg).find(d => String(d.id) === String(_g2bInvoiceId));
+    if (!doc) return `<div class="oh-empty"><div class="oh-empty-title">Document not found</div></div>`;
+    const v = doc.v;
+    const isImport = v.supplyType === G2B_IMPORT_SUPPLY;
+    const isIntra = !isImport && isIntraStateSupply(v.supplyType);
+    const byRate = new Map();
+    (v.rows || []).forEach(r => {
+      const l = g2bLine(r);
+      const split = isImport ? { igst: l.gst, cgst: 0, sgst: 0 } : gstSplit(l.gst, v.supplyType);
+      const acc = byRate.get(l.rate) || { taxable: 0, igst: 0, cgst: 0, sgst: 0 };
+      acc.taxable += l.taxable;
+      acc.igst += split.igst;
+      acc.cgst += split.cgst;
+      acc.sgst += split.sgst;
+      byRate.set(l.rate, acc);
+    });
+    const rates = Array.from(new Set(GST_RATE_SLABS.concat(Array.from(byRate.keys())))).sort((a, b) => a - b);
+    const taxCols = isIntra
+      ? [['cgst', 'Central Tax (₹)'], ['sgst', 'State/UT Tax (₹)'], ['cess', 'Cess (₹)']]
+      : [['igst', 'Integrated Tax (₹)'], ['cess', 'Cess (₹)']];
+    const box = n => `<div class="gst-inv-box num">${n === null ? '' : fmtAmt(n)}</div>`;
+    const fields = isImport ? `
+          <div class="gst-inv-grid">
+            ${renderReadonlyField('Icegate Reference Date', doc.refDate)}
+            ${renderReadonlyField('Port Code', doc.port)}
+            ${renderReadonlyField('Amended (Yes)', doc.amended)}
+          </div>
+          <div class="gst-inv-grid band">
+            ${renderReadonlyField('Bill of Entry Number', doc.boeNo)}
+            ${renderReadonlyField('Bill of Entry Date', fmtDateSlash(doc.boeDate))}
+            ${renderReadonlyField('Taxable Value (₹)', fmtAmt(doc.taxable), { num: true })}
+          </div>` : `
+          <div class="gst-inv-grid">
+            ${renderReadonlyField('GSTIN of Supplier', doc.gstin)}
+            ${renderReadonlyField('Trade/Legal Name', doc.name)}
+            ${renderReadonlyField('Invoice Type', doc.type)}
+          </div>
+          <div class="gst-inv-grid band">
+            ${renderReadonlyField('Invoice Number', doc.no)}
+            ${renderReadonlyField('Invoice Date', fmtDateSlash(doc.date))}
+            ${renderReadonlyField('Invoice Value (₹)', fmtAmt(doc.value), { num: true })}
+          </div>
+          <div class="gst-inv-grid">
+            ${renderReadonlyField('Place of Supply', doc.pos)}
+            ${renderReadonlyField('Supply Type', isIntra ? 'Intra-State' : 'Inter-State')}
+            ${renderReadonlyField('Supply Attract Reverse Charge', doc.rcm)}
+          </div>
+          <div class="gst-inv-grid band">
+            ${renderReadonlyField('ITC Availability', doc.itc)}
+            ${renderReadonlyField('IRN', doc.irn)}
+            ${renderReadonlyField('IRN Date', doc.irnDate)}
+          </div>`;
+    return `
+      <div class="gst-dash">
+        <div class="gst-activity-card" style="padding: 18px;">
+          ${fields}
+          <div class="gst-inv-section-title">Item details</div>
+          <div class="gst-activity-scroll">
+            <table class="gst-activity-table gst-grid-table gst-inv-items">
+              <thead>
+                <tr>
+                  <th rowspan="2" style="text-align: center;">Rate (%)</th>
+                  <th rowspan="2" style="text-align: center;">Taxable Value (₹)</th>
+                  <th colspan="${taxCols.length}" style="text-align: center;">Amount of Tax</th>
+                </tr>
+                <tr>${taxCols.map(([, label]) => `<th style="text-align: center;">${label}</th>`).join('')}</tr>
+              </thead>
+              <tbody>
+                ${rates.map(rate => {
+                  const r = byRate.get(rate);
+                  return `
+                    <tr>
+                      <td style="text-align: center; white-space: nowrap;">${rate}%</td>
+                      <td>${box(r ? r.taxable : null)}</td>
+                      ${taxCols.map(([key]) => `<td>${box(r && key !== 'cess' ? r[key] : null)}</td>`).join('')}
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function showGstr2bAdvisory(text) {
+    document.getElementById('g2bAdvisoryOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'g2b-advisory-overlay';
+    overlay.id = 'g2bAdvisoryOverlay';
+    overlay.innerHTML = `
+      <div class="g2b-advisory-card" role="dialog" aria-modal="true" aria-labelledby="g2bAdvisoryTitle">
+        <div class="g2b-advisory-head" id="g2bAdvisoryTitle">Advisory</div>
+        <div class="g2b-advisory-body">${escHtml(text)}</div>
+        <div class="g2b-advisory-foot"><button type="button" class="btn btn-secondary" id="g2bAdvisoryClose" style="height: 34px; padding: 0 16px; font-size: 13px; font-weight: 600;">Close</button></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.querySelector('#g2bAdvisoryClose').addEventListener('click', close);
+    overlay.querySelector('#g2bAdvisoryClose').focus();
+  }
+
+  function wireGstr2bView(container) {
+    const rerender = () => {
+      renderReportsHubPanel();
+    };
+
+    container.querySelectorAll('[data-g2b-main]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _g2bMainTab = btn.dataset.g2bMain;
+        g2bResetDocsState();
+        rerender();
+      });
+    });
+    container.querySelectorAll('[data-g2b-sum]').forEach(btn => {
+      btn.addEventListener('click', () => { _g2bSummaryTab = btn.dataset.g2bSum; rerender(); });
+    });
+    container.querySelectorAll('[data-g2b-sec]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.g2bSec;
+        if (_g2bExpanded.has(key)) _g2bExpanded.delete(key);
+        else _g2bExpanded.add(key);
+        rerender();
+      });
+    });
+    const expandAll = container.querySelector('#g2bExpandAll');
+    if (expandAll) {
+      expandAll.addEventListener('click', () => {
+        const keys = g2bAllSectionKeys();
+        const allOpen = keys.every(k => _g2bExpanded.has(k));
+        keys.forEach(k => { if (allOpen) _g2bExpanded.delete(k); else _g2bExpanded.add(k); });
+        rerender();
+      });
+    }
+    container.querySelectorAll('[data-g2b-advisory]').forEach(btn => {
+      btn.addEventListener('click', () => showGstr2bAdvisory(btn.dataset.g2bAdvisory));
+    });
+    container.querySelectorAll('[data-g2b-open]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _g2bScope = { table: btn.dataset.g2bOpen, tab: _g2bSummaryTab, rcm: btn.dataset.g2bRcm === '1', heading: btn.dataset.g2bHeading };
+        g2bResetDocsState();
+        _gstView = 'gstr2b-docs';
+        rerender();
+        container.scrollIntoView({ block: 'start' });
+      });
+    });
+
+    const tableSelect = container.querySelector('#g2bTableSelect');
+    if (tableSelect) {
+      tableSelect.addEventListener('change', () => {
+        _g2bAllTable = tableSelect.value;
+        g2bResetDocsState();
+        rerender();
+      });
+    }
+
+    container.querySelectorAll('[data-g2b-doctab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _g2bDocTab = btn.dataset.g2bDoctab;
+        _g2bSearch = '';
+        _g2bPage = 0;
+        rerender();
+      });
+    });
+    const clearSupplier = container.querySelector('#g2bClearSupplier');
+    if (clearSupplier) {
+      clearSupplier.addEventListener('click', () => { _g2bSupplier = ''; _g2bPage = 0; rerender(); });
+    }
+
+    const wrap = container.querySelector('#g2bDocsTableWrap');
+    if (!wrap) return;
+    const refreshTable = () => { wrap.innerHTML = renderGstr2bDocsTable(); wireTable(); };
+    const wireTable = () => {
+      wrap.querySelectorAll('.g2b-page-btn').forEach(btn => {
+        btn.addEventListener('click', () => { _g2bPage = parseInt(btn.dataset.page, 10) || 0; refreshTable(); });
+      });
+      wrap.querySelectorAll('[data-g2b-supplier]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          _g2bSupplier = btn.dataset.g2bSupplier;
+          _g2bDocTab = 'docs';
+          _g2bSearch = '';
+          _g2bPage = 0;
+          rerender();
+        });
+      });
+      wrap.querySelectorAll('[data-g2b-invoice]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          _g2bInvoiceId = btn.dataset.g2bInvoice;
+          GST_VIEW_PARENT['gstr2b-invoice'] = _gstView;
+          _gstView = 'gstr2b-invoice';
+          rerender();
+          container.scrollIntoView({ block: 'start' });
+        });
+      });
+    };
+    wireTable();
+
+    const search = container.querySelector('#g2bSearch');
+    if (search) {
+      search.addEventListener('input', () => { _g2bSearch = search.value; _g2bPage = 0; refreshTable(); });
+    }
+    const pageSize = container.querySelector('#g2bPageSize');
+    if (pageSize) {
+      pageSize.addEventListener('change', () => { _g2bPageSize = parseInt(pageSize.value, 10) || 10; _g2bPage = 0; refreshTable(); });
+    }
+    const colsBtn = container.querySelector('.g2b-cols-menu') && container.querySelector('.b2b-docs-cols-btn');
+    const colsMenu = container.querySelector('.g2b-cols-menu');
+    if (colsBtn && colsMenu) {
+      colsBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        colsMenu.hidden = !colsMenu.hidden;
+        colsBtn.setAttribute('aria-expanded', String(!colsMenu.hidden));
+      });
+      colsMenu.addEventListener('click', e => e.stopPropagation());
+      colsMenu.querySelectorAll('input[data-g2b-col]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) _g2bHiddenCols.delete(cb.dataset.g2bCol);
+          else _g2bHiddenCols.add(cb.dataset.g2bCol);
+          refreshTable();
+        });
+      });
+    }
+  }
+
   // Shown under every GST screen
   function renderGstDisclaimer() {
     return `
@@ -1897,6 +2874,9 @@
     if (_gstView === 'gstr1-docs') return renderGstr1DocumentsView();
     if (_gstView === 'gstr1-b2b-docs') return renderGstr1B2bDocsView();
     if (_gstView === 'gstr1-b2b-invoice') return renderGstr1B2bInvoiceView();
+    if (_gstView === 'gstr2b') return renderGstr2bView();
+    if (_gstView === 'gstr2b-docs') return renderGstr2bDocsView();
+    if (_gstView === 'gstr2b-invoice') return renderGstr2bInvoiceView();
     if (_gstView === 'gstr3b') return renderGstr3bSectionsView();
     return renderGstView();
   }
@@ -1986,6 +2966,11 @@
       backBtn.addEventListener('click', () => {
         // GSTR-1 sections → GST dashboard → Reports overview
         if (_activeReportsTab === 'gst' && _gstView !== 'dashboard') {
+          // Leaving a GSTR-2B summary heading's documents: its search / supplier filter go too
+          if (_gstView === 'gstr2b-docs') {
+            _g2bScope = null;
+            g2bResetDocsState();
+          }
           _gstView = GST_VIEW_PARENT[_gstView] || 'dashboard';
         } else {
           _activeReportsTab = 'overview';
@@ -2052,6 +3037,7 @@
 
     wireB2bDocsView(container);
     wireHsnView(container);
+    wireGstr2bView(container);
 
     container.querySelectorAll('.gst-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {

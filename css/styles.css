@@ -5254,12 +5254,14 @@
     #quoteCustomerSelectTrigger:hover,
     #proformaCustomerSelectTrigger:hover,
     #orderCustomerSelectTrigger:hover,
-    #challanCustomerSelectTrigger:hover { border-color: var(--slate-400) !important; }
+    #challanCustomerSelectTrigger:hover,
+    #purchaseVendorSelectTrigger:hover { border-color: var(--slate-400) !important; }
     #salesCustomerSelectWrap:has(#salesCustomerSelectDropdown[style*="display: flex"]) #salesCustomerSelectTrigger,
     #quoteCustomerSelectWrap:has(#quoteCustomerSelectDropdown[style*="display: flex"]) #quoteCustomerSelectTrigger,
     #proformaCustomerSelectWrap:has(#proformaCustomerSelectDropdown[style*="display: flex"]) #proformaCustomerSelectTrigger,
     #orderCustomerSelectWrap:has(#orderCustomerSelectDropdown[style*="display: flex"]) #orderCustomerSelectTrigger,
-    #challanCustomerSelectWrap:has(#challanCustomerSelectDropdown[style*="display: flex"]) #challanCustomerSelectTrigger {
+    #challanCustomerSelectWrap:has(#challanCustomerSelectDropdown[style*="display: flex"]) #challanCustomerSelectTrigger,
+    #purchaseVendorSelectWrap:has(#purchaseVendorSelectDropdown[style*="display: flex"]) #purchaseVendorSelectTrigger {
       border-color: var(--blue-500) !important;
       box-shadow: 0 0 0 3px rgba(59,130,246,.18), 0 1px 2px rgba(0,0,0,.04) !important;
     }
@@ -5664,7 +5666,8 @@
       min-height: 0;
     }
     #salesNotes,
-    #quoteNotes {
+    #quoteNotes,
+    #purchaseNotes {
       flex: 1;
       width: 100%;
       min-height: 90px;
@@ -5681,7 +5684,8 @@
       .sales-totals-left, .sales-totals-right {
         height: auto !important;
       }
-      #salesNotes {
+      #salesNotes,
+      #purchaseNotes {
         flex: initial !important;
         height: auto !important;
         min-height: 90px !important;
@@ -5690,17 +5694,21 @@
         max-width: 100% !important;
         margin-left: 0 !important;
       }
-      #panel-sales-voucher .je-fields-bar {
+      #panel-sales-voucher .je-fields-bar,
+      #panel-purchase-voucher .je-fields-bar {
         padding: 16px 18px !important;
         gap: 16px !important;
       }
-      #panel-sales-voucher .je-table-section {
+      #panel-sales-voucher .je-table-section,
+      #panel-purchase-voucher .je-table-section {
         padding: 16px 18px 0 !important;
       }
-      #panel-sales-voucher .je-add-row-wrap {
+      #panel-sales-voucher .je-add-row-wrap,
+      #panel-purchase-voucher .je-add-row-wrap {
         padding: 12px 18px !important;
       }
-      #panel-sales-voucher .je-actions-bar {
+      #panel-sales-voucher .je-actions-bar,
+      #panel-purchase-voucher .je-actions-bar {
         padding: 16px 18px !important;
       }
       .je-totals {

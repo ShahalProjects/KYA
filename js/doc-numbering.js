@@ -30,6 +30,11 @@
     deliveryChallan: {
       noun: 'Delivery Challan', store: 'deliveryChallans', drafts: 'deliveryChallansDrafts',
       noField: 'challanNo', inputId: 'challanNo', chipId: 'challanChipDisplay'
+    },
+    // Purchase Voucher → New Purchase (purchase-form.js)
+    purchase: {
+      noun: 'Purchase', store: 'purchaseVouchers', drafts: 'purchaseVouchersDrafts',
+      noField: 'invoiceNo', inputId: 'purchaseInvoiceNo', chipId: 'purchaseVoucherChipDisplay'
     }
   };
 
@@ -190,7 +195,8 @@
     quotation: 'btnSaveQuoteDraft',
     proforma: 'btnSaveProformaDraft',
     salesOrder: 'btnSaveOrderDraft',
-    deliveryChallan: 'btnSaveChallanDraft'
+    deliveryChallan: 'btnSaveChallanDraft',
+    purchase: 'btnSavePurchaseDraft'
   };
 
   function isSavedDoc(kind, id) {
@@ -223,4 +229,5 @@
   window.checkDocNoBeforeSave = checkDocNoBeforeSave;
   window.openDocNumberingModal = openDocNumberingModal;
   window.wireDocNumberField = wireDocNumberField;
+  window.refreshDocNoPlaceholder = refreshDocNoPlaceholder;
 })();

@@ -3243,8 +3243,9 @@
     // 5. Process Purchase drafts
     const purchDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchersDrafts)) ? window.KYA_STORE.purchaseVouchersDrafts : [];
     purchDrafts.forEach(d => {
-      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const vNo = d.invoiceNo ? (d.invoiceNo.startsWith('PV-') ? d.invoiceNo : `PV-${d.invoiceNo}`) : 'Draft';
+      // The full bill value, before the TDS deducted from it (as a sales row shows)
+      const vAmt = getVoucherDeskSalesAmount(d);
+      const vNo = d.invoiceNo || 'Draft';
 
       list.push({
         id: d.id,
@@ -3262,14 +3263,15 @@
     const purchPosted = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers)) ? window.KYA_STORE.purchaseVouchers : [];
     purchPosted.forEach(v => {
       const alreadyInList = list.some(item => !item.isDraft && (
-        item.id === v.id || 
-        item.voucherNo === v.invoiceNo || 
+        item.id === v.journalEntryId ||
+        item.id === v.id ||
+        item.voucherNo === v.invoiceNo ||
         item.voucherNo === `PV-${v.invoiceNo}`
       ));
 
       if (!alreadyInList) {
-        const vNo = v.invoiceNo ? (v.invoiceNo.startsWith('PV-') ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
-        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const vNo = v.invoiceNo ? ((v.invoiceNo.startsWith('PV-') || v.invoiceNo.startsWith('PUR-')) ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
+        const vAmt = getVoucherDeskSalesAmount(v);
 
         list.push({
           id: v.id,
@@ -3634,10 +3636,14 @@
                   }
                 } else {
                   const pList = window.KYA_STORE?.purchaseVouchers || [];
-                  const idx = pList.findIndex(v => String(v.id) === String(id));
+                  const idx = pList.findIndex(v => String(v.id) === String(id) || String(v.journalEntryId) === String(id));
                   if (idx > -1) {
+                    // The purchase goes, and its entries with it (purchase, TDS, payment)
+                    const pv = pList[idx];
                     pList.splice(idx, 1);
                     window.KYA_STORE.purchaseVouchers = pList;
+                    const pvIds = new Set([pv.journalEntryId, pv.tdsJournalEntryId, pv.paymentJournalEntryId].filter(Boolean).map(String));
+                    postedEntries = postedEntries.filter(e => !pvIds.has(String(e.id)));
                   }
                   postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
                 }
@@ -3704,13 +3710,19 @@
             }
           }
         } else if (type === 'Purchase') {
-          if (typeof loadPurchaseVoucher === 'function') {
-            loadPurchaseVoucher(id, isDraft);
-            if (typeof openTab === 'function') openTab('purchase_voucher');
+          // As an invoice: the Purchase Voucher preview (a draft's with Edit and Post); its
+          // TDS / payment entries open as journal entries
+          const pv = isDraft
+            ? (window.KYA_STORE?.purchaseVouchersDrafts || []).find(v => String(v.id) === String(id))
+            : (window.KYA_STORE?.purchaseVouchers || []).find(v => String(v.id) === String(id) || String(v.journalEntryId) === String(id));
+          if (pv && typeof window.viewPurchaseVoucher === 'function') {
+            window.viewPurchaseVoucher(pv.id);
+          } else if (pv && typeof loadPurchaseVoucher === 'function') {
+            loadPurchaseVoucher(pv, isDraft);
           } else {
             const entry = isDraft
-              ? draftedEntries.find(e => e.id === id)
-              : postedEntries.find(e => e.id === id);
+              ? draftedEntries.find(e => String(e.id) === String(id))
+              : postedEntries.find(e => String(e.id) === String(id));
             if (entry) showFullJournalModal(entry, isDraft);
           }
         }
@@ -3843,8 +3855,9 @@
     // 5. Process Purchase drafts
     const purchDrafts = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchersDrafts)) ? window.KYA_STORE.purchaseVouchersDrafts : [];
     purchDrafts.forEach(d => {
-      const vAmt = typeof fmtNum === 'function' ? fmtNum(d.total) : (parseFloat(d.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const vNo = d.invoiceNo ? (d.invoiceNo.startsWith('PV-') ? d.invoiceNo : `PV-${d.invoiceNo}`) : 'Draft';
+      // The full bill value, before the TDS deducted from it (as a sales row shows)
+      const vAmt = getVoucherDeskSalesAmount(d);
+      const vNo = d.invoiceNo || 'Draft';
 
       list.push({
         id: d.id,
@@ -3863,14 +3876,15 @@
     const purchPosted = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers)) ? window.KYA_STORE.purchaseVouchers : [];
     purchPosted.forEach(v => {
       const alreadyInList = list.some(item => !item.isDraft && (
-        item.id === v.id || 
-        item.voucherNo === v.invoiceNo || 
+        item.id === v.journalEntryId ||
+        item.id === v.id ||
+        item.voucherNo === v.invoiceNo ||
         item.voucherNo === `PV-${v.invoiceNo}`
       ));
 
       if (!alreadyInList) {
-        const vNo = v.invoiceNo ? (v.invoiceNo.startsWith('PV-') ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
-        const vAmt = typeof fmtNum === 'function' ? fmtNum(v.total) : (parseFloat(v.total) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const vNo = v.invoiceNo ? ((v.invoiceNo.startsWith('PV-') || v.invoiceNo.startsWith('PUR-')) ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
+        const vAmt = getVoucherDeskSalesAmount(v);
 
         list.push({
           id: v.id,

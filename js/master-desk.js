@@ -13126,6 +13126,7 @@
 
             showToast(`Supplier "${name}" updated successfully.`, 'success');
             _masterAlterSelectedSupplierId = currentSupplier.id;
+            if (returnAlterToVoucher('suppliers', currentSupplier)) return;
             updateMasterDeskContent();
         };
         if (saveBtn) saveBtn.addEventListener('click', applyAlterCurrent);
@@ -15114,11 +15115,12 @@
     }, 60);
   }
 
-  // Opens Alter on one record (customers / ledger / stock_item / unit); used by the
-  // voucher's pencil icons. Saving that record returns to the voucher.
+  // Opens Alter on one record (customers / suppliers / ledger / stock_item / unit); used by
+  // the voucher's pencil icons. Saving that record returns to the voucher.
   function openMasterDeskAlter(options = {}) {
     const setSelected = {
       customers: (id) => { _masterAlterSelectedCustomerId = id; },
+      suppliers: (id) => { _masterAlterSelectedSupplierId = id; },
       ledger: (id) => { _masterAlterSelectedLedgerId = id; },
       stock_item: (id) => { _masterAlterSelectedStockItemId = id; },
       unit: (id) => { _masterAlterSelectedUnitId = id; }

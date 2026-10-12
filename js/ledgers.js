@@ -951,6 +951,12 @@
     const transactions = [];
 
     const vouchers = (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers)) ? window.KYA_STORE.purchaseVouchers : [];
+    // The journal entries of the purchase vouchers (purchase, TDS, payment) are shown from
+    // the vouchers below, so they are left out of the journal scan
+    const purchaseJournalEntryIds = new Set();
+    vouchers.forEach(v => {
+      [v.journalEntryId, v.tdsJournalEntryId, v.paymentJournalEntryId].forEach(id => { if (id) purchaseJournalEntryIds.add(String(id)); });
+    });
     vouchers.forEach(v => {
       if (v.isDraft) return;
       const isMatch = String(v.vendorId) === String(supplier.id) || (v.vendorName && v.vendorName.toLowerCase() === supplier.name.toLowerCase());
@@ -958,28 +964,45 @@
 
       const vDate = v.date || '';
       const total = parseFloat(v.total) || 0;
-      const paid = (v.paymentStatus === 'Full Payment') ? total : (parseFloat(v.paymentAmount) || 0);
+      // Mirrors the purchase entries: the bill at its full value, then the TDS deducted from it
+      const tdsAmt = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0) ? parseFloat(v.tdsTcsAmount) : 0;
+      const grossAmount = total + tdsAmt;
+      const paid = (v.paymentStatus === 'Full Payment')
+        ? ((parseFloat(v.paymentAmount) || 0) > 0 ? parseFloat(v.paymentAmount) : total)
+        : (parseFloat(v.paymentAmount) || 0);
 
       if (dateFrom && vDate < dateFrom) {
-        preBilled += total;
-        prePaid += paid;
+        preBilled += grossAmount;
+        prePaid += tdsAmt + paid;
       } else if ((!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo)) {
-        periodBilled += total;
+        periodBilled += grossAmount;
         transactions.push({
-          id: v.id,
+          id: v.journalEntryId || v.id,
           date: vDate,
           voucherNo: v.invoiceNo || 'PUR-' + v.id,
           particulars: 'Purchase Bill',
           debit: 0,
-          credit: total,
+          credit: grossAmount,
           isPurchase: true
         });
+        if (tdsAmt > 0) {
+          periodPaid += tdsAmt;
+          transactions.push({
+            id: v.tdsJournalEntryId || v.id,
+            date: vDate,
+            voucherNo: v.tdsVoucherNo || (v.invoiceNo || 'PUR-' + v.id) + ' (TDS)',
+            particulars: 'TDS Deducted',
+            debit: tdsAmt,
+            credit: 0,
+            isPurchase: true
+          });
+        }
         if (paid > 0) {
           periodPaid += paid;
           transactions.push({
-            id: v.id,
+            id: v.paymentJournalEntryId || v.id,
             date: vDate,
-            voucherNo: (v.invoiceNo || 'PUR-' + v.id) + ' (Pmt)',
+            voucherNo: v.paymentVoucherNo || (v.invoiceNo || 'PUR-' + v.id) + ' (Pmt)',
             particulars: 'Payment Paid',
             debit: paid,
             credit: 0,
@@ -991,6 +1014,7 @@
 
     postedEntries.forEach(entry => {
       if ((entry.voucherNo || '').startsWith('PV-')) return;
+      if (entry.preparedBy === 'Purchase Module' || purchaseJournalEntryIds.has(String(entry.id))) return;
       (entry.allRows || []).forEach(row => {
         const rowPart = row.particular.trim().toLowerCase();
         const isSuppName = (rowPart === supplier.name.toLowerCase());
@@ -2199,6 +2223,15 @@
       }
     }
 
+    // A purchase's entry (purchase, TDS or payment): the Purchase Voucher opens on its form
+    if (entry.preparedBy === 'Purchase Module' && typeof window.findPurchaseVoucherByEntry === 'function') {
+      const pv = window.findPurchaseVoucherByEntry(entry.id);
+      if (pv && typeof window.loadPurchaseVoucher === 'function') {
+        window.loadPurchaseVoucher(pv, false);
+        return;
+      }
+    }
+
     const currentTab = (typeof activeTabId !== 'undefined' && activeTabId) ? activeTabId : 'chart';
     const returnContext = {
       tabId: currentTab,
@@ -2213,6 +2246,31 @@
   window.deleteVoucherFromStatement = function(id) {
     const entry = postedEntries.find(e => String(e.id) === String(id));
     if (!entry) return;
+
+    // A purchase's entry: the Purchase Voucher is deleted, and all its entries with it
+    const purchaseVoucher = (entry.preparedBy === 'Purchase Module' && typeof window.findPurchaseVoucherByEntry === 'function')
+      ? window.findPurchaseVoucherByEntry(entry.id) : null;
+    if (purchaseVoucher) {
+      showKyaConfirm({
+        title: 'Delete Posted Purchase?',
+        message: 'Are you sure you want to delete this purchase voucher? This will also delete its journal entries (purchase, TDS and payment) and cannot be undone.',
+        confirmLabel: 'Delete',
+        okBg: 'var(--red-600)',
+        onConfirm: () => {
+          window.KYA_STORE.purchaseVouchers = (window.KYA_STORE.purchaseVouchers || []).filter(v => String(v.id) !== String(purchaseVoucher.id));
+          if (typeof window.removePurchaseJournalEntries === 'function') window.removePurchaseJournalEntries(purchaseVoucher);
+          showToast(`Purchase "${purchaseVoucher.invoiceNo}" deleted.`, 'success');
+          if (typeof window.refreshAllAppViews === 'function') {
+            window.refreshAllAppViews();
+          } else {
+            renderLedgerStatementView();
+            refreshAllReports();
+            triggerAutoBackup();
+          }
+        }
+      });
+      return;
+    }
 
     const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
     if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
@@ -2294,7 +2352,11 @@
       if (entry) loadJournalEntry(entry, true, returnContext);
     } else {
       const entry = postedEntries.find(e => String(e.id) === String(id));
-      if (entry) loadJournalEntry(entry, false, returnContext);
+      // A purchase's entry: its Purchase Voucher opens on the purchase form
+      const pv = (entry && entry.preparedBy === 'Purchase Module' && typeof window.findPurchaseVoucherByEntry === 'function')
+        ? window.findPurchaseVoucherByEntry(entry.id) : null;
+      if (pv && typeof window.loadPurchaseVoucher === 'function') window.loadPurchaseVoucher(pv, false);
+      else if (entry) loadJournalEntry(entry, false, returnContext);
     }
   };
 
@@ -2321,6 +2383,12 @@
       });
     } else {
       const entry = postedEntries.find(e => String(e.id) === String(id));
+      // A purchase's entry: deleted with its Purchase Voucher (see deleteVoucherFromStatement)
+      if (entry && entry.preparedBy === 'Purchase Module' && typeof window.findPurchaseVoucherByEntry === 'function'
+          && window.findPurchaseVoucherByEntry(entry.id)) {
+        window.deleteVoucherFromStatement(entry.id);
+        return;
+      }
       if (entry) {
         const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
         if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {

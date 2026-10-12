@@ -43,11 +43,21 @@
     return global.ExcelJS;
   }
 
-  function getExportData(inv) {
-    if (typeof global.getSalesInvoiceExportData !== 'function') {
-      throw new Error('Invoice module is not loaded.');
+  // The document being exported: the Sales Tax Invoice unless another document (the
+  // Purchase Voucher, purchase-print.js) passes its own kit — { render(doc) → sheet HTML,
+  // data(doc) → the same figures and labels getSalesInvoiceExportData gives }
+  const SALES_KIT = {
+    render: (inv) => global.renderSalesTaxInvoiceHTML(inv),
+    data: (inv) => {
+      if (typeof global.getSalesInvoiceExportData !== 'function') {
+        throw new Error('Invoice module is not loaded.');
+      }
+      return global.getSalesInvoiceExportData(inv);
     }
-    return global.getSalesInvoiceExportData(inv);
+  };
+
+  function getExportData(inv, kit) {
+    return (kit || SALES_KIT).data(inv);
   }
 
   function withTimeout(promise, ms, label) {
@@ -206,7 +216,7 @@
 
   // A tiny hidden frame holding ONLY the invoice sheet. Printing and snapshotting
   // this frame is far faster than working on the whole app page.
-  async function createInvoiceFrame(inv, title) {
+  async function createInvoiceFrame(inv, title, kit) {
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.tabIndex = -1;
@@ -223,7 +233,7 @@
       'thead{display:table-header-group;}' +
       'tr,img{break-inside:avoid;page-break-inside:avoid;}' +
       '</style>' + fontLinks + '</head><body>' +
-      global.renderSalesTaxInvoiceHTML(inv) + '</body></html>');
+      (kit || SALES_KIT).render(inv) + '</body></html>');
     doc.close();
     await waitForImages(doc.body);
     if (doc.fonts && doc.fonts.ready) { try { await withTimeout(doc.fonts.ready, 1500, 'Fonts'); } catch (e) {} }
@@ -231,9 +241,9 @@
   }
 
   // Off-screen snapshot of the invoice sheet (used for the Excel picture sheet).
-  async function captureInvoiceCanvas(inv) {
+  async function captureInvoiceCanvas(inv, kit) {
     const html2canvas = await ensureHtml2Canvas();
-    const f = await createInvoiceFrame(inv);
+    const f = await createInvoiceFrame(inv, undefined, kit);
     try {
       rasterizeGradients(f.sheet);
       await rasterizeSvgImages(f.sheet);
@@ -250,9 +260,9 @@
   // The browser's own print engine writes a true vector PDF: text and lines stay
   // razor-sharp at any zoom and the page matches the on-screen invoice exactly.
   // The document title becomes the suggested file name in "Save as PDF".
-  async function exportSalesInvoiceViaPrint(inv) {
-    const d = getExportData(inv);
-    const f = await createInvoiceFrame(inv, d.fileBase);
+  async function exportSalesInvoiceViaPrint(inv, kit) {
+    const d = getExportData(inv, kit);
+    const f = await createInvoiceFrame(inv, d.fileBase, kit);
     const cleanup = () => { if (f.frame.parentNode) f.frame.remove(); };
     const win = f.frame.contentWindow;
     // Lay out at the A4 printable width (210mm - 2 x 8mm) and, when the invoice is only
@@ -345,9 +355,23 @@
     return { base64: c.toDataURL('image/png').split(',')[1], extension: 'png' };
   }
 
-  async function exportSalesInvoiceToExcel(inv) {
-    const d = getExportData(inv);
+  async function exportSalesInvoiceToExcel(inv, kit) {
+    const d = getExportData(inv, kit);
     const ExcelJS = await ensureExcelJS();
+    // Wording of the Details sheet: the Sales Invoice's, unless the document's data says
+    // otherwise (d.excel — the Purchase Voucher)
+    const X = Object.assign({
+      docSection: 'INVOICE',
+      noLabel: 'Invoice No.',
+      dateLabel: 'Invoice Date',
+      supplyType: inv.salesSupplyType || '',
+      partyBlocks: [
+        ['BILLED TO (RECIPIENT)', d.parties.billed],
+        ['SHIPPED TO (DELIVERY)', d.parties.shipped || d.parties.billed]
+      ],
+      tdsLabel: '',            // a label shows the TDS as its own line in the totals
+      bankTitle: 'BANK DETAILS'
+    }, d.excel || {});
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'KYA Accounting';
@@ -358,7 +382,7 @@
     const sheetName = String(inv.invoiceNo || 'Invoice').replace(/[\\/?*[\]:]/g, '-').slice(0, 31) || 'Invoice';
     // Sheet 1 — the invoice exactly as printed (the same snapshot the PDF uses).
     try {
-      const snap = await withTimeout(captureInvoiceCanvas(inv), 25000, 'Invoice snapshot');
+      const snap = await withTimeout(captureInvoiceCanvas(inv, kit), 25000, 'Invoice snapshot');
       const ps = wb.addWorksheet(sheetName, {
         properties: { tabColor: { argb: 'FF1E3A8A' } },
         views: [{ showGridLines: false }],
@@ -448,7 +472,7 @@
     r = 2;
     ws.mergeCells(2, 1, 2, LAST);
     const t2 = ws.getCell(2, 1);
-    t2.value = d.companyName + '   |   Invoice Date: ' + (d.invoiceDate || '') + '   |   Total Amount: ' +
+    t2.value = d.companyName + '   |   ' + X.dateLabel + ': ' + (d.invoiceDate || '') + '   |   Total Amount: ' +
       (parseFloat(d.grandTotal) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     t2.font = fnt({ size: 10, italic: true, color: { argb: C.navy } });
     t2.fill = solid(C.blueSoft);
@@ -511,13 +535,13 @@
     };
 
     // ── Invoice ──
-    section('INVOICE');
+    section(X.docSection);
     field('Document Type', d.docTitle);
-    field('Invoice No.', inv.invoiceNo || '');
-    field('Invoice Date', toDate(inv.date) || inv.date || '', DATEF);
+    field(X.noLabel, inv.invoiceNo || '');
+    field(X.dateLabel, toDate(inv.date) || inv.date || '', DATEF);
     field('Due Date', toDate(inv.dueDate) || inv.dueDate || '', DATEF);
     if (d.isReturn) field('Against Invoice', inv.returnAgainstInvoice || '');
-    field('Supply Type', inv.salesSupplyType || '');
+    field('Supply Type', X.supplyType);
     field('Tax Type', d.taxMode === 'split' ? 'CGST + SGST' : (d.taxMode === 'igst' ? 'IGST' : 'No Tax'));
     field('Place of Supply', d.placeOfSupply || '');
     field('Payment Status', inv.paymentStatus || '');
@@ -535,8 +559,7 @@
       field('GSTIN', p.gstin || '');
       field('PAN', p.pan || '');
     };
-    partyBlock('BILLED TO (RECIPIENT)', d.parties.billed);
-    partyBlock('SHIPPED TO (DELIVERY)', d.parties.shipped || d.parties.billed);
+    X.partyBlocks.forEach(([title, p]) => partyBlock(title, p || {}));
 
     // ── Line items ──
     section('LINE ITEMS', 1, LAST);
@@ -666,10 +689,17 @@
       c.border = box(C.navy);
     });
     ws.getRow(grandRow).height = 22;
+    // A document that shows its TDS (the Purchase Voucher: TDS deducted from the supplier)
+    let tdsRow = 0;
+    if (X.tdsLabel) {
+      field(X.tdsLabel, tds, NUMF);
+      tdsRow = r;
+    }
     field('Amount Paid', d.paidAmount || 0, NUMF);
     const paidRow = r;
     // The TDS the customer deducted is settled, not due
-    field('Balance Due', fmla(`MAX(0,C${grandRow}${tds ? '-' + tds : ''}-C${paidRow})`, d.balanceDue), NUMF);
+    const tdsRef = tdsRow ? '-C' + tdsRow : (tds ? '-' + tds : '');
+    field('Balance Due', fmla(`MAX(0,C${grandRow}${tdsRef}-C${paidRow})`, d.balanceDue), NUMF);
     const balRow = r;
     [2, 3].forEach(col => {
       const c = ws.getCell(balRow, col);
@@ -703,7 +733,7 @@
       section('PAYMENT DETAILS');
       d.paymentDetails.lines.forEach(l => field(l.label, l.value));
     } else {
-      section('BANK DETAILS');
+      section(X.bankTitle);
       field('Bank', d.bank.bankName || '');
       field('Account Holder', d.bank.accountHolder || '');
       const acc = field('Account No.', d.bank.accountNo ? String(d.bank.accountNo) : '');
@@ -747,4 +777,7 @@
   global.printSalesInvoice = exportSalesInvoiceViaPrint;
   global.exportSalesInvoiceToPDFImage = exportSalesInvoiceToPDF;
   global.exportSalesInvoiceToExcel = exportSalesInvoiceToExcel;
+  // The same Print / PDF / Excel for another document's sheet (kit: see SALES_KIT)
+  global.exportKyaDocViaPrint = exportSalesInvoiceViaPrint;
+  global.exportKyaDocToExcel = exportSalesInvoiceToExcel;
 })(window);

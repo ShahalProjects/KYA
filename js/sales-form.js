@@ -27,6 +27,19 @@
   }
   window.getRevenueFromOperationsLedgers = getRevenueFromOperationsLedgers;
 
+  // Ledgers a Purchase Voucher line can be booked to: every ledger under an Expense group
+  function getPurchaseExpenseLedgers() {
+    if (typeof coaLedgers === 'undefined' || !Array.isArray(coaLedgers)) return [];
+    const sgs = (typeof COA_SYS_SGS !== 'undefined' && Array.isArray(COA_SYS_SGS)) ? COA_SYS_SGS : [];
+    const expenseSgIds = new Set(sgs.filter(s => s.main === 'expense').map(s => s.id));
+    return coaLedgers.filter(l => {
+      if (!l || l.type === 'group-ledger' || !l.name) return false;
+      if (expenseSgIds.has(l.sgId)) return true;
+      return typeof getLedgerMainGroup === 'function' && getLedgerMainGroup(l) === 'expense';
+    });
+  }
+  window.getPurchaseExpenseLedgers = getPurchaseExpenseLedgers;
+
   // ── Global Sales State Variables ──
   window.salesRows = window.salesRows || [];
   window.currentSalesType = window.currentSalesType || 'Product';
@@ -81,6 +94,9 @@
     let _activeFilter = 'all';
     // Set per open(): a voucher that moves goods only (Delivery Challan) lists stock items alone
     let _productsOnly = false;
+    // Set per open(): the Purchase Voucher lists stock items at their cost and its Expense
+    // ledgers in place of the Revenue from Operations services
+    let _purchase = false;
     function _filter() { return _productsOnly ? 'product' : _activeFilter; }
 
     function _items() { return el.querySelectorAll('.je-drop-item'); }
@@ -113,15 +129,17 @@
     }
 
     // Products come from the Stock Item master (Master Desk / Stock Hub), carrying their
-    // HSN code, GST rate, unit and selling price so the row can fill itself in.
-    function toProductPick(it) {
+    // HSN code, GST rate, unit and selling price so the row can fill itself in. A purchase
+    // takes the item's cost (its master Rate) instead of the selling price.
+    function toProductPick(it, purchase) {
+      const cost = parseFloat(it.rate) || parseFloat(it.cost) || 0;
       return {
         name: it.name || 'Unnamed Item',
         type: 'Product',
         id: it.id || '',
         sku: it.sku || '',
         unit: it.uom || '',
-        rate: (typeof it.price === 'number' && it.price > 0) ? it.price : (parseFloat(it.rate) || 0),
+        rate: purchase ? cost : ((typeof it.price === 'number' && it.price > 0) ? it.price : (parseFloat(it.rate) || 0)),
         stockQty: parseFloat(it.qty) || 0,
         hsn: it.hsnCode || '',
         hsnDesc: it.hsnDesc || '',
@@ -130,7 +148,7 @@
       };
     }
     function getProductsList() {
-      return getMasterStockItemList().map(toProductPick);
+      return getMasterStockItemList().map(it => toProductPick(it, _purchase));
     }
 
     // Services come from the Revenue from Operations ledgers, carrying their SAC code
@@ -148,7 +166,22 @@
       };
     }
     function getServicesList() {
+      if (_purchase) return getPurchaseExpenseLedgers().map(toExpensePick);
       return getRevenueFromOperationsLedgers().map(toServicePick);
+    }
+
+    // Purchase Voucher: an expense line posts to its own Expense ledger
+    function toExpensePick(l) {
+      return {
+        name: l.name,
+        type: 'Expense',
+        id: l.id,
+        aliases: Array.isArray(l.aliases) ? l.aliases : [],
+        code: l.code,
+        sac: (l.sacInfo && l.sacInfo.sacCode) || '',
+        sacDesc: (l.sacInfo && l.sacInfo.sacDesc) || '',
+        gst: (l.sacInfo && typeof l.sacInfo.gstRate === 'number') ? l.sacInfo.gstRate : undefined
+      };
     }
 
     // ── Create a missing Stock Item / Service in Master Desk, then come back ──
@@ -157,13 +190,13 @@
     let _pendingCreate = null;
 
     function _startCreate(kind, name) {
-      _pendingCreate = { cb: _activeCb, inp: _activeInp };
+      _pendingCreate = { cb: _activeCb, inp: _activeInp, purchase: _purchase };
       close();
-      const ctx = { initialName: name, returnTab: 'sales_voucher', purpose: 'voucherItem' };
+      const ctx = { initialName: name, returnTab: _purchase ? 'purchase_voucher' : 'sales_voucher', purpose: 'voucherItem' };
       if (kind === 'Product') {
         if (typeof window.openMasterDeskCreateStockItem === 'function') window.openMasterDeskCreateStockItem(ctx);
       } else if (typeof window.openMasterDeskCreateLedger === 'function') {
-        window.openMasterDeskCreateLedger(Object.assign(ctx, { groupVal: 'sg:sg-rfo' }));
+        window.openMasterDeskCreateLedger(Object.assign(ctx, { groupVal: _purchase ? 'sg:sg-oe' : 'sg:sg-rfo' }));
       }
     }
 
@@ -171,7 +204,10 @@
       const pending = _pendingCreate;
       _pendingCreate = null;
       if (!pending || !entity) return;
-      const sel = kind === 'Service' ? toServicePick(entity) : toProductPick(entity);
+      // Master Desk reports any ledger as 'Service'; on a purchase it is an Expense ledger
+      const sel = kind === 'Service'
+        ? (pending.purchase ? toExpensePick(entity) : toServicePick(entity))
+        : toProductPick(entity, pending.purchase);
       // Let the voucher tab finish showing before filling the row
       setTimeout(() => {
         if (typeof pending.cb === 'function') pending.cb(sel);
@@ -222,7 +258,7 @@
         btnRow.appendChild(btn);
       };
       if (showProduct) addBtn('Product', 'Stock Item');
-      if (showService) addBtn('Service', 'Service');
+      if (showService) addBtn('Service', _purchase ? 'Expense Ledger' : 'Service');
       wrap.appendChild(btnRow);
       el.appendChild(wrap);
     }
@@ -231,6 +267,7 @@
       _activeInp    = inp;
       _activeCb     = onSelect;
       _productsOnly = !!(opts && opts.productsOnly);
+      _purchase     = !!(opts && opts.purchase);
       _highlightIdx = -1;
       _position(inp);
       _renderPortalList(query);
@@ -252,7 +289,7 @@
       const tabs = [
         { id: 'all', label: 'All' },
         { id: 'product', label: 'Product' },
-        { id: 'service', label: 'Service' }
+        { id: 'service', label: _purchase ? 'Expense' : 'Service' }
       ];
       tabs.forEach(t => {
         const btn = document.createElement('button');
@@ -310,7 +347,7 @@
             <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.8"/>
             <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
-          <span class="je-drop-empty-txt">${_productsOnly ? 'No stock item found' : 'No stock item or service found'}</span>
+          <span class="je-drop-empty-txt">${_productsOnly ? 'No stock item found' : (_purchase ? 'No stock item or expense found' : 'No stock item or service found')}</span>
           <span class="je-drop-empty-sub">Create one below, or type a description directly</span>
         `;
         el.appendChild(emptyDiv);
@@ -349,8 +386,13 @@
         if (services.length > 0) {
           const hdr = document.createElement('div');
           hdr.className = 'je-drop-header';
-          hdr.textContent = 'Revenue from Operations';
+          hdr.textContent = _purchase ? 'Expense Accounts' : 'Revenue from Operations';
           el.appendChild(hdr);
+          // Expense lines (purchase) in red, services (sales) in green
+          const dot = _purchase ? '#ef4444' : '#10b981';
+          const pill = _purchase
+            ? 'background:#fef2f2;color:#dc2626;">Expense'
+            : 'background:#ecfdf5;color:#059669;">Service';
           services.forEach(s => {
             const item = document.createElement('div');
             item.className = 'je-drop-item';
@@ -359,9 +401,9 @@
             if (s.sac) meta.push('SAC ' + s.sac);
             if (typeof s.gst === 'number') meta.push(s.gst + '% GST');
             item.innerHTML = `
-              <span class="je-drop-dot" style="background:#10b981"></span>
+              <span class="je-drop-dot" style="background:${dot}"></span>
               <span class="je-drop-name" style="flex:1">${queryHighlight(s.name, q)}${akaStr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">${queryHighlight(akaStr, q)}</span>` : ''}${meta.length ? `<span style="display:block;font-size:10.5px;font-weight:600;color:#94a3b8;margin-top:1px">${meta.join(' · ')}</span>` : ''}</span>
-              <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#ecfdf5;color:#059669;text-transform:uppercase;">Service</span>
+              <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;${pill}</span>
             `;
             const handleItemSelect = (e) => {
               e.preventDefault();
@@ -419,8 +461,9 @@
       close();
       if (typeof cb === 'function') cb(sel);
     }
-    function toPick(entity, kind) {
-      return kind === 'Service' ? toServicePick(entity) : toProductPick(entity);
+    function toPick(entity, kind, purchase) {
+      if (kind === 'Expense') return toExpensePick(entity);
+      return kind === 'Service' ? toServicePick(entity) : toProductPick(entity, purchase);
     }
 
     return { open, close, isOpen, moveHighlight, selectHighlighted, pickFor, toPick };
@@ -682,10 +725,18 @@
     return btn;
   }
 
+  // pending.returnTab: the voucher tab to come back to (Sales unless said otherwise);
+  // pending.onAltered(tab, record): the voucher's own handler for the altered record
   function goAlter(tab, id, pending) {
     if (typeof window.openMasterDeskAlter !== 'function') return;
     _pendingAlter = pending;
-    window.openMasterDeskAlter({ tab: tab, id: id, returnTab: 'sales_voucher' });
+    window.openMasterDeskAlter({ tab: tab, id: id, returnTab: (pending && pending.returnTab) || 'sales_voucher' });
+  }
+  window.openVoucherMasterAlter = goAlter;
+
+  // The voucher tab an element sits on: the Purchase Voucher, or Sales (Invoice / Pre Invoice)
+  function getVoucherTabOf(el) {
+    return (el && el.closest && el.closest('#panel-purchase-voucher')) ? 'purchase_voucher' : 'sales_voucher';
   }
 
   // The master record a row's Description is linked to, if it still exists.
@@ -698,6 +749,11 @@
     if (row.revenueLedgerId && typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
       const l = coaLedgers.find(x => String(x.id) === String(row.revenueLedgerId));
       if (l) return { tab: 'ledger', id: l.id, entity: l, kind: 'Service' };
+    }
+    // A purchase line booked to an Expense ledger
+    if (row.expenseLedgerId && typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      const l = coaLedgers.find(x => String(x.id) === String(row.expenseLedgerId));
+      if (l) return { tab: 'ledger', id: l.id, entity: l, kind: 'Expense' };
     }
     return null;
   }
@@ -720,7 +776,11 @@
         const linked = getRowLinkedMaster(getRow());
         if (!linked) return;
         _salesItemPortal.close();
-        goAlter(linked.tab, linked.id, { type: 'item', inp: itemInp, kind: linked.kind, tr: tr });
+        const returnTab = getVoucherTabOf(tr);
+        goAlter(linked.tab, linked.id, {
+          type: 'item', inp: itemInp, kind: linked.kind, tr: tr,
+          returnTab, purchase: returnTab === 'purchase_voucher'
+        });
       });
     }
 
@@ -737,7 +797,7 @@
         const unit = findMasterUnit(unitInp.value);
         if (!unit) return;
         _salesUnitPortal.close();
-        goAlter('unit', unit.id, { type: 'unit', inp: unitInp });
+        goAlter('unit', unit.id, { type: 'unit', inp: unitInp, returnTab: getVoucherTabOf(unitInp) });
       });
       markVoucherRowUnit(unitInp);
     }
@@ -847,7 +907,10 @@
     _pendingAlter = null;
     if (!pending || !record) return;
     setTimeout(() => {
-      if (pending.type === 'preCustomer') {
+      if (typeof pending.onAltered === 'function') {
+        // A voucher that handles its own record (the Purchase Voucher's Vendor box)
+        pending.onAltered(tab, record);
+      } else if (pending.type === 'preCustomer') {
         // A pre-invoice form: same party, refreshed name / state / details. Its cached copy of
         // the party is dropped so it rebuilds from the altered master — unless it was edited
         // for this document on purpose (as on the Sales Invoice)
@@ -871,7 +934,7 @@
         refreshSalesCustomerAlterPencil();
       } else if (pending.type === 'item') {
         // Re-apply the altered item to its row (name, HSN/SAC, unit, price, GST)
-        _salesItemPortal.pickFor(pending.inp, _salesItemPortal.toPick(record, pending.kind));
+        _salesItemPortal.pickFor(pending.inp, _salesItemPortal.toPick(record, pending.kind, pending.purchase));
         if (pending.tr && pending.tr._refreshAlterPencils) pending.tr._refreshAlterPencils();
       } else if (pending.type === 'unit') {
         const inp = pending.inp;
@@ -1056,9 +1119,10 @@
     }
 
     function _startCreate(name) {
-      _pendingCreate = { inp: _activeInp };
+      const inp = _activeInp;
+      _pendingCreate = { inp };
       close();
-      window.openMasterDeskCreateUnit({ initialName: name, returnTab: 'sales_voucher', purpose: 'voucherUnit' });
+      window.openMasterDeskCreateUnit({ initialName: name, returnTab: getVoucherTabOf(inp), purpose: 'voucherUnit' });
     }
 
     window.onVoucherUnitCreated = function (unit) {
@@ -1285,10 +1349,12 @@
     return currentSalesVoucherSubtype === 'Return' ? 'return' : 'invoice';
   }
 
-  // Default prefix per kind: invoices / reversals, and the pre-invoice documents
+  // Default prefix per kind: invoices / reversals, the pre-invoice documents
   // (Quotation, Proforma Invoice, Sales Order, Delivery Challan — see doc-numbering.js)
+  // and the Purchase Voucher
   const SALES_NUMBER_DEFAULT_CODES = {
-    invoice: 'INV', return: 'REV', quotation: 'QT', proforma: 'PI', salesOrder: 'SO', deliveryChallan: 'DC'
+    invoice: 'INV', return: 'REV', quotation: 'QT', proforma: 'PI', salesOrder: 'SO', deliveryChallan: 'DC',
+    purchase: 'PUR'
   };
 
   function getSalesNumberingSettings(kind) {
@@ -2581,11 +2647,11 @@
     }
   }
 
-  // Product rows pick from the HSN master, service rows from the SAC master.
+  // Product rows pick from the HSN master, service (and purchase expense) rows from the SAC master.
   function getSalesRowCodeKind(row, defaultType) {
     const fallback = defaultType || (typeof currentSalesType !== 'undefined' ? currentSalesType : 'Product');
     const type = (row && row.itemType) || fallback;
-    return type === 'Service' ? 'SAC' : 'HSN';
+    return (type === 'Service' || type === 'Expense') ? 'SAC' : 'HSN';
   }
   window.getSalesRowCodeKind = getSalesRowCodeKind;
 
@@ -2609,9 +2675,19 @@
       row.hsnDesc = selectedItem.sacDesc || '';
       row.unit = '';
       row.rate = 0;
+    } else if (selectedItem.type === 'Expense') {
+      // Purchase Voucher: the line is booked to this Expense ledger
+      row.expenseLedgerId = selectedItem.id || '';
+      row.stockItemId = '';
+      row.revenueLedgerId = '';
+      row.hsn = selectedItem.sac || '';
+      row.hsnDesc = selectedItem.sacDesc || '';
+      row.unit = '';
+      row.rate = 0;
     } else {
       row.stockItemId = selectedItem.id || '';
       row.revenueLedgerId = '';
+      if (row.expenseLedgerId) row.expenseLedgerId = '';
       row.hsn = selectedItem.hsn || '';
       row.hsnDesc = selectedItem.hsnDesc || '';
       row.unit = selectedItem.unit || '';
@@ -2632,6 +2708,7 @@
     row.itemType = '';
     row.stockItemId = '';
     row.revenueLedgerId = '';
+    if (row.expenseLedgerId) row.expenseLedgerId = '';
     row.hsn = '';
     row.hsnDesc = '';
     row.unit = '';

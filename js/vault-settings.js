@@ -43,6 +43,8 @@
         postedEntries = data.postedEntries.filter(e => {
           if (!e) return false;
           if (e.preparedBy === 'Sales Module') return false;
+          // Purchase entries are rebuilt from the posted purchase vouchers below
+          if (e.preparedBy === 'Purchase Module') return false;
           const no = e.voucherNo || '';
           if (no.startsWith('SV-') || no.startsWith('SR-') || no.startsWith('SO-') || no.startsWith('RF-')) return false;
           return true;
@@ -127,9 +129,18 @@
         if (!usedReg[kind].includes(no)) usedReg[kind].push(no);
       });
 
+      // ...and every posted purchase number, likewise
+      usedReg.purchase = usedReg.purchase || [];
+      window.KYA_STORE.purchaseVouchers.forEach(v => {
+        const no = (v && v.invoiceNo || '').trim().toLowerCase();
+        if (no && !usedReg.purchase.includes(no)) usedReg.purchase.push(no);
+      });
+
       // The sales entries dropped above are rebuilt from the posted vouchers, so sales keep
       // flowing into the Chart of Accounts, ledgers and reports after every load.
       if (typeof rebuildSalesJournalEntries === 'function') rebuildSalesJournalEntries();
+      // The same for purchases (purchase-posting.js)
+      if (typeof rebuildPurchaseJournalEntries === 'function') rebuildPurchaseJournalEntries();
 
       if (!quiet) {
         showToast('Data restored successfully.', 'success');

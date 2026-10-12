@@ -1061,9 +1061,10 @@
         if (typeof purchaseRows !== 'undefined' && purchaseRows.length === 0 && typeof initPurchaseForm === 'function') {
           initPurchaseForm();
         } else {
-          if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors();
-          if (typeof populatePurchaseExecutives === 'function') populatePurchaseExecutives();
-          if (typeof populatePurchasePaymentAccounts === 'function') populatePurchasePaymentAccounts();
+          // Refresh the lists but keep what the form already holds (as on the Sales Invoice)
+          if (typeof populatePurchaseVendors === 'function') populatePurchaseVendors(document.getElementById('purchaseVendor')?.value || null);
+          if (typeof populatePurchaseExecutives === 'function') populatePurchaseExecutives(document.getElementById('purchaseExecutive')?.value || null);
+          if (typeof populatePurchasePaymentAccounts === 'function') populatePurchasePaymentAccounts(document.getElementById('purchasePaymentAccount')?.value || null);
         }
         if (typeof window.checkAndRestorePendingJournalState === 'function') {
           window.checkAndRestorePendingJournalState();
