@@ -35,6 +35,30 @@
     purchase: {
       noun: 'Purchase', store: 'purchaseVouchers', drafts: 'purchaseVouchersDrafts',
       noField: 'invoiceNo', inputId: 'purchaseInvoiceNo', chipId: 'purchaseVoucherChipDisplay'
+    },
+    // Purchase Voucher → Reversal: the same number box as New Purchase (purchase-form.js),
+    // with its own register of used numbers; the document open on it is New Purchase's
+    purchaseReturn: {
+      noun: 'Reversal', store: 'purchaseVouchers', drafts: 'purchaseVouchersDrafts',
+      noField: 'invoiceNo', inputId: 'purchaseInvoiceNo', chipId: 'purchaseVoucherChipDisplay',
+      ownIdFrom: 'purchase'
+    },
+    // Purchase Voucher → Pre Purchase (purchase-pre.js)
+    purchaseQuotation: {
+      noun: 'Purchase Quotation', store: 'purchaseQuotations', drafts: 'purchaseQuotationsDrafts',
+      noField: 'docNo', inputId: 'ppQuoteNo', chipId: 'ppQuoteChipDisplay'
+    },
+    purchaseProforma: {
+      noun: 'Purchase Proforma', store: 'purchaseProformas', drafts: 'purchaseProformasDrafts',
+      noField: 'docNo', inputId: 'ppProformaNo', chipId: 'ppProformaChipDisplay'
+    },
+    purchaseOrder: {
+      noun: 'Purchase Order', store: 'purchaseOrders', drafts: 'purchaseOrdersDrafts',
+      noField: 'docNo', inputId: 'ppOrderNo', chipId: 'ppOrderChipDisplay'
+    },
+    goodsReceipt: {
+      noun: 'Goods Receipt Note', store: 'goodsReceiptNotes', drafts: 'goodsReceiptNotesDrafts',
+      noField: 'docNo', inputId: 'ppGrnNo', chipId: 'ppGrnChipDisplay'
     }
   };
 
@@ -99,7 +123,8 @@
   }
 
   function ownIdOf(kind) {
-    const get = _ownIdGetters[kind];
+    const cfg = DOC_KINDS[kind];
+    const get = _ownIdGetters[kind] || (cfg && cfg.ownIdFrom ? _ownIdGetters[cfg.ownIdFrom] : null);
     return typeof get === 'function' ? get() : null;
   }
 
@@ -196,7 +221,11 @@
     proforma: 'btnSaveProformaDraft',
     salesOrder: 'btnSaveOrderDraft',
     deliveryChallan: 'btnSaveChallanDraft',
-    purchase: 'btnSavePurchaseDraft'
+    purchase: 'btnSavePurchaseDraft',
+    purchaseQuotation: 'btnSavePpQuoteDraft',
+    purchaseProforma: 'btnSavePpProformaDraft',
+    purchaseOrder: 'btnSavePpOrderDraft',
+    goodsReceipt: 'btnSavePpGrnDraft'
   };
 
   function isSavedDoc(kind, id) {

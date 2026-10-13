@@ -21,6 +21,10 @@
   let purchaseUploadedDoc = null;
   let purchaseMultiPayments = [];
   let _purchasePaymentAccountPrev = '';
+  // The Pre Purchase document this purchase is made from (purchase-pre.js):
+  // { kind, id, advance: { amount, journalEntryId, voucherNo } } — set by Convert to Purchase
+  // or the Pre Purchase No. box, or read back from the voucher being edited
+  let _purchasePreLink = null;
 
   const MULTI_PAYMENT_VALUE = 'multi-payment';
   const $ = id => document.getElementById(id);
@@ -87,12 +91,331 @@
   }
 
   function getNextPurchaseInvoiceNo() {
+    // A reversal is numbered from its Original Doc (none chosen yet: no number)
+    if (isPurchaseReturnMode()) return getPurchaseReversalDocNo() ? getPurchaseReversalNoFor(getPurchaseReversalDocNo()) : '';
     if (typeof getNextDocNo === 'function') return getNextDocNo('purchase');
     return `PUR-${new Date().getFullYear()}-${String(window.KYA_STORE.purchaseInvoiceCtr || 1).padStart(3, '0')}`;
   }
 
+  // The doc-numbering kind of the number box: purchases and reversals are counted apart
+  function getPurchaseNumberKind() {
+    return isPurchaseReturnMode() ? 'purchaseReturn' : 'purchase';
+  }
+
   function validatePurchaseNoField() {
-    return (typeof validateDocNoField === 'function') ? validateDocNoField('purchase') : true;
+    return (typeof validateDocNoField === 'function') ? validateDocNoField(getPurchaseNumberKind()) : true;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  REVERSAL (Purchase Voucher → Reversal) — the mirror of the Sales Reversal: an
+  //  Original Doc (a posted purchase or a Pre Purchase document, purchase-reversal.js),
+  //  its lines and TDS / TCS, and a refund from the supplier
+  // ══════════════════════════════════════════════════════════════════
+  let _purchaseMode = 'Purchase'; // 'Purchase' | 'Return'
+  // The Original Doc: { type: 'purchase', id, no, date } or
+  // { type: 'pre', kind, id, no, date, label, advance, advanceJournalEntryId, advanceVoucherNo, inPartyLedger }
+  let _purchaseReturnSource = null;
+
+  function isPurchaseReturnMode() {
+    return _purchaseMode === 'Return';
+  }
+
+  function getPurchaseReversalDocNo() {
+    return (_purchaseReturnSource && _purchaseReturnSource.no) || '';
+  }
+
+  // The posted purchase being reversed (null for a Pre Purchase document or none chosen)
+  function getPurchaseReturnOriginal() {
+    const src = _purchaseReturnSource;
+    if (!src || src.type !== 'purchase' || typeof window.findPostedPurchaseForReversal !== 'function') return null;
+    return window.findPostedPurchaseForReversal(src.id);
+  }
+
+  // Reversal No.: <prefix><Original Doc no.>; the prefix is set from the pencil (default
+  // "REV-"), and a further reversal of the same document gets -2, -3 …
+  function getPurchaseReversalPrefix() {
+    const s = typeof getSalesNumberingSettings === 'function' ? getSalesNumberingSettings('purchaseReversal') : null;
+    return (s && s.prefix) || 'REV-';
+  }
+
+  function getPurchaseReversalNoFor(docNo, prefix) {
+    const base = `${prefix === undefined ? getPurchaseReversalPrefix() : prefix}${docNo}`;
+    let candidate = base;
+    let n = 1;
+    while (typeof isDocNoUsed === 'function' && isDocNoUsed('purchaseReturn', candidate, getPurchaseOwnId())) {
+      n++;
+      candidate = `${base}-${n}`;
+    }
+    return candidate;
+  }
+
+  // Fills the read-only Reversal No. box: empty until an Original Doc is chosen. A number that
+  // already belongs to the chosen document is kept unless `force` is set.
+  function refreshPurchaseReversalNo(force) {
+    if (!isPurchaseReturnMode()) return;
+    const noEl = $('purchaseInvoiceNo');
+    const chip = $('purchaseVoucherChipDisplay');
+    if (!noEl) return;
+    const docNo = getPurchaseReversalDocNo();
+    if (!docNo) {
+      noEl.value = '';
+      noEl.placeholder = 'Select Original Doc first';
+    } else {
+      noEl.placeholder = '';
+      const base = `${getPurchaseReversalPrefix()}${docNo}`.toLowerCase();
+      const cur = noEl.value.trim().toLowerCase();
+      const belongs = !!cur && (cur === base || cur.startsWith(`${base}-`));
+      if (force || !belongs) noEl.value = getPurchaseReversalNoFor(docNo);
+    }
+    if (chip) chip.textContent = noEl.value || 'REV-XXXX';
+    validatePurchaseNoField();
+  }
+
+  // Pencil in the Reversal No. box: the Number Format popup with the prefix only (the
+  // number itself is the Original Doc's)
+  function openPurchaseReversalNumberingModal() {
+    if (typeof openKyaNumberingModal !== 'function') return;
+    const docNo = getPurchaseReversalDocNo();
+    openKyaNumberingModal({
+      kind: 'purchaseReversal',
+      noun: 'Reversal',
+      prefixOnly: true,
+      requirePrefix: true,
+      subtitle: 'A reversal is numbered with this prefix followed by its Original Doc number. A further reversal of the same document gets -2, -3 …',
+      previewLabel: docNo ? `Reversal number for ${docNo}` : 'Example reversal number',
+      preview: f => ({
+        text: f.prefix ? getPurchaseReversalNoFor(docNo || 'PUR-2026-001', f.prefix) : '',
+        note: docNo ? '' : 'Shown for an example purchase — the chosen Original Doc number is used.'
+      }),
+      onSaved: () => {
+        // A posted reversal being edited keeps its number; anything else takes the prefix
+        if (_editingPurchaseVoucher && !_editingPurchaseVoucher.isDraft) validatePurchaseNoField();
+        else refreshPurchaseReversalNo(true);
+      }
+    });
+  }
+
+  // The refund the supplier can make on this reversal: a Pre Purchase document's advance,
+  // or what was paid on the purchase less earlier refunds (never above this reversal)
+  function getPurchaseRefundMax(total) {
+    const src = _purchaseReturnSource;
+    if (!src) return 0;
+    if (src.type === 'pre') return Math.max(0, r2(src.advance));
+    const orig = getPurchaseReturnOriginal();
+    if (!orig || typeof window.getPurchaseRefundable !== 'function') return 0;
+    const refundable = window.getPurchaseRefundable(orig, getPurchaseOwnId());
+    return Math.max(0, Math.min(r2(total), refundable));
+  }
+
+  // Title, the Original Doc box, the number box, the button and the header for the mode
+  function updatePurchaseModeUI() {
+    const isReturn = isPurchaseReturnMode();
+    const card = $('purchaseVoucherFormCard');
+    const title = card && card.querySelector('.je-card-title-text');
+    const subtitle = card && card.querySelector('.je-card-subtitle-text');
+    if (title) title.textContent = isReturn ? 'Purchase Reversal' : 'Purchase Voucher';
+    if (subtitle) subtitle.textContent = isReturn ? 'Record purchase reversals and supplier debits' : 'Record purchase transactions and vendor payables';
+    const origField = $('purchaseOriginalDocField');
+    if (origField) origField.style.display = isReturn ? '' : 'none';
+    const preField = $('purchasePreField');
+    if (preField) preField.style.display = isReturn ? 'none' : '';
+    const lbl = $('lblPurchaseInvoiceNo');
+    if (lbl) lbl.textContent = isReturn ? 'Reversal No.' : 'Purchase / Bill No.';
+    const noEl = $('purchaseInvoiceNo');
+    if (noEl) {
+      noEl.readOnly = isReturn;
+      noEl.style.background = isReturn ? 'var(--slate-50)' : '';
+      noEl.style.cursor = isReturn ? 'default' : '';
+      noEl.title = isReturn ? 'Prefix + Original Doc number' : '';
+    }
+    const fmtBtn = $('purchaseInvoiceNoFormatBtn');
+    if (fmtBtn) {
+      fmtBtn.title = isReturn ? 'Set reversal number prefix' : 'Set purchase number prefix';
+      fmtBtn.setAttribute('aria-label', fmtBtn.title);
+    }
+    const postBtn = $('btnPostPurchase');
+    if (postBtn) {
+      const textNode = Array.from(postBtn.childNodes).reverse().find(n => n.nodeType === 3 && n.textContent.trim());
+      if (textNode) textNode.textContent = isReturn ? ' Save Reversal ' : ' Save Purchase ';
+      postBtn.setAttribute('aria-label', isReturn ? 'Save reversal' : 'Save purchase');
+    }
+    // A reversal only works on the Original Doc's lines — no new rows
+    const addRowBtn = $('purchaseAddRow');
+    if (addRowBtn) addRowBtn.style.display = isReturn ? 'none' : '';
+    const trigText = $('purchaseInvoiceSelectTriggerText');
+    if (trigText) {
+      const no = getPurchaseReversalDocNo();
+      trigText.textContent = no || '— Select —';
+      trigText.style.color = no ? 'var(--slate-800)' : '';
+      trigText.style.fontWeight = no ? '600' : '';
+    }
+    // The header follows the form only while the form is the card on show (not Pre Purchase)
+    if (typeof window.setPurchaseHeaderMode === 'function' && card && card.style.display !== 'none') {
+      window.setPurchaseHeaderMode(isReturn ? 'return' : 'new');
+    }
+  }
+
+  // While the Vendor box is locked (a reversal), a click on it does nothing; the details card
+  // still opens on hover
+  function setPurchaseReturnFieldLocks() {
+    const isReturn = isPurchaseReturnMode();
+    const trigger = $('purchaseVendorSelectTrigger');
+    const wrap = $('purchaseVendorSelectWrap');
+    if (wrap && trigger && !wrap._returnLockWired) {
+      wrap._returnLockWired = true;
+      wrap.addEventListener('click', e => {
+        if (trigger.dataset.returnLocked && trigger.contains(e.target)) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }, true);
+    }
+    if (trigger) {
+      if (isReturn) {
+        trigger.dataset.returnLocked = '1';
+        trigger.style.backgroundColor = 'var(--slate-50)';
+        trigger.style.cursor = 'default';
+        trigger.style.opacity = '0.7';
+      } else if (trigger.dataset.returnLocked) {
+        delete trigger.dataset.returnLocked;
+        trigger.style.backgroundColor = '#fff';
+        trigger.style.cursor = 'pointer';
+        trigger.style.opacity = '1';
+      }
+    }
+    ['purchaseSupplyType', 'purchaseExecutive'].forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      if (isReturn) {
+        el.disabled = true;
+        el.style.backgroundColor = 'var(--slate-50)';
+        el.style.cursor = 'not-allowed';
+        el.dataset.returnLocked = '1';
+      } else if (el.dataset.returnLocked) {
+        el.disabled = false;
+        el.style.backgroundColor = '';
+        el.style.cursor = '';
+        delete el.dataset.returnLocked;
+      }
+    });
+    // TDS / TCS follow the Original Doc
+    const lockBtn = (el, on) => {
+      if (!el) return;
+      el.disabled = on;
+      el.style.cursor = on ? 'not-allowed' : '';
+      el.style.opacity = on ? '0.5' : '';
+    };
+    ['purchaseTdsTcsNone', 'purchaseTdsTcsTds', 'purchaseTdsTcsTcs'].forEach(id => {
+      const b = $(id);
+      lockBtn(b, isReturn && !!b && !b.classList.contains('active'));
+    });
+    ['purchaseTdsTcsRateSelect', 'purchaseTdsTcsRateCustom'].forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      el.disabled = isReturn;
+      el.style.backgroundColor = isReturn ? 'var(--slate-50)' : '';
+      el.style.cursor = isReturn ? 'not-allowed' : '';
+    });
+  }
+
+  // Rows of a reversal: nothing changes before an Original Doc is chosen; a Pre Purchase
+  // document is reversed whole; a purchase's lines keep their item, rate, amount and tax —
+  // only the quantity (and a ₹ discount) being reversed changes. 'none' | 'all' | 'qty'
+  function getPurchaseReturnRowLock() {
+    if (!isPurchaseReturnMode()) return 'none';
+    if (!_purchaseReturnSource || _purchaseReturnSource.type === 'pre') return 'all';
+    return 'qty';
+  }
+
+  function lockPurchaseReturnRow(tr, mode) {
+    const lockEl = el => {
+      if (!el) return;
+      if (el.tagName === 'SELECT') el.disabled = true;
+      else el.readOnly = true;
+      el.style.cursor = 'not-allowed';
+      el.style.color = 'var(--slate-500)';
+    };
+    if (mode === 'all') {
+      tr.querySelectorAll('input, select').forEach(lockEl);
+      tr.querySelectorAll('.sales-del-row').forEach(b => { b.style.display = 'none'; });
+    } else {
+      ['.sales-row-item', '.sales-row-hsn', '.sales-row-unit', '.sales-row-rate', '.sales-row-amount-input', '.sales-row-tax', '.sales-row-discount-type']
+        .forEach(sel => lockEl(tr.querySelector(sel)));
+    }
+    tr.querySelectorAll('.sales-row-drop-arrow').forEach(a => { a.style.display = 'none'; });
+  }
+
+  // The refund box on a reversal: what the Original Doc allows to be refunded; Full and
+  // Partial are off when there is nothing to refund
+  function updatePurchaseReversalInfo(total) {
+    const box = $('purchaseAdvanceInfo');
+    setPurchasePaymentLabels(true);
+    const max = getPurchaseRefundMax(total);
+    const src = _purchaseReturnSource;
+    const row = (label, value, strong) => `<div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 2px;"><span>${label}</span>${strong ? `<strong>${value}</strong>` : `<span>${value}</span>`}</div>`;
+    if (box) {
+      if (!src) {
+        box.dataset.active = '0';
+        box.style.display = 'none';
+        box.innerHTML = '';
+      } else if (src.type === 'pre') {
+        box.dataset.active = '1';
+        box.innerHTML = src.advance > 0
+          ? `${row(`Advance paid${src.advanceVoucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${ohEsc(src.advanceVoucherNo)}]</span>` : ''}`, `₹ ${fmt(src.advance)}`, true)}
+             <div style="margin-top: 4px; font-weight: 500;">Record the supplier's refund below; any part not refunded stays ${src.inPartyLedger ? "in the supplier's ledger" : 'in Advances to Suppliers'}.</div>`
+          : `<div style="font-weight: 500;">No advance was paid against ${ohEsc(src.no)} — nothing to refund.</div>`;
+      } else {
+        const orig = getPurchaseReturnOriginal();
+        const paid = orig ? getPurchasePaidAmount(orig) : 0;
+        const refundable = (orig && typeof window.getPurchaseRefundable === 'function') ? window.getPurchaseRefundable(orig, getPurchaseOwnId()) : 0;
+        const already = Math.max(0, r2(paid - refundable));
+        box.dataset.active = '1';
+        box.innerHTML = paid > 0
+          ? `${row(`Paid on ${ohEsc(src.no)}`, `₹ ${fmt(paid)}`)}
+             ${already > 0 ? row('Already refunded', `₹ ${fmt(already)}`) : ''}
+             ${row('Refundable on this reversal', `₹ ${fmt(max)}`, true)}
+             <div style="margin-top: 4px; font-weight: 500;">Any part not refunded stays as an amount the supplier owes you.</div>`
+          : `<div style="font-weight: 500;">Nothing was paid on ${ohEsc(src.no)} — the reversal reduces what you owe the supplier.</div>`;
+      }
+    }
+    // Nothing to refund: only "Not Refunded" applies
+    const nothing = max <= 0.005;
+    const notPaidBtn = $('purchasePaymentStatusNotPaid');
+    if (nothing && notPaidBtn && !notPaidBtn.classList.contains('active')) setPurchasePaymentStatus('NotPaid');
+    ['purchasePaymentStatusFull', 'purchasePaymentStatusPartial'].forEach(id => {
+      const btn = $(id);
+      if (!btn || btn.dataset.cashLocked) return;
+      if (nothing) btn.dataset.advLocked = '1';
+      else delete btn.dataset.advLocked;
+      btn.disabled = nothing;
+      btn.style.cursor = nothing ? 'not-allowed' : '';
+      btn.style.opacity = nothing ? '0.5' : '';
+    });
+  }
+
+  // A fresh reversal gives the money back the way it went: Full Refund through the account
+  // (or Multi Payment split) the purchase / advance was paid from
+  function presetPurchaseRefund(preset) {
+    if (!preset || !preset.accountId) return;
+    if (getPurchaseCashVendorLedger()) return; // a cash purchase is refunded in full by its own lock
+    const max = getPurchaseRefundMax(getPurchaseGrandTotal());
+    if (!(max > 0)) return;
+    const acc = String(preset.accountId);
+    let splits = null;
+    if (acc === MULTI_PAYMENT_VALUE) {
+      splits = (preset.splits || []).filter(sp => sp && sp.accountId && (parseFloat(sp.amount) || 0) > 0);
+      const splitTotal = splits.reduce((s, sp) => s + (parseFloat(sp.amount) || 0), 0);
+      if (!splits.length || Math.abs(splitTotal - max) > 0.01) return; // a different amount: chosen again
+    } else if (!getCashEquivalentLedgers().some(l => String(l.id) === acc)) {
+      return;
+    }
+    setPurchasePaymentStatus('Full');
+    populatePurchasePaymentAccounts(acc);
+    const sel = $('purchasePaymentAccount');
+    if (sel) sel.value = acc;
+    _purchasePaymentAccountPrev = acc === MULTI_PAYMENT_VALUE ? '' : acc;
+    if (splits) setPurchaseMultiPayments(splits);
+    updatePurchaseMultiPaymentUI();
   }
 
   // Save Draft is for a new voucher or a draft: a posted one is changed with Save Purchase
@@ -171,8 +494,10 @@
     refreshPurchaseVendorAlterPencil();
   }
 
-  // "Create new" at the bottom of the vendor list: a ledger under Trade Payables (coa.js)
-  function appendPurchasePartyCreateFooter(listEl, query) {
+  // "Create new" at the bottom of the vendor list: a ledger under Trade Payables (coa.js).
+  // `target` ({ dropdownId, onCreated, onCancelled }) is a Pre Purchase form's vendor box
+  // (purchase-pre.js); none means New Purchase's own Vendor box.
+  function appendPurchasePartyCreateFooter(listEl, query, target) {
     if (!listEl) return;
     const raw = (query || '').trim();
     const wrap = document.createElement('div');
@@ -191,11 +516,12 @@
     btn.addEventListener('mousedown', e => {
       e.preventDefault();
       e.stopPropagation();
-      const dd = $('purchaseVendorSelectDropdown');
+      window._purchasePartyCreateTarget = target || null;
+      const dd = $((target && target.dropdownId) || 'purchaseVendorSelectDropdown');
       if (dd) dd.style.display = 'none';
       if (typeof hidePartyHoverCard === 'function') hidePartyHoverCard();
       if (typeof window.openMasterDeskCreateLedger === 'function') {
-        window.openMasterDeskCreateLedger({ initialName: raw, groupVal: 'sg:sg-tp', returnTab: 'purchase_voucher', selectId: 'purchaseVendor' });
+        window.openMasterDeskCreateLedger({ initialName: raw, groupVal: 'sg:sg-tp', returnTab: 'purchase_voucher', selectId: (target && target.selectId) || 'purchaseVendor' });
       }
     });
     btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
@@ -204,6 +530,13 @@
   }
 
   window.onPartyCreatedForPurchase = function(newParty, partySource) {
+    // Asked for by a Pre Purchase form: the new party goes to that form's vendor box
+    const target = window._purchasePartyCreateTarget;
+    window._purchasePartyCreateTarget = null;
+    if (target && typeof target.onCreated === 'function') {
+      if (newParty) setTimeout(() => target.onCreated(newParty, partySource), 60);
+      return;
+    }
     if (!newParty) return;
     populatePurchaseVendors(newParty.id);
     setTimeout(() => {
@@ -219,6 +552,12 @@
   };
 
   window.onPartyCreationCancelledForPurchase = function(initialName) {
+    const target = window._purchasePartyCreateTarget;
+    window._purchasePartyCreateTarget = null;
+    if (target && typeof target.onCancelled === 'function') {
+      setTimeout(() => target.onCancelled(initialName), 60);
+      return;
+    }
     setTimeout(() => {
       const dropdown = $('purchaseVendorSelectDropdown');
       const searchInput = $('purchaseVendorSelectSearch');
@@ -362,9 +701,202 @@
 
     const multiOpt = document.createElement('option');
     multiOpt.value = MULTI_PAYMENT_VALUE;
-    multiOpt.textContent = 'Multi Payment';
+    multiOpt.textContent = isPurchaseReturnMode() ? 'Multi Refund' : 'Multi Payment';
     if (String(selectedId) === MULTI_PAYMENT_VALUE) multiOpt.selected = true;
     paySelect.appendChild(multiOpt);
+  }
+
+  // ── Advance carried in from a Pre Purchase document (Proforma / Purchase Order / GRN) ──
+  // The advance already paid to the vendor: from the conversion in progress, or stored on
+  // the voucher being edited
+  function getPurchaseLinkedAdvance() {
+    if (isPurchaseReturnMode()) return { amount: 0, voucherNo: '' };
+    const a = _purchasePreLink && _purchasePreLink.advance;
+    return { amount: a ? r2(a.amount) : 0, voucherNo: (a && a.voucherNo) || '' };
+  }
+
+  // The part of the advance this purchase uses — never more than its Grand Total
+  function getPurchaseAdvanceApplied(total) {
+    return Math.max(0, Math.min(getPurchaseLinkedAdvance().amount, r2(total)));
+  }
+
+  // Advance paid above the bill value. While there is one, the Payment Status buttons work
+  // as Not Refunded / Full Refund / Partial Refund for that excess (the supplier pays it back)
+  function getPurchaseAdvanceExcess(total) {
+    const excess = r2(getPurchaseLinkedAdvance().amount - r2(total));
+    return excess > 0.01 ? excess : 0;
+  }
+
+  // The most the form's payment can be: the balance after the advance, or the excess to refund
+  function getPurchasePaymentMax(total) {
+    // A reversal: the refund its Original Doc allows
+    if (isPurchaseReturnMode()) return getPurchaseRefundMax(total);
+    const excess = getPurchaseAdvanceExcess(total);
+    if (excess > 0) return excess;
+    return Math.max(0, r2(total - getPurchaseAdvanceApplied(total)));
+  }
+
+  // Wording for the "amount adjusted" / "cannot exceed" messages
+  function getPurchasePaymentLimitMessage(maxVal, total, adjusted) {
+    if (isPurchaseReturnMode()) {
+      return adjusted
+        ? `Refund Amount adjusted to ₹${fmt(maxVal)} to not exceed the allowed refund amount.`
+        : `Refund Amount cannot exceed the allowed refund amount of ₹${fmt(maxVal)}.`;
+    }
+    if (getPurchaseAdvanceExcess(total) > 0) {
+      return adjusted
+        ? `Refund Amount adjusted to ₹${fmt(maxVal)} to not exceed the excess advance.`
+        : `Refund Amount cannot exceed the excess advance of ₹${fmt(maxVal)}.`;
+    }
+    if (getPurchaseLinkedAdvance().amount > 0) {
+      return adjusted
+        ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the balance after the advance.`
+        : `Payment Amount cannot exceed the balance of ₹${fmt(maxVal)} after the advance.`;
+    }
+    return adjusted
+      ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the Grand Total.`
+      : `Payment Amount cannot exceed the Grand Total of ₹${fmt(maxVal)}.`;
+  }
+
+  // Payment Status ⇄ Refund Status wording
+  function setPurchasePaymentLabels(refundMode) {
+    const set = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+    set($('purchasePaymentStatusLabel'), refundMode ? 'Refund Status' : 'Payment Status');
+    set($('purchasePaymentStatusNotPaid'), refundMode ? 'Not Refunded' : 'Not Paid');
+    set($('purchasePaymentStatusFull'), refundMode ? 'Full Refund' : 'Full Payment');
+    set($('purchasePaymentStatusPartial'), refundMode ? 'Partial Refund' : 'Partial Payment');
+    set(document.querySelector('#purchasePaymentAmountField label'), refundMode ? 'Refund Amount *' : 'Payment Amount *');
+    set(document.querySelector('#purchasePaymentAccountField label'), refundMode ? 'Refund Account *' : 'Payment Account *');
+  }
+
+  // The advance / balance popup appears only while the pointer (or focus) is in the
+  // Payment Status box, and only when the purchase carries an advance
+  function wirePurchaseAdvanceHover() {
+    const payBox = $('purchasePaymentBox');
+    const box = $('purchaseAdvanceInfo');
+    if (!payBox || !box || payBox._advHoverWired) return;
+    payBox._advHoverWired = true;
+    const show = () => { if (box.dataset.active === '1') box.style.display = 'block'; };
+    const hide = () => { box.style.display = 'none'; };
+    payBox.addEventListener('mouseenter', show);
+    payBox.addEventListener('mouseleave', hide);
+    payBox.addEventListener('focusin', show);
+    payBox.addEventListener('focusout', e => { if (!payBox.contains(e.relatedTarget)) hide(); });
+  }
+
+  // Advance / balance popup content for the Payment Status box; Full & Partial are off once
+  // the advance pays the whole bill exactly
+  function updatePurchaseAdvanceInfo(total) {
+    const box = $('purchaseAdvanceInfo');
+    wirePurchaseAdvanceHover();
+    const t = (typeof total === 'number') ? total : getPurchaseGrandTotal();
+    // A reversal shows what its Original Doc allows to be refunded instead
+    if (isPurchaseReturnMode()) { updatePurchaseReversalInfo(t); return; }
+    const adv = getPurchaseLinkedAdvance();
+    const fullBtn = $('purchasePaymentStatusFull');
+    const partBtn = $('purchasePaymentStatusPartial');
+    const setLocked = (btn, locked) => {
+      if (!btn || btn.dataset.cashLocked) return;
+      btn.disabled = locked;
+      btn.style.cursor = locked ? 'not-allowed' : '';
+      btn.style.opacity = locked ? '0.5' : '';
+    };
+    setPurchasePaymentLabels(getPurchaseAdvanceExcess(t) > 0);
+
+    if (adv.amount <= 0) {
+      if (box) {
+        box.dataset.active = '0';
+        box.style.display = 'none';
+        box.innerHTML = '';
+      }
+      if (fullBtn && fullBtn.dataset.advLocked) { setLocked(fullBtn, false); delete fullBtn.dataset.advLocked; }
+      if (partBtn && partBtn.dataset.advLocked) { setLocked(partBtn, false); delete partBtn.dataset.advLocked; }
+      return;
+    }
+
+    const applied = getPurchaseAdvanceApplied(t);
+    const balance = Math.max(0, r2(t - applied));
+    const excess = getPurchaseAdvanceExcess(t);
+    const party = getPurchaseParty({ vendorId: ($('purchaseVendor') || {}).value || '' });
+    const inLedger = typeof window.isPurchaseLedgerVendor === 'function' && window.isPurchaseLedgerVendor(party);
+    const row = (label, value, strong) => `<div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 2px;"><span>${label}</span>${strong ? `<strong>${value}</strong>` : `<span>${value}</span>`}</div>`;
+    if (box) {
+      box.dataset.active = '1';
+      box.innerHTML = `
+        ${row(`Advance paid${adv.voucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${ohEsc(adv.voucherNo)}]</span>` : ''}`, `₹ ${fmt(adv.amount)}`, true)}
+        ${excess > 0 ? `
+          ${row('Purchase total', `₹ ${fmt(t)}`)}
+          ${row('Excess advance', `₹ ${fmt(excess)}`, true)}
+          <div style="margin-top: 4px; font-weight: 500;">Record the supplier's refund below; any part not refunded stays as an advance ${inLedger ? "in the supplier's ledger" : 'in Advances to Suppliers'}.</div>`
+        : `
+          ${row('Balance due', `₹ ${fmt(balance)}`, true)}
+          ${balance <= 0.01
+            ? '<div style="margin-top: 4px; font-weight: 500;">Fully paid by the advance — no further payment needed.</div>'
+            : '<div style="margin-top: 4px; font-weight: 500;">Payment below is for the balance only.</div>'}`}`;
+    }
+
+    // Exactly paid by the advance: nothing to pay or refund, only "Not Paid" applies
+    const settled = balance <= 0.01 && excess <= 0;
+    if (settled) {
+      const notPaidBtn = $('purchasePaymentStatusNotPaid');
+      if (notPaidBtn && !notPaidBtn.classList.contains('active')) setPurchasePaymentStatus('NotPaid');
+    }
+    [fullBtn, partBtn].forEach(btn => {
+      if (!btn) return;
+      if (settled) btn.dataset.advLocked = '1';
+      else delete btn.dataset.advLocked;
+      setLocked(btn, settled);
+    });
+  }
+
+  // After a voucher is loaded: turn its stored payment (advance + payment) back into the
+  // balance-only view the form shows (or the refund of an advance above the bill)
+  function applyPurchaseAdvanceToPaymentUI(v) {
+    const total = r2(v.total);
+    const payAmtEl = $('purchasePaymentAmount');
+    resetPurchaseMultiPayments();
+    if (getPurchaseAdvanceExcess(total) > 0) {
+      const refund = v.advanceRefund;
+      if (refund && refund.amount > 0) {
+        setPurchasePaymentStatus(refund.status === 'Full Refund' ? 'Full' : 'Partial');
+        populatePurchasePaymentAccounts(refund.accountId);
+        _purchasePaymentAccountPrev = refund.accountId && refund.accountId !== MULTI_PAYMENT_VALUE ? String(refund.accountId) : '';
+        if (refund.accountId === MULTI_PAYMENT_VALUE) setPurchaseMultiPayments(refund.splits || []);
+        if (payAmtEl) payAmtEl.value = refund.status === 'Partial Refund' ? Number(refund.amount).toFixed(2) : '';
+      } else {
+        setPurchasePaymentStatus('NotPaid');
+        populatePurchasePaymentAccounts('');
+        if (payAmtEl) payAmtEl.value = '';
+      }
+      updatePurchaseMultiPaymentUI();
+      updatePurchaseAdvanceInfo(total);
+      return;
+    }
+    const stored = getPurchasePaidAmount(v);
+    const applied = getPurchaseAdvanceApplied(total);
+    const further = Math.max(0, r2(stored - applied));
+    const balance = Math.max(0, r2(total - applied));
+    if (further <= 0) {
+      setPurchasePaymentStatus('NotPaid');
+      // The document's account / split described the advance, not a new payment
+      populatePurchasePaymentAccounts(v.paymentAccountId === MULTI_PAYMENT_VALUE ? '' : v.paymentAccountId);
+      if (payAmtEl) payAmtEl.value = '';
+    } else {
+      setPurchasePaymentStatus(further >= balance - 0.01 ? 'Full' : 'Partial');
+      populatePurchasePaymentAccounts(v.paymentAccountId);
+      _purchasePaymentAccountPrev = v.paymentAccountId && v.paymentAccountId !== MULTI_PAYMENT_VALUE ? String(v.paymentAccountId) : '';
+      setPurchaseMultiPayments(v.paymentSplits || []);
+      if (payAmtEl) payAmtEl.value = further >= balance - 0.01 ? '' : further.toFixed(2);
+    }
+    updatePurchaseMultiPaymentUI();
+    updatePurchaseAdvanceInfo(total);
+  }
+
+  function getPurchasePaidAmount(v) {
+    if (typeof window.getPurchasePaidAmount === 'function') return window.getPurchasePaidAmount(v);
+    if (v.paymentStatus === 'Full Payment') return r2((parseFloat(v.paymentAmount) || 0) > 0 ? v.paymentAmount : v.total);
+    if (v.paymentStatus === 'Partial Payment') return r2(v.paymentAmount);
+    return 0;
   }
 
   function getPurchasePaymentStatus() {
@@ -454,7 +986,8 @@
   // Amount that has to be distributed across the Multi Payment accounts
   function getPurchaseMultiPaymentTarget() {
     const status = getPurchasePaymentStatus();
-    if (status === 'Full Payment') return getPurchaseGrandTotal();
+    // Full: the Grand Total — or, with an advance, the balance after it (the excess to refund)
+    if (status === 'Full Payment') return getPurchasePaymentMax(getPurchaseGrandTotal());
     if (status === 'Partial Payment') return parseFloat(($('purchasePaymentAmount') || {}).value) || 0;
     return 0;
   }
@@ -462,7 +995,7 @@
   function openPurchaseMultiPaymentModal() {
     if (typeof window.openMultiPaymentModal !== 'function') return;
     window.openMultiPaymentModal({
-      typeLabel: 'Payment',
+      typeLabel: (isPurchaseReturnMode() || getPurchaseAdvanceExcess(getPurchaseGrandTotal()) > 0) ? 'Refund' : 'Payment',
       getTarget: getPurchaseMultiPaymentTarget,
       getAccounts: getCashEquivalentLedgers,
       splits: purchaseMultiPayments,
@@ -550,6 +1083,7 @@
     body.innerHTML = '';
 
     const isZeroTax = isPurchaseZeroTaxSupply();
+    const rowLock = getPurchaseReturnRowLock();
 
     purchaseRows.forEach((row, index) => {
       if (isZeroTax) {
@@ -618,6 +1152,12 @@
       const tr = tempBody.firstElementChild;
       body.appendChild(tr);
 
+      // A reversal: its lines are the Original Doc's — locked before any picker is attached
+      if (rowLock !== 'none') {
+        lockPurchaseReturnRow(tr, rowLock);
+        return;
+      }
+
       // Description: Stock Items (at cost) and Expense ledgers, with Create / ✎ Alter
       const itemInp = tr.querySelector('.sales-row-item');
       if (itemInp && typeof _salesItemPortal !== 'undefined') {
@@ -682,11 +1222,27 @@
     const unitEl = tr.querySelector('.sales-row-unit');
     if (unitEl) row.unit = unitEl.value;
 
-    const qty = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    let qty = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
     let rate = Math.round(parsePurchaseAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
-    const discount = parsePurchaseAmt(tr.querySelector('.sales-row-discount')?.value || '0');
+    let discount = parsePurchaseAmt(tr.querySelector('.sales-row-discount')?.value || '0');
     row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
     row.tax = parseFloat(tr.querySelector('.sales-row-tax')?.value) || 0;
+
+    // A reversal line covers at most what is left of its purchase line
+    if (isPurchaseReturnMode() && row.origQty !== undefined) {
+      if (qty > row.origQty) {
+        qty = row.origQty;
+        const qtyInput = tr.querySelector('.sales-row-qty');
+        if (qtyInput) qtyInput.value = qty;
+        toast(`Quantity cannot exceed remaining quantity of ${row.origQty}.`, 'warning');
+      }
+      const origDiscount = parseFloat(row.origDiscount) || 0;
+      if (discount > origDiscount) {
+        discount = origDiscount;
+        const discInput = tr.querySelector('.sales-row-discount');
+        if (discInput) discInput.value = discount === 0 ? '' : discount;
+      }
+    }
 
     if (amountEdited) {
       const enteredAmount = Math.round(parsePurchaseAmt(amtInput.value) * 100) / 100;
@@ -855,19 +1411,23 @@
     const totalEl = $('purchaseTotal');
     if (totalEl) totalEl.textContent = '₹ ' + fmt(total);
 
-    // The payment can never be more than the Grand Total
+    // The payment can never be more than the Grand Total (with an advance: the balance after
+    // it, or the excess to refund)
     const payAmtEl = $('purchasePaymentAmount');
+    const payMax = getPurchasePaymentMax(total);
     if (payAmtEl && payAmtEl.value && total > 0) {
       const currentVal = parseFloat(payAmtEl.value) || 0;
-      if (currentVal > total) {
-        payAmtEl.value = total.toFixed(2);
-        toast(`Payment Amount adjusted to ₹${fmt(total)} to not exceed the Grand Total.`, 'warning');
+      if (currentVal > payMax) {
+        payAmtEl.value = payMax.toFixed(2);
+        toast(getPurchasePaymentLimitMessage(payMax, total, true), 'warning');
       }
     }
 
     // A cash purchase stays Full Payment from its own account
     applyPurchaseCashVendorLock();
     updatePurchaseMultiPaymentUI();
+    // An advance carried in from a Pre Purchase document: the balance / refund popup
+    updatePurchaseAdvanceInfo(total);
   }
 
   // Round off: rounds the total to the nearest rupee; clicking again takes it off
@@ -1015,8 +1575,16 @@
   // ══════════════════════════════════════════════════════════════════
   //  FORM INIT / LOAD
   // ══════════════════════════════════════════════════════════════════
-  function initPurchaseForm() {
+  // opts.keepEditing: stay on the draft being edited (the Pre Purchase No. box's × clears
+  // what a document filled in, but the draft is still the same draft)
+  function initPurchaseForm(opts) {
+    const keep = (opts && opts.keepEditing && _editingPurchaseVoucher && _editingPurchaseVoucher.isDraft) ? _editingPurchaseVoucher : null;
     _editingPurchaseVoucher = null;
+    _purchasePreLink = null;
+    // A reversal starts with no Original Doc (the mode — purchase or reversal — is kept)
+    _purchaseReturnSource = null;
+    if (typeof window.closePurchaseOriginalDocList === 'function') window.closePurchaseOriginalDocList();
+    updatePurchaseModeUI();
     window._purchasePartyOverride = null;
     if (typeof hidePartyHoverCard === 'function') hidePartyHoverCard();
     // Clear the last voucher's payment amount first: the resets below recalculate the
@@ -1032,6 +1600,8 @@
     if ($('purchaseInvoiceNo')) $('purchaseInvoiceNo').value = invNo;
     if ($('purchaseVoucherChipDisplay')) $('purchaseVoucherChipDisplay').textContent = invNo;
     if (typeof refreshDocNoPlaceholder === 'function') refreshDocNoPlaceholder('purchase');
+    // A reversal has no number until its Original Doc is chosen
+    if (isPurchaseReturnMode()) refreshPurchaseReversalNo(true);
 
     if ($('purchaseNotes')) $('purchaseNotes').value = '';
     if ($('purchaseAdjustments')) $('purchaseAdjustments').value = '';
@@ -1061,10 +1631,15 @@
     setPurchaseTdsTcs('None');
     setPurchasePaymentStatus('NotPaid');
     updatePurchaseDocUI(null);
+    // Vendor, supply type, Purchaser and TDS / TCS are fixed on a reversal (from its Original Doc)
+    setPurchaseReturnFieldLocks();
+    if (keep) _editingPurchaseVoucher = keep;
     validatePurchaseNoField();
     refreshPurchaseDraftButton();
     refreshPurchaseVendorAlterPencil();
     recalculatePurchaseTotals();
+    // Pre Purchase No. box: empty again, and the vendor unlocked (purchase-pre-picker.js)
+    if (typeof window.refreshPurchasePrePicker === 'function') window.refreshPurchasePrePicker();
   }
 
   function findStoredPurchase(id) {
@@ -1094,19 +1669,49 @@
     const store = window.KYA_STORE || {};
     const editIsPosted = !isDraft && (store.purchaseVouchers || []).some(x => String(x.id) === String(v.id));
     const editIsDraft = isDraft && (store.purchaseVouchersDrafts || []).some(x => String(x.id) === String(v.id));
+    // A reversal opens the form as Purchase Reversal
+    _purchaseMode = v.isReturn ? 'Return' : 'Purchase';
     initPurchaseForm();
+    // The form may be behind a Pre Purchase card (purchase-pre.js)
+    if (typeof window.showPurchaseFormCard === 'function') window.showPurchaseFormCard();
     _editingPurchaseVoucher = (editIsPosted || editIsDraft) ? { id: v.id, isDraft: !!isDraft } : null;
+    // A reversal's Original Doc: a fresh one carries it as returnSource; a stored one keeps
+    // the purchase it reverses (returnAgainstId) or the Pre Purchase document (reversedPreDoc)
+    if (v.isReturn) {
+      if (v.returnSource) {
+        _purchaseReturnSource = JSON.parse(JSON.stringify(v.returnSource));
+      } else if (v.reversedPreDoc) {
+        _purchaseReturnSource = Object.assign({ type: 'pre' }, JSON.parse(JSON.stringify(v.reversedPreDoc)));
+      } else if (v.returnAgainstId || v.returnAgainstInvoice) {
+        const orig = (store.purchaseVouchers || []).find(x => !x.isReturn && (String(x.id) === String(v.returnAgainstId)
+          || (!v.returnAgainstId && String(x.invoiceNo || '').toLowerCase() === String(v.returnAgainstInvoice || '').toLowerCase())));
+        _purchaseReturnSource = { type: 'purchase', id: orig ? orig.id : v.returnAgainstId, no: v.returnAgainstInvoice || (orig && orig.invoiceNo) || '', date: orig ? orig.date : '' };
+      }
+      updatePurchaseModeUI();
+    }
     window._purchasePartyOverride = v.partyOverride ? JSON.parse(JSON.stringify(v.partyOverride)) : null;
+    // Made from a Pre Purchase document: the link, and the advance paid against it
+    _purchasePreLink = (v.preDocKind && v.preDocId !== undefined && v.preDocId !== null && v.preDocId !== '') ? {
+      kind: v.preDocKind,
+      id: v.preDocId,
+      advance: {
+        amount: r2(v.advancePaidAmount),
+        journalEntryId: v.advanceJournalEntryId || null,
+        voucherNo: v.advanceVoucherNo || null
+      }
+    } : null;
 
     if ($('purchaseDate')) $('purchaseDate').value = v.date || localToday();
     if ($('purchaseDueDate')) $('purchaseDueDate').value = v.dueDate || v.date || localToday();
 
     // A draft whose number was taken meanwhile (posted on another voucher) gets the next free one
     const storedNo = (v.invoiceNo && v.invoiceNo.trim() && v.invoiceNo.trim() !== 'Draft') ? v.invoiceNo.trim() : '';
-    const noTaken = editIsDraft && !!storedNo && typeof isDocNoUsed === 'function' && isDocNoUsed('purchase', storedNo, v.id);
+    const noTaken = editIsDraft && !!storedNo && typeof isDocNoUsed === 'function' && isDocNoUsed(getPurchaseNumberKind(), storedNo, v.id);
     const invNoEl = $('purchaseInvoiceNo');
     if (invNoEl) invNoEl.value = (storedNo && !noTaken) ? storedNo : getNextPurchaseInvoiceNo();
-    if ($('purchaseVoucherChipDisplay')) $('purchaseVoucherChipDisplay').textContent = (invNoEl && invNoEl.value) || 'PUR-XXXX';
+    // A reversal's number follows its Original Doc (a posted one keeps its own)
+    if (v.isReturn && !editIsPosted) refreshPurchaseReversalNo(!storedNo || noTaken);
+    if ($('purchaseVoucherChipDisplay')) $('purchaseVoucherChipDisplay').textContent = (invNoEl && invNoEl.value) || (v.isReturn ? 'REV-XXXX' : 'PUR-XXXX');
 
     if ($('purchaseNotes')) $('purchaseNotes').value = v.notes || '';
     const adjEl = $('purchaseAdjustments');
@@ -1124,6 +1729,21 @@
     if ($('purchaseSupplyType')) $('purchaseSupplyType').value = v.supplyType || 'Intra-State (CGST + SGST)';
 
     purchaseRows = (Array.isArray(v.rows) && v.rows.length) ? v.rows : [newPurchaseRow()];
+    // A reversal of a purchase: each line may cover what is still left of its purchase line
+    // (the reversal being edited is left out of "already reversed")
+    const origPurchase = v.isReturn ? getPurchaseReturnOriginal() : null;
+    if (origPurchase && typeof window.getPurchaseRemainingRows === 'function') {
+      const remaining = window.getPurchaseRemainingRows(origPurchase, editIsPosted ? v.id : null);
+      purchaseRows.forEach(row => {
+        const m = (row.origIndex !== undefined && remaining[row.origIndex]) ? remaining[row.origIndex]
+          : remaining.find(r => String(r.item || '').trim().toLowerCase() === String(row.item || '').trim().toLowerCase());
+        if (m) {
+          row.origIndex = m.origIndex;
+          row.origQty = parseFloat(m.qty) || 0;
+          row.origDiscount = m.discount;
+        }
+      });
+    }
     renderPurchaseRows();
 
     // TDS / TCS and its rate (a custom rate keeps its exact saved amount)
@@ -1144,14 +1764,28 @@
       }
     }
 
-    // Payment
-    if (v.paymentStatus === 'Full Payment') setPurchasePaymentStatus('Full');
-    else if (v.paymentStatus === 'Partial Payment') setPurchasePaymentStatus('Partial');
-    else setPurchasePaymentStatus('NotPaid');
-    populatePurchasePaymentAccounts(v.paymentAccountId);
-    _purchasePaymentAccountPrev = v.paymentAccountId && v.paymentAccountId !== MULTI_PAYMENT_VALUE ? String(v.paymentAccountId) : '';
-    setPurchaseMultiPayments(v.paymentSplits || []);
-    if ($('purchasePaymentAmount')) $('purchasePaymentAmount').value = (v.paymentStatus === 'Partial Payment' && v.paymentAmount) ? v.paymentAmount : '';
+    // Payment — with an advance, the form shows only the balance after it (or its refund);
+    // a reversal shows the refund the supplier made
+    if (v.isReturn) {
+      setPurchaseReturnFieldLocks();
+      if (v.paymentStatus === 'Full Refund') setPurchasePaymentStatus('Full');
+      else if (v.paymentStatus === 'Partial Refund') setPurchasePaymentStatus('Partial');
+      else setPurchasePaymentStatus('NotPaid');
+      populatePurchasePaymentAccounts(v.paymentAccountId);
+      _purchasePaymentAccountPrev = v.paymentAccountId && v.paymentAccountId !== MULTI_PAYMENT_VALUE ? String(v.paymentAccountId) : '';
+      setPurchaseMultiPayments(v.paymentSplits || []);
+      if ($('purchasePaymentAmount')) $('purchasePaymentAmount').value = (v.paymentStatus === 'Partial Refund' && v.paymentAmount) ? v.paymentAmount : '';
+    } else if (getPurchaseLinkedAdvance().amount > 0) {
+      applyPurchaseAdvanceToPaymentUI(v);
+    } else {
+      if (v.paymentStatus === 'Full Payment') setPurchasePaymentStatus('Full');
+      else if (v.paymentStatus === 'Partial Payment') setPurchasePaymentStatus('Partial');
+      else setPurchasePaymentStatus('NotPaid');
+      populatePurchasePaymentAccounts(v.paymentAccountId);
+      _purchasePaymentAccountPrev = v.paymentAccountId && v.paymentAccountId !== MULTI_PAYMENT_VALUE ? String(v.paymentAccountId) : '';
+      setPurchaseMultiPayments(v.paymentSplits || []);
+      if ($('purchasePaymentAmount')) $('purchasePaymentAmount').value = (v.paymentStatus === 'Partial Payment' && v.paymentAmount) ? v.paymentAmount : '';
+    }
 
     updatePurchaseDocUI(v.uploadedDoc || v.document || null);
     validatePurchaseNoField();
@@ -1159,6 +1793,13 @@
     refreshPurchaseVendorAlterPencil();
     updatePurchaseDueDateDays();
     recalculatePurchaseTotals();
+    if (v.isReturn) {
+      setPurchaseReturnFieldLocks();
+      // A fresh reversal: the money comes back the way it was paid
+      if (v.presetRefund) presetPurchaseRefund(v.presetRefund);
+      recalculatePurchaseTotals();
+    }
+    if (typeof window.refreshPurchasePrePicker === 'function') window.refreshPurchasePrePicker();
 
     if (typeof openTab === 'function') openTab('purchase_voucher');
     if (noTaken && invNoEl && invNoEl.value !== storedNo) {
@@ -1177,12 +1818,63 @@
     const mode = getPurchaseTdsTcsMode();
     const subTotal = calculatePurchaseSubtotal();
     const total = getPurchaseGrandTotal();
-    const paymentStatus = getPurchasePaymentStatus();
-    const paymentAccountId = ($('purchasePaymentAccount') || {}).value || '';
-    let paymentAmount = 0;
-    if (paymentStatus === 'Full Payment') paymentAmount = total;
-    else if (paymentStatus === 'Partial Payment') paymentAmount = parseFloat(($('purchasePaymentAmount') || {}).value) || 0;
-    return {
+    // What the Payment Status box says. With an advance from a Pre Purchase document it is
+    // the payment of the balance only — or the refund of an advance above the bill
+    const formStatus = getPurchasePaymentStatus();
+    const formAccountId = ($('purchasePaymentAccount') || {}).value || '';
+    const payMax = getPurchasePaymentMax(total);
+    let formAmount = 0;
+    if (formStatus === 'Full Payment') formAmount = payMax;
+    else if (formStatus === 'Partial Payment') formAmount = parseFloat(($('purchasePaymentAmount') || {}).value) || 0;
+    const formSplits = formStatus === 'Not Paid' ? [] : getPurchaseMultiPaymentSplits();
+
+    // What the voucher stores: everything paid to the vendor (advance + this payment)
+    let paymentStatus = formStatus;
+    let paymentAmount = formAmount;
+    let paymentAccountId = formStatus === 'Not Paid' ? '' : formAccountId;
+    let paymentSplits = formSplits;
+    let advanceRefund = null;
+    const advance = getPurchaseLinkedAdvance();
+    const excess = getPurchaseAdvanceExcess(total);
+    if (advance.amount > 0 && excess > 0) {
+      // The advance pays the whole bill; the form's buttons were about refunding the excess
+      const refundAmt = r2(Math.min(formAmount, excess));
+      advanceRefund = {
+        excess,
+        status: refundAmt <= 0 ? 'Not Refunded' : (refundAmt >= excess - 0.01 ? 'Full Refund' : 'Partial Refund'),
+        amount: refundAmt,
+        accountId: refundAmt > 0 ? formAccountId : '',
+        splits: refundAmt > 0 ? formSplits : []
+      };
+      paymentStatus = 'Full Payment';
+      paymentAmount = total;
+      paymentAccountId = '';
+      paymentSplits = [];
+    } else if (advance.amount > 0) {
+      const received = r2(getPurchaseAdvanceApplied(total) + formAmount);
+      paymentStatus = received >= total - 0.01 ? 'Full Payment' : 'Partial Payment';
+      paymentAmount = received;
+    }
+    // A reversal: the status is the supplier's refund
+    const isReturn = isPurchaseReturnMode();
+    const src = _purchaseReturnSource;
+    if (isReturn) {
+      paymentStatus = formStatus === 'Full Payment' ? 'Full Refund' : (formStatus === 'Partial Payment' ? 'Partial Refund' : 'No Refund');
+    }
+    const returnFields = !isReturn ? {} : {
+      isReturn: true,
+      returnAgainstInvoice: (src && src.no) || '',
+      returnAgainstId: (src && src.type === 'purchase') ? src.id : null,
+      // Reversing a Pre Purchase document: no purchase to undo, only its advance to settle
+      reversedPreDoc: (src && src.type === 'pre') ? {
+        kind: src.kind, id: src.id, no: src.no, date: src.date || '', label: src.label || '',
+        advance: r2(src.advance),
+        advanceJournalEntryId: src.advanceJournalEntryId || null,
+        advanceVoucherNo: src.advanceVoucherNo || null,
+        inPartyLedger: !!src.inPartyLedger
+      } : null
+    };
+    return Object.assign({
       id: _editingPurchaseVoucher ? _editingPurchaseVoucher.id : Date.now(),
       invoiceNo: (($('purchaseInvoiceNo') || {}).value || '').trim(),
       date: ($('purchaseDate') || {}).value || localToday(),
@@ -1200,21 +1892,45 @@
       adjustments: parseFloat(($('purchaseAdjustments') || {}).value) || 0,
       total,
       paymentStatus,
-      paymentAccountId: paymentStatus === 'Not Paid' ? '' : paymentAccountId,
+      paymentAccountId,
       paymentAmount: r2(paymentAmount),
-      paymentSplits: paymentStatus === 'Not Paid' ? [] : getPurchaseMultiPaymentSplits(),
+      paymentSplits,
       notes: ($('purchaseNotes') || {}).value || '',
-      uploadedDoc: purchaseUploadedDoc || null
-    };
+      uploadedDoc: purchaseUploadedDoc || null,
+      // The Pre Purchase document it is made from, and the advance paid against it
+      preDocKind: _purchasePreLink ? _purchasePreLink.kind : null,
+      preDocId: _purchasePreLink ? _purchasePreLink.id : null,
+      advancePaidAmount: advance.amount,
+      advanceJournalEntryId: (_purchasePreLink && _purchasePreLink.advance && _purchasePreLink.advance.journalEntryId) || null,
+      advanceVoucherNo: (_purchasePreLink && _purchasePreLink.advance && _purchasePreLink.advance.voucherNo) || null,
+      advanceRefund,
+      // The Payment Status box as entered — checked on Save, not stored
+      formPayment: {
+        status: formStatus,
+        amount: r2(formAmount),
+        accountId: formAccountId,
+        splits: formSplits,
+        max: payMax,
+        refundMode: excess > 0 || isReturn
+      }
+    }, returnFields);
   }
 
   function savePurchaseDraft() {
     // A posted voucher is changed with Save Purchase, not turned back into a draft
     if (_editingPurchaseVoucher && !_editingPurchaseVoucher.isDraft) {
-      toast('This purchase is already posted — use Save Purchase to keep the changes.', 'warning');
+      toast(isPurchaseReturnMode()
+        ? 'This reversal is already posted — use Save Reversal to keep the changes.'
+        : 'This purchase is already posted — use Save Purchase to keep the changes.', 'warning');
       return;
     }
     const data = readPurchaseForm();
+    delete data.formPayment;
+    // A reversal's draft comes back to its Original Doc
+    if (isPurchaseReturnMode() && !_purchaseReturnSource) {
+      toast('Please select the Original Doc before saving the draft.', 'warning');
+      return;
+    }
     // A draft needs something to come back to — the vendor and at least one line
     if (!data.vendorId) {
       toast('Please select a Vendor / Supplier before saving the draft.', 'warning');
@@ -1246,7 +1962,7 @@
       drafts.push(draft);
     }
 
-    toast('Purchase Voucher Draft saved successfully.', 'success');
+    toast(data.isReturn ? 'Purchase Reversal Draft saved successfully.' : 'Purchase Voucher Draft saved successfully.', 'success');
     initPurchaseForm();
     // Stay on the Purchase form, ready for the next one (drafts are listed in Voucher Desk)
     if (typeof openTab === 'function') openTab('purchase_voucher');
@@ -1258,18 +1974,42 @@
 
   function postPurchaseVoucher() {
     const data = readPurchaseForm();
+    const isReturn = !!data.isReturn;
+    const src = _purchaseReturnSource;
 
+    if (isReturn && !src) {
+      toast('Please select the Original Doc.', 'warning');
+      return false;
+    }
     if (!data.vendorId) {
       toast('Please select a Vendor / Supplier.', 'warning');
       return false;
     }
     if (!data.invoiceNo) {
-      toast('Purchase number is required.', 'warning');
+      toast(isReturn ? 'Reversal number is required.' : 'Purchase number is required.', 'warning');
       return false;
     }
-    // Numbers used by any purchase — including deleted ones — can't be issued again
-    if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('purchase', data.invoiceNo, getPurchaseOwnId())) {
+    // Numbers used by any purchase / reversal — including deleted ones — can't be issued again
+    if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave(getPurchaseNumberKind(), data.invoiceNo, getPurchaseOwnId())) {
       return false;
+    }
+
+    // A Pre Purchase document can be reversed only while it is active (or by its own reversal)
+    let preDoc = null;
+    if (isReturn && src.type === 'pre') {
+      if (typeof window.healPurchasePreReversals === 'function') window.healPurchasePreReversals();
+      const found = typeof window.findPurchasePreDocForReversal === 'function' ? window.findPurchasePreDocForReversal(src.kind, src.id) : null;
+      if (!found) {
+        toast('The selected pre purchase no longer exists.', 'warning');
+        return false;
+      }
+      preDoc = found.doc;
+      const own = _editingPurchaseVoucher && !_editingPurchaseVoucher.isDraft && preDoc.reversedBy
+        && String(preDoc.reversedBy.voucherId) === String(_editingPurchaseVoucher.id);
+      if (preDoc.status && preDoc.status !== 'Active' && !own) {
+        toast(`${src.label || 'Pre Purchase'} ${src.no} is ${preDoc.status} and can't be reversed.`, 'warning');
+        return false;
+      }
     }
 
     // Leave out completely blank rows when at least one row has something
@@ -1282,7 +2022,8 @@
       toast('Please add at least one line item.', 'warning');
       return false;
     }
-    for (let i = 0; i < rows.length; i++) {
+    // A Pre Purchase document is reversed whole, as it was saved
+    for (let i = 0; i < rows.length && !(isReturn && src.type === 'pre'); i++) {
       const r = rows[i];
       if (!r.item || !r.item.trim()) {
         toast(`Row #${i + 1}: Please select an item or expense.`, 'warning');
@@ -1296,45 +2037,58 @@
         toast(`Row #${i + 1}: Rate must be greater than zero.`, 'warning');
         return false;
       }
+      if (isReturn && r.origQty !== undefined && parseFloat(r.qty) > parseFloat(r.origQty) + 0.0001) {
+        toast(`Row #${i + 1}: Return Qty (${r.qty}) cannot exceed remaining returnable Qty (${r.origQty}).`, 'warning');
+        return false;
+      }
     }
     if (!data.date) {
       toast('Please select a Date.', 'warning');
       return false;
     }
+    if (isReturn && src.date && data.date < src.date) {
+      toast(`Reversal date cannot be before the ${src.type === 'pre' ? (src.label || 'document') : 'purchase'} date (${src.date}).`, 'warning');
+      return false;
+    }
 
-    if (data.paymentStatus !== 'Not Paid') {
-      if (!data.paymentAccountId) {
-        toast('Please select a Payment Account.', 'warning');
+    // The Payment Status box as entered: the payment (of the balance, when an advance came
+    // in from a Pre Purchase document) or the refund of an advance above the bill
+    const fp = data.formPayment;
+    delete data.formPayment;
+    if (fp.status !== 'Not Paid') {
+      const what = fp.refundMode ? 'Refund' : 'Payment';
+      if (!fp.accountId) {
+        toast(`Please select a ${what} Account.`, 'warning');
         return false;
       }
-      if (data.paymentStatus === 'Partial Payment') {
-        if (data.paymentAmount <= 0) {
-          toast('Payment Amount must be greater than zero for Partial Payments.', 'warning');
+      if (fp.status === 'Partial Payment') {
+        if (fp.amount <= 0) {
+          toast(`${what} Amount must be greater than zero for Partial ${what}s.`, 'warning');
           return false;
         }
-        if (data.paymentAmount > data.total + 0.001) {
-          toast(`Payment Amount cannot exceed the Grand Total of ₹${fmt(data.total)}.`, 'warning');
+        if (fp.amount > fp.max + 0.001) {
+          toast(getPurchasePaymentLimitMessage(fp.max, data.total, false), 'warning');
           return false;
         }
       }
-      if (data.paymentAmount <= 0) {
-        toast('Payment Amount must be greater than zero.', 'warning');
+      if (fp.amount <= 0) {
+        toast(`${what} Amount must be greater than zero.`, 'warning');
         return false;
       }
-      if (data.paymentAccountId === MULTI_PAYMENT_VALUE) {
-        const splits = data.paymentSplits;
+      if (fp.accountId === MULTI_PAYMENT_VALUE) {
+        const splits = fp.splits;
         if (splits.length === 0) {
-          toast('Please select at least one account with an amount for Multi Payment.', 'warning');
+          toast(`Please select at least one account with an amount for Multi ${what}.`, 'warning');
           return false;
         }
         const hasDuplicate = splits.some((sp, i) => splits.findIndex(o => String(o.accountId) === String(sp.accountId)) !== i);
         if (hasDuplicate) {
-          toast('Each Multi Payment account can be selected only once.', 'warning');
+          toast(`Each Multi ${what} account can be selected only once.`, 'warning');
           return false;
         }
         const splitTotal = splits.reduce((sum, sp) => sum + sp.amount, 0);
-        if (Math.abs(splitTotal - data.paymentAmount) > 0.01) {
-          toast(`Multi Payment split of ₹${fmt(splitTotal)} must equal the payment amount of ₹${fmt(data.paymentAmount)}.`, 'warning');
+        if (Math.abs(splitTotal - fp.amount) > 0.01) {
+          toast(`Multi ${what} split of ₹${fmt(splitTotal)} must equal the ${what.toLowerCase()} amount of ₹${fmt(fp.amount)}.`, 'warning');
           return false;
         }
       }
@@ -1353,7 +2107,9 @@
       tdsJournalEntryId: existing ? (existing.tdsJournalEntryId || '') : '',
       tdsVoucherNo: existing ? (existing.tdsVoucherNo || '') : '',
       paymentJournalEntryId: existing ? (existing.paymentJournalEntryId || '') : '',
-      paymentVoucherNo: existing ? (existing.paymentVoucherNo || '') : ''
+      paymentVoucherNo: existing ? (existing.paymentVoucherNo || '') : '',
+      advanceRefundJournalEntryId: existing ? (existing.advanceRefundJournalEntryId || '') : '',
+      advanceRefundVoucherNo: existing ? (existing.advanceRefundVoucherNo || '') : ''
     });
 
     // Post to the books (flows to Trial Balance, Ledgers, P&L, Balance Sheet, Voucher Desk)
@@ -1364,6 +2120,8 @@
       voucher.tdsVoucherNo = je.tdsJEId ? je.tdsVoucherNo : '';
       voucher.paymentJournalEntryId = je.paymentJEId || '';
       voucher.paymentVoucherNo = je.paymentJEId ? je.paymentVoucherNo : '';
+      voucher.advanceRefundJournalEntryId = je.advanceRefundJEId || '';
+      voucher.advanceRefundVoucherNo = je.advanceRefundJEId ? je.advanceRefundVoucherNo : '';
     }
 
     if (_editingPurchaseVoucher && _editingPurchaseVoucher.isDraft) {
@@ -1375,9 +2133,24 @@
     else list.push(voucher);
 
     // Once posted, a number is used for good — deleting the voucher won't free it
-    if (typeof registerDocNo === 'function') registerDocNo('purchase', voucher.invoiceNo);
+    if (typeof registerDocNo === 'function') registerDocNo(getPurchaseNumberKind(), voucher.invoiceNo);
+    // Made from a Pre Purchase document: that document is now Completed
+    if (!isReturn && voucher.preDocKind && typeof window.markPurchasePreDocCompleted === 'function') {
+      window.markPurchasePreDocCompleted(voucher.preDocKind, voucher.preDocId);
+    }
+    // Reversing a Pre Purchase document cancels it (a document this reversal pointed at before
+    // goes back to Active)
+    if (preDoc) {
+      preDoc.status = 'Cancelled';
+      preDoc.reversedBy = { voucherId: voucher.id, no: voucher.invoiceNo, date: voucher.date };
+      preDoc.updatedAt = Date.now();
+      if (typeof window.healPurchasePreReversals === 'function') window.healPurchasePreReversals();
+    }
 
-    toast(`Purchase Voucher "${voucher.invoiceNo}" saved successfully.`, 'success');
+    toast(isReturn
+      ? `Purchase Reversal "${voucher.invoiceNo}" posted successfully.${preDoc ? ` ${src.label || 'Pre Purchase'} ${src.no} cancelled.` : ''}`
+      : `Purchase Voucher "${voucher.invoiceNo}" saved successfully.`, 'success');
+    // A reversal is followed by a fresh reversal
     initPurchaseForm();
     if (typeof openTab === 'function') openTab('purchase_voucher');
 
@@ -1466,6 +2239,7 @@
         return;
       }
       const data = readPurchaseForm();
+      delete data.formPayment;
       data.invoiceNo = data.invoiceNo || getNextPurchaseInvoiceNo();
       try {
         await fn(data);
@@ -1556,8 +2330,34 @@
       newPurchaseBtn._wired = true;
       newPurchaseBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        _purchaseMode = 'Purchase';
         initPurchaseForm();
       });
+    }
+
+    // Reversal: the purchase form as Purchase Reversal, starting with no Original Doc
+    const returnBtn = $('btnPurchaseReturn');
+    if (returnBtn && !returnBtn._wired) {
+      returnBtn._wired = true;
+      returnBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        _purchaseMode = 'Return';
+        initPurchaseForm();
+        if (typeof window.showPurchaseFormCard === 'function') window.showPurchaseFormCard();
+      });
+    }
+
+    // The number pencil on a reversal sets the reversal prefix (the rest is the Original Doc's);
+    // runs ahead of the purchase number format popup (doc-numbering.js)
+    const fmtBtn = $('purchaseInvoiceNoFormatBtn');
+    if (fmtBtn && !fmtBtn._returnWired) {
+      fmtBtn._returnWired = true;
+      fmtBtn.addEventListener('click', (e) => {
+        if (!isPurchaseReturnMode()) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openPurchaseReversalNumberingModal();
+      }, true);
     }
 
     const saveDraftBtn = $('btnSavePurchaseDraft');
@@ -1657,9 +2457,11 @@
       payAmtEl._wired = true;
       payAmtEl.addEventListener('input', () => {
         const total = getPurchaseGrandTotal();
-        if (total > 0 && parseFloat(payAmtEl.value) > total) {
-          payAmtEl.value = total.toFixed(2);
-          toast(`Payment Amount adjusted to ₹${fmt(total)} to not exceed the Grand Total.`, 'warning');
+        // With an advance: the balance after it, or the excess to refund
+        const max = getPurchasePaymentMax(total);
+        if (total > 0 && parseFloat(payAmtEl.value) > max) {
+          payAmtEl.value = max.toFixed(2);
+          toast(getPurchasePaymentLimitMessage(max, total, true), 'warning');
         }
         if (typeof window.isMultiPaymentModalOpen === 'function' && window.isMultiPaymentModalOpen() && typeof window.updateMultiPaymentModalTotals === 'function') {
           window.updateMultiPaymentModalTotals();
@@ -1807,6 +2609,19 @@
   window.editPurchaseDraft = editPurchaseDraft;
   window.postPurchaseDraft = postPurchaseDraft;
   window.appendPurchasePartyCreateFooter = appendPurchasePartyCreateFooter;
+  // Whether the form is a Purchase Reversal (purchase-pre.js, purchase-pre-picker.js)
+  window.isPurchaseReturnMode = isPurchaseReturnMode;
+  // The Pre Purchase document the purchase on the form is made from (purchase-pre-picker.js).
+  // `locked`: a posted purchase keeps the document it was made from
+  window.getPurchasePreLink = function() {
+    if (!_purchasePreLink) return null;
+    return {
+      kind: _purchasePreLink.kind,
+      id: _purchasePreLink.id,
+      advance: Object.assign({}, _purchasePreLink.advance || {}),
+      locked: !!(_editingPurchaseVoucher && !_editingPurchaseVoucher.isDraft)
+    };
+  };
   // The rows on the form (read live: app-shell only starts a fresh form when there are none)
   Object.defineProperty(window, 'purchaseRows', { configurable: true, get: () => purchaseRows });
 

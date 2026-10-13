@@ -90,6 +90,8 @@
   // A purchase paid in full when it was made — Full Payment, or a cash purchase (a Cash and
   // Cash Equivalents ledger as the vendor) — shows how it was paid. Returns null otherwise.
   function getPurchasePaymentDetails(v, paidAmount) {
+    // A Debit Note shows its refund in the bank details box, as a Credit Note does
+    if (!v || v.isReturn) return null;
     const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
     const ledgerOf = id => ledgers.find(l => String(l.id) === String(id));
     const cashLedger = ledgerOf(v.vendorId);
@@ -104,8 +106,13 @@
         .map(sp => `${nameOf(sp.accountId)} ${num(sp.amount)}`).join(', ');
     } else if (v.paymentAccountId) paidFrom = nameOf(v.paymentAccountId);
 
+    // An advance paid against the Pre Purchase document it was made from (purchase-pre.js)
+    const advance = Math.min(parseFloat(v.advancePaidAmount) || 0, parseFloat(paidAmount) || 0);
+    const paidNow = Math.max(0, r2(paidAmount - advance));
+
     const lines = [{ label: 'Payment', value: isCash ? 'Cash Purchase — Full Payment' : 'Full Payment' }];
-    if (paidFrom) lines.push({ label: 'Paid From', value: paidFrom });
+    if (advance > 0) lines.push({ label: 'Advance Adjusted', value: num(advance) + (v.advanceVoucherNo ? ` (${v.advanceVoucherNo})` : '') });
+    if (paidFrom && (paidNow > 0 || isCash)) lines.push({ label: 'Paid From', value: paidFrom });
     lines.push({ label: 'Amount Paid', value: num(paidAmount) });
     return { lines };
   }
@@ -158,7 +165,7 @@
     const payLines = [];
     if (v.dueDate && !isFullyPaid) payLines.push({ label: 'Due Date', value: dateOf(v.dueDate) });
     if (tdsAmount > 0) payLines.push({ label: 'TDS Deducted' + (v.tdsTcsRate ? ' @ ' + v.tdsTcsRate + '%' : ''), value: num(tdsAmount) });
-    if (paidAmount > 0) payLines.push({ label: 'Paid (' + (v.paymentStatus || '') + ')', value: num(paidAmount) });
+    if (paidAmount > 0) payLines.push({ label: (v.isReturn ? 'Refund Received (' : 'Paid (') + (v.paymentStatus || '') + ')', value: num(paidAmount) });
     if (!isFullyPaid) payLines.push({ label: 'Balance Due', value: num(balanceDue) });
 
     const vendorBank = parties.shipped && (parties.shipped.bankName || parties.shipped.accountNo) ? parties.shipped : parties.billed;
@@ -312,10 +319,11 @@
             </div>
           </div>
           <div style="text-align:right; flex-shrink:0;">
-            <div style="font-size:22px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; color:#1d4ed8;">Purchase Voucher</div>
+            <div style="font-size:22px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; color:#1d4ed8;">${v.isReturn ? 'Debit Note' : 'Purchase Voucher'}</div>
+            ${v.isReturn ? `<div style="font-size:${FS.note}; color:#64748b; font-weight:600; margin-top:2px;">Against Purchase ${esc(v.returnAgainstInvoice || '')}</div>` : ''}
             ${d.isDraft ? `<div style="font-size:${FS.note}; color:#64748b; font-weight:600; margin-top:2px;">Draft — not posted</div>` : ''}
             <div style="margin-top:8px; font-size:${FS.body}; color:#0f172a; line-height:1.7;">
-              <div><span style="color:#64748b; font-weight:600;">Purchase / Bill No.:</span> <strong>${esc(v.invoiceNo || '')}</strong></div>
+              <div><span style="color:#64748b; font-weight:600;">${v.isReturn ? 'Reversal No.' : 'Purchase / Bill No.'}:</span> <strong>${esc(v.invoiceNo || '')}</strong></div>
               <div><span style="color:#64748b; font-weight:600;">Date:</span> <strong>${esc(dateOf(v.date))}</strong></div>
               ${d.placeOfSupply ? `<div><span style="color:#64748b; font-weight:600;">Place of Supply:</span> <strong>${esc(d.placeOfSupply)}</strong></div>` : ''}
             </div>
@@ -345,7 +353,7 @@
             </tr>
           </thead>
           <tbody>
-            ${itemRowsHtml || `<tr><td colspan="${colCount}" style="padding:14px; text-align:center; color:#94a3b8;">No line items on this purchase.</td></tr>`}
+            ${itemRowsHtml || `<tr><td colspan="${colCount}" style="padding:14px; text-align:center; color:#94a3b8;">No line items on this ${v.isReturn ? 'debit note' : 'purchase'}.</td></tr>`}
           </tbody>
         </table>
 
@@ -378,7 +386,7 @@
 
         <div style="text-align:center; margin-top:18px; padding-top:12px; border-top:1px solid #94a3b8;">
           <div style="font-size:10px; color:#94a3b8;">
-            Certified that the particulars given above are true and correct. This is a computer generated purchase voucher.
+            Certified that the particulars given above are true and correct. This is a computer generated ${v.isReturn ? 'debit note' : 'purchase voucher'}.
           </div>
         </div>
       </div>`;
@@ -388,15 +396,15 @@
   function getPurchaseVoucherExportData(v) {
     const d = computePurchaseSheet(v);
     const co = d.co;
-    const docTitle = (d.isDraft ? 'Draft ' : '') + 'Purchase Voucher';
+    const docTitle = (d.isDraft ? 'Draft ' : '') + (v.isReturn ? 'Debit Note' : 'Purchase Voucher');
     const companyName = (typeof getInvoiceCompanyName === 'function') ? getInvoiceCompanyName(co) : (co.name || '');
     return {
       inv: v, co, parties: d.parties, bank: d.bank, paymentDetails: d.paymentDetails, rows: d.rows,
-      taxMode: d.taxMode, isReturn: false, docTitle,
+      taxMode: d.taxMode, isReturn: !!v.isReturn, docTitle,
       companyName,
       companySeal: (typeof getInvoiceCompanySeal === 'function') ? getInvoiceCompanySeal(co) : '',
       signatureImage: co.signatureImage || '',
-      subtitle: d.isDraft ? 'Draft — not posted' : '',
+      subtitle: v.isReturn ? 'Against Purchase ' + (v.returnAgainstInvoice || '') : (d.isDraft ? 'Draft — not posted' : ''),
       subTotal: d.subTotal, grossTotal: d.grossTotal, totalTax: d.totalTax, totalDiscount: d.totalDiscount,
       adjustments: d.adjustments, tdsTcsAmount: d.tdsTcsAmount, grandTotal: d.grandTotal,
       paidAmount: d.paidAmount, balanceDue: d.balanceDue, isFullyPaid: d.isFullyPaid,
@@ -407,9 +415,10 @@
       fileBase: (docTitle.replace(/\s+/g, '_') + '_' + (v.invoiceNo || 'Purchase')).replace(/[^a-zA-Z0-9_-]/g, '_'),
       // Wording of the Excel Details sheet
       excel: {
-        docSection: 'PURCHASE VOUCHER',
-        noLabel: 'Purchase / Bill No.',
-        dateLabel: 'Purchase Date',
+        docSection: v.isReturn ? 'DEBIT NOTE' : 'PURCHASE VOUCHER',
+        noLabel: v.isReturn ? 'Reversal No.' : 'Purchase / Bill No.',
+        dateLabel: v.isReturn ? 'Reversal Date' : 'Purchase Date',
+        againstLabel: 'Against Purchase',
         supplyType: v.supplyType || '',
         partyBlocks: [
           ['SUPPLIER (BILL FROM)', d.parties.billed],
@@ -472,7 +481,7 @@
       <div class="inv-modal-card" style="padding:0; max-width:${compact ? '640px' : '900px'}; width:94%;${compact ? ' overflow:hidden;' : ''}">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1.5px solid var(--slate-100); background:var(--slate-50); border-radius:20px 20px 0 0;">
           <div style="font-weight:700; color:var(--slate-800); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span>Purchase Voucher &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${esc(v.invoiceNo || 'Draft')}</span></span>
+            <span>${v.isReturn ? 'Debit Note' : 'Purchase Voucher'} &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${esc(v.invoiceNo || 'Draft')}</span></span>
             ${isDraft && !compact ? '<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">Draft</span>' : ''}
           </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">

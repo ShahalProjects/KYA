@@ -4722,6 +4722,19 @@
               </svg>
               New Purchase
             </button>
+            <button class="btn-sales-action" id="btnPurchasePre" type="button" aria-label="Pre Purchase" style="display: flex; align-items: center; gap: 6px; height: 38px; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M5 5.5h6M5 8h6M5 10.5h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+              Pre Purchase
+            </button>
+            <button class="btn-sales-action" id="btnPurchaseReturn" type="button">
+              <svg viewBox="0 0 16 16" fill="none" style="width: 14px; height: 14px;">
+                <path d="M2.5 8h11M2.5 8l4-4M2.5 8l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Reversal
+            </button>
           </div>
         </div>
 
@@ -4815,6 +4828,20 @@
                 </button>
               </div>
             </div>
+            <!-- Original Doc (Purchase Reversal only): the purchase or Pre Purchase document being reversed (purchase-reversal.js) -->
+            <div class="je-field" id="purchaseOriginalDocField" style="display: none;">
+              <label for="purchaseInvoiceSelectTrigger">Original Doc *</label>
+              <div class="kya-searchable-select-wrap" id="purchaseInvoiceSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="purchaseInvoiceSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-500); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04);">
+                  <span id="purchaseInvoiceSelectTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">&mdash; Select &mdash;</span>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px; flex-shrink: 0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="purchaseInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: 340px; max-width: 90vw; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 300px; overflow-y: auto; flex-direction: column; gap: 4px; box-sizing: border-box;">
+                  <input type="text" id="purchaseInvoiceSelectSearch" placeholder="Search no., vendor, item..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+                  <div id="purchaseInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
             <div class="je-field" id="purchaseInvoiceNoContainer">
               <label for="purchaseInvoiceNo" id="lblPurchaseInvoiceNo">Purchase / Bill No.</label>
               <div id="purchaseInvoiceNoInputWrap" class="kya-docno-wrap" style="position: relative; width: 100%;">
@@ -4823,6 +4850,21 @@
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                 </button>
                 <div id="purchaseInvoiceNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
+              </div>
+            </div>
+            <!-- Pre Purchase No.: pick an active Purchase Quotation / Proforma / Purchase Order / GRN to bill (purchase-pre-picker.js) -->
+            <div class="je-field" id="purchasePreField">
+              <label for="purchasePreSelectTrigger">Pre Purchase No.</label>
+              <div class="kya-searchable-select-wrap" id="purchasePreSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="purchasePreSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-500); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04);">
+                  <span id="purchasePreSelectTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">&mdash; Select &mdash;</span>
+                  <button type="button" class="kya-preinv-clear-btn" id="purchasePreClearBtn" title="Remove Pre Purchase" aria-label="Remove Pre Purchase" style="display: none;"><svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px;"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px; flex-shrink: 0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="purchasePreSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 100%; width: 340px; max-width: 90vw; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 300px; overflow-y: auto; flex-direction: column; gap: 4px; box-sizing: border-box;">
+                  <input type="text" id="purchasePreSelectSearch" placeholder="Search no., vendor, item..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; height: auto; box-sizing: border-box;" />
+                  <div id="purchasePreSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
               </div>
             </div>
             <div class="je-field" id="purchaseVendorWrap">
@@ -4896,6 +4938,8 @@
             <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
               <!-- Payment Status Sliding selector -->
               <div id="purchasePaymentBox" style="position: relative; background: var(--white); border: 1.5px solid var(--slate-100); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+                <!-- Advance carried in from a Pre Purchase document: advance paid and balance due, shown while hovering the payment box (purchase-form.js) -->
+                <div id="purchaseAdvanceInfo" role="tooltip" style="display: none; position: absolute; left: 14px; right: 14px; bottom: calc(100% + 6px); z-index: 50; padding: 9px 12px; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; box-shadow: 0 8px 20px -6px rgba(15,23,42,0.25); color: #1e3a8a; font-size: 12.5px; font-weight: 600; line-height: 1.45;"></div>
                 <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
                   <label id="purchasePaymentStatusLabel" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0;">Payment Status</label>
                   <div class="sales-paystatus-wrap" style="margin-top: 4px; width: 100%;">
@@ -5123,17 +5167,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-<script src="js/exportPdf.js?v=20261004_7"></script>
-<script src="js/exportExcel.js?v=20261004_7"></script>
+<script src="js/exportPdf.js?v=20261013_pp1"></script>
+<script src="js/exportExcel.js?v=20261013_pp1"></script>
 <script src="js/app-shell.js?v=20261012_p1"></script>
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
 <script src="js/master-desk.js?v=20261012_p1"></script>
-<script src="js/journal.js?v=20261012_p1"></script>
+<script src="js/journal.js?v=20261013_pr1"></script>
 <script src="js/coa.js?v=20261012_p1"></script>
 <script src="js/reports.js"></script>
-<script src="js/stock-hub.js"></script>
-<script src="js/reports-hub.js?v=20261012_g2b1"></script>
+<script src="js/stock-hub.js?v=20261013_pr1"></script>
+<script src="js/reports-hub.js?v=20261013_pr1"></script>
 <script src="js/onehub-shell.js"></script>
 <script src="js/onehub-departments.js"></script>
 <script src="js/onehub-employees.js"></script>
@@ -5141,30 +5185,33 @@
 <script src="js/onehub-reminders-core.js"></script>
 <script src="js/onehub-reminders-view.js"></script>
 <script src="js/vault-core.js"></script>
-<script src="js/ledgers.js?v=20261012_p1"></script>
-<script src="js/vault-settings.js?v=20261012_p1"></script>
+<script src="js/ledgers.js?v=20261013_pr1"></script>
+<script src="js/vault-settings.js?v=20261013_pr1"></script>
 <script src="js/kya-datepicker.js?v=20261004_1"></script>
-<script src="js/sales-form.js?v=20261012_p1"></script>
+<script src="js/sales-form.js?v=20261013_pr1"></script>
 <script src="js/sales-posting.js?v=20261011_v6"></script>
-<script src="js/sales-helpers.js?v=20261007_2"></script>
+<script src="js/sales-helpers.js?v=20261013_pp1"></script>
 <script src="js/sales-credit-adjust.js?v=20261008_d1"></script>
 <script src="js/sales-customers.js?v=20261008_11"></script>
-<script src="js/doc-numbering.js?v=20261012_p1"></script>
+<script src="js/doc-numbering.js?v=20261013_pr1"></script>
 <script src="js/sales-records.js?v=20261008_v1"></script>
 <script src="js/sales-print-events.js?v=20261011_v2"></script>
 <script src="js/sales-invoice-print.js?v=20261011_v7"></script>
-<script src="js/sales-invoice-export.js?v=20261012_p1"></script>
+<script src="js/sales-invoice-export.js?v=20261013_pr1"></script>
 <script src="js/quotation.js?v=20261011_v4"></script>
 <script src="js/proforma.js?v=20261011_v3"></script>
-<script src="js/preinvoice-bulk.js?v=20261011_v2"></script>
-<script src="js/preinvoice-list.js?v=20261011_v3"></script>
+<script src="js/preinvoice-bulk.js?v=20261013_pp1"></script>
+<script src="js/preinvoice-list.js?v=20261013_pr1"></script>
 <script src="js/sales-order.js?v=20261008_a1"></script>
 <script src="js/delivery-challan.js?v=20261008_a1"></script>
 <script src="js/sales-preinvoice-picker.js?v=20261008_d1"></script>
 <script src="js/sales-preinvoice-reversal.js?v=20261011_v3"></script>
-<script src="js/purchase-posting.js?v=20261012_p1"></script>
-<script src="js/purchase-print.js?v=20261012_p1"></script>
-<script src="js/purchase-form.js?v=20261012_p1"></script>
+<script src="js/purchase-posting.js?v=20261013_pr1"></script>
+<script src="js/purchase-print.js?v=20261013_pr1"></script>
+<script src="js/purchase-form.js?v=20261013_pr1"></script>
+<script src="js/purchase-pre.js?v=20261013_pr1"></script>
+<script src="js/purchase-pre-picker.js?v=20261013_pr1"></script>
+<script src="js/purchase-reversal.js?v=20261013_pr1"></script>
 <script src="js/company-profile.js?v=20260912_2"></script>
 <script src="js/cashline-core.js?v=20260827_8"></script>
 <script src="js/cashline-accounts.js?v=20260827_1"></script>

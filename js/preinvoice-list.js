@@ -55,11 +55,36 @@
    *   openForm(doc, openedFrom),         // the module's form opener
    *   exportLabels: { pdf, excel },
    *   api: { openList, closeList, view, markCompleted }  // window names this list answers to
+   *
+   *   Optional — a Pre Purchase list (purchase-pre.js) sets these; Sales leaves them out:
+   *   party: { idField, nameField, type, noun, execField }  // default customerId / customerName / 'Customer'
+   *   showCard(cardId), backToHub()      // card switching, default the Sales Pre Invoice cards
+   *   listCardId                         // the list's own card (default ids.listCard)
+   *   numberKind                         // doc-numbering kind for Make Active
+   *   advanceHooks: { post(doc, amount) } // posts the advance (default the customer advance)
+   *   convert(doc), convertLabel, convertTarget  // Convert to … (default Convert to Sale)
+   *   hasAdvance: false                  // no Advance Payment on the preview (a quotation)
+   *   heal(), blockIfReversed(doc, label) // reversals that own a document (default: Sales Reversal)
    * }
    */
   function createPreInvoiceDocList(cfg) {
     let _filter = 'all';
     let _search = '';
+    const P_ID = (cfg.party && cfg.party.idField) || 'customerId';
+    const P_NAME = (cfg.party && cfg.party.nameField) || 'customerName';
+    const P_TYPE = (cfg.party && cfg.party.type) || 'Customer';
+    const P_NOUN = (cfg.party && cfg.party.noun) || 'customer';
+    const P_EXEC = (cfg.party && cfg.party.execField) || 'salesExecutiveName';
+    const showCard = id => {
+      if (typeof cfg.showCard === 'function') cfg.showCard(id);
+      else if (typeof showSalesPreInvoiceCard === 'function') showSalesPreInvoiceCard(id);
+    };
+    // A document a reversal owns can't be reopened, edited or deleted (Sales Reversal by
+    // default; a Pre Purchase list passes its own check)
+    const isReversedBlocked = (doc, label) => {
+      if (typeof cfg.blockIfReversed === 'function') return !!cfg.blockIfReversed(doc, label);
+      return typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(doc, label);
+    };
 
     function store() {
       window.KYA_STORE = window.KYA_STORE || {};
@@ -70,7 +95,8 @@
 
     // Saved documents plus drafts, newest first
     function getAll() {
-      if (typeof window.healPreInvoiceReversals === 'function') window.healPreInvoiceReversals();
+      if (typeof cfg.heal === 'function') cfg.heal();
+      else if (typeof window.healPreInvoiceReversals === 'function') window.healPreInvoiceReversals();
       const S = store();
       const map = new Map();
       S[cfg.storeKey].forEach(d => map.set(String(d.id), { ...d, isDraft: false }));
@@ -101,10 +127,14 @@
 
     // Re-post the advance from what the document holds (its form already validated it)
     function repostAdvance(doc) {
-      if (typeof postPreInvoiceAdvanceEntry !== 'function') return;
       const total = parseFloat(doc.total) || 0;
       const advance = doc.paymentStatus === 'Not Paid' ? 0 : (parseFloat(doc.paymentAmount) || 0);
       const amount = total > 0 ? Math.min(advance, total) : advance;
+      if (cfg.advanceHooks) {
+        if (amount > 0) cfg.advanceHooks.post(doc, amount);
+        return;
+      }
+      if (typeof postPreInvoiceAdvanceEntry !== 'function') return;
       if (amount > 0) {
         postPreInvoiceAdvanceEntry(doc, amount, getPreInvoiceAdvanceReceiptRows(doc, amount), {
           preparedBy: cfg.moduleName,
@@ -124,7 +154,7 @@
     function setStatus(id, newStatus) {
       const { doc, isDraft } = findStored(id);
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
-      if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(doc, `${cfg.kind} ${doc[cfg.noField] || ''}`)) return;
+      if (isReversedBlocked(doc, `${cfg.kind} ${doc[cfg.noField] || ''}`)) return;
       // Cancelling gives the advance back — not while part of it paid other documents
       if (newStatus === 'Cancelled' && typeof blockIfCreditUsed === 'function'
           && blockIfCreditUsed([`adv:${cfg.storeKey}:${doc.id}`], `${cfg.kind} ${doc[cfg.noField] || ''}`, 'cancelled')) return;
@@ -152,7 +182,7 @@
     function remove(id) {
       const { doc } = findStored(id);
       const docNo = doc ? (doc[cfg.noField] || cfg.noun) : cfg.noun;
-      if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(doc, `${cfg.kind} ${docNo}`)) return;
+      if (isReversedBlocked(doc, `${cfg.kind} ${docNo}`)) return;
       if (doc && typeof blockIfCreditUsed === 'function'
           && blockIfCreditUsed([`adv:${cfg.storeKey}:${doc.id}`], `${cfg.kind} ${docNo}`, 'deleted')) return;
       if (doc && doc.status === 'Completed') {
@@ -182,7 +212,7 @@
     function edit(id) {
       const doc = getAll().find(d => String(d.id) === String(id));
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
-      if (typeof blockIfPreInvoiceReversed === 'function' && blockIfPreInvoiceReversed(findStored(id).doc, `${cfg.kind} ${doc[cfg.noField] || ''}`)) return;
+      if (isReversedBlocked(findStored(id).doc, `${cfg.kind} ${doc[cfg.noField] || ''}`)) return;
       if (doc.status === 'Completed') {
         showToast(`Completed ${cfg.plural.toLowerCase()} cannot be edited.`, 'warning');
         return;
@@ -204,6 +234,8 @@
     function convertToInvoice(id) {
       const doc = getAll().find(d => String(d.id) === String(id));
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
+      // A Pre Purchase document goes into New Purchase instead (purchase-pre.js)
+      if (typeof cfg.convert === 'function') { cfg.convert(doc); return; }
       if (typeof loadSalesInvoice !== 'function') return;
 
       const today = kyaLocalIso();
@@ -263,7 +295,7 @@
 
     // ── List page ──
     function open(filterStatus) {
-      if (typeof showSalesPreInvoiceCard === 'function') showSalesPreInvoiceCard(cfg.ids.listCard);
+      showCard(cfg.ids.listCard);
       _filter = filterStatus || 'all';
       const area = document.getElementById(cfg.ids.contentArea);
       if (area) {
@@ -286,7 +318,9 @@
         storeKey: cfg.storeKey,
         draftsKey: cfg.draftsKey,
         noField: cfg.noField,
-        numberKind: NUMBER_KINDS[cfg.storeKey],
+        numberKind: cfg.numberKind || NUMBER_KINDS[cfg.storeKey],
+        partyIdField: P_ID,
+        partyNoun: P_NOUN,
         // The advance is posted as saving the document from its form does
         advance: {
           amount: doc => {
@@ -294,6 +328,7 @@
             const advance = doc.paymentStatus === 'Not Paid' ? 0 : (parseFloat(doc.paymentAmount) || 0);
             return total > 0 ? Math.min(advance, total) : advance;
           },
+          post: cfg.advanceHooks ? (doc, amount) => cfg.advanceHooks.post(doc, amount) : null,
           receiptRows: (doc, amount) => getPreInvoiceAdvanceReceiptRows(doc, amount),
           info: doc => ({
             preparedBy: cfg.moduleName,
@@ -307,6 +342,7 @@
     }
 
     function close() {
+      if (typeof cfg.backToHub === 'function') { cfg.backToHub(); return; }
       if (typeof showSalesPreInvoiceCard === 'function') showSalesPreInvoiceCard('salesPreInvoiceCard');
       if (typeof window.switchSalesPreInvTab === 'function') window.switchSalesPreInvTab('preinvoice');
     }
@@ -317,7 +353,7 @@
       const term = (_search || '').trim().toLowerCase();
       const bySearch = items => !term ? items : items.filter(d =>
         (d[cfg.noField] || '').toLowerCase().includes(term) ||
-        (d.customerName || '').toLowerCase().includes(term) ||
+        (d[P_NAME] || '').toLowerCase().includes(term) ||
         (d.date || '').toLowerCase().includes(term) ||
         String(d.total || '').toLowerCase().includes(term) ||
         (Array.isArray(d.rows) && d.rows.some(r => (r.item || '').toLowerCase().includes(term))));
@@ -377,8 +413,8 @@
               <td style="padding: 12px 14px; white-space: nowrap; color: var(--slate-700);">${d.date || '—'}</td>
               <td style="padding: 12px 14px; white-space: nowrap; color: var(--slate-500); font-size: 12px;">${cfg.secondDate.get(d) || '—'}</td>
               <td style="padding: 12px 16px; font-weight: 600; color: var(--slate-800); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                ${safeEsc(d.customerName || 'Customer')}
-                ${d.salesExecutiveName ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500;">By ${safeEsc(d.salesExecutiveName)}</div>` : ''}
+                ${safeEsc(d[P_NAME] || P_TYPE)}
+                ${d[P_EXEC] ? `<div style="font-size: 11px; color: var(--slate-400); font-weight: 500;">By ${safeEsc(d[P_EXEC])}</div>` : ''}
               </td>
               <td style="padding: 12px 14px; font-size: 12px; color: var(--slate-600); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${itemsSummary}</td>
               <td style="padding: 12px 16px; text-align: right; font-weight: 800; color: var(--slate-900); white-space: nowrap;">
@@ -461,7 +497,7 @@
             <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
             <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          <input type="text" id="${P}ListSearchInput" class="pt-search-inp" placeholder="Search ${cfg.noun} #, customer, item, date, amount…" value="${safeEsc(_search)}" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
+          <input type="text" id="${P}ListSearchInput" class="pt-search-inp" placeholder="Search ${cfg.noun} #, ${P_NOUN}, item, date, amount…" value="${safeEsc(_search)}" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
           <button type="button" id="btn${P}ListClearSearch" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 14px; padding: 4px; display: ${_search ? 'flex' : 'none'}; align-items: center; justify-content: center;" title="Clear search">✕</button>
         </div>`;
       const input = slot.querySelector('input');
@@ -496,11 +532,11 @@
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
 
       const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
-      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(doc.customerId, 'Customer') : null) ||
-                       { name: doc.customerName || 'Customer' };
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(doc[P_ID], P_TYPE) : null) ||
+                       { name: doc[P_NAME] || P_TYPE };
       // With the customer details changed for this document only (Customer Details card)
       const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, doc.partyOverride) : masterCustomer;
-      const partyName = customer.name || doc.customerName || 'Customer';
+      const partyName = customer.name || doc[P_NAME] || P_TYPE;
       const cityPin = [customer.city, customer.pincode].filter(Boolean).join(' - ');
       const stateCountry = [customer.state, customer.country || 'India'].filter(Boolean).join(', ');
       const partyPhone = customer.phone || customer.mobile || '';
@@ -532,7 +568,7 @@
       let statusActionsHtml = '';
       if (isOpenStatus(doc) || doc.isDraft) {
         statusActionsHtml = `
-          <button type="button" data-act="convert" class="btn btn-secondary" style="${actBtnStyle}">Convert to Sale</button>
+          <button type="button" data-act="convert" class="btn btn-secondary" style="${actBtnStyle}">${cfg.convertLabel || 'Convert to Sale'}</button>
           <button type="button" data-act="complete" class="btn btn-secondary" style="${actBtnStyle}">Mark Completed</button>
           <button type="button" data-act="cancel" class="btn btn-secondary" style="${actBtnStyle}">Mark Cancelled</button>`;
       } else if (doc.status === 'Cancelled') {
@@ -621,7 +657,7 @@
                   ${meta(cfg.previewDateLabel, doc.date || '—')}
                   ${meta(`${cfg.secondDate.label}:`, cfg.secondDate.get(doc) || '—')}
                   ${meta(cfg.supplyLabel, safeEsc(doc.supplyType || '—'))}
-                  <div>
+                  ${cfg.hasAdvance === false ? '' : `<div>
                     <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Advance Payment:</div>
                     <div style="margin-top: 4px;">${payStatusBadge(doc)}</div>
                     ${(doc.paymentStatus !== 'Not Paid' && (doc.advancePaidAmount || doc.paymentAmount)) ? `
@@ -629,11 +665,11 @@
                         <strong>Advance:</strong> ₹${safeFmtNum(doc.advancePaidAmount || doc.paymentAmount)}
                         ${doc.advanceVoucherNo ? `<span style="font-family: monospace; color: var(--blue-700); font-weight: 700; margin-left: 4px;">[${safeEsc(doc.advanceVoucherNo)}]</span>` : ''}
                       </div>` : ''}
-                  </div>
-                  ${doc.salesExecutiveName ? `
+                  </div>`}
+                  ${doc[P_EXEC] ? `
                 <div style="grid-column: 1 / -1;">
                   <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">${cfg.preparedLabel}</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${safeEsc(doc.salesExecutiveName)}</div>
+                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${safeEsc(doc[P_EXEC])}</div>
                 </div>` : ''}
                 </div>
               </div>
@@ -699,7 +735,8 @@
 
       const exportMenu = overlay.querySelector('[data-role="export-menu"]');
       const noHtml = `<strong>${safeEsc(docNo)}</strong>`;
-      const exportDoc = { ...doc, proformaNo: docNo };
+      // The exporters read the party from customerId / customerName
+      const exportDoc = { ...doc, proformaNo: docNo, customerId: doc[P_ID], customerName: doc[P_NAME] };
       const confirmThen = (opts, fn) => showKyaConfirm(Object.assign({}, opts, { onConfirm: () => { overlay.remove(); fn(); } }));
 
       const actions = {
@@ -719,9 +756,9 @@
         delete: () => { overlay.remove(); remove(doc.id); },
         reopen: () => { overlay.remove(); setStatus(doc.id, 'Active'); },
         convert: () => confirmThen({
-          title: 'Convert to Sale?',
-          message: `Convert ${cfg.noun} ${noHtml} to a Sales Invoice?<br>It will be marked Completed once the invoice is posted.`,
-          confirmLabel: 'Convert to Sale',
+          title: `${cfg.convertLabel || 'Convert to Sale'}?`,
+          message: `Convert ${cfg.noun} ${noHtml} to ${cfg.convertTarget || 'a Sales Invoice'}?<br>It will be marked Completed once the ${cfg.convertTarget ? 'purchase' : 'invoice'} is posted.`,
+          confirmLabel: cfg.convertLabel || 'Convert to Sale',
           okBg: '#2563eb',
           iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14h8M13 11l3 3-3 3"/></svg>'
         }, () => convertToInvoice(doc.id)),

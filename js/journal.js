@@ -2968,6 +2968,13 @@
     }
   }
 
+  // A Purchase Reversal's entries (PR-… and its TDS reversal / refund JVs — purchase-posting.js)
+  const PURCHASE_REVERSAL_JE_TYPES = ['purchase_reversal', 'purchase_tds_reversal', 'purchase_refund', 'purchase_preinvoice_reversal'];
+  function isPurchaseReversalEntry(e) {
+    return !!e && e.preparedBy === 'Purchase Module'
+      && (String(e.voucherNo || '').startsWith('PR-') || PURCHASE_REVERSAL_JE_TYPES.includes(e.jeType));
+  }
+
   // A sales voucher's amount on the Voucher Desk: the full value, before the customer's TDS
   function getVoucherDeskSalesAmount(v) {
     const tds = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0) ? parseFloat(v.tdsTcsAmount) : 0;
@@ -2978,7 +2985,7 @@
   function getVoucherParticularsName(e, type) {
     if (!e) return '—';
     const isSales = (type === 'Invoice' || type === 'Order' || type === 'Reversal' || type === 'Sales Invoice' || type === 'Sales Order' || type === 'Sales Reversal' || (e.preparedBy === 'Sales Module'));
-    const isPurch = (type === 'Purchase' || type === 'Purchase Voucher' || (e.preparedBy === 'Purchase Module'));
+    const isPurch = (type === 'Purchase' || type === 'Purchase Voucher' || type === 'Purchase Reversal' || (e.preparedBy === 'Purchase Module'));
 
     // 1. Sales Voucher / Customer Name
     if (isSales) {
@@ -3151,6 +3158,8 @@
         type = 'Order';
       } else if (vNo.startsWith('SV-') || vNo.startsWith('INV-') || e.preparedBy === 'Sales Module') {
         type = 'Invoice';
+      } else if (isPurchaseReversalEntry(e)) {
+        type = 'Purchase Reversal';
       } else if (vNo.startsWith('PV-') || e.preparedBy === 'Purchase Module') {
         type = 'Purchase';
       }
@@ -3251,7 +3260,7 @@
         id: d.id,
         date: d.date,
         voucherNo: vNo,
-        type: 'Purchase',
+        type: d.isReturn ? 'Purchase Reversal' : 'Purchase',
         particulars: getVoucherParticularsName(d, 'Purchase'),
         amount: vAmt,
         isDraft: true,
@@ -3266,18 +3275,22 @@
         item.id === v.journalEntryId ||
         item.id === v.id ||
         item.voucherNo === v.invoiceNo ||
-        item.voucherNo === `PV-${v.invoiceNo}`
+        item.voucherNo === `PV-${v.invoiceNo}` ||
+        item.voucherNo === `PR-${v.invoiceNo}`
       ));
 
       if (!alreadyInList) {
-        const vNo = v.invoiceNo ? ((v.invoiceNo.startsWith('PV-') || v.invoiceNo.startsWith('PUR-')) ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
+        // A Purchase Reversal with no entry (a Pre Purchase document reversed, nothing refunded)
+        const vNo = v.invoiceNo
+          ? (v.isReturn ? `PR-${v.invoiceNo}` : ((v.invoiceNo.startsWith('PV-') || v.invoiceNo.startsWith('PUR-')) ? v.invoiceNo : `PV-${v.invoiceNo}`))
+          : '—';
         const vAmt = getVoucherDeskSalesAmount(v);
 
         list.push({
           id: v.id,
           date: v.date,
           voucherNo: vNo,
-          type: 'Purchase',
+          type: v.isReturn ? 'Purchase Reversal' : 'Purchase',
           particulars: getVoucherParticularsName(v, 'Purchase'),
           amount: vAmt,
           isDraft: false,
@@ -3390,6 +3403,7 @@
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
               <option value="Reversal" ${_vdTypeFilter === 'Reversal' ? 'selected' : ''}>Sales Reversal</option>
               <option value="Purchase" ${_vdTypeFilter === 'Purchase' ? 'selected' : ''}>Purchase Voucher</option>
+              <option value="Purchase Reversal" ${_vdTypeFilter === 'Purchase Reversal' ? 'selected' : ''}>Purchase Reversal</option>
             </select>
           </div>
         </div>
@@ -3444,6 +3458,7 @@
               <option value="Invoice" ${_vdTypeFilter === 'Invoice' ? 'selected' : ''}>Sales Invoice</option>
               <option value="Reversal" ${_vdTypeFilter === 'Reversal' ? 'selected' : ''}>Sales Reversal</option>
               <option value="Purchase" ${_vdTypeFilter === 'Purchase' ? 'selected' : ''}>Purchase Voucher</option>
+              <option value="Purchase Reversal" ${_vdTypeFilter === 'Purchase Reversal' ? 'selected' : ''}>Purchase Reversal</option>
             </select>
           </div>
         </div>
@@ -3473,8 +3488,8 @@
 
                 const typeBadge = e.type === 'Journal'
                    ? `<span class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Journal Entry</span>`
-                   : (e.type === 'Reversal'
-                      ? `<span class="tb-badge" style="background:#fee2e2; color:#b91c1c; border:1.5px solid #fca5a5; font-size:11px; padding:3px 8px; text-transform:none;">Sales Reversal</span>`
+                   : (e.type === 'Reversal' || e.type === 'Purchase Reversal'
+                      ? `<span class="tb-badge" style="background:#fee2e2; color:#b91c1c; border:1.5px solid #fca5a5; font-size:11px; padding:3px 8px; text-transform:none;">${e.type === 'Purchase Reversal' ? 'Purchase Reversal' : 'Sales Reversal'}</span>`
                       : (e.type === 'Purchase'
                          ? `<span class="tb-badge" style="background:#fef3c7; color:#b45309; border:1.5px solid #fde68a; font-size:11px; padding:3px 8px; text-transform:none;">Purchase Voucher</span>`
                          : `<span class="tb-badge" style="background:#dcfce7; color:#15803d; border:1.5px solid #bbf7d0; font-size:11px; padding:3px 8px; text-transform:none;">Sales Invoice</span>`));
@@ -3486,7 +3501,7 @@
                   statusBadge = `<span class="tb-badge" style="background:#ecfdf5; color:#059669; border:1.5px solid #a7f3d0; font-size:11px; padding:3px 8px; text-transform:none;">Posted</span>`;
                 }
 
-                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : (e.type === 'Reversal' ? '#dc2626' : (e.type === 'Purchase' ? 'var(--amber-700)' : '#059669'));
+                const amtColor = e.type === 'Journal' ? 'var(--blue-600)' : ((e.type === 'Reversal' || e.type === 'Purchase Reversal') ? '#dc2626' : (e.type === 'Purchase' ? 'var(--amber-700)' : '#059669'));
 
                 return `
                   <tr data-id="${e.id}" data-type="${e.type}" data-draft="${e.isDraft}" data-key="${itemKey}" class="vd-row ${isSelected ? 'pt-sel-row' : ''}" style="cursor: pointer;">
@@ -3629,7 +3644,7 @@
                     postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
                   }
                 }
-              } else if (type === 'Purchase') {
+              } else if (type === 'Purchase' || type === 'Purchase Reversal') {
                 if (isDraft) {
                   if (window.KYA_STORE?.purchaseVouchersDrafts) {
                     window.KYA_STORE.purchaseVouchersDrafts = window.KYA_STORE.purchaseVouchersDrafts.filter(d => String(d.id) !== String(id));
@@ -3638,11 +3653,11 @@
                   const pList = window.KYA_STORE?.purchaseVouchers || [];
                   const idx = pList.findIndex(v => String(v.id) === String(id) || String(v.journalEntryId) === String(id));
                   if (idx > -1) {
-                    // The purchase goes, and its entries with it (purchase, TDS, payment)
+                    // The purchase goes, and its entries with it (purchase, TDS, payment, advance refund)
                     const pv = pList[idx];
                     pList.splice(idx, 1);
                     window.KYA_STORE.purchaseVouchers = pList;
-                    const pvIds = new Set([pv.journalEntryId, pv.tdsJournalEntryId, pv.paymentJournalEntryId].filter(Boolean).map(String));
+                    const pvIds = new Set([pv.journalEntryId, pv.tdsJournalEntryId, pv.paymentJournalEntryId, pv.advanceRefundJournalEntryId].filter(Boolean).map(String));
                     postedEntries = postedEntries.filter(e => !pvIds.has(String(e.id)));
                   }
                   postedEntries = postedEntries.filter(e => String(e.id) !== String(id));
@@ -3709,7 +3724,7 @@
               if (entry) showFullJournalModal(entry, false);
             }
           }
-        } else if (type === 'Purchase') {
+        } else if (type === 'Purchase' || type === 'Purchase Reversal') {
           // As an invoice: the Purchase Voucher preview (a draft's with Edit and Post); its
           // TDS / payment entries open as journal entries
           const pv = isDraft
@@ -3757,6 +3772,8 @@
         type = 'Sales Order';
       } else if (vNo.startsWith('SV-') || vNo.startsWith('INV-') || e.preparedBy === 'Sales Module') {
         type = 'Sales Invoice';
+      } else if (isPurchaseReversalEntry(e)) {
+        type = 'Purchase Reversal';
       } else if (vNo.startsWith('PV-') || e.preparedBy === 'Purchase Module') {
         type = 'Purchase';
       }
@@ -3777,7 +3794,7 @@
         date: e.date,
         voucherNo: e.voucherNo,
         type: type,
-        rawType: (type === 'Journal Entry' ? 'Journal' : (type === 'Sales Reversal' ? 'Reversal' : (type === 'Sales Order' ? 'Order' : (type === 'Purchase' ? 'Purchase' : 'Invoice')))),
+        rawType: (type === 'Journal Entry' ? 'Journal' : (type === 'Sales Reversal' ? 'Reversal' : (type === 'Sales Order' ? 'Order' : ((type === 'Purchase' || type === 'Purchase Reversal') ? type : 'Invoice')))),
         particulars: getVoucherParticularsName(e, type),
         amount: formattedAmount,
         status: 'Posted',
@@ -3863,8 +3880,8 @@
         id: d.id,
         date: d.date,
         voucherNo: vNo,
-        type: 'Purchase Voucher',
-        rawType: 'Purchase',
+        type: d.isReturn ? 'Purchase Reversal' : 'Purchase Voucher',
+        rawType: d.isReturn ? 'Purchase Reversal' : 'Purchase',
         particulars: getVoucherParticularsName(d, 'Purchase'),
         amount: vAmt,
         status: 'Draft',
@@ -3879,19 +3896,22 @@
         item.id === v.journalEntryId ||
         item.id === v.id ||
         item.voucherNo === v.invoiceNo ||
-        item.voucherNo === `PV-${v.invoiceNo}`
+        item.voucherNo === `PV-${v.invoiceNo}` ||
+        item.voucherNo === `PR-${v.invoiceNo}`
       ));
 
       if (!alreadyInList) {
-        const vNo = v.invoiceNo ? ((v.invoiceNo.startsWith('PV-') || v.invoiceNo.startsWith('PUR-')) ? v.invoiceNo : `PV-${v.invoiceNo}`) : '—';
+        const vNo = v.invoiceNo
+          ? (v.isReturn ? `PR-${v.invoiceNo}` : ((v.invoiceNo.startsWith('PV-') || v.invoiceNo.startsWith('PUR-')) ? v.invoiceNo : `PV-${v.invoiceNo}`))
+          : '—';
         const vAmt = getVoucherDeskSalesAmount(v);
 
         list.push({
           id: v.id,
           date: v.date,
           voucherNo: vNo,
-          type: 'Purchase Voucher',
-          rawType: 'Purchase',
+          type: v.isReturn ? 'Purchase Reversal' : 'Purchase Voucher',
+          rawType: v.isReturn ? 'Purchase Reversal' : 'Purchase',
           particulars: getVoucherParticularsName(v, 'Purchase'),
           amount: vAmt,
           status: 'Posted',

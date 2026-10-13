@@ -15,8 +15,10 @@
  *     storeKey, draftsKey,       // KYA_STORE arrays for saved / draft documents
  *     noField, numberKind,       // number field and its doc-numbering kind
  *     advance: null | {          // documents that take an advance from the customer
- *       amount(doc), receiptRows(doc, amount), info(doc)
+ *       amount(doc), receiptRows(doc, amount), info(doc),
+ *       post(doc, amount)        // optional: posts it instead (Pre Purchase — advance paid)
  *     },
+ *     partyIdField, partyNoun,   // optional: the party field ('vendorId' / 'vendor')
  *     reload()                   // draws the list again after a change
  *   }
  * Rows must carry data-doc-id.
@@ -88,7 +90,8 @@
 
   // The same checks the form makes before saving
   function activateProblem(cfg, doc) {
-    if (!doc.customerId) return 'no customer';
+    // A Pre Purchase list names its party field (vendorId) — see preinvoice-list.js
+    if (!doc[cfg.partyIdField || 'customerId']) return `no ${cfg.partyNoun || 'customer'}`;
     const rows = Array.isArray(doc.rows) ? doc.rows : [];
     if (!rows.some(r => (r.item && String(r.item).trim()) || (parseFloat(r.amount) || 0) > 0)) return 'no line items';
     if (!((parseFloat(doc.total) || 0) > 0)) return 'total is zero';
@@ -133,7 +136,11 @@
 
       if (cfg.advance) {
         const amount = r2(cfg.advance.amount(doc));
-        if (amount > 0 && typeof postPreInvoiceAdvanceEntry === 'function') {
+        if (amount > 0 && typeof cfg.advance.post === 'function') {
+          // A Pre Purchase document: the advance paid to the vendor (purchase-pre.js)
+          cfg.advance.post(doc, amount);
+          booksChanged = true;
+        } else if (amount > 0 && typeof postPreInvoiceAdvanceEntry === 'function') {
           postPreInvoiceAdvanceEntry(doc, amount, cfg.advance.receiptRows(doc, amount), cfg.advance.info(doc));
           booksChanged = true;
         }

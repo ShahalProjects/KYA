@@ -129,11 +129,13 @@
         if (!usedReg[kind].includes(no)) usedReg[kind].push(no);
       });
 
-      // ...and every posted purchase number, likewise
+      // ...and every posted purchase / purchase reversal number, likewise
       usedReg.purchase = usedReg.purchase || [];
+      usedReg.purchaseReturn = usedReg.purchaseReturn || [];
       window.KYA_STORE.purchaseVouchers.forEach(v => {
         const no = (v && v.invoiceNo || '').trim().toLowerCase();
-        if (no && !usedReg.purchase.includes(no)) usedReg.purchase.push(no);
+        const reg = (v && v.isReturn) ? usedReg.purchaseReturn : usedReg.purchase;
+        if (no && !reg.includes(no)) reg.push(no);
       });
 
       // The sales entries dropped above are rebuilt from the posted vouchers, so sales keep

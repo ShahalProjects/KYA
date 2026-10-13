@@ -2147,7 +2147,9 @@
     // `labels` lets Sales Order / Delivery Challan reuse this layout under their own titles
     const L = Object.assign({
       title: 'PROFORMA INVOICE', sheetName: 'Proforma_Invoice', noLabel: 'Proforma #',
-      forLabel: 'Proforma For', filePrefix: 'Proforma', footer: 'Proforma'
+      forLabel: 'Proforma For', filePrefix: 'Proforma', footer: 'Proforma',
+      // The party of a Pre Purchase document is a vendor (purchase-pre.js)
+      partyType: 'Customer'
     }, labels || {});
     try {
       await ensureExcelJSLoaded();
@@ -2194,12 +2196,12 @@
       r2.getCell(6).alignment = { vertical: 'middle', horizontal: 'right' };
 
       // Row 3: Customer & Date
-      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, 'Customer') : null) ||
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, L.partyType) : null) ||
                        (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) ||
-                       { name: proforma.customerName || 'Customer' };
+                       { name: proforma.customerName || L.partyType };
       // With the customer details changed for this document only (Customer Details card)
       const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, proforma.partyOverride) : masterCustomer;
-      const partyName = customer.name || proforma.customerName || 'Customer';
+      const partyName = customer.name || proforma.customerName || L.partyType;
       const r3 = sheet.addRow([`${L.forLabel}: ${partyName}`, '', '', '', `Date: ${formatRptDate(proforma.date) || '—'}`]);
       r3.height = 18;
       sheet.mergeCells('A3:D3');
@@ -2345,13 +2347,13 @@
    * CSV fallback for Proforma export (also Sales Order / Delivery Challan via `labels`)
    */
   function exportProformaToCsvFallback(proforma, labels) {
-    const L = Object.assign({ noLabel: 'Proforma #', filePrefix: 'Proforma' }, labels || {});
+    const L = Object.assign({ noLabel: 'Proforma #', filePrefix: 'Proforma', partyType: 'Customer' }, labels || {});
     try {
       const rows = [
         [L.noLabel, proforma.proformaNo || ''],
         ['Date', proforma.date || ''],
         ['Due Date', proforma.dueDate || proforma.expiryDate || ''],
-        ['Customer', proforma.customerName || ''],
+        [L.partyType, proforma.customerName || ''],
         ['Supply Type', proforma.supplyType || ''],
         ['Payment Terms', proforma.paymentStatus || ''],
         [],

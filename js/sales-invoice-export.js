@@ -370,7 +370,8 @@
         ['SHIPPED TO (DELIVERY)', d.parties.shipped || d.parties.billed]
       ],
       tdsLabel: '',            // a label shows the TDS as its own line in the totals
-      bankTitle: 'BANK DETAILS'
+      bankTitle: 'BANK DETAILS',
+      againstLabel: 'Against Invoice' // a return's Original Doc
     }, d.excel || {});
 
     const wb = new ExcelJS.Workbook();
@@ -540,7 +541,7 @@
     field(X.noLabel, inv.invoiceNo || '');
     field(X.dateLabel, toDate(inv.date) || inv.date || '', DATEF);
     field('Due Date', toDate(inv.dueDate) || inv.dueDate || '', DATEF);
-    if (d.isReturn) field('Against Invoice', inv.returnAgainstInvoice || '');
+    if (d.isReturn) field(X.againstLabel, inv.returnAgainstInvoice || '');
     field('Supply Type', X.supplyType);
     field('Tax Type', d.taxMode === 'split' ? 'CGST + SGST' : (d.taxMode === 'igst' ? 'IGST' : 'No Tax'));
     field('Place of Supply', d.placeOfSupply || '');

@@ -247,8 +247,11 @@
   // `prefix` is the element id prefix ('order' → orderPaymentAccount, orderPaymentAmount,
   // orderMultiPaymentSummary); `getGrandTotal` returns the form's current Grand Total;
   // `onAmountChange` lets the form recalculate after the amount is edited.
-  function createPreInvoiceAdvanceBox(prefix, getGrandTotal, onAmountChange) {
+  // `opts.noAdjust`: no Invoice Balance option — the Pre Purchase forms (purchase-pre.js)
+  // pay an advance from Cash / Bank or Multi Payment only, as New Purchase does.
+  function createPreInvoiceAdvanceBox(prefix, getGrandTotal, onAmountChange, opts) {
     const MULTI = 'multi-payment';
+    const noAdjust = !!(opts && opts.noAdjust);
     const $ = name => document.getElementById(prefix + name);
     let splits = [];
     let prevAccount = '';
@@ -259,6 +262,7 @@
     // credit the customer already has
     let adjust = null;
     function getAdjust() {
+      if (noAdjust) return null;
       if (adjust || typeof createAdjustController !== 'function') return adjust;
       adjust = createAdjustController({
         selectId: prefix + 'PaymentAccount',
@@ -311,7 +315,7 @@
       multiOpt.textContent = 'Multi Payment';
       if (String(selectedId) === MULTI) multiOpt.selected = true;
       select.appendChild(multiOpt);
-      if (typeof appendAdjustOptions === 'function') appendAdjustOptions(select, selectedId);
+      if (!noAdjust && typeof appendAdjustOptions === 'function') appendAdjustOptions(select, selectedId);
     }
 
     function isMulti() {
@@ -438,7 +442,7 @@
         paymentSplits: getSplits(),
         // Invoice Balance (the account, or its Multi Payment row): the customer's credits the
         // advance came from
-        creditAdjustments: (typeof usesCreditAdjust === 'function' && usesCreditAdjust(accountId, getSplits()) && getAdjust())
+        creditAdjustments: (!noAdjust && typeof usesCreditAdjust === 'function' && usesCreditAdjust(accountId, getSplits()) && getAdjust())
           ? getAdjust().get() : []
       };
     }
@@ -448,7 +452,7 @@
       if (data.paymentStatus === 'Not Paid') return '';
       if (!data.paymentAccountId) return 'Please select a Payment Account for the advance payment.';
       // Invoice Balance: the credits chosen must cover its part of the advance
-      if (typeof usesCreditAdjust === 'function' && usesCreditAdjust(data.paymentAccountId, data.paymentSplits)
+      if (!noAdjust && typeof usesCreditAdjust === 'function' && usesCreditAdjust(data.paymentAccountId, data.paymentSplits)
           && typeof validateAllocations === 'function') {
         const err = validateAllocations('pay', data.creditAdjustments,
           getCreditAdjustPortion(data.paymentAccountId, data.paymentSplits, data.paymentAmount), data.customerId, adjustCtx());

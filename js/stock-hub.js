@@ -1500,17 +1500,20 @@
     });
 
     purchaseVouchers.forEach(v => {
-      if (v.isDraft) return;
+      // A reversal of a Pre Purchase document moved no goods
+      if (v.isDraft || v.reversedPreDoc) return;
       const d = shoParseDate(v.date) || shoParseDate(v.postedAt);
       if (!d) return;
       const age = shoDaysAgo(d, today);
+      // A purchase reversal sends the goods back: it counts against what came in
+      const sign = v.isReturn ? -1 : 1;
       let val = 0, lines = 0;
       (v.rows || []).forEach(row => {
         const it = matchRow(row);
         if (!it) return;
-        val += parseFloat(row.amount) || 0;
+        val += (parseFloat(row.amount) || 0) * sign;
         lines++;
-        if (age >= 0 && age < 30) purch.items.add(it.id);
+        if (age >= 0 && age < 30 && !v.isReturn) purch.items.add(it.id);
         touch(it, d);
       });
       if (!lines) return;
@@ -1519,8 +1522,8 @@
       const w = weekOf(d);
       if (w) w.inVal += val;
       activity.push({
-        kind: 'purchase', date: d, ts: Number(v.postedAt) || 0,
-        title: 'Purchase ' + (v.invoiceNo || ''), party: shoVendorName(v), lines, val
+        kind: v.isReturn ? 'return' : 'purchase', date: d, ts: Number(v.postedAt) || 0,
+        title: (v.isReturn ? 'Purchase return ' : 'Purchase ') + (v.invoiceNo || ''), party: shoVendorName(v), lines, val: Math.abs(val)
       });
     });
 

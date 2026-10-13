@@ -827,7 +827,10 @@
   }
 
   function getPurchaseVouchers() {
-    return (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers)) ? window.KYA_STORE.purchaseVouchers : [];
+    // A reversal of a Pre Purchase document cancels a document that never made a purchase —
+    // it has no GST, so it stays out of the GST reports (a purchase's reversal is a credit note)
+    return (window.KYA_STORE && Array.isArray(window.KYA_STORE.purchaseVouchers))
+      ? window.KYA_STORE.purchaseVouchers.filter(v => !(v && v.reversedPreDoc)) : [];
   }
 
   function getAvailableFyStarts() {
@@ -895,15 +898,17 @@
     const itc = { igst: 0, cgst: 0, sgst: 0 };
     const exemptInward = { inter: 0, intra: 0 };
     purchases.forEach(pv => {
+      // A purchase reversal (the supplier's credit note) is netted off the ITC
+      const sign = pv.isReturn ? -1 : 1;
       (pv.rows || []).forEach(r => {
         const { taxable, gst } = purchaseRowTaxableAndGst(r);
         const split = gstSplit(gst, pv.supplyType);
-        itc.igst += split.igst;
-        itc.cgst += split.cgst;
-        itc.sgst += split.sgst;
+        itc.igst += sign * split.igst;
+        itc.cgst += sign * split.cgst;
+        itc.sgst += sign * split.sgst;
         if (!(parseFloat(r.tax) > 0)) {
-          if (isIntraStateSupply(pv.supplyType)) exemptInward.intra += taxable;
-          else exemptInward.inter += taxable;
+          if (isIntraStateSupply(pv.supplyType)) exemptInward.intra += sign * taxable;
+          else exemptInward.inter += sign * taxable;
         }
       });
     });
@@ -939,8 +944,8 @@
       lastAny: latestDate(sales.concat(purchases)),
       g3b,
       g2bItc: g2b.itcTotal,
-      g2bCount: g2b.b2b.length + g2b.impg.length,
-      g2bLast: latestDate(g2b.b2b.concat(g2b.impg).map(d => d.v)),
+      g2bCount: g2b.b2b.length + g2b.impg.length + g2b.cdnr.length,
+      g2bLast: latestDate(g2b.b2b.concat(g2b.impg, g2b.cdnr).map(d => d.v)),
     };
   }
 
@@ -2038,6 +2043,7 @@
   function computeGstr2bData(period) {
     const b2b = [];
     const impg = [];
+    const cdnr = [];
     getPurchaseVouchers().forEach(v => {
       if (!v || v.isDraft || !inPeriod(v.date, period)) return;
       let taxable = 0, gst = 0;
@@ -2047,6 +2053,25 @@
         gst += l.gst;
       });
       const dateObj = parseVoucherDate(v.date);
+      if (v.isReturn) {
+        // A purchase reversal: the supplier's credit note, in B2B-CDNR (an import's comes
+        // through customs, not from a supplier GSTIN)
+        if (v.supplyType === G2B_IMPORT_SUPPLY) return;
+        const supR = g2bSupplierOf(v);
+        if (!supR.gstin) return;
+        const splitR = gstSplit(gst, v.supplyType);
+        cdnr.push({
+          id: v.id, v, dateObj,
+          gstin: supR.gstin, name: supR.name,
+          noteNo: v.invoiceNo || '', noteType: 'Credit Note', noteSupply: g2bInvoiceType(v.supplyType),
+          noteDate: dateObj ? fmtDateSlash(dateObj) : '-',
+          noteValue: taxable + splitR.igst + splitR.cgst + splitR.sgst,
+          pos: g2bPlaceOfSupply(supR.party, v.supplyType), rcm: 'No',
+          taxable, igst: splitR.igst, cgst: splitR.cgst, sgst: splitR.sgst, cess: 0,
+          period: '-', filed: '-', itc: 'Yes', reason: '-', applicable: '-', source: '-', irn: '-', irnDate: '-',
+        });
+        return;
+      }
       if (v.supplyType === G2B_IMPORT_SUPPLY) {
         // Imports reach GSTR-2B from the bill of entry (ICEGATE), not from a supplier GSTIN
         impg.push({
@@ -2071,17 +2096,27 @@
     const byDate = (a, b) => ((b.dateObj || 0) - (a.dateObj || 0)) || String(b.no || b.boeNo).localeCompare(String(a.no || a.boeNo));
     b2b.sort(byDate);
     impg.sort(byDate);
+    cdnr.sort((a, b) => ((b.dateObj || 0) - (a.dateObj || 0)) || String(b.noteNo).localeCompare(String(a.noteNo)));
+    // Credit notes are netted off the ITC available (Part B of the summary)
     const itcTotal = b2b.filter(d => d.itc === 'Yes').reduce((s, d) => s + d.igst + d.cgst + d.sgst + d.cess, 0)
-      + impg.reduce((s, d) => s + d.igst + d.cess, 0);
-    return { b2b, impg, itcTotal };
+      + impg.reduce((s, d) => s + d.igst + d.cess, 0)
+      - cdnr.filter(d => d.itc === 'Yes').reduce((s, d) => s + d.igst + d.cgst + d.sgst + d.cess, 0);
+    return { b2b, impg, cdnr, itcTotal };
   }
 
-  // The documents behind a table: in a summary heading's scope ({ tab, rcm }) or all of them
+  // The documents behind a table: in a summary heading's scope ({ tab, rcm, note }) or all of
+  // them. B2B-CDNR holds credit and debit notes; a heading names which (scope.note).
   function g2bDocsFor(data, table, scope) {
+    const inScope = d => (d.rcm === 'Yes') === !!scope.rcm
+      && ((scope.tab === 'available' && d.itc === 'Yes') || (scope.tab === 'notavailable' && d.itc === 'No'));
     if (table === 'B2B') {
       if (!scope) return data.b2b;
-      return data.b2b.filter(d => (d.rcm === 'Yes') === !!scope.rcm
-        && ((scope.tab === 'available' && d.itc === 'Yes') || (scope.tab === 'notavailable' && d.itc === 'No')));
+      return data.b2b.filter(inScope);
+    }
+    if (table === 'B2B CDNR') {
+      const notes = data.cdnr || [];
+      if (!scope) return notes;
+      return notes.filter(d => inScope(d) && (!scope.note || d.noteType === scope.note));
     }
     if (table === 'IMPG') return (!scope || scope.tab === 'available') ? data.impg : [];
     return [];
@@ -2103,7 +2138,7 @@
   const g2bRow = (heading, table, src, extra) => Object.assign({ heading, table, src }, extra || {});
   const G2B_ALL_OTHER_ROWS = t => [
     g2bRow('B2B - Invoices', t, 'B2B'),
-    g2bRow('B2B - Debit notes', t, 'B2B CDNR'),
+    g2bRow('B2B - Debit notes', t, 'B2B CDNR', { note: 'Debit Note' }),
     g2bRow('ECO - Documents', t, 'ECO'),
     g2bRow('B2B - Invoices (Amendment)', t, 'B2BA'),
     g2bRow('B2B - Debit notes (Amendment)', t, 'B2B CDNRA'),
@@ -2112,14 +2147,14 @@
   const G2B_ISD_ROWS = t => [g2bRow('ISD - Invoices', t, 'ISD'), g2bRow('ISD - Invoices (Amendment)', t, 'ISDA')];
   const G2B_RCM_ROWS = t => [
     g2bRow('B2B - Invoices', t, 'B2B', { rcm: true }),
-    g2bRow('B2B - Debit notes', t, 'B2B CDNR', { rcm: true }),
+    g2bRow('B2B - Debit notes', t, 'B2B CDNR', { rcm: true, note: 'Debit Note' }),
     g2bRow('B2B - Invoices (Amendment)', t, 'B2BA', { rcm: true }),
     g2bRow('B2B - Debit notes (Amendment)', t, 'B2B CDNRA', { rcm: true }),
   ];
   const G2B_CN_ROWS = () => [
-    g2bRow('B2B - Credit notes', '4(A)(5)', 'B2B CDNR'),
+    g2bRow('B2B - Credit notes', '4(A)(5)', 'B2B CDNR', { note: 'Credit Note' }),
     g2bRow('B2B - Credit notes (Amendment)', '4(A)(5)', 'B2B CDNRA'),
-    g2bRow('B2B - Credit notes (Reverse charge)', '4(A)(3)', 'B2B CDNR', { rcm: true }),
+    g2bRow('B2B - Credit notes (Reverse charge)', '4(A)(3)', 'B2B CDNR', { rcm: true, note: 'Credit Note' }),
     g2bRow('B2B - Credit notes (Reverse charge) (Amendment)', '4(A)(3)', 'B2B CDNRA', { rcm: true }),
     g2bRow('ISD - Credit notes', '4(A)(4)', 'ISD'),
     g2bRow('ISD - Credit notes (Amendment)', '4(A)(4)', 'ISDA'),
@@ -2364,7 +2399,7 @@
   // Tax of one summary heading: the documents in its scope added up
   function g2bRowTotals(data, tab, row) {
     const t = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
-    g2bDocsFor(data, row.src, { tab, rcm: !!row.rcm }).forEach(d => {
+    g2bDocsFor(data, row.src, { tab, rcm: !!row.rcm, note: row.note || '' }).forEach(d => {
       t.igst += d.igst || 0;
       t.cgst += d.cgst || 0;
       t.sgst += d.sgst || 0;
@@ -2399,7 +2434,7 @@
         const children = open ? sec.rows.map((r, ri) => `
           <tr class="g2b-child-row">
             <td></td>
-            <td class="g2b-heading"><button type="button" class="g2b-link" data-g2b-open="${escHtml(r.src)}" data-g2b-rcm="${r.rcm ? '1' : ''}" data-g2b-heading="${escHtml(r.heading)}">${escHtml(r.heading)}</button></td>
+            <td class="g2b-heading"><button type="button" class="g2b-link" data-g2b-open="${escHtml(r.src)}" data-g2b-rcm="${r.rcm ? '1' : ''}" data-g2b-note="${escHtml(r.note || '')}" data-g2b-heading="${escHtml(r.heading)}">${escHtml(r.heading)}</button></td>
             <td class="nowrap">${escHtml(r.table)}</td>
             ${amounts(rowTotals[ri])}
             <td></td>
@@ -2764,7 +2799,7 @@
     });
     container.querySelectorAll('[data-g2b-open]').forEach(btn => {
       btn.addEventListener('click', () => {
-        _g2bScope = { table: btn.dataset.g2bOpen, tab: _g2bSummaryTab, rcm: btn.dataset.g2bRcm === '1', heading: btn.dataset.g2bHeading };
+        _g2bScope = { table: btn.dataset.g2bOpen, tab: _g2bSummaryTab, rcm: btn.dataset.g2bRcm === '1', note: btn.dataset.g2bNote || '', heading: btn.dataset.g2bHeading };
         g2bResetDocsState();
         _gstView = 'gstr2b-docs';
         rerender();

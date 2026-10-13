@@ -2442,7 +2442,9 @@
     // `labels` lets Sales Order / Delivery Challan reuse this layout under their own titles
     const L = Object.assign({
       title: 'PROFORMA INVOICE', forLabel: 'PROFORMA FOR:', dateLabel: 'Proforma Date:',
-      fallbackSub: 'Provisional Invoice', footer: 'Proforma Invoice', filePrefix: 'Proforma'
+      fallbackSub: 'Provisional Invoice', footer: 'Proforma Invoice', filePrefix: 'Proforma',
+      // The party of a Pre Purchase document is a vendor (purchase-pre.js)
+      partyType: 'Customer', acceptLabel: 'Customer Acceptance'
     }, labels || {});
     try {
       await ensureJsPDFLoaded();
@@ -2489,10 +2491,10 @@
       doc.line(14, 26.5, pageWidth - 14, 26.5);
 
       // Metadata Info Box
-      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, 'Customer') : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) || { name: proforma.customerName || 'Unknown Customer' };
+      const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(proforma.customerId, L.partyType) : null) || (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == proforma.customerId) : null) || { name: proforma.customerName || `Unknown ${L.partyType}` };
       // With the customer details changed for this document only (Customer Details card)
       const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, proforma.partyOverride) : masterCustomer;
-      const partyName = customer.name || proforma.customerName || 'Unknown Customer';
+      const partyName = customer.name || proforma.customerName || `Unknown ${L.partyType}`;
       const partyAddr = customer.address || '';
       const partyGstin = customer.gstin || '';
 
@@ -2657,7 +2659,7 @@
 
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('Customer Acceptance', 45, finalY + 20, { align: 'center' });
+      doc.text(L.acceptLabel, 45, finalY + 20, { align: 'center' });
       doc.text('Authorized Signatory', pageWidth - 45, finalY + 20, { align: 'center' });
 
       // Footer

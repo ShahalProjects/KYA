@@ -955,8 +955,16 @@
     // the vouchers below, so they are left out of the journal scan
     const purchaseJournalEntryIds = new Set();
     vouchers.forEach(v => {
-      [v.journalEntryId, v.tdsJournalEntryId, v.paymentJournalEntryId].forEach(id => { if (id) purchaseJournalEntryIds.add(String(id)); });
+      [v.journalEntryId, v.tdsJournalEntryId, v.paymentJournalEntryId, v.advanceRefundJournalEntryId].forEach(id => { if (id) purchaseJournalEntryIds.add(String(id)); });
     });
+
+    // An advance paid against a Pre Purchase document (purchase-pre.js) is posted Dr Advances
+    // to Suppliers, Cr Cash / Bank, so it never names the supplier. It was still paid to this
+    // supplier, so the statement lists it as well (Trade Payables is untouched — no double count).
+    const suppNameLower = String(supplier.name || '').toLowerCase();
+    const advanceEntryIds = new Set(postedEntries.filter(entry => entry && entry.jeType === 'advance_payment' && (
+      String(entry.vendorId) === String(supplier.id) || String(entry.vendorName || '').toLowerCase() === suppNameLower
+    )).map(entry => String(entry.id)));
     vouchers.forEach(v => {
       if (v.isDraft) return;
       const isMatch = String(v.vendorId) === String(supplier.id) || (v.vendorName && v.vendorName.toLowerCase() === supplier.name.toLowerCase());
@@ -964,15 +972,74 @@
 
       const vDate = v.date || '';
       const total = parseFloat(v.total) || 0;
+      const inPeriod = (!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo);
+      const before = !!dateFrom && vDate < dateFrom;
+
+      if (v.isReturn) {
+        // Purchase Reversal (purchase-reversal.js). Money the supplier refunded comes in;
+        // a cash purchase was reversed through the cash account itself
+        const refundIn = (v.paymentStatus === 'Full Refund' || v.paymentStatus === 'Partial Refund') ? (parseFloat(v.paymentAmount) || 0) : 0;
+        if (v.reversedPreDoc) {
+          // A Pre Purchase document reversed: no bill is undone, only the advance refunded
+          // (a part not refunded stays as an advance — still owed by the supplier)
+          if (refundIn <= 0) return;
+          if (before) preBilled += refundIn;
+          else if (inPeriod) {
+            periodBilled += refundIn;
+            transactions.push({
+              id: v.journalEntryId || v.id, date: vDate, voucherNo: v.invoiceNo || '',
+              particulars: `Advance Refunded (${v.reversedPreDoc.no || 'Pre Purchase'} reversed)`,
+              debit: 0, credit: refundIn, isPurchase: true
+            });
+          }
+          return;
+        }
+        // Mirrors the reversal's entries: the reversal at its full value, the TDS reversed, the refund
+        const retTds = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0) ? parseFloat(v.tdsTcsAmount) : 0;
+        const grossReversed = total + retTds;
+        if (before) {
+          prePaid += grossReversed;
+          preBilled += retTds + refundIn;
+        } else if (inPeriod) {
+          periodPaid += grossReversed;
+          transactions.push({
+            id: v.journalEntryId || v.id, date: vDate, voucherNo: v.invoiceNo || '',
+            particulars: 'Purchase Reversal', debit: grossReversed, credit: 0, isPurchase: true
+          });
+          if (retTds > 0) {
+            periodBilled += retTds;
+            transactions.push({
+              id: v.tdsJournalEntryId || v.id, date: vDate, voucherNo: v.tdsVoucherNo || (v.invoiceNo || '') + ' (TDS)',
+              particulars: 'TDS Reversed', debit: 0, credit: retTds, isPurchase: true
+            });
+          }
+          if (refundIn > 0) {
+            periodBilled += refundIn;
+            transactions.push({
+              id: v.paymentJournalEntryId || v.id, date: vDate, voucherNo: v.paymentVoucherNo || (v.invoiceNo || '') + ' (Ref)',
+              particulars: 'Refund Received', debit: 0, credit: refundIn, isPurchase: true
+            });
+          }
+        }
+        return;
+      }
+
       // Mirrors the purchase entries: the bill at its full value, then the TDS deducted from it
       const tdsAmt = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0) ? parseFloat(v.tdsTcsAmount) : 0;
       const grossAmount = total + tdsAmt;
-      const paid = (v.paymentStatus === 'Full Payment')
+      const paidTotal = (v.paymentStatus === 'Full Payment')
         ? ((parseFloat(v.paymentAmount) || 0) > 0 ? parseFloat(v.paymentAmount) : total)
         : (parseFloat(v.paymentAmount) || 0);
+      // Part of it may be the advance paid against the Pre Purchase document, which the
+      // statement already shows on that document's date — only the balance is a fresh payment
+      const advAdjusted = (v.advanceJournalEntryId && advanceEntryIds.has(String(v.advanceJournalEntryId)))
+        ? Math.min(parseFloat(v.advancePaidAmount) || 0, paidTotal) : 0;
+      const paid = Math.max(0, paidTotal - advAdjusted);
+      // An advance above the bill value that the supplier paid back
+      const advRefunded = (v.advanceRefund && v.advanceRefundJournalEntryId) ? (parseFloat(v.advanceRefund.amount) || 0) : 0;
 
       if (dateFrom && vDate < dateFrom) {
-        preBilled += grossAmount;
+        preBilled += grossAmount + advRefunded;
         prePaid += tdsAmt + paid;
       } else if ((!dateFrom || vDate >= dateFrom) && (!dateTo || vDate <= dateTo)) {
         periodBilled += grossAmount;
@@ -1009,10 +1076,42 @@
             isPurchase: true
           });
         }
+        if (advRefunded > 0) {
+          periodBilled += advRefunded;
+          transactions.push({
+            id: v.advanceRefundJournalEntryId,
+            date: vDate,
+            voucherNo: v.advanceRefundVoucherNo || '',
+            particulars: 'Advance Refunded',
+            debit: 0,
+            credit: advRefunded,
+            isPurchase: true
+          });
+        }
       }
     });
 
     postedEntries.forEach(entry => {
+      if (!entry) return;
+      if (advanceEntryIds.has(String(entry.id))) {
+        const advAmt = (entry.allRows || []).reduce((sum, r) => sum + (parseFloat(r.debit) || 0), 0);
+        if (advAmt <= 0.009) return;
+        if (dateFrom && entry.date < dateFrom) {
+          prePaid += advAmt;
+        } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
+          periodPaid += advAmt;
+          transactions.push({
+            id: entry.id,
+            date: entry.date,
+            voucherNo: entry.voucherNo || 'JE-' + entry.id,
+            particulars: entry.sourceDocNo ? `Advance Paid (${entry.sourceDocNo})` : 'Advance Paid',
+            debit: advAmt,
+            credit: 0,
+            isJournal: true
+          });
+        }
+        return;
+      }
       if ((entry.voucherNo || '').startsWith('PV-')) return;
       if (entry.preparedBy === 'Purchase Module' || purchaseJournalEntryIds.has(String(entry.id))) return;
       (entry.allRows || []).forEach(row => {

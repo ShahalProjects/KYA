@@ -6,7 +6,13 @@
 //        Receivable (TCS the supplier collected), round off to Adjustments Account;
 //        Cr Vendor with the full bill value
 //    • TDS entry (JV-…) ..... Dr Vendor; Cr TDS Payable — the TDS deducted from the bill
-//    • Payment entry (JV-…) . Dr Vendor; Cr Cash / Bank (or each Multi Payment account)
+//    • Payment entry (JV-…) . Dr Vendor; Cr Cash / Bank (or each Multi Payment account).
+//        A purchase made from a Pre Purchase document (purchase-pre.js) sets off the advance
+//        paid against it: Cr Advances to Suppliers for that part (a ledger-only vendor's
+//        advance is already in its own ledger, so only the balance is posted)
+//    • Advance refund (JV-…)  Dr Cash / Bank; Cr Advances to Suppliers (or the vendor's
+//        ledger) — the supplier paying back an advance above the bill value; any part not
+//        refunded stays as an advance
 //  A cash purchase (a Cash and Cash Equivalents ledger as the vendor) is paid in the
 //  purchase entry itself, so it has no payment entry — as a cash sale has no receipt.
 //  The entries are derived from the stored vouchers: a restore drops them and
@@ -74,7 +80,8 @@
     return !!party && party.type === 'ledger' && party.sgId === 'sg-cce';
   }
 
-  // The debit lines: each line's own Expense ledger, or Purchase for stock items / products
+  // The debit lines: each line's own Expense ledger, or Purchase for stock items / products.
+  // On a reversal they are the credit lines: the Expense ledger, or Purchase Returns.
   function getPurchaseDebitLines(v) {
     const ledgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []);
     const lines = [];
@@ -84,7 +91,7 @@
       const own = r.expenseLedgerId
         ? ledgers.find(l => l.type !== 'group-ledger' && String(l.id) === String(r.expenseLedgerId))
         : null;
-      const name = (own && own.name) || ledgerNameOf('Purchase', 'sg-pst');
+      const name = (own && own.name) || (v.isReturn ? ledgerNameOf('Purchase Returns', 'sg-pst') : ledgerNameOf('Purchase', 'sg-pst'));
       const line = lines.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
       if (line) line.amount = r2(line.amount + amt);
       else lines.push({ name, amount: amt });
@@ -114,18 +121,21 @@
     return rows.length ? rows : [{ name: nameOf(splits[0].accountId), amount: r2(amount) }];
   }
 
+  // Paid on a purchase — or, on a reversal, refunded by the supplier
   function getPurchasePaidAmount(v) {
-    if (v.paymentStatus === 'Full Payment') {
+    if (v.paymentStatus === 'Full Payment' || v.paymentStatus === 'Full Refund') {
       const stored = parseFloat(v.paymentAmount) || 0;
       return r2(stored > 0 ? stored : v.total);
     }
-    if (v.paymentStatus === 'Partial Payment') return r2(v.paymentAmount);
+    if (v.paymentStatus === 'Partial Payment' || v.paymentStatus === 'Partial Refund') return r2(v.paymentAmount);
     return 0;
   }
 
-  // The purchase entry's voucher number: the Purchase / Bill No. itself
+  // The purchase entry's voucher number: the Purchase / Bill No. itself; a reversal's is
+  // PR-<Reversal No.> (as a Sales Reversal's is SR-…)
   function getPurchaseEntryNo(v) {
     const no = String(v.invoiceNo || '').trim();
+    if (v.isReturn) return no.startsWith('PR-') ? no : `PR-${no}`;
     return (no.startsWith('PUR-') || no.startsWith('PV-')) ? no : `PV-${no}`;
   }
 
@@ -137,6 +147,8 @@
   function postPurchaseVoucherToJournal(v, options) {
     if (!v || typeof postedEntries === 'undefined') return null;
     const silent = !!(options && options.silent);
+    // A Purchase Reversal mirrors the purchase's entries (purchase-reversal.js)
+    if (v.isReturn) return postPurchaseReversalToJournal(v, silent);
 
     const vendorName = getPurchaseVendorName(v);
     const cashPurchase = isPurchaseCashVendor(v);
@@ -230,16 +242,63 @@
       };
     } : null);
 
+    // ── The advance paid against the Pre Purchase document this purchase is made from ──
+    // Where it sits: Advances to Suppliers, or (a ledger-only vendor) the vendor's own ledger
+    const advance = r2(v.advancePaidAmount);
+    const advEntry = (advance > 0 && v.advanceJournalEntryId)
+      ? postedEntries.find(e => String(e.id) === String(v.advanceJournalEntryId)) : null;
+    const advDebitRow = advEntry ? (advEntry.allRows || []).find(r => (parseFloat(r.debit) || 0) > 0) : null;
+    const advInLedger = !!advDebitRow && String(advDebitRow.particular || '').trim().toLowerCase() === vendorName.trim().toLowerCase();
+    const advLedgerName = advInLedger ? vendorName
+      : ((advDebitRow && advDebitRow.particular) || ledgerNameOf('Advances to Suppliers', 'sg-stla'));
+    const advApplied = advance > 0 ? Math.min(advance, paidAmount) : 0;
+    const cashPortion = r2(paidAmount - advApplied);
+    // The vendor is debited with everything paid — except an advance already in its ledger
+    const vendorDebit = advInLedger ? cashPortion : paidAmount;
+    const docLabel = v.preDocKind ? ({ quotation: 'Purchase Quotation', proforma: 'Purchase Proforma', order: 'Purchase Order', grn: 'Goods Receipt Note' }[v.preDocKind] || 'the Pre Purchase document') : '';
+
     // ── Payment entry: paid to the supplier (none for a cash purchase) ──
-    const payRes = placeLinkedEntry(v.paymentJournalEntryId, v.paymentVoucherNo, Number(purchaseJEId) + 2, (paidAmount > 0 && !cashPurchase) ? () => {
-      const payRows = getPurchasePaymentRows(v, paidAmount);
+    const payRes = placeLinkedEntry(v.paymentJournalEntryId, v.paymentVoucherNo, Number(purchaseJEId) + 2, (vendorDebit > 0 && !cashPurchase) ? () => {
+      const rows = [{ id: 1, type: 'By', particular: vendorName, debit: vendorDebit.toFixed(2), credit: '' }];
+      if (advApplied > 0 && !advInLedger) {
+        rows.push({ id: rows.length + 1, type: 'To', particular: advLedgerName, debit: '', credit: advApplied.toFixed(2) });
+      }
+      if (cashPortion > 0) {
+        getPurchasePaymentRows(v, cashPortion).forEach(p => {
+          rows.push({ id: rows.length + 1, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) });
+        });
+      }
+      let narration = `Payment made to supplier ${vendorName} against Purchase No. ${v.invoiceNo}. Status: ${v.paymentStatus}.`;
+      if (advInLedger) {
+        narration = `Balance payment ₹${fmt(cashPortion)} made to ${vendorName} against Purchase No. ${v.invoiceNo} (advance ₹${fmt(advApplied)} against ${docLabel} already in the ledger).`;
+      } else if (advApplied > 0 && cashPortion > 0) {
+        narration = `Advance ₹${fmt(advApplied)} adjusted from ${docLabel} and balance payment ₹${fmt(cashPortion)} made to supplier ${vendorName} against Purchase No. ${v.invoiceNo}.`;
+      } else if (advApplied > 0) {
+        narration = `Advance ₹${fmt(advApplied)} adjusted from ${docLabel} against Purchase No. ${v.invoiceNo} of supplier ${vendorName}.`;
+      }
       return {
         firstParticular: vendorName,
-        amount: fmt(paidAmount),
-        allRows: [{ id: 1, type: 'By', particular: vendorName, debit: paidAmount.toFixed(2), credit: '' }]
-          .concat(payRows.map((p, i) => ({ id: i + 2, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) }))),
-        narration: `Payment made to supplier ${vendorName} against Purchase No. ${v.invoiceNo}. Status: ${v.paymentStatus}.`,
+        amount: fmt(vendorDebit),
+        allRows: rows,
+        narration,
         jeType: 'purchase_payment'
+      };
+    } : null);
+
+    // ── Advance refund: the supplier pays back an advance above the bill value ──
+    const refund = v.advanceRefund;
+    const refundAmt = (refund && advance > 0) ? Math.min(r2(refund.amount), r2(refund.excess)) : 0;
+    const refundRes = placeLinkedEntry(v.advanceRefundJournalEntryId, v.advanceRefundVoucherNo, Number(purchaseJEId) + 3, refundAmt > 0 ? () => {
+      const inRows = getPurchasePaymentRows({ paymentAccountId: refund.accountId, paymentSplits: refund.splits || [] }, refundAmt);
+      const rows = inRows.map((p, i) => ({ id: i + 1, type: 'By', particular: p.name, debit: p.amount.toFixed(2), credit: '' }));
+      rows.push({ id: rows.length + 1, type: 'To', particular: advLedgerName, debit: '', credit: refundAmt.toFixed(2) });
+      const rest = r2(refund.excess - refundAmt);
+      return {
+        firstParticular: rows[0].particular,
+        amount: fmt(refundAmt),
+        allRows: rows,
+        narration: `Advance of ₹${fmt(refund.excess)} paid to ${vendorName} above Purchase No. ${v.invoiceNo}: ₹${fmt(refundAmt)} refunded by the supplier${rest > 0 ? `, ₹${fmt(rest)} stays as an advance${advInLedger ? " in the supplier's ledger" : ` in ${advLedgerName}`}` : ''}.`,
+        jeType: 'purchase_advance_refund'
       };
     } : null);
 
@@ -248,14 +307,158 @@
     return {
       purchaseJEId,
       tdsJEId: tdsRes.id, tdsVoucherNo: tdsRes.voucherNo,
-      paymentJEId: payRes.id, paymentVoucherNo: payRes.voucherNo
+      paymentJEId: payRes.id, paymentVoucherNo: payRes.voucherNo,
+      advanceRefundJEId: refundRes.id, advanceRefundVoucherNo: refundRes.voucherNo
+    };
+  }
+
+  // ── Purchase Reversal ──
+  // The mirror of the purchase's entries:
+  //  • Reversal entry (PR-…) Dr Vendor with the full value; Cr Purchase Returns (stock items /
+  //      products) or the line's Expense ledger, Cr Input CGST + SGST / IGST, Cr TCS
+  //      Receivable; the round off reversed in Adjustments Account
+  //  • TDS reversal (JV-…) . Dr TDS Payable; Cr Vendor
+  //  • Refund (JV-…) ....... Dr Cash / Bank (each Multi Refund account); Cr Vendor
+  // A cash purchase is reversed in the reversal entry itself (the vendor is the cash account).
+  // A reversal of a Pre Purchase document has no purchase to undo: only the refund of its
+  // advance — Dr Cash / Bank; Cr Advances to Suppliers (or the vendor's own ledger).
+  function postPurchaseReversalToJournal(v, silent) {
+    const vendorName = getPurchaseVendorName(v);
+    const cashPurchase = isPurchaseCashVendor(v);
+    const refundAmt = getPurchasePaidAmount(v);
+    const entryId = v.journalEntryId || Date.now();
+    const placeEntry = (id, build) => {
+      const prevIdx = postedEntries.findIndex(e => String(e.id) === String(id));
+      if (!build) {
+        if (prevIdx > -1) postedEntries.splice(prevIdx, 1);
+        return '';
+      }
+      const entry = Object.assign({
+        id, date: v.date, voucherNo: getPurchaseEntryNo(v), preparedBy: 'Purchase Module', departmentId: '', isBudget: false,
+        vendorId: v.vendorId, vendorName, partyName: vendorName
+      }, build());
+      if (prevIdx > -1) postedEntries[prevIdx] = entry;
+      else postedEntries.unshift(entry);
+      return id;
+    };
+    const linked = (oldId, oldNo, fallbackId, build) => {
+      const prev = oldId ? postedEntries.find(e => String(e.id) === String(oldId)) : null;
+      if (oldId) postedEntries = postedEntries.filter(e => String(e.id) !== String(oldId));
+      if (!build) return { id: '', voucherNo: '' };
+      const id = oldId || fallbackId;
+      const no = (prev && String(prev.voucherNo || '').startsWith('JV-')) ? prev.voucherNo
+        : (oldNo && String(oldNo).startsWith('JV-') ? oldNo : nextJvNo(v.date));
+      postedEntries.unshift(Object.assign({
+        id, date: v.date, voucherNo: no, preparedBy: 'Purchase Module', departmentId: '', isBudget: false,
+        vendorId: v.vendorId, vendorName, partyName: vendorName
+      }, build()));
+      return { id, voucherNo: no };
+    };
+
+    // ── Reversal of a Pre Purchase document: the advance refunded ──
+    if (v.reversedPreDoc) {
+      const ref = v.reversedPreDoc;
+      const refund = Math.min(r2(ref.advance), refundAmt);
+      const advEntry = ref.advanceJournalEntryId ? postedEntries.find(e => String(e.id) === String(ref.advanceJournalEntryId)) : null;
+      const advRow = advEntry ? (advEntry.allRows || []).find(r => (parseFloat(r.debit) || 0) > 0) : null;
+      const advLedger = ref.inPartyLedger ? vendorName : ((advRow && advRow.particular) || ledgerNameOf('Advances to Suppliers', 'sg-stla'));
+      const rest = r2(r2(ref.advance) - refund);
+      const id = placeEntry(entryId, refund > 0 ? () => {
+        const payRows = getPurchasePaymentRows(v, refund);
+        const rows = payRows.map((p, i) => ({ id: i + 1, type: 'By', particular: p.name, debit: p.amount.toFixed(2), credit: '' }));
+        rows.push({ id: rows.length + 1, type: 'To', particular: advLedger, debit: '', credit: refund.toFixed(2) });
+        return {
+          firstParticular: rows[0].particular,
+          amount: fmt(refund),
+          allRows: rows,
+          narration: `Purchase Reversal No. ${v.invoiceNo} of ${ref.label || 'Pre Purchase'} ${ref.no || ''} for ${vendorName}: advance of ₹${fmt(ref.advance)}${ref.advanceVoucherNo ? ` (payment ${ref.advanceVoucherNo})` : ''} reversed — ₹${fmt(refund)} refunded by the supplier${rest > 0 ? `, ₹${fmt(rest)} stays as an advance${ref.inPartyLedger ? " in the supplier's ledger" : ` in ${advLedger}`}` : ''}.`,
+          jeType: 'purchase_preinvoice_reversal'
+        };
+      } : null);
+      window.postedEntries = postedEntries;
+      if (!silent && typeof refreshAllReports === 'function') refreshAllReports();
+      return { purchaseJEId: id, tdsJEId: '', tdsVoucherNo: '', paymentJEId: '', paymentVoucherNo: '', advanceRefundJEId: '', advanceRefundVoucherNo: '' };
+    }
+
+    const tdsAmt = (v.tdsTcsMode === 'TDS' && parseFloat(v.tdsTcsAmount) > 0) ? r2(v.tdsTcsAmount) : 0;
+    const tcsAmt = (v.tdsTcsMode === 'TCS' && parseFloat(v.tdsTcsAmount) > 0) ? r2(v.tdsTcsAmount) : 0;
+    const adjAmt = r2(v.adjustments);
+    const grossReversed = r2((parseFloat(v.total) || 0) + tdsAmt);
+
+    // ── Reversal entry ──
+    placeEntry(entryId, () => {
+      const rows = [];
+      const add = (type, particular, amount) => {
+        const amt = r2(amount);
+        if (amt <= 0) return;
+        rows.push({ id: rows.length + 1, type, particular, debit: type === 'By' ? amt.toFixed(2) : '', credit: type === 'To' ? amt.toFixed(2) : '' });
+      };
+      add('By', vendorName, grossReversed);
+      if (adjAmt < 0) add('By', ledgerNameOf('Adjustments Account', 'sg-oe'), -adjAmt);
+      getPurchaseDebitLines(v).forEach(line => add('To', line.name, line.amount));
+      const gst = r2((v.rows || []).reduce((s, r) => s + getPurchaseLineFigures(r).taxAmt, 0));
+      if (gst > 0) {
+        if (getPurchaseTaxMode(v.supplyType) === 'split') {
+          const cgst = r2(gst / 2);
+          add('To', ledgerNameOf('Input CGST', 'sg-oca'), cgst);
+          add('To', ledgerNameOf('Input SGST', 'sg-oca'), r2(gst - cgst));
+        } else {
+          add('To', ledgerNameOf('Input IGST', 'sg-oca'), gst);
+        }
+      }
+      if (tcsAmt > 0) add('To', ledgerNameOf('TCS Receivable', 'sg-oca'), tcsAmt);
+      if (adjAmt > 0) add('To', ledgerNameOf('Adjustments Account', 'sg-oe'), adjAmt);
+      return {
+        firstParticular: vendorName,
+        amount: fmt(grossReversed),
+        allRows: rows,
+        narration: `Purchase Reversal No. ${v.invoiceNo} posted for supplier ${vendorName}${v.returnAgainstInvoice ? ` (Purchase No. ${v.returnAgainstInvoice})` : ''}.${tcsAmt > 0 ? ` TCS ₹${fmt(tcsAmt)} reversed.` : ''} ${v.notes || ''}`.trim(),
+        jeType: 'purchase_reversal'
+      };
+    });
+
+    // ── TDS reversal: the mirror of the purchase's TDS entry ──
+    const tdsRes = linked(v.tdsJournalEntryId, v.tdsVoucherNo, Number(entryId) + 1, tdsAmt > 0 ? () => {
+      const tdsName = ledgerNameOf('TDS Payable', 'sg-ocl');
+      return {
+        firstParticular: tdsName,
+        amount: fmt(tdsAmt),
+        allRows: [
+          { id: 1, type: 'By', particular: tdsName, debit: tdsAmt.toFixed(2), credit: '' },
+          { id: 2, type: 'To', particular: vendorName, debit: '', credit: tdsAmt.toFixed(2) }
+        ],
+        narration: `TDS of ₹${fmt(tdsAmt)} reversed for supplier ${vendorName} on Purchase Reversal No. ${v.invoiceNo}${v.returnAgainstInvoice ? ` (Purchase No. ${v.returnAgainstInvoice})` : ''}${v.tdsTcsRate ? ` @ ${v.tdsTcsRate}%` : ''}.`,
+        jeType: 'purchase_tds_reversal'
+      };
+    } : null);
+
+    // ── Refund: the mirror of the purchase's payment (none for a cash purchase) ──
+    const refundRes = linked(v.paymentJournalEntryId, v.paymentVoucherNo, Number(entryId) + 2, (refundAmt > 0 && !cashPurchase) ? () => {
+      const payRows = getPurchasePaymentRows(v, refundAmt);
+      return {
+        firstParticular: payRows[0] ? payRows[0].name : vendorName,
+        amount: fmt(refundAmt),
+        allRows: payRows.map((p, i) => ({ id: i + 1, type: 'By', particular: p.name, debit: p.amount.toFixed(2), credit: '' }))
+          .concat([{ id: payRows.length + 1, type: 'To', particular: vendorName, debit: '', credit: refundAmt.toFixed(2) }]),
+        narration: `Refund of ₹${fmt(refundAmt)} received from supplier ${vendorName} against Purchase Reversal No. ${v.invoiceNo}${v.returnAgainstInvoice ? ` (Purchase No. ${v.returnAgainstInvoice})` : ''}.`,
+        jeType: 'purchase_refund'
+      };
+    } : null);
+
+    window.postedEntries = postedEntries;
+    if (!silent && typeof refreshAllReports === 'function') refreshAllReports();
+    return {
+      purchaseJEId: entryId,
+      tdsJEId: tdsRes.id, tdsVoucherNo: tdsRes.voucherNo,
+      paymentJEId: refundRes.id, paymentVoucherNo: refundRes.voucherNo,
+      advanceRefundJEId: '', advanceRefundVoucherNo: ''
     };
   }
 
   // Takes a purchase out of the books (the voucher is being deleted)
   function removePurchaseJournalEntries(v) {
     if (!v || typeof postedEntries === 'undefined') return;
-    const ids = new Set([v.journalEntryId, v.tdsJournalEntryId, v.paymentJournalEntryId].filter(Boolean).map(String));
+    const ids = new Set([v.journalEntryId, v.tdsJournalEntryId, v.paymentJournalEntryId, v.advanceRefundJournalEntryId].filter(Boolean).map(String));
     postedEntries = postedEntries.filter(e => !ids.has(String(e.id)));
     window.postedEntries = postedEntries;
   }
@@ -271,21 +474,26 @@
       if (!v.journalEntryId) v.journalEntryId = idBase + i * 3;
       const res = postPurchaseVoucherToJournal(v, { silent: true });
       if (res) {
+        // A reversal of a Pre Purchase document with nothing refunded has no entry at all
+        v.journalEntryId = res.purchaseJEId || '';
         v.tdsJournalEntryId = res.tdsJEId || '';
         v.tdsVoucherNo = res.tdsJEId ? res.tdsVoucherNo : '';
         v.paymentJournalEntryId = res.paymentJEId || '';
         v.paymentVoucherNo = res.paymentJEId ? res.paymentVoucherNo : '';
+        v.advanceRefundJournalEntryId = res.advanceRefundJEId || '';
+        v.advanceRefundVoucherNo = res.advanceRefundJEId ? res.advanceRefundVoucherNo : '';
       }
     });
     window.postedEntries = postedEntries;
   }
 
-  // The voucher a purchase journal entry belongs to (any of its three entries)
+  // The voucher a purchase journal entry belongs to (any of its entries)
   function findPurchaseVoucherByEntry(entryId) {
     const id = String(entryId);
     return ((window.KYA_STORE || {}).purchaseVouchers || []).find(v => v && (
       String(v.journalEntryId) === id || String(v.tdsJournalEntryId) === id ||
-      String(v.paymentJournalEntryId) === id || String(v.id) === id)) || null;
+      String(v.paymentJournalEntryId) === id || String(v.advanceRefundJournalEntryId) === id ||
+      String(v.id) === id)) || null;
   }
 
   window.getPurchaseLineFigures = getPurchaseLineFigures;

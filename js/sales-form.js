@@ -1354,13 +1354,14 @@
   // and the Purchase Voucher
   const SALES_NUMBER_DEFAULT_CODES = {
     invoice: 'INV', return: 'REV', quotation: 'QT', proforma: 'PI', salesOrder: 'SO', deliveryChallan: 'DC',
-    purchase: 'PUR'
+    purchase: 'PUR', purchaseQuotation: 'PQT', purchaseProforma: 'PPI', purchaseOrder: 'PO', goodsReceipt: 'GRN'
   };
 
   function getSalesNumberingSettings(kind) {
     const year = new Date().getFullYear();
-    // 'reversal': the prefix put in front of the Original Doc number (REV-INV-2026-001)
-    const defaults = kind === 'reversal'
+    // 'reversal': the prefix put in front of the Original Doc number (REV-INV-2026-001);
+    // 'purchaseReversal' likewise for a Purchase Reversal (REV-PUR-2026-001)
+    const defaults = (kind === 'reversal' || kind === 'purchaseReversal')
       ? { prefix: 'REV-', start: 1, digits: 3 }
       : { prefix: `${SALES_NUMBER_DEFAULT_CODES[kind] || 'INV'}-${year}-`, start: 1, digits: 3 };
     const saved = ((window.KYA_STORE || {}).salesNumbering || {})[kind];
