@@ -2173,11 +2173,8 @@
     return `
       ${showBackButton ? `
         <div style="margin-bottom: 14px;">
-          <button type="button" class="btn-stock-back btn-back-to-details" title="Return to Stock Details">
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
-              <path d="M15 10H5M10 15l-5-5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>Back to Details</span>
+          <button type="button" class="kya-back-btn btn-back-to-details" title="Back to Details" aria-label="Back to Details">
+            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </div>
       ` : ''}
@@ -2289,11 +2286,8 @@
       <!-- Back Button & Movement Action Strip -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1.5px solid var(--slate-100); padding-bottom: 14px; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <button type="button" class="btn-stock-back btn-back-to-details" title="Return to Stock Details">
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
-              <path d="M15 10H5M10 15l-5-5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>Back to Details</span>
+          <button type="button" class="kya-back-btn btn-back-to-details" title="Back to Details" aria-label="Back to Details">
+            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <div style="font-weight: 800; font-size: 16px; color: var(--slate-900);">Stock Movement Journal</div>
         </div>
@@ -2419,11 +2413,8 @@
       <!-- Back Button & Analytics Header Strip -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1.5px solid var(--slate-100); padding-bottom: 14px; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <button type="button" class="btn-stock-back btn-back-to-details" title="Return to Stock Details">
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
-              <path d="M15 10H5M10 15l-5-5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>Back to Details</span>
+          <button type="button" class="kya-back-btn btn-back-to-details" title="Back to Details" aria-label="Back to Details">
+            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <div style="font-weight: 800; font-size: 16px; color: var(--slate-900);">Stock Valuation & Analytics</div>
         </div>

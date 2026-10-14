@@ -921,8 +921,11 @@
     if (clearSalesBtn) {
       clearSalesBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        // Editing one opened from another screen: drop the changes and go back there
+        const returnTo = window._editingSalesInvoice && window._editingSalesInvoice.returnTo;
         window._editingSalesInvoice = null;
         initSalesForm();
+        if (returnTo && typeof window.returnFromSalesEdit === 'function') window.returnFromSalesEdit(returnTo);
       });
     }
 

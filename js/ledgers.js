@@ -226,6 +226,10 @@
     if (layoutContainer) {
       layoutContainer.classList.toggle('full-width', isStatement);
     }
+    // The open statement's From / To dates, in the title card
+    document.querySelectorAll('.coa-stmt-dates').forEach(el => {
+      el.style.display = el.dataset.stmtView === tab ? 'flex' : 'none';
+    });
 
     if (tab === 'list') {
       renderLedgerListView();
@@ -1173,6 +1177,108 @@
     };
   }
 
+  // ── Search, number of entries and column sort of each statement ──
+  const STATEMENT_SEARCH = {
+    'statement':          { wrap: 'statementTableWrap',     input: 'statementSearchInput',     clear: 'statementSearchClear',     count: 'statementEntryCount',     render: () => renderLedgerStatementView() },
+    'customer-statement': { wrap: 'statementCustTableWrap', input: 'statementCustSearchInput', clear: 'statementCustSearchClear', count: 'statementCustEntryCount', render: () => renderCustomerStatementView() },
+    'supplier-statement': { wrap: 'statementSuppTableWrap', input: 'statementSuppSearchInput', clear: 'statementSuppSearchClear', count: 'statementSuppEntryCount', render: () => renderSupplierStatementView() },
+  };
+  const _statementSearch = {};
+
+  // The rows a statement shows for its search (date, particular, voucher no., amount), in the
+  // column order picked, and their number in the count box. Another ledger / party starts
+  // with an empty search; the sort stays.
+  function filterStatementRows(view, partyId, rows) {
+    const cfg = STATEMENT_SEARCH[view];
+    const st = _statementSearch[view] || (_statementSearch[view] = { q: '', forId: null, sortCol: '', sortDir: '' });
+    if (String(st.forId) !== String(partyId)) { st.q = ''; st.forId = partyId; }
+    const input = document.getElementById(cfg.input);
+    const clearBtn = document.getElementById(cfg.clear);
+    if (input && !input._wired) {
+      input._wired = true;
+      input.addEventListener('input', () => { st.q = input.value; cfg.render(); });
+      if (clearBtn) clearBtn.addEventListener('click', () => { st.q = ''; input.value = ''; cfg.render(); input.focus(); });
+    }
+    if (input && input.value !== st.q) input.value = st.q;
+    if (clearBtn) clearBtn.style.display = st.q ? 'flex' : 'none';
+
+    // Header clicks (the table is redrawn each time, so they are caught on its holder),
+    // as in Cashline: ascending → descending → normal
+    const wrapEl = document.getElementById(cfg.wrap);
+    if (wrapEl && !wrapEl._sortWired) {
+      wrapEl._sortWired = true;
+      wrapEl.addEventListener('click', e => {
+        const th = e.target.closest('th[data-sort]');
+        if (!th || !wrapEl.contains(th)) return;
+        const col = th.dataset.sort;
+        if (st.sortCol === col) {
+          if (st.sortDir === 'asc') st.sortDir = 'desc';
+          else { st.sortCol = ''; st.sortDir = ''; }
+        } else {
+          st.sortCol = col;
+          st.sortDir = 'asc';
+        }
+        cfg.render();
+      });
+    }
+
+    const q = st.q.trim().toLowerCase();
+    let shown = !q ? rows : rows.filter(tr => {
+      const d = tr.date || '';
+      const p = d.split('-');
+      const dmy = (p.length === 3 && p[0].length === 4) ? `${p[2]}-${p[1]}-${p[0]}` : d;
+      const amts = [tr.debit, tr.credit].map(a => parseFloat(a) || 0).filter(a => a > 0)
+        .map(a => `${a.toFixed(2)} ${fmtNum(a.toFixed(2))}`).join(' ');
+      return [d, dmy, tr.particulars, tr.voucherNo, amts].join(' ').toLowerCase().includes(q);
+    });
+    if (st.sortCol && st.sortDir) {
+      const key = {
+        date:       r => r.date || '',
+        particular: r => r.particulars || '',
+        voucher:    r => r.voucherNo || '',
+        debit:      r => parseFloat(r.debit) || 0,
+        credit:     r => parseFloat(r.credit) || 0,
+      }[st.sortCol];
+      if (key) {
+        // Ties keep the statement's own (date) order
+        shown = shown.map((r, i) => [r, i]).sort(([a, ia], [b, ib]) => {
+          const x = key(a), y = key(b);
+          let res = typeof x === 'number' ? x - y
+            : String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: 'base' });
+          if (st.sortDir === 'desc') res = -res;
+          return res || ia - ib;
+        }).map(([r]) => r);
+      }
+    }
+    const countEl = document.getElementById(cfg.count);
+    if (countEl) countEl.textContent = shown.length;
+    return shown;
+  }
+
+  // A statement table's column headers, each click-to-sort with its ⇅ / ▲ / ▼ (as in Cashline)
+  function statementSortHeaders(wrapId) {
+    const view = Object.keys(STATEMENT_SEARCH).find(v => STATEMENT_SEARCH[v].wrap === wrapId);
+    const st = _statementSearch[view] || {};
+    const icon = col => st.sortCol !== col
+      ? `<span style="font-size: 10px; color: #94a3b8; opacity: 0.5; margin-left: 5px;">⇅</span>`
+      : `<span style="font-size: 10px; color: #2563eb; font-weight: 800; margin-left: 5px;">${st.sortDir === 'desc' ? '▼' : '▲'}</span>`;
+    const th = (col, label, tip, attrs, justify) => `
+            <th data-sort="${col}" ${attrs} title="${tip}">
+              <div style="display: flex; align-items: center; justify-content: ${justify};"><span>${label}</span>${icon(col)}</div>
+            </th>`;
+    return th('date', 'Date', 'Click to sort: Older → Newer → Normal', 'style="width: 110px; white-space: nowrap; cursor: pointer; user-select: none;"', 'space-between')
+      + th('particular', 'Particular', 'Click to sort: A-Z → Z-A → Normal', 'style="cursor: pointer; user-select: none;"', 'space-between')
+      + th('voucher', 'Voucher No', 'Click to sort: A-Z → Z-A → Normal', 'style="width: 140px; white-space: nowrap; cursor: pointer; user-select: none;"', 'space-between')
+      + th('debit', 'Debit', 'Click to sort by Debit', 'class="num-col" style="width: 130px; cursor: pointer; user-select: none;"', 'flex-end')
+      + th('credit', 'Credit', 'Click to sort by Credit', 'class="num-col" style="width: 130px; cursor: pointer; user-select: none;"', 'flex-end');
+  }
+
+  const STATEMENT_NO_MATCH_ROW = `
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 20px; color: var(--slate-400);">No entries match your search.</td>
+        </tr>
+      `;
+
   function renderLedgerStatementView() {
     const wrap = document.getElementById('statementTableWrap');
     if (!wrap) return;
@@ -1272,7 +1378,8 @@
       </tr>
     `;
 
-    ledgerTrans.forEach(tr => {
+    const shownTrans = filterStatementRows('statement', _ledgerStatementId, ledgerTrans);
+    shownTrans.forEach(tr => {
       const drText = tr.debit ? `₹${fmtNum(tr.debit.toFixed(2))}` : '-';
       const crText = tr.credit ? `₹${fmtNum(tr.credit.toFixed(2))}` : '-';
 
@@ -1301,17 +1408,15 @@
           <td colspan="5" style="text-align: center; padding: 20px; color: var(--slate-400);">No transactions found in this period.</td>
         </tr>
       `;
+    } else if (ledgerTrans.length && !shownTrans.length) {
+      rowsHtml += STATEMENT_NO_MATCH_ROW;
     }
 
     wrap.innerHTML = `
-      <table class="tb-table">
+      <table class="tb-table coa-stmt-table">
         <thead>
           <tr>
-            <th style="width: 110px; white-space: nowrap;">Date</th>
-            <th>Particular</th>
-            <th style="width: 140px; white-space: nowrap;">Voucher No</th>
-            <th class="num-col" style="width: 130px;">Debit</th>
-            <th class="num-col" style="width: 130px;">Credit</th>
+            ${statementSortHeaders(wrap.id)}
           </tr>
         </thead>
         <tbody>
@@ -1372,7 +1477,8 @@
       </tr>
     `;
 
-    data.transactions.forEach(tr => {
+    const shownTrans = filterStatementRows('customer-statement', customer.id, data.transactions);
+    shownTrans.forEach(tr => {
       const drText = tr.debit ? `₹${fmtNum(tr.debit.toFixed(2))}` : '-';
       const crText = tr.credit ? `₹${fmtNum(tr.credit.toFixed(2))}` : '-';
 
@@ -1403,17 +1509,15 @@
           <td colspan="5" style="text-align: center; padding: 20px; color: var(--slate-400);">No transactions found in this period.</td>
         </tr>
       `;
+    } else if (data.transactions.length && !shownTrans.length) {
+      rowsHtml += STATEMENT_NO_MATCH_ROW;
     }
 
     wrap.innerHTML = `
-      <table class="tb-table">
+      <table class="tb-table coa-stmt-table">
         <thead>
           <tr>
-            <th style="width: 110px; white-space: nowrap;">Date</th>
-            <th>Particular</th>
-            <th style="width: 140px; white-space: nowrap;">Voucher No</th>
-            <th class="num-col" style="width: 130px;">Debit</th>
-            <th class="num-col" style="width: 130px;">Credit</th>
+            ${statementSortHeaders(wrap.id)}
           </tr>
         </thead>
         <tbody>
@@ -1470,7 +1574,8 @@
       </tr>
     `;
 
-    data.transactions.forEach(tr => {
+    const shownTrans = filterStatementRows('supplier-statement', supplier.id, data.transactions);
+    shownTrans.forEach(tr => {
       const drText = tr.debit ? `₹${fmtNum(tr.debit.toFixed(2))}` : '-';
       const crText = tr.credit ? `₹${fmtNum(tr.credit.toFixed(2))}` : '-';
 
@@ -1501,17 +1606,15 @@
           <td colspan="5" style="text-align: center; padding: 20px; color: var(--slate-400);">No transactions found in this period.</td>
         </tr>
       `;
+    } else if (data.transactions.length && !shownTrans.length) {
+      rowsHtml += STATEMENT_NO_MATCH_ROW;
     }
 
     wrap.innerHTML = `
-      <table class="tb-table">
+      <table class="tb-table coa-stmt-table">
         <thead>
           <tr>
-            <th style="width: 110px; white-space: nowrap;">Date</th>
-            <th>Particular</th>
-            <th style="width: 140px; white-space: nowrap;">Voucher No</th>
-            <th class="num-col" style="width: 130px;">Debit</th>
-            <th class="num-col" style="width: 130px;">Credit</th>
+            ${statementSortHeaders(wrap.id)}
           </tr>
         </thead>
         <tbody>
@@ -2290,6 +2393,27 @@
     if (!entry && voucherNo) {
       entry = postedEntries.find(e => (e.voucherNo || '').toLowerCase() === String(voucherNo).toLowerCase());
     }
+
+    // A sales or purchase voucher's entry (invoice, TDS, payment, refund) opens as that
+    // invoice; so does a statement row standing for the voucher itself (one with no entry)
+    const S = window.KYA_STORE || {};
+    const sv = entry ? findSalesVoucherByEntry(entry)
+      : (S.salesVouchers || []).find(v => v && !v.isOrder && (String(v.id) === String(id) || (voucherNo && v.invoiceNo && (
+          v.invoiceNo === voucherNo || `PAY-${v.invoiceNo}` === voucherNo || `TDS-${v.invoiceNo}` === voucherNo ||
+          v.paymentVoucherNo === voucherNo || v.tdsVoucherNo === voucherNo)))) || null;
+    if (sv && typeof window.viewSalesTaxInvoice === 'function') {
+      window.viewSalesTaxInvoice(sv.id);
+      return;
+    }
+    const rowId = entry ? entry.id : id;
+    const pv = ((!entry || entry.preparedBy === 'Purchase Module') && rowId !== undefined && rowId !== null && rowId !== ''
+        && String(rowId) !== 'undefined' && typeof window.findPurchaseVoucherByEntry === 'function')
+      ? window.findPurchaseVoucherByEntry(rowId) : null;
+    if (pv && typeof window.viewPurchaseVoucher === 'function') {
+      window.viewPurchaseVoucher(pv.id);
+      return;
+    }
+
     if (!entry && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
       const sInv = window.KYA_STORE.salesVouchers.find(v => String(v.id) === String(id) || (v.invoiceNo && (v.invoiceNo === voucherNo || `PAY-${v.invoiceNo}` === voucherNo || `TDS-${v.invoiceNo}` === voucherNo || (v.paymentVoucherNo && v.paymentVoucherNo === voucherNo) || (v.tdsVoucherNo && v.tdsVoucherNo === voucherNo))));
       if (sInv) {
@@ -2308,9 +2432,27 @@
     showFullJournalModal(entry, false);
   };
 
+  // The posted Sales Invoice / Reversal a sales entry belongs to (invoice, TDS, payment,
+  // advance refund or refund entry)
+  function findSalesVoucherByEntry(entry) {
+    if (!entry || entry.preparedBy !== 'Sales Module') return null;
+    const id = String(entry.id);
+    return ((window.KYA_STORE || {}).salesVouchers || []).find(v => v && !v.isOrder &&
+      [v.journalEntryId, v.tdsJournalEntryId, v.paymentJournalEntryId, v.advanceRefundJournalEntryId]
+        .concat(Array.isArray(v.refundJournalEntryIds) ? v.refundJournalEntryIds : [])
+        .some(x => x && String(x) === id)) || null;
+  }
+
   window.editVoucherFromStatement = function(id) {
     const entry = postedEntries.find(e => String(e.id) === String(id));
     if (!entry) return;
+
+    // A sales entry (invoice, TDS or payment): the Sales Invoice opens on its form
+    const sv = findSalesVoucherByEntry(entry);
+    if (sv) {
+      loadSalesInvoice(sv, false);
+      return;
+    }
 
     const isSales = (entry.voucherNo || '').startsWith('SV-') || (entry.voucherNo || '').startsWith('SR-');
     if (isSales && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) {
@@ -2451,10 +2593,13 @@
       if (entry) loadJournalEntry(entry, true, returnContext);
     } else {
       const entry = postedEntries.find(e => String(e.id) === String(id));
+      // A sales entry: its Sales Invoice / Reversal opens on the sales form
+      const sv = findSalesVoucherByEntry(entry);
       // A purchase's entry: its Purchase Voucher opens on the purchase form
       const pv = (entry && entry.preparedBy === 'Purchase Module' && typeof window.findPurchaseVoucherByEntry === 'function')
         ? window.findPurchaseVoucherByEntry(entry.id) : null;
-      if (pv && typeof window.loadPurchaseVoucher === 'function') window.loadPurchaseVoucher(pv, false);
+      if (sv && typeof window.loadSalesInvoice === 'function') window.loadSalesInvoice(sv, false);
+      else if (pv && typeof window.loadPurchaseVoucher === 'function') window.loadPurchaseVoucher(pv, false);
       else if (entry) loadJournalEntry(entry, false, returnContext);
     }
   };

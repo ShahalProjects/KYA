@@ -439,7 +439,7 @@
           </div>
 
           <div style="display: flex; gap: 10px; margin-top: 26px; justify-content: flex-end; border-top: 1px solid var(--slate-100); padding-top: 18px;">
-            <button class="btn btn-secondary" id="clWzBack2" style="padding: 10px 20px; border-radius: 10px; font-weight: 600;">➔ Back</button>
+            <button type="button" class="kya-back-btn" id="clWzBack2" title="Back" aria-label="Back" style="align-self: center;"><svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <button class="btn btn-primary" id="clWzImport2" style="padding: 10px 22px; border-radius: 10px; font-weight: 700; background: linear-gradient(135deg, #2563eb, #1d4ed8); box-shadow: 0 4px 12px rgba(37,99,235,0.25);">Import Statement</button>
           </div>
         </div>

@@ -602,8 +602,9 @@
       transform: scale(1.05);
     }
 
-    /* Back button on the Sales Voucher screens — an icon only, the same look as the
-       sidebar's collapse button above (its title / aria-label says where it goes) */
+    /* Back button on every screen (first made for the Sales Voucher screens) — an icon only,
+       the same look as the sidebar's collapse button above (its title / aria-label says
+       where it goes) */
     .kya-back-btn {
       width: 32px;
       height: 32px;
@@ -2608,6 +2609,28 @@
       color: var(--slate-800);
       vertical-align: middle;
     }
+
+    /* Chart of Accounts statements (ledger / customer / supplier): one look always, the
+       table style above with amounts on the right, even after Trial Balance has added its
+       own .tb-table rules (reports.js) */
+    .tb-table.coa-stmt-table { margin-top: 0; }
+    .tb-table.coa-stmt-table th {
+      padding: 12px 22px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--slate-600);
+      background: var(--slate-50);
+      border-bottom: 1px solid var(--slate-200);
+    }
+    .tb-table.coa-stmt-table td {
+      padding: 14px 22px;
+      font-size: 13.5px;
+      color: var(--slate-800);
+      border-bottom: none;
+    }
+    .tb-table.coa-stmt-table .num-col { text-align: right; font-weight: 600; min-width: 0; }
 
     .td-ref {
       font-family: 'Courier New', monospace;

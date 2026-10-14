@@ -1653,6 +1653,8 @@
 
   // Opens a stored purchase (posted or draft) on the form. Takes the voucher or its id.
   function loadPurchaseVoucher(vOrId, isDraft = false) {
+    // The screen it is opened from (see returnFromPurchaseEdit)
+    const fromTab = (typeof activeTabId !== 'undefined') ? activeTabId : null;
     let v = vOrId;
     if (v === null || v === undefined) return;
     if (typeof v !== 'object') {
@@ -1675,6 +1677,9 @@
     // The form may be behind a Pre Purchase card (purchase-pre.js)
     if (typeof window.showPurchaseFormCard === 'function') window.showPurchaseFormCard();
     _editingPurchaseVoucher = (editIsPosted || editIsDraft) ? { id: v.id, isDraft: !!isDraft } : null;
+    // Opened for editing from another screen (Voucher Desk, a statement, Cashline…): Save,
+    // Save Draft or Clear goes back there
+    if (_editingPurchaseVoucher && fromTab && fromTab !== 'purchase_voucher') _editingPurchaseVoucher.returnTo = fromTab;
     // A reversal's Original Doc: a fresh one carries it as returnSource; a stored one keeps
     // the purchase it reverses (returnAgainstId) or the Pre Purchase document (reversedPreDoc)
     if (v.isReturn) {
@@ -1963,7 +1968,10 @@
     }
 
     toast(data.isReturn ? 'Purchase Reversal Draft saved successfully.' : 'Purchase Voucher Draft saved successfully.', 'success');
+    const returnTo = _editingPurchaseVoucher && _editingPurchaseVoucher.returnTo;
     initPurchaseForm();
+    // Edited from another screen: back there, with no preview popup
+    if (returnFromPurchaseEdit(returnTo)) return;
     // Stay on the Purchase form, ready for the next one (drafts are listed in Voucher Desk)
     if (typeof openTab === 'function') openTab('purchase_voucher');
     if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
@@ -2150,8 +2158,11 @@
     toast(isReturn
       ? `Purchase Reversal "${voucher.invoiceNo}" posted successfully.${preDoc ? ` ${src.label || 'Pre Purchase'} ${src.no} cancelled.` : ''}`
       : `Purchase Voucher "${voucher.invoiceNo}" saved successfully.`, 'success');
+    const returnTo = _editingPurchaseVoucher && _editingPurchaseVoucher.returnTo;
     // A reversal is followed by a fresh reversal
     initPurchaseForm();
+    // Edited from another screen: back there, with no preview popup
+    if (returnFromPurchaseEdit(returnTo)) return true;
     if (typeof openTab === 'function') openTab('purchase_voucher');
 
     if (typeof refreshAllReports === 'function') refreshAllReports();
@@ -2178,11 +2189,59 @@
     if (!draft) return;
     const returnTo = (typeof activeTabId !== 'undefined') ? activeTabId : null;
     loadPurchaseVoucher(draft, true);
+    // Not an edit: this flow goes back on its own (below), with the posted preview
+    if (_editingPurchaseVoucher) delete _editingPurchaseVoucher.returnTo;
     const posted = postPurchaseVoucher();
     if (posted && returnTo && returnTo !== 'purchase_voucher' && typeof openTab === 'function') {
       openTab(returnTo);
       if (returnTo === 'voucher_desk' && typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
     }
+  }
+
+  // Back to the screen a voucher was opened for editing from (see loadPurchaseVoucher),
+  // refreshed. The Purchase form closes, as the Journal Entry does.
+  function returnFromPurchaseEdit(returnTo) {
+    if (!returnTo) return false;
+    if (typeof closeTab === 'function') closeTab('purchase_voucher', null, returnTo);
+    else if (typeof openTab === 'function') openTab(returnTo);
+    if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews();
+    else if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+    return true;
+  }
+
+  // Delete from its preview: a draft just goes; a posted purchase goes with all its entries
+  // (purchase, TDS, payment), as the Ledgers delete does
+  function deletePurchaseVoucher(id) {
+    const S = window.KYA_STORE || {};
+    const draft = (S.purchaseVouchersDrafts || []).find(d => String(d.id) === String(id));
+    const v = draft || (S.purchaseVouchers || []).find(x => String(x.id) === String(id));
+    if (!v) return;
+    const label = v.isReturn ? 'Purchase Reversal' : 'Purchase';
+    showKyaConfirm({
+      title: draft ? 'Delete Draft?' : `Delete Posted ${label}?`,
+      message: draft
+        ? 'Are you sure you want to delete this draft? This action cannot be undone.'
+        : `Are you sure you want to delete this ${label.toLowerCase()}? This will also delete its journal entries (purchase, TDS and payment) and cannot be undone.`,
+      confirmLabel: 'Delete',
+      okBg: 'var(--red-600)',
+      onConfirm: () => {
+        if (draft) {
+          S.purchaseVouchersDrafts = (S.purchaseVouchersDrafts || []).filter(d => String(d.id) !== String(id));
+          toast('Draft deleted successfully.', 'success');
+        } else {
+          S.purchaseVouchers = (S.purchaseVouchers || []).filter(x => String(x.id) !== String(id));
+          if (typeof window.removePurchaseJournalEntries === 'function') window.removePurchaseJournalEntries(v);
+          toast(`${label} "${v.invoiceNo}" deleted.`, 'success');
+        }
+        if (typeof window.refreshAllAppViews === 'function') {
+          window.refreshAllAppViews();
+        } else {
+          if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+          if (typeof refreshAllReports === 'function') refreshAllReports();
+          if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+        }
+      }
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -2321,7 +2380,10 @@
       clearBtn._wired = true;
       clearBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        // Editing one opened from another screen: drop the changes and go back there
+        const returnTo = _editingPurchaseVoucher && _editingPurchaseVoucher.returnTo;
         initPurchaseForm();
+        returnFromPurchaseEdit(returnTo);
       });
     }
 
@@ -2608,6 +2670,7 @@
   window.postPurchaseVoucher = postPurchaseVoucher;
   window.editPurchaseDraft = editPurchaseDraft;
   window.postPurchaseDraft = postPurchaseDraft;
+  window.deletePurchaseVoucher = deletePurchaseVoucher;
   window.appendPurchasePartyCreateFooter = appendPurchasePartyCreateFooter;
   // Whether the form is a Purchase Reversal (purchase-pre.js, purchase-pre-picker.js)
   window.isPurchaseReturnMode = isPurchaseReturnMode;

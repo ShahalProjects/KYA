@@ -10,6 +10,13 @@
     const editIsPosted = !isDraft && (store.salesVouchers || []).some(v => String(v.id) === String(inv.id));
     const editIsDraft = isDraft && (store.salesVouchersDrafts || []).some(d => String(d.id) === String(inv.id));
     const editCtx = (editIsPosted || editIsDraft) ? { id: inv.id, isDraft: !!isDraft } : null;
+    // Opened for editing from another screen (Voucher Desk, a statement, Cashline, Customers…):
+    // Post, Save Draft or Clear goes back there (returnFromSalesEdit)
+    if (editCtx) {
+      const fromTab = (typeof activeTabId !== 'undefined') ? activeTabId : null;
+      if (fromTab && fromTab !== 'sales_voucher') editCtx.returnTo = { tabId: fromTab };
+      else if (fromTab === 'sales_voucher' && currentSalesVoucherSubtype === 'Customers') editCtx.returnTo = { tabId: fromTab, subtype: 'Customers' };
+    }
     window._editingSalesInvoice = editCtx;
     window._salesPartyOverride = inv.partyOverride ? JSON.parse(JSON.stringify(inv.partyOverride)) : null;
     // A reversal made against a pre-invoice keeps that document as its Original Doc
@@ -242,6 +249,25 @@
     }
   }
 
+  // Back to the screen an invoice was opened for editing from (see loadSalesInvoice), refreshed.
+  // The Sales form closes, as the Journal Entry does; Customers is a view of the Sales tab itself.
+  function returnFromSalesEdit(returnTo) {
+    if (!returnTo || !returnTo.tabId) return false;
+    if (returnTo.subtype === 'Customers') {
+      currentSalesVoucherSubtype = 'Customers';
+      updateVoucherSubtypeUI();
+      openTab('sales_voucher');
+    } else if (typeof closeTab === 'function') {
+      closeTab('sales_voucher', null, returnTo.tabId);
+    } else {
+      openTab(returnTo.tabId);
+    }
+    if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews();
+    else triggerAutoBackup();
+    return true;
+  }
+  window.returnFromSalesEdit = returnFromSalesEdit;
+
   function saveSalesDraft() {
     // A posted voucher is edited and posted again, not turned back into a draft
     if (window._editingSalesInvoice && !window._editingSalesInvoice.isDraft) {
@@ -404,9 +430,12 @@
       draftToastMsg = 'Sales Reversal Draft saved successfully.';
     }
     showToast(draftToastMsg, 'success');
+    const returnTo = window._editingSalesInvoice && window._editingSalesInvoice.returnTo;
     window._editingSalesInvoice = null;
     currentSalesVoucherSubtype = 'Invoice';
     initSalesForm();
+    // Edited from another screen: back there, with no preview popup
+    if (returnFromSalesEdit(returnTo)) return;
     // Stay on the Sales Invoice form, ready for the next one (drafts are listed in Voucher Desk)
     openTab('sales_voucher');
     triggerAutoBackup();
@@ -839,9 +868,12 @@
       if (typeof window.renderSalesPreInvoicePanel === 'function') window.renderSalesPreInvoicePanel();
     });
 
+    const returnTo = window._editingSalesInvoice && window._editingSalesInvoice.returnTo;
     window._editingSalesInvoice = null;
     currentSalesVoucherSubtype = _subtypeSnapshot === 'Return' ? 'Return' : 'Invoice'; // a reversal is followed by a fresh reversal
     initSalesForm();
+    // Edited from another screen: back there, with no preview popup
+    if (returnFromSalesEdit(returnTo)) return;
     openTab('sales_voucher');
 
     if (typeof refreshAllReports === 'function') refreshAllReports();

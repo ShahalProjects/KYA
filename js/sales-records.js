@@ -151,11 +151,16 @@
         const successMsg = isRet ? `Sales Reversal "${invoice.invoiceNo}" deleted.` : `Invoice "${invoice.invoiceNo}" deleted.`;
         
         showToast(successMsg, 'success');
-        if (typeof refreshAllReports === 'function') refreshAllReports();
-        if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
-        if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
-        if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
-        triggerAutoBackup();
+        // Every view showing it (Voucher Desk, statements, Cashline, reports)
+        if (typeof window.refreshAllAppViews === 'function') {
+          window.refreshAllAppViews();
+        } else {
+          if (typeof refreshAllReports === 'function') refreshAllReports();
+          if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+          if (typeof renderSalesPostedPanel === 'function') renderSalesPostedPanel();
+          if (typeof renderLedgerStatementView === 'function') renderLedgerStatementView();
+          triggerAutoBackup();
+        }
       }
     });
   }
@@ -258,6 +263,8 @@
     if (!draft) return;
     const returnTo = (typeof activeTabId !== 'undefined') ? activeTabId : null;
     loadSalesInvoice(JSON.parse(JSON.stringify(draft)), true);
+    // Not an edit: this flow goes back on its own (below), with the posted preview
+    if (window._editingSalesInvoice) delete window._editingSalesInvoice.returnTo;
     postSalesInvoice();
     const posted = !(window.KYA_STORE.salesVouchersDrafts || []).some(d => String(d.id) === String(id));
     if (posted && returnTo && returnTo !== 'sales_voucher' && typeof openTab === 'function') {
@@ -280,6 +287,7 @@
         window.KYA_STORE.salesVouchersDrafts = list;
         showToast('Draft deleted successfully.', 'success');
         renderSalesDraftedPanel();
+        if (typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
         triggerAutoBackup();
       }
     });

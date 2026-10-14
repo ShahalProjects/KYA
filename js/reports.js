@@ -603,11 +603,8 @@
               <div class="pnl-notes-hero-title">Notes to Financial Statements (Balance Sheet)</div>
               <div class="pnl-notes-hero-sub">Schedule III Disclosures &middot; ${escBsHtml(data.col1Title)} vs ${escBsHtml(data.col2Title)}</div>
             </div>
-            <button class="btn btn-sales-action" data-bs-back type="button" style="height: 34px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Back to Balance Sheet
+            <button type="button" class="kya-back-btn" data-bs-back title="Back to Balance Sheet" aria-label="Back to Balance Sheet">
+              <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
           <div class="pnl-notes-pills-wrap">
@@ -710,11 +707,8 @@
               <div class="pnl-notes-hero-title">Property, Plant and Equipment &amp; Intangible Assets</div>
               <div class="pnl-notes-hero-sub">Schedule III &middot; Movement for ${escBsHtml(ppe.periodLabel)} &middot; Net block compared with ${escBsHtml(ppe.prevLabel)} &middot; Amount in ₹</div>
             </div>
-            <button class="btn btn-sales-action" data-bs-back type="button" style="height: 34px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Back to Balance Sheet
+            <button type="button" class="kya-back-btn" data-bs-back title="Back to Balance Sheet" aria-label="Back to Balance Sheet">
+              <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
           <div class="pnl-notes-pills-wrap">
@@ -2733,11 +2727,8 @@
               <div class="pnl-notes-hero-title">Notes to Financial Statements (Profit &amp; Loss)</div>
               <div class="pnl-notes-hero-sub">Schedule III Disclosures &middot; ${col1Title} vs ${col2Title}</div>
             </div>
-            <button class="btn btn-sales-action" id="pnlNotesBackToSchBtn" type="button" style="height: 34px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Back to Profit &amp; Loss Statement
+            <button type="button" class="kya-back-btn" id="pnlNotesBackToSchBtn" title="Back to Profit &amp; Loss Statement" aria-label="Back to Profit &amp; Loss Statement">
+              <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
           <div class="pnl-notes-pills-wrap">

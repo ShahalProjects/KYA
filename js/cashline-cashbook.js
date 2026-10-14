@@ -25,15 +25,15 @@
         if (controls) controls.innerHTML = '';
         target.innerHTML = `
           <div style="margin-bottom: 16px;">
-            <button class="btn btn-secondary" id="clInlineTabBackNoAcc" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
-              ← Back
+            <button type="button" class="kya-back-btn" id="clInlineTabBackNoAcc" title="Back" aria-label="Back">
+              <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
           <div style="padding: 48px; text-align: center; border: 1.5px dashed var(--slate-200); border-radius: 16px; background: var(--slate-50);">
             <div style="font-size: 14.5px; font-weight: 700; color: var(--slate-700);">No Bank Accounts defined</div>
             <div style="font-size: 12.5px; color: var(--slate-400); margin-top: 4px; margin-bottom: 16px;">Please create a Bank account first.</div>
-            <button class="btn btn-primary" id="clBtnBackToAccounts" style="height:36px; font-size:13px; padding: 0 16px; font-weight:600; cursor:pointer; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
-              ← Back to Accounts
+            <button type="button" class="kya-back-btn" id="clBtnBackToAccounts" title="Back to Accounts" aria-label="Back to Accounts">
+              <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
         `;
@@ -57,15 +57,15 @@
       if (!selectedLedger) {
         target.innerHTML = `
           <div style="margin-bottom: 16px;">
-            <button class="btn btn-secondary" id="clInlineTabBackNoLdg" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
-              ← Back
+            <button type="button" class="kya-back-btn" id="clInlineTabBackNoLdg" title="Back" aria-label="Back">
+              <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
           <div style="padding: 48px; text-align: center; border: 1.5px dashed var(--slate-200); border-radius: 16px; background: var(--slate-50);">
             <div style="font-size: 14.5px; font-weight: 700; color: var(--slate-700);">Linked ledger not found</div>
             <div style="margin-top: 16px;">
-              <button class="btn btn-primary" id="clBtnBackToAccountsLdg" style="height:36px; font-size:13px; padding: 0 16px; font-weight:600; cursor:pointer; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
-                ← Back to Accounts
+              <button type="button" class="kya-back-btn" id="clBtnBackToAccountsLdg" title="Back to Accounts" aria-label="Back to Accounts">
+                <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
             </div>
           </div>
@@ -1792,8 +1792,8 @@
               <!-- Inline bank selection header -->
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--slate-50); border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 12px 16px;">
                 <div style="display: flex; gap: 10px; align-items: center;">
-                  <button class="btn btn-secondary" id="clInlineTabBack" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px; margin-right:12px;">
-                    ← Back
+                  <button type="button" class="kya-back-btn" id="clInlineTabBack" title="Back" aria-label="Back" style="margin-right:12px;">
+                    <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </button>
                   <span style="font-size: 13px; font-weight: 700; color: var(--slate-700);">Select Bank Account:</span>
                   <select id="clCbSelectBankInline" class="je-input" style="height: 34px; font-size: 13.5px; padding: 0 8px; cursor: pointer; background: #fff; border-radius: 6px; width: 220px; font-weight: 600; color: var(--slate-800);">

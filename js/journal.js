@@ -3324,17 +3324,20 @@
     // Update Stat counters based on date range
     const totalJournal = dateFilteredList.filter(e => e.type === 'Journal' && !e.isDraft).length;
     const totalSales = dateFilteredList.filter(e => (e.type === 'Invoice' || e.type === 'Order' || e.type === 'Reversal') && !e.isDraft).length;
+    const totalPurchase = dateFilteredList.filter(e => (e.type === 'Purchase' || e.type === 'Purchase Reversal') && !e.isDraft).length;
     const totalDrafts = dateFilteredList.filter(e => e.isDraft).length;
     const totalVouchers = dateFilteredList.length;
 
     const elTotal = document.getElementById('vdStatTotal');
     const elJE = document.getElementById('vdStatJE');
     const elInv = document.getElementById('vdStatInv');
+    const elPurch = document.getElementById('vdStatPurch');
     const elDrafts = document.getElementById('vdStatDrafts');
 
     if (elTotal) elTotal.textContent = totalVouchers;
     if (elJE) elJE.textContent = totalJournal;
     if (elInv) elInv.textContent = totalSales;
+    if (elPurch) elPurch.textContent = totalPurchase;
     if (elDrafts) elDrafts.textContent = totalDrafts;
 
     dateFilteredList.sort((a, b) => {

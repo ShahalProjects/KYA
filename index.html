@@ -1071,19 +1071,23 @@
           <!-- Statistics Cards Grid -->
           <div class="vd-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
             <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Total Vouchers</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Total</span>
               <span id="vdStatTotal" style="font-size: 24px; font-weight: 800; color: var(--slate-800);">0</span>
             </div>
             <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Journal Entries</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Journal</span>
               <span id="vdStatJE" style="font-size: 24px; font-weight: 800; color: var(--blue-600);">0</span>
             </div>
             <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Sales Vouchers</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Sales</span>
               <span id="vdStatInv" style="font-size: 24px; font-weight: 800; color: #059669;">0</span>
             </div>
             <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Drafts Count</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Purchase</span>
+              <span id="vdStatPurch" style="font-size: 24px; font-weight: 800; color: #b45309;">0</span>
+            </div>
+            <div class="vd-stat-card" style="background: var(--slate-50); border: 1.5px solid var(--slate-100); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.5px;">Drafts</span>
               <span id="vdStatDrafts" style="font-size: 24px; font-weight: 800; color: #d97706;">0</span>
             </div>
           </div>
@@ -1213,6 +1217,19 @@
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
+              <!-- Statement period: the open statement's dates only (ledgers.js switchLedgerTab) -->
+              <div class="coa-stmt-dates" data-stmt-view="statement" style="display: none; gap: 8px; align-items: center;">
+                <input type="date" id="statementDateFrom" class="cl-glass-control" title="From" aria-label="From date" style="width: 125px;" />
+                <input type="date" id="statementDateTo" class="cl-glass-control" title="To" aria-label="To date" style="width: 125px;" />
+              </div>
+              <div class="coa-stmt-dates" data-stmt-view="customer-statement" style="display: none; gap: 8px; align-items: center;">
+                <input type="date" id="statementCustDateFrom" class="cl-glass-control" title="From" aria-label="From date" style="width: 125px;" />
+                <input type="date" id="statementCustDateTo" class="cl-glass-control" title="To" aria-label="To date" style="width: 125px;" />
+              </div>
+              <div class="coa-stmt-dates" data-stmt-view="supplier-statement" style="display: none; gap: 8px; align-items: center;">
+                <input type="date" id="statementSuppDateFrom" class="cl-glass-control" title="From" aria-label="From date" style="width: 125px;" />
+                <input type="date" id="statementSuppDateTo" class="cl-glass-control" title="To" aria-label="To date" style="width: 125px;" />
+              </div>
               <div class="panel-actions" id="ledgerHeaderActions" style="display: flex; gap: 8px; align-items: center;"></div>
               <!-- 3-dot more options dropdown -->
               <div class="rpt-more-wrap">
@@ -1352,34 +1369,33 @@
 
               <!-- 4. Ledger Statement view -->
               <div id="ledger-statement-view" role="tabpanel" style="display:none">
-                <!-- Back button and Date filter bar -->
+                <!-- Back button, search and the number of entries (dates are in the title card) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-                  <button class="btn btn-secondary" id="btnBackToLedgerList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="19" y1="12" x2="5" y2="12"></line>
-                      <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-                    Back to Ledgers
-                  </button>
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">From:</label>
-                      <input type="date" id="statementDateFrom" class="je-input" style="height: 38px; padding: 0 10px;" />
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">To:</label>
-                      <input type="date" id="statementDateTo" class="je-input" style="height: 38px; padding: 0 10px;" />
+                  <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
+                    <button type="button" class="kya-back-btn" id="btnBackToLedgerList" title="Back to Ledgers" aria-label="Back to Ledgers">
+                      <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                        <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                    <div class="pt-search-wrap" style="position: relative; flex: 1; max-width: 560px; min-width: 0;">
+                      <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
+                        <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      </svg>
+                      <input type="text" id="statementSearchInput" class="pt-search-inp" placeholder="Search date, particular, voucher no., amount…" autocomplete="off" aria-label="Search this statement" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
+                      <button type="button" id="statementSearchClear" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 14px; padding: 4px; display: none; align-items: center; justify-content: center;" title="Clear search">✕</button>
                     </div>
                   </div>
+                  <span id="statementEntryCount" title="Entries in this statement" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-size: 12.5px; font-weight: 600;">0</span>
                 </div>
 
                 <!-- Table Card -->
                 <div class="table-card" style="padding: 0; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 20px;">
-                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center; background: var(--slate-50);">
+                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-200); display: flex; justify-content: space-between; align-items: center; background: #fff;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <h3 id="statementLedgerName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Account Ledger</h3>
                     </div>
-                    <span id="statementSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Subgroup</span>
+                    <span id="statementSubGroupName" class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Subgroup</span>
                   </div>
                   
                   <div id="statementTableWrap" style="overflow-x: auto;">
@@ -1406,34 +1422,33 @@
 
               <!-- 7. Customer Statement view -->
               <div id="customer-statement-view" role="tabpanel" style="display:none">
-                <!-- Back button and Date filter bar -->
+                <!-- Back button, search and the number of entries (dates are in the title card) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-                  <button class="btn btn-secondary" id="btnBackToCustomerList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="19" y1="12" x2="5" y2="12"></line>
-                      <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-                    Back to Customers
-                  </button>
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">From:</label>
-                      <input type="date" id="statementCustDateFrom" class="je-input" style="height: 38px; padding: 0 10px;" />
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">To:</label>
-                      <input type="date" id="statementCustDateTo" class="je-input" style="height: 38px; padding: 0 10px;" />
+                  <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
+                    <button type="button" class="kya-back-btn" id="btnBackToCustomerList" title="Back to Customers" aria-label="Back to Customers">
+                      <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                        <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                    <div class="pt-search-wrap" style="position: relative; flex: 1; max-width: 560px; min-width: 0;">
+                      <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
+                        <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      </svg>
+                      <input type="text" id="statementCustSearchInput" class="pt-search-inp" placeholder="Search date, particular, voucher no., amount…" autocomplete="off" aria-label="Search this statement" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
+                      <button type="button" id="statementCustSearchClear" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 14px; padding: 4px; display: none; align-items: center; justify-content: center;" title="Clear search">✕</button>
                     </div>
                   </div>
+                  <span id="statementCustEntryCount" title="Entries in this statement" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-size: 12.5px; font-weight: 600;">0</span>
                 </div>
 
                 <!-- Table Card -->
                 <div class="table-card" style="padding: 0; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 20px;">
-                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center; background: var(--slate-50);">
+                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-200); display: flex; justify-content: space-between; align-items: center; background: #fff;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <h3 id="statementCustName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Customer</h3>
                     </div>
-                    <span id="statementCustSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Trade Receivables</span>
+                    <span id="statementCustSubGroupName" class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Trade Receivables</span>
                   </div>
                   
                   <div id="statementCustTableWrap" style="overflow-x: auto;">
@@ -1460,34 +1475,33 @@
 
               <!-- 8. Supplier Statement view -->
               <div id="supplier-statement-view" role="tabpanel" style="display:none">
-                <!-- Back button and Date filter bar -->
+                <!-- Back button, search and the number of entries (dates are in the title card) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-                  <button class="btn btn-secondary" id="btnBackToSupplierList" style="display: flex; align-items: center; gap: 6px; height: 38px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="19" y1="12" x2="5" y2="12"></line>
-                      <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-                    Back to Suppliers
-                  </button>
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">From:</label>
-                      <input type="date" id="statementSuppDateFrom" class="je-input" style="height: 38px; padding: 0 10px;" />
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <label style="font-size: 13px; font-weight: 600; color: var(--slate-600);">To:</label>
-                      <input type="date" id="statementSuppDateTo" class="je-input" style="height: 38px; padding: 0 10px;" />
+                  <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px;">
+                    <button type="button" class="kya-back-btn" id="btnBackToSupplierList" title="Back to Suppliers" aria-label="Back to Suppliers">
+                      <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true">
+                        <path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                    <div class="pt-search-wrap" style="position: relative; flex: 1; max-width: 560px; min-width: 0;">
+                      <svg class="pt-search-icon" width="16" height="16" viewBox="0 0 15 15" fill="none" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--slate-400); pointer-events: none;">
+                        <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      </svg>
+                      <input type="text" id="statementSuppSearchInput" class="pt-search-inp" placeholder="Search date, particular, voucher no., amount…" autocomplete="off" aria-label="Search this statement" style="width: 100%; height: 36px; padding: 8px 36px 8px 38px; font-size: 13px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; box-sizing: border-box; outline: none; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03);" onfocus="this.style.borderColor='var(--blue-500)'; this.style.boxShadow='0 0 0 3px rgba(37,99,235,0.1)';" onblur="this.style.borderColor='var(--slate-200)'; this.style.boxShadow='none';" />
+                      <button type="button" id="statementSuppSearchClear" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: var(--slate-400); cursor: pointer; font-size: 14px; padding: 4px; display: none; align-items: center; justify-content: center;" title="Clear search">✕</button>
                     </div>
                   </div>
+                  <span id="statementSuppEntryCount" title="Entries in this statement" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-size: 12.5px; font-weight: 600;">0</span>
                 </div>
 
                 <!-- Table Card -->
                 <div class="table-card" style="padding: 0; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 20px;">
-                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-100); display: flex; justify-content: space-between; align-items: center; background: var(--slate-50);">
+                  <div style="padding: 16px 20px; border-bottom: 1.5px solid var(--slate-200); display: flex; justify-content: space-between; align-items: center; background: #fff;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <h3 id="statementSuppName" style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0;">Supplier</h3>
                     </div>
-                    <span id="statementSuppSubGroupName" class="vd-badge font-mono" style="background:var(--blue-50);color:var(--blue-700)">Trade Payables</span>
+                    <span id="statementSuppSubGroupName" class="tb-badge" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #bae6fd; font-size:11px; padding:3px 8px; text-transform:none;">Trade Payables</span>
                   </div>
                   
                   <div id="statementSuppTableWrap" style="overflow-x: auto;">

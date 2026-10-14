@@ -863,14 +863,19 @@
             <span>${inv.isReturn ? 'Credit Note' : 'Tax Invoice'} &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${siEsc(inv.invoiceNo || 'Draft')}</span></span>
             ${isDraft && !compact ? '<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">Draft</span>' : ''}          </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
-            ${isDraft && !compact ? `
-            <button class="btn btn-secondary" id="btnSalesInvoiceEditDraft" type="button" style="padding:7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
+            ${!compact ? `
+            <button class="btn btn-secondary" id="btnSalesInvoiceEdit" type="button" style="padding:7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
               Edit
             </button>
+            ${isDraft ? `
             <button class="btn btn-success" id="btnSalesInvoicePostDraft" type="button" style="padding:7px 16px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
               <svg width="14" height="14" viewBox="0 0 15 15" fill="none"><path d="M2.5 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Post
+            </button>` : ''}
+            <button class="btn btn-secondary" id="btnSalesInvoiceDelete" type="button" style="padding:7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px; color:var(--red-600);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Delete
             </button>` : ''}
             <button class="btn btn-secondary" id="btnSalesInvoicePrint" type="button" style="padding:7px 14px; height:34px; font-size:13px; display:flex; align-items:center; gap:6px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -957,11 +962,22 @@
     const closeBtn = overlay.querySelector('#btnSalesInvoiceClose');
     if (closeBtn) closeBtn.addEventListener('click', () => overlay.remove());
 
-    // Draft: open it on the form to change it, or post it as it is (sales-records.js)
-    const editDraftBtn = overlay.querySelector('#btnSalesInvoiceEditDraft');
-    if (editDraftBtn) editDraftBtn.addEventListener('click', () => {
+    // Edit: the invoice opens on the Sales form; Delete asks first (sales-records.js).
+    // A draft can also be posted as it is.
+    const editBtn = overlay.querySelector('#btnSalesInvoiceEdit');
+    if (editBtn) editBtn.addEventListener('click', () => {
       overlay.remove();
-      if (typeof window.editSalesDraft === 'function') window.editSalesDraft(inv.id);
+      if (isDraft) {
+        if (typeof window.editSalesDraft === 'function') window.editSalesDraft(inv.id);
+      } else if (typeof window.loadSalesInvoice === 'function') {
+        window.loadSalesInvoice(inv, false);
+      }
+    });
+    const deleteBtn = overlay.querySelector('#btnSalesInvoiceDelete');
+    if (deleteBtn) deleteBtn.addEventListener('click', () => {
+      overlay.remove();
+      const fn = isDraft ? window.deleteSalesDraft : window.deleteSalesInvoice;
+      if (typeof fn === 'function') fn(inv.id);
     });
     const postDraftBtn = overlay.querySelector('#btnSalesInvoicePostDraft');
     if (postDraftBtn) postDraftBtn.addEventListener('click', () => {

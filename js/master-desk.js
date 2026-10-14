@@ -14804,8 +14804,8 @@
           <div class="oh-content-area">
             <div id="masterDeskBackBar" style="display: none; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--slate-50); border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 12px 16px;">
               <div style="display: flex; gap: 10px; align-items: center;">
-                <button class="btn btn-secondary" id="masterDeskBackBtn" type="button" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
-                  ← Back
+                <button type="button" class="kya-back-btn" id="masterDeskBackBtn" title="Back" aria-label="Back">
+                  <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
                 <button class="btn btn-secondary master-back-bar-nav" type="button" data-section="accounting" data-tab="group" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Group</button>
                 <button class="btn btn-secondary master-back-bar-nav" type="button" data-section="accounting" data-tab="ledger" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Ledger</button>
