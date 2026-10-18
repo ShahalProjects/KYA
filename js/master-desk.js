@@ -617,6 +617,59 @@
     wireCodeDescComboField(container, codePrefix, descPrefix, hsnList, 'HSN');
   }
 
+  // Selling Price (Master Desk > Stock Item): Markup on Rate %, Margin on Selling Price %
+  // and the Selling Price per unit (before GST) are worked out from the item's Rate.
+  // Typing in any one box fills the other two; changing the Rate keeps the Markup % and
+  // works the price out again.
+  function wireStockItemSellingPriceFields(container, prefix) {
+    const rateInp = container.querySelector('#' + prefix + 'Rate');
+    const markupInp = container.querySelector('#' + prefix + 'Markup');
+    const marginInp = container.querySelector('#' + prefix + 'Margin');
+    const priceInp = container.querySelector('#' + prefix + 'Price');
+    if (!rateInp || !markupInp || !marginInp || !priceInp) return;
+
+    const fmt = (n) => (Math.round(n * 100) / 100).toFixed(2);
+    const readNum = (inp) => {
+      const v = parseFloat(inp.value);
+      return inp.value.trim() === '' || isNaN(v) ? null : v;
+    };
+
+    const fillFrom = (source) => {
+      const rate = parseFloat(rateInp.value) || 0;
+      if (source === 'markup') {
+        const m = readNum(markupInp);
+        // No Rate, or a markup that leaves no price: nothing to work out
+        if (m === null || rate <= 0 || m <= -100) { marginInp.value = ''; priceInp.value = ''; return; }
+        const price = rate * (1 + m / 100);
+        priceInp.value = fmt(price);
+        marginInp.value = fmt((price - rate) / price * 100);
+      } else if (source === 'margin') {
+        const g = readNum(marginInp);
+        // A margin of 100% or more has no selling price
+        if (g === null || rate <= 0 || g >= 100) { markupInp.value = ''; priceInp.value = ''; return; }
+        const price = rate / (1 - g / 100);
+        priceInp.value = fmt(price);
+        markupInp.value = fmt((price - rate) / rate * 100);
+      } else {
+        const p = readNum(priceInp);
+        if (p === null || p <= 0 || rate <= 0) { markupInp.value = ''; marginInp.value = ''; return; }
+        markupInp.value = fmt((p - rate) / rate * 100);
+        marginInp.value = fmt((p - rate) / p * 100);
+      }
+    };
+
+    markupInp.addEventListener('input', () => fillFrom('markup'));
+    marginInp.addEventListener('input', () => fillFrom('margin'));
+    priceInp.addEventListener('input', () => fillFrom('price'));
+    rateInp.addEventListener('input', () => {
+      if (readNum(markupInp) !== null) fillFrom('markup');
+      else if (readNum(priceInp) !== null) fillFrom('price');
+    });
+
+    // A saved price (Alter) shows its Markup % and Margin %
+    if (readNum(priceInp) !== null) fillFrom('price');
+  }
+
   // SAC Code <-> Description (Master Desk > Ledger — Revenue from Operations group)
   // Backed by window.SAC_CODE_LIST ([code, description] pairs) from js/sac-codes.js.
   function wireSacCodeDescFields(container, codePrefix, descPrefix) {
@@ -9066,7 +9119,7 @@
           </div>
         </div>
 
-        <!-- Additional Details popup (HSN, Category, Warehouse, Opening Stock & Valuation) -->
+        <!-- Additional Details popup (HSN, Category, Warehouse, Opening Stock & Valuation, Selling Price) -->
         <style>
           /* Popup fields fill their grid column instead of overflowing it on narrow screens */
           #masterStockItemAddlModal .master-stock-item-addl-body input:not([type=hidden]),
@@ -9162,6 +9215,31 @@
                   </select>
                 </div>
               </div>
+
+              <div style="border-top: 1px dashed var(--slate-200); margin: 16px 0;"></div>
+
+              <!-- Selling Price: Markup %, Margin % and the price fill each other from the Rate -->
+              <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                  <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+                Selling Price
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end;">
+                <div>
+                  <label style="${siSmallLabelStyle}">Markup on Rate (%)</label>
+                  <input type="number" step="0.01" id="masterStockItemMarkup" placeholder="0.00" style="${siSmallInpStyle}">
+                </div>
+                <div>
+                  <label style="${siSmallLabelStyle}">Margin on Selling Price (%)</label>
+                  <input type="number" step="0.01" max="99.99" id="masterStockItemMargin" placeholder="0.00" style="${siSmallInpStyle}">
+                </div>
+                <div>
+                  <label style="${siSmallLabelStyle}">Selling Price / Unit (₹, excl. GST)</label>
+                  <input type="number" min="0" step="0.01" id="masterStockItemPrice" placeholder="0.00" style="${siSmallInpStyle}">
+                </div>
+              </div>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--slate-200);">
@@ -9192,6 +9270,7 @@
       };
       if (qtyInp) qtyInp.addEventListener('input', calcVal);
       if (rateInp) rateInp.addEventListener('input', calcVal);
+      wireStockItemSellingPriceFields(contentArea, 'masterStockItem');
 
       const saveBtn = contentArea.querySelector('#masterStockItemSaveBtn');
       const cancelBtn = contentArea.querySelector('#masterStockItemCancelBtn');
@@ -9246,7 +9325,8 @@
         masterStockItemSku: '', masterStockItemUomSel: defaultUom,
         masterStockItemHsnCode: '', masterStockItemHsnDesc: '',
         masterStockItemCategorySel: '', masterStockItemWarehouseSel: '',
-        masterStockItemQty: '', masterStockItemRate: '', masterStockItemReorder: '', masterStockItemGstSel: '18'
+        masterStockItemQty: '', masterStockItemRate: '', masterStockItemReorder: '', masterStockItemGstSel: '18',
+        masterStockItemMarkup: '', masterStockItemMargin: '', masterStockItemPrice: ''
       };
       const newStockItemRowState = () => ({ aliases: [], fields: Object.assign({}, STOCK_ITEM_FIELD_DEFAULTS) });
 
@@ -9549,11 +9629,13 @@
           const createdItems = [];
           rows.forEach((row, i) => {
             const f = row.fields;
+            // SKU is optional: left blank, it stays blank (no code is made up)
             const sku = (f.masterStockItemSku || '').trim();
-            createdItems.push({
+            const price = parseFloat(f.masterStockItemPrice);
+            const item = {
               id: 'item-' + now + (i ? '-' + i : ''),
               name: row.name,
-              sku: sku || ('SKU-' + (now + i).toString().slice(-4)),
+              sku: sku,
               group: row.group,
               category: f.masterStockItemCategorySel || '',
               uom: f.masterStockItemUomSel || 'Pcs',
@@ -9566,7 +9648,10 @@
               hsnCode: (f.masterStockItemHsnCode || '').trim(),
               hsnDesc: (f.masterStockItemHsnDesc || '').trim(),
               aliases: row.aliases
-            });
+            };
+            // Selling Price per unit, before GST. Left off when blank, so sales keep using the Rate.
+            if (price > 0) item.price = price;
+            createdItems.push(item);
           });
           _masterStockItems.push(...createdItems);
           persistMasterStockItems();
@@ -13745,6 +13830,30 @@
                 </div>
               </div>
             </div>
+            <!-- Selling Price: Markup %, Margin % and the price fill each other from the Rate -->
+            <div style="background: #f8fafc; border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+              <div style="font-size: 13px; font-weight: 700; color: var(--slate-800); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                  <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+                Selling Price
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end;">
+                <div>
+                  <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">Markup on Rate (%)</label>
+                  <input type="number" step="0.01" id="masterAlterStockItemMarkup" placeholder="0.00" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                </div>
+                <div>
+                  <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">Margin on Selling Price (%)</label>
+                  <input type="number" step="0.01" max="99.99" id="masterAlterStockItemMargin" placeholder="0.00" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                </div>
+                <div>
+                  <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">Selling Price / Unit (₹, excl. GST)</label>
+                  <input type="number" min="0" step="0.01" id="masterAlterStockItemPrice" value="${(typeof currentItem.price === 'number' && currentItem.price > 0) ? currentItem.price : ''}" placeholder="0.00" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
+                </div>
+              </div>
+            </div>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--slate-200);">
                 <button type="button" class="btn btn-primary" id="masterAlterStockItemAddlDoneBtn" style="height: 38px; padding: 8px 18px; font-size: 13px; font-weight: 600;">Done</button>
@@ -13771,7 +13880,7 @@
         initSearchableSelectHelper(contentArea, 'masterAlterStockItemWarehouseSel', 'Select Warehouse / Godown');
         wireHsnCodeDescFields(contentArea, 'masterAlterStockItemHsnCode', 'masterAlterStockItemHsnDesc');
 
-        // Additional Details popup (HSN, Category, Warehouse, Opening Stock & Valuation), like Create
+        // Additional Details popup (HSN, Category, Warehouse, Opening Stock & Valuation, Selling Price), like Create
         wireAlterAddlPopup(contentArea, 'masterAlterStockItem', {
           subtitle: () => {
             const nm = contentArea.querySelector('#masterAlterStockItemName');
@@ -13790,6 +13899,7 @@
         };
         if (qtyInp) qtyInp.addEventListener('input', calcVal);
         if (rateInp) rateInp.addEventListener('input', calcVal);
+        wireStockItemSellingPriceFields(contentArea, 'masterAlterStockItem');
 
         const saveBtn = contentArea.querySelector('#masterAlterStockItemSaveBtn');
         const cancelBtn = contentArea.querySelector('#masterAlterStockItemCancelBtn');
@@ -13819,6 +13929,7 @@
             const gst = isNaN(gstRaw) ? 18 : gstRaw;
             const hsnCode = contentArea.querySelector('#masterAlterStockItemHsnCode')?.value?.trim() || '';
             const hsnDesc = contentArea.querySelector('#masterAlterStockItemHsnDesc')?.value?.trim() || '';
+            const price = parseFloat(contentArea.querySelector('#masterAlterStockItemPrice')?.value);
 
             currentItem.name = name;
             currentItem.sku = sku;
@@ -13832,6 +13943,9 @@
             currentItem.gst = gst;
             currentItem.hsnCode = hsnCode;
             currentItem.hsnDesc = hsnDesc;
+            // Selling Price per unit, before GST. Cleared, sales go back to using the Rate.
+            if (price > 0) currentItem.price = price;
+            else delete currentItem.price;
             currentItem.aliases = _masterAlterStockItemAliases.filter(a => a.trim() !== '');
 
             persistMasterStockItems();

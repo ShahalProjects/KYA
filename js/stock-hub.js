@@ -46,7 +46,7 @@
   // Navigation State
   // Top Action Buttons: 'overview', 'item', 'group', 'category', 'unit', 'warehouse'
   let _activeTopTab = 'overview';
-  // Sub-tabs: 'details', 'items', 'movement', 'analysis'
+  // Sub-tabs: 'details', 'movement', 'analysis'
   let _activeLeftSubtab = 'details';
 
   // Filters state
@@ -54,16 +54,17 @@
   let _selectedCategory = 'all';
   let _selectedStatus = 'all';
   let _selectedWarehouse = 'all';
-  let _movementTypeFilter = 'all';
 
-  // Optional dynamic columns state for Stock Item list (Unit, Group, Category, Warehouse hidden by default)
+  // Optional columns of the Stock List (Group, Category, Warehouse, Tax Rate hidden by default)
   let _stockItemOptionalCols = {
-    unit: false,
     group: false,
     category: false,
-    warehouse: false
+    warehouse: false,
+    gst: false
   };
   let _isStockColDropdownOpen = false;
+  // Stock List sort: column key and 'asc' | 'desc'; no column = master order
+  let _stockListSort = { col: '', dir: '' };
 
   // Get active items synchronized with Master Desk if available
   function getStockItems() {
@@ -81,7 +82,7 @@
       return {
         id: item.id || 'STK-' + (item.sku || Math.random().toString(36).substr(2, 4)),
         name: item.name || 'Unnamed Item',
-        sku: item.sku || 'SKU-000',
+        sku: item.sku || '',
         group: item.group || 'General',
         category: item.category || '',
         uom: item.uom || 'Pcs',
@@ -548,600 +549,76 @@
         gap: 10px;
       }
 
-      /* ── Stock Overview dashboard (Overview → Details) ── */
-      .sho { display: flex; flex-direction: column; gap: 18px; }
-      .sho-grid-2 {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
-        gap: 18px;
-      }
-      .sho-card {
-        background: #ffffff;
-        border: 1px solid var(--slate-200);
-        border-radius: 14px;
-        padding: 18px 20px;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-        min-width: 0;
-      }
-      .sho-card-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 14px;
-      }
-      .sho-card-title { font-size: 14px; font-weight: 700; color: var(--slate-800); }
-      .sho-card-sub { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
-      .sho-subhead {
-        font-size: 11.5px;
-        font-weight: 700;
-        color: var(--slate-500);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        margin: 16px 0 6px;
-        padding-top: 14px;
-        border-top: 1px solid var(--slate-100);
-      }
-      .sho-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        background: none;
-        border: none;
-        padding: 4px 0;
-        font: 600 12px var(--font-main);
-        color: var(--blue-600);
-        cursor: pointer;
-        white-space: nowrap;
-        flex-shrink: 0;
-      }
-      .sho-link:hover { color: var(--blue-800); text-decoration: underline; }
-      .sho-link:focus-visible, .sho-btn:focus-visible, .sho-seg button:focus-visible, .sho-tile.clickable:focus-visible, .sho-col:focus-visible {
-        outline: 2px solid var(--blue-500);
-        outline-offset: 2px;
-      }
-      .sho-more { margin-top: 10px; }
-      .sho-trunc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .sho-muted-empty {
-        font-size: 12.5px;
-        color: var(--slate-400);
-        text-align: center;
-        padding: 22px 8px;
-        background: var(--slate-50);
-        border-radius: 10px;
-      }
+      /* ── Details (Overview → Details): KPI cards styled like the KYA Dashboard ── */
+      .shd { container-type: inline-size; }
+      .shd-kpi-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+      .shd-kpi-strip .db-kpi-card, .shd-pnl-strip .db-kpi-card { padding-bottom: 18px; cursor: default; }
+      .shd-kpi-strip .db-kpi-top, .shd-pnl-strip .db-kpi-top { margin-bottom: 14px; }
+      .shd-kpi-strip .db-kpi-value, .shd-pnl-strip .db-kpi-value { overflow-wrap: anywhere; }
+      .shd-pnl-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+      .shd-method { display: inline-flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--slate-100); border: 1px solid var(--slate-200); }
+      .shd-method button { font-family: var(--font-main); font-size: 11px; font-weight: 700; padding: 3px 8px; border: 0; border-radius: 5px; background: transparent; color: var(--slate-500); cursor: pointer; white-space: nowrap; }
+      .shd-method button:hover { color: var(--blue-700); }
+      .shd-method button.active { background: #ffffff; color: var(--blue-700); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
 
-      /* Buttons */
-      .sho-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-      .sho-btn {
-        height: 36px;
-        padding: 0 14px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font: 600 13px var(--font-main);
-        border-radius: 9px;
-        border: 1.5px solid var(--slate-200);
-        background: #ffffff;
-        color: var(--slate-700);
-        cursor: pointer;
-        white-space: nowrap;
-        transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-      }
-      .sho-btn:hover { border-color: var(--blue-300); color: var(--blue-700); }
-      .sho-btn.primary {
-        background: var(--blue-600);
-        border-color: var(--blue-600);
-        color: #ffffff;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
-      }
-      .sho-btn.primary:hover { background: var(--blue-700); border-color: var(--blue-700); color: #ffffff; }
-      .sho-btn.sm { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 8px; }
+      /* Stock List: Columns icon and ⋮ menu in the title card, sortable headers */
+      .stock-head-actions { position: relative; z-index: 5; display: flex; align-items: center; gap: 8px; margin-left: auto; }
+      .stock-col-wrap { position: relative; }
+      .stock-table th[data-stock-sort], .stock-table th[data-mov-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+      .stock-table th[data-stock-sort]:hover, .stock-table th[data-mov-sort]:hover { color: var(--slate-900); }
+      .stock-sort-ico { font-size: 10px; color: #94a3b8; opacity: 0.6; margin-left: 5px; }
+      .stock-sort-ico.on { color: #2563eb; opacity: 1; font-weight: 800; }
 
-      /* Hero */
-      .sho-hero {
-        border-radius: 16px;
-        padding: 22px 24px 18px;
-        background: linear-gradient(135deg, var(--blue-50) 0%, #ffffff 65%);
-        border: 1px solid var(--blue-100);
-      }
-      .sho-hero-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        flex-wrap: wrap;
-      }
-      .sho-eyebrow {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--slate-500);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-      .sho-dot-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--slate-300); }
-      .sho-hero-val {
-        font-size: 40px;
-        font-weight: 800;
-        color: var(--slate-900);
-        letter-spacing: -0.02em;
-        line-height: 1.15;
-        margin-top: 4px;
-        overflow-wrap: anywhere;
-      }
-      .sho-hero-val .sho-cur { font-size: 26px; font-weight: 700; color: var(--slate-500); margin-right: 4px; }
-      .sho-hero-val .sho-dec { font-size: 22px; font-weight: 700; color: var(--slate-400); }
-      .sho-hero-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 16px;
-        margin-top: 8px;
-        font-size: 12.5px;
-        color: var(--slate-600);
-      }
-      .sho-hero-meta strong { color: var(--slate-900); font-weight: 700; }
-      .sho-health { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--blue-100); }
-      .sho-health-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        font-size: 12.5px;
-        font-weight: 600;
-        color: var(--slate-700);
-        margin-bottom: 8px;
-      }
-      .sho-health-head span:last-child { font-weight: 500; color: var(--slate-500); }
-      .sho-health-head strong { color: var(--slate-900); font-weight: 700; }
-      .sho-meter {
-        display: flex;
-        gap: 2px;
-        height: 10px;
-        border-radius: 5px;
-        overflow: hidden;
-        background: var(--slate-100);
-      }
-      .sho-meter > span { display: block; height: 100%; min-width: 4px; }
-      .sho-meter.abc { margin-bottom: 12px; }
-      .sho-legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 18px;
-        margin-top: 10px;
-        font-size: 12px;
-        color: var(--slate-600);
-      }
-      .sho-legend-item { display: inline-flex; align-items: center; gap: 6px; }
-      .sho-legend-item strong { color: var(--slate-900); font-weight: 700; }
-      .sho-status-ico {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: #ffffff;
-        flex-shrink: 0;
-      }
-      .sho-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+      /* Stock Movement: search row, Qty group header, grand total */
+      .stock-mov-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+      .stock-mov-table th.grp { text-align: center; border-bottom: 1px solid var(--slate-200); }
+      .stock-mov-table th.num, .stock-mov-table td.num { text-align: right; }
+      .stock-mov-table tfoot td { font-weight: 800; color: var(--slate-900); background: var(--slate-50); border-top: 2px solid var(--slate-200); }
 
-      /* Stat tiles */
-      .sho-tiles {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr));
-        gap: 12px;
-      }
-      .sho-tile {
-        background: #ffffff;
-        border: 1px solid var(--slate-200);
-        border-radius: 12px;
-        padding: 14px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        min-width: 0;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-      }
-      .sho-tile.clickable { cursor: pointer; }
-      .sho-tile.clickable:hover { border-color: var(--blue-300); box-shadow: var(--shadow-md); transform: translateY(-1px); }
-      .sho-tile-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--slate-500); }
-      .sho-tile-ico {
-        width: 26px;
-        height: 26px;
-        border-radius: 7px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .sho-tile-val {
-        font-size: 21px;
-        font-weight: 800;
-        color: var(--slate-900);
-        margin-top: 6px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .sho-tile-sub { font-size: 11.5px; color: var(--slate-500); line-height: 1.4; }
-      .sho-delta { font-weight: 600; }
-      .sho-delta.good { color: var(--emerald-700); }
-      .sho-delta.bad { color: var(--red-700); }
-      .sho-delta.neutral { color: var(--slate-600); }
-
-      /* All-clear note */
-      .sho-ok {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        padding: 14px;
-        border-radius: 10px;
-        background: var(--emerald-50);
-        border: 1px solid var(--emerald-100);
-        font-size: 12.5px;
-        color: var(--slate-600);
-      }
-      .sho-ok strong { display: block; color: var(--emerald-800); font-weight: 700; }
-      .sho-ok-ico {
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        background: var(--emerald-500);
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-
-      /* Needs attention */
-      .sho-att-list { display: flex; flex-direction: column; }
-      .sho-att-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--slate-100);
-      }
-      .sho-att-row:first-child { padding-top: 0; }
-      .sho-att-row:last-child { border-bottom: none; padding-bottom: 0; }
-      .sho-att-main { flex: 1; min-width: 0; }
-      .sho-att-name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--slate-800); }
-      .sho-pill { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; }
-      .sho-pill.out { background: var(--red-50); color: var(--red-700); border: 1px solid var(--red-200); }
-      .sho-pill.low { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-      .sho-mini-meter { height: 6px; border-radius: 3px; overflow: hidden; margin: 7px 0 5px; }
-      .sho-mini-meter > span { display: block; height: 100%; border-radius: 3px; }
-      .sho-mini-meter.low { background: #fef3c7; }
-      .sho-mini-meter.low > span { background: var(--warning); }
-      .sho-mini-meter.out { background: var(--red-100); }
-      .sho-att-qty { font-size: 11.5px; color: var(--slate-500); }
-
-      /* Insights */
-      .sho-insights { display: flex; flex-direction: column; gap: 8px; }
-      .sho-insight {
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-        font-size: 12.5px;
-        line-height: 1.5;
-        color: var(--slate-600);
-        padding: 10px 12px;
-        border-radius: 10px;
-        background: var(--slate-50);
-        border: 1px solid var(--slate-100);
-      }
-      .sho-insight strong { color: var(--slate-900); font-weight: 700; }
-      .sho-insight-ico {
-        width: 26px;
-        height: 26px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .sho-insight-ico.warn { background: #fffbeb; color: #b45309; }
-      .sho-insight-ico.info { background: var(--blue-50); color: var(--blue-700); }
-      .sho-insight-ico.muted { background: var(--slate-100); color: var(--slate-600); }
-
-      /* Purchases vs sales chart */
-      .sho-chart { position: relative; }
-      .sho-plot {
-        position: relative;
-        height: 150px;
-        margin-left: 46px;
-        border-bottom: 1px solid var(--slate-300);
-      }
-      .sho-grid-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--slate-100); }
-      .sho-ytick {
-        position: absolute;
-        left: -46px;
-        width: 40px;
-        text-align: right;
-        font-size: 10.5px;
-        color: var(--slate-400);
-        transform: translateY(50%);
-        font-variant-numeric: tabular-nums;
-      }
-      .sho-cols { position: absolute; inset: 0; display: flex; }
-      .sho-col {
-        flex: 1;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        gap: 2px;
-        border-radius: 6px 6px 0 0;
-        outline-offset: -2px;
-        cursor: default;
-      }
-      .sho-col:hover, .sho-col:focus-visible { background: rgba(37, 99, 235, 0.06); }
-      .sho-bar { display: block; width: min(14px, 32%); border-radius: 4px 4px 0 0; }
-      .sho-plot-empty {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 0 16px;
-        font-size: 12px;
-        color: var(--slate-400);
-        pointer-events: none;
-      }
-      .sho-xlabels { display: flex; margin-left: 46px; }
-      .sho-xlabels span {
-        flex: 1;
-        text-align: center;
-        font-size: 10.5px;
-        color: var(--slate-400);
-        padding-top: 6px;
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
-      }
-      .sho-tip {
-        position: absolute;
-        top: 0;
-        left: 0;
-        transform: translate(-50%, calc(-100% - 6px));
-        background: var(--slate-900);
-        color: #ffffff;
-        border-radius: 8px;
-        padding: 8px 10px;
-        font-size: 11.5px;
-        box-shadow: var(--shadow-lg);
-        white-space: nowrap;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.12s ease;
-        z-index: 5;
-      }
-      .sho-tip.show { opacity: 1; }
-      .sho-tip-head { font-weight: 700; margin-bottom: 4px; color: var(--slate-200); }
-      .sho-tip-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; line-height: 1.7; }
-      .sho-tip-row > span { display: inline-flex; align-items: center; gap: 6px; }
-      .sho-table-wrap { overflow-x: auto; }
-      .sho-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      .sho-table th {
-        text-align: left;
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--slate-500);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        padding: 6px 8px;
-        border-bottom: 1px solid var(--slate-200);
-      }
-      .sho-table td { padding: 6px 8px; border-bottom: 1px solid var(--slate-100); color: var(--slate-700); white-space: nowrap; }
-      .sho-table th:first-child, .sho-table td:first-child { padding-left: 0; }
-      .sho-table th:last-child, .sho-table td:last-child { padding-right: 0; }
-      .sho-table tfoot td { font-weight: 700; color: var(--slate-900); border-bottom: none; border-top: 1px solid var(--slate-200); }
-      .sho-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-
-      /* Top movers */
-      .sho-rank-list { display: flex; flex-direction: column; }
-      .sho-rank-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 9px 0;
-        border-bottom: 1px solid var(--slate-100);
-      }
-      .sho-rank-row:first-child { padding-top: 0; }
-      .sho-rank-row:last-child { border-bottom: none; padding-bottom: 0; }
-      .sho-rank-n {
-        width: 22px;
-        height: 22px;
-        border-radius: 6px;
-        background: var(--slate-100);
-        color: var(--slate-600);
-        font-size: 11px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .sho-rank-main { flex: 1; min-width: 0; }
-      .sho-rank-name { font-size: 13px; font-weight: 600; color: var(--slate-800); }
-      .sho-rank-sub { font-size: 11.5px; color: var(--slate-500); margin-top: 1px; }
-      .sho-cover {
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 8px;
-        border-radius: 20px;
-        background: var(--slate-100);
-        color: var(--slate-600);
-        white-space: nowrap;
-        flex-shrink: 0;
-      }
-      .sho-cover.warn { background: #fffbeb; color: #b45309; }
-
-      /* Where the value sits */
-      .sho-seg { display: inline-flex; background: var(--slate-100); border-radius: 8px; padding: 3px; gap: 2px; flex-shrink: 0; }
-      .sho-seg button {
-        border: none;
-        background: transparent;
-        font: 600 12px var(--font-main);
-        color: var(--slate-600);
-        padding: 5px 10px;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-      .sho-seg button:hover { color: var(--slate-900); }
-      .sho-seg button.active { background: #ffffff; color: var(--blue-700); box-shadow: var(--shadow-sm); }
-      .sho-card > .sho-seg { margin-bottom: 14px; }
-      .sho-hbars { display: flex; flex-direction: column; gap: 12px; }
-      .sho-hbar-row { font-size: 12.5px; }
-      .sho-hbar-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
-      .sho-hbar-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--slate-800); font-weight: 600; }
-      .sho-hbar-name .muted { color: var(--slate-500); font-weight: 500; }
-      .sho-hbar-count { font-size: 11px; font-weight: 500; color: var(--slate-400); white-space: nowrap; flex-shrink: 0; }
-      .sho-hbar-track { height: 8px; min-width: 0; }
-      .sho-hbar-track > span { display: block; height: 100%; min-width: 2px; background: ${SHO_CLR_IN}; border-radius: 0 4px 4px 0; }
-      .sho-hbar-val { font-weight: 700; color: var(--slate-800); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; flex-shrink: 0; }
-      .sho-hbar-val span { font-weight: 500; color: var(--slate-400); margin-left: 2px; }
-
-      /* Value concentration */
-      .sho-abc-rows { display: flex; flex-direction: column; gap: 6px; }
-      .sho-abc-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
-      .sho-abc-k { font-weight: 700; color: var(--slate-800); width: 56px; }
-      .sho-abc-n { color: var(--slate-500); flex: 1; }
-      .sho-abc-v { font-weight: 700; color: var(--slate-800); font-variant-numeric: tabular-nums; }
-      .sho-abc-v span { font-weight: 500; color: var(--slate-400); margin-left: 2px; }
-      .sho-top-list { display: flex; flex-direction: column; }
-      .sho-top-row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 7px 0;
-        font-size: 12.5px;
-        border-bottom: 1px solid var(--slate-100);
-      }
-      .sho-top-row:last-child { border-bottom: none; padding-bottom: 0; }
-      .sho-top-row .sho-trunc { flex: 1; font-weight: 600; color: var(--slate-800); }
-      .sho-abc-badge {
-        width: 18px;
-        height: 18px;
-        border-radius: 5px;
-        color: #ffffff;
-        font-size: 10.5px;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .sho-top-qty { color: var(--slate-500); font-size: 11.5px; white-space: nowrap; }
-      .sho-top-val { font-weight: 700; color: var(--slate-900); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
-
-      /* Recent activity */
-      .sho-act-list { display: flex; flex-direction: column; }
-      .sho-act-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--slate-100);
-      }
-      .sho-act-row:first-child { padding-top: 0; }
-      .sho-act-row:last-child { border-bottom: none; padding-bottom: 0; }
-      .sho-act-ico {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .sho-act-main { flex: 1; min-width: 0; }
-      .sho-act-title { font-size: 13px; font-weight: 600; color: var(--slate-800); }
-      .sho-act-sub { font-size: 11.5px; color: var(--slate-500); margin-top: 1px; }
-      .sho-act-right { text-align: right; flex-shrink: 0; }
-      .sho-act-val { font-size: 13px; font-weight: 700; color: var(--slate-900); font-variant-numeric: tabular-nums; }
-      .sho-act-date { font-size: 11px; color: var(--slate-400); margin-top: 1px; }
-
-      /* Empty (no stock items yet) */
-      .sho-empty {
-        text-align: center;
-        padding: 40px 24px;
-        border: 1.5px dashed var(--slate-200);
-        border-radius: 16px;
-        background: linear-gradient(180deg, var(--blue-50) 0%, #ffffff 55%);
-      }
-      .sho-empty-ico {
-        width: 56px;
-        height: 56px;
-        border-radius: 16px;
-        background: #ffffff;
-        color: var(--blue-600);
-        border: 1px solid var(--blue-100);
-        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.12);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 14px;
-      }
-      .sho-empty-title { font-size: 18px; font-weight: 800; color: var(--slate-900); }
-      .sho-empty-sub { font-size: 13px; color: var(--slate-500); max-width: 440px; margin: 6px auto 22px; line-height: 1.5; }
-      .sho-empty-steps {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
-        gap: 10px;
-        margin: 0 auto 22px;
-        max-width: 640px;
-        text-align: left;
-      }
-      .sho-step {
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-        background: #ffffff;
-        border: 1px solid var(--slate-200);
-        border-radius: 12px;
-        padding: 12px;
-        font-size: 12px;
-        color: var(--slate-500);
-      }
-      .sho-step strong { display: block; font-size: 13px; color: var(--slate-800); margin-bottom: 2px; }
-      .sho-step-n {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: var(--blue-600);
-        color: #ffffff;
-        font-size: 11px;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-
-      /* The overview sizes itself to its own width (sidebar state changes it), not the window's */
-      .sho { container-type: inline-size; }
+      /* Details: voucher calendar card, same shell as the KPI cards */
+      .shd-cal { position: relative; margin-top: 16px; background: var(--white); border: 1.5px solid var(--slate-200); border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+      .shd-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+      .shd-slider { position: relative; display: inline-flex; gap: 2px; padding: 3px; max-width: 100%; overflow-x: auto; scrollbar-width: none; border-radius: 10px; background: var(--slate-100); border: 1px solid var(--slate-200); }
+      .shd-slider::-webkit-scrollbar { display: none; }
+      .shd-slider-thumb { position: absolute; top: 3px; bottom: 3px; left: 0; width: 0; border-radius: 7px; background: #ffffff; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); transition: left .25s var(--ease), width .25s var(--ease); }
+      .shd-slider.no-anim .shd-slider-thumb { transition: none; }
+      .shd-slider button { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-radius: 7px; background: transparent; font-family: var(--font-main); font-size: 12px; font-weight: 600; color: var(--slate-500); cursor: pointer; white-space: nowrap; }
+      .shd-slider button:hover { color: var(--slate-800); }
+      .shd-slider button.active { color: var(--slate-900); font-weight: 700; }
+      .shd-slider-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+      .shd-cal-nav { display: inline-flex; align-items: center; gap: 6px; }
+      .shd-cal-nav button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--slate-200); background: #ffffff; color: var(--slate-600); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+      .shd-cal-nav button:hover { border-color: var(--blue-300); color: var(--blue-700); }
+      .shd-cal-title { min-width: 120px; text-align: center; font-size: 13.5px; font-weight: 700; color: var(--slate-900); }
+      .shd-cal-week, .shd-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+      .shd-cal-week { margin-bottom: 6px; }
+      .shd-cal-week span { font-size: 11px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; letter-spacing: .04em; padding-left: 8px; }
+      .shd-cal-cell { height: 44px; border-radius: 8px; background: var(--slate-50); color: var(--slate-500); font-size: 12px; font-weight: 600; padding: 6px 8px; box-sizing: border-box; }
+      .shd-cal-cell.blank { background: transparent; }
+      .shd-cal-cell.has { cursor: default; font-weight: 700; }
+      .shd-cal-cell.has:hover, .shd-cal-cell.has:focus-visible { outline: 2px solid var(--slate-900); outline-offset: 1px; }
+      .shd-cal-cell.today span { font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+      .shd-cal-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 12px; font-size: 11px; color: var(--slate-500); }
+      .shd-cal-legend span { margin: 0 4px; }
+      .shd-cal-legend i { width: 12px; height: 12px; border-radius: 3px; }
+      .shd-cal-tip { position: absolute; z-index: 20; top: 0; left: 0; width: 260px; max-width: calc(100% - 16px); box-sizing: border-box; background: #ffffff; border: 1px solid var(--slate-200); border-radius: 10px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16); padding: 10px 12px; font-size: 12px; color: var(--slate-700); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s; }
+      .shd-cal-tip.show { opacity: 1; visibility: visible; }
+      .shd-tip-head { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--slate-900); padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--slate-100); }
+      .shd-tip-kv { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 4px 0; color: var(--slate-600); }
+      .shd-tip-kv strong { color: var(--slate-900); white-space: nowrap; }
+      .shd-tip-sep { height: 1px; margin: 4px 0; background: var(--slate-100); }
       @container (max-width: 520px) {
-        .sho-hero { padding: 16px; }
-        .sho-hero-val { font-size: 30px; }
-        .sho-hero-val .sho-cur { font-size: 20px; }
-        .sho-hero-val .sho-dec { font-size: 18px; }
-        .sho-hero-top > .sho-actions { width: 100%; }
-        .sho-hero-top > .sho-actions .sho-btn { flex: 1 1 auto; justify-content: center; padding: 0 10px; }
-        .sho-card { padding: 16px; }
-        .sho-card-head { flex-wrap: wrap; }
-        .sho-top-qty { display: none; }
+        .shd-cal { padding: 14px; }
+        .shd-cal-nav { width: 100%; justify-content: space-between; }
+        .shd-cal-title { min-width: 0; }
+        .shd-cal-week, .shd-cal-grid { gap: 4px; }
+        .shd-cal-week span { padding-left: 0; text-align: center; font-size: 0; letter-spacing: 0; }
+        .shd-cal-week span::after { content: attr(data-short); font-size: 10px; }
+        .shd-cal-cell { height: 36px; padding: 4px; text-align: center; }
       }
-      @container (max-width: 360px) {
-        .sho-hero-val { font-size: 24px; white-space: nowrap; }
-        .sho-hero-top > .sho-actions .sho-btn { flex-basis: 100%; }
-        .sho-health-head { flex-direction: column; gap: 2px; }
-        .sho-top-val { min-width: 0; }
-        .sho-act-ico { display: none; }
-        .sho-seg { display: flex; }
-        .sho-seg button { flex: 1; padding: 5px 4px; }
-      }
+      @container (max-width: 900px) { .shd-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @container (max-width: 600px) { .shd-pnl-strip { grid-template-columns: 1fr; } }
+      @container (max-width: 380px) { .shd-kpi-strip { grid-template-columns: 1fr; } }
       @media (max-width: 600px) {
         #panel-stock-hub .je-form-card > .sho-shell-body { padding: 14px !important; }
         #panel-stock-hub #stockHubContentArea { padding: 12px !important; }
@@ -1249,23 +726,7 @@
           <span class="oh-tab-text">Details</span>
         </button>
 
-        <!-- 2. Stock List (Second!) -->
-        <button class="oh-sub-tab ${_activeLeftSubtab === 'items' ? 'active' : ''}" data-subtab="items" role="tab" aria-selected="${_activeLeftSubtab === 'items'}">
-          <div class="oh-tab-icon-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="8" y1="6" x2="21" y2="6"></line>
-              <line x1="8" y1="12" x2="21" y2="12"></line>
-              <line x1="8" y1="18" x2="21" y2="18"></line>
-              <line x1="3" y1="6" x2="3.01" y2="6"></line>
-              <line x1="3" y1="12" x2="3.01" y2="12"></line>
-              <line x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
-          </div>
-          <span class="oh-tab-text">Stock List</span>
-          <span class="oh-sub-tab-badge">${stockItems.length}</span>
-        </button>
-
-        <!-- 3. Movement (Third!) -->
+        <!-- 2. Movement (Second!) -->
         <button class="oh-sub-tab ${_activeLeftSubtab === 'movement' ? 'active' : ''}" data-subtab="movement" role="tab" aria-selected="${_activeLeftSubtab === 'movement'}">
           <div class="oh-tab-icon-wrap">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1279,7 +740,7 @@
           <span class="oh-sub-tab-badge">${_stockMovements.length}</span>
         </button>
 
-        <!-- 4. Analysis (Fourth!) -->
+        <!-- 3. Analysis (Third!) -->
         <button class="oh-sub-tab ${_activeLeftSubtab === 'analysis' ? 'active' : ''}" data-subtab="analysis" role="tab" aria-selected="${_activeLeftSubtab === 'analysis'}">
           <div class="oh-tab-icon-wrap">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1296,890 +757,693 @@
   }
 
   // ==========================================
-  // SUB-TAB 1: DETAILS VIEW (Stock Overview dashboard)
+  // SUB-TAB 1: DETAILS VIEW (Dashboard-style KPI cards)
   // ==========================================
-  // Breakdown dimension for the "Where the value sits" card: 'group' | 'category' | 'warehouse'
-  let _shoBreakdown = 'group';
-  // The weekly purchases-vs-sales card shows a table instead of the chart when true
-  let _shoFlowAsTable = false;
+  // Cost formula for the Stock Valuation card: 'avg' (weighted average) or 'fifo'
+  const KYA_STOCK_VAL_METHOD_KEY = 'kya_stock_valuation_method';
+  let _stockValMethod = 'avg';
+  try { if (localStorage.getItem(KYA_STOCK_VAL_METHOD_KEY) === 'fifo') _stockValMethod = 'fifo'; } catch (e) {}
 
-  const SHO_DAY_MS = 86400000;
-  const SHO_FLOW_WEEKS = 8;
-  const SHO_IDLE_DAYS = 90;
-  // Chart series (validated pair) and ABC ordinal ramp (validated light→dark on white)
-  const SHO_CLR_IN = '#2563eb';
-  const SHO_CLR_OUT = '#eb6834';
-  const SHO_CLR_ABC = { A: '#1e3a8a', B: '#2563eb', C: '#60a5fa' };
-
-  const SHO_ICONS = {
-    box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
-    plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
-    swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
-    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
-    down: '<path d="M12 3v13"/><polyline points="6 11 12 17 18 11"/><path d="M4 21h16"/>',
-    up: '<path d="M12 21V8"/><polyline points="6 13 12 7 18 13"/><path d="M4 3h16"/>',
-    alert: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
-    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-    check: '<polyline points="20 6 9 17 4 12"/>',
-    x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
-    bang: '<line x1="12" y1="6" x2="12" y2="13"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
-    bulb: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
-    pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
-    tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
-    home: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-8a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8"/>',
-    cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
-    receipt: '<path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="14" y2="13"/>',
-    undo: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
-    arrow: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>'
-  };
-
-  function shoIcon(name, size, strokeWidth) {
-    const s = size || 16;
-    return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth || 2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SHO_ICONS[name] || ''}</svg>`;
-  }
-
-  // Voucher dates are YYYY-MM-DD (movements add " HH:MM"); anything else falls back to Date parsing.
-  function shoParseDate(val) {
-    if (val === null || val === undefined || val === '') return null;
-    if (typeof val === 'number') {
-      const d = new Date(val);
-      return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    }
-    const s = String(val).trim();
-    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
-    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
-    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
-    const d = new Date(s);
-    return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  }
-
-  function shoDaysAgo(date, today) {
-    return Math.round((today - date) / SHO_DAY_MS);
-  }
-
-  function shoCompactInr(val) {
-    const n = Number(val) || 0;
-    const a = Math.abs(n);
-    const sign = n < 0 ? '-' : '';
-    const trim = x => (x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2)).replace(/\.0+$|(\.\d*[1-9])0+$/, '$1');
-    if (a >= 1e7) return sign + '₹' + trim(a / 1e7) + ' Cr';
-    if (a >= 1e5) return sign + '₹' + trim(a / 1e5) + ' L';
-    if (a >= 1e3) return sign + '₹' + trim(a / 1e3) + 'K';
-    return sign + '₹' + Math.round(a).toLocaleString('en-IN');
-  }
-
-  // Whole rupees for tiles; crores switch to the compact form so the tile never overflows.
-  function shoTileInr(val) {
-    const n = Number(val) || 0;
-    return Math.abs(n) >= 1e7 ? shoCompactInr(n) : '₹' + Math.round(n).toLocaleString('en-IN');
-  }
-
-  function shoFmtQty(q) {
-    return (Number(q) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-  }
-
-  function shoShortDate(d) {
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-  }
-
-  function shoRelDate(d, today) {
-    const n = shoDaysAgo(d, today);
-    if (n < 0) return shoShortDate(d);
-    if (n === 0) return 'Today';
-    if (n === 1) return 'Yesterday';
-    if (n < 7) return n + ' days ago';
-    return shoShortDate(d);
-  }
-
-  function shoNiceMax(v) {
-    if (v <= 0) return 1;
-    const pow = Math.pow(10, Math.floor(Math.log10(v)));
-    const n = v / pow;
-    const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
-    return step * pow;
-  }
-
-  function shoVendorName(v) {
-    const id = String(v.vendorId || '');
-    const store = window.KYA_STORE || {};
-    const sup = (store.suppliers || []).find(s => String(s.id) === id);
-    if (sup && sup.name) return sup.name;
-    const led = (Array.isArray(window.coaLedgers) ? window.coaLedgers : []).find(l => String(l.id) === id);
-    if (led && led.name) return led.name;
-    return (v.partyOverride && v.partyOverride.name) || '';
-  }
-
-  // Everything the overview shows, derived from stock items, posted sales/purchase
-  // vouchers (rows linked to a stock item) and the movement log.
-  function computeStockOverview(stockItems) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const store = window.KYA_STORE || {};
-    const salesVouchers = Array.isArray(store.salesVouchers) ? store.salesVouchers : [];
-    const purchaseVouchers = Array.isArray(store.purchaseVouchers) ? store.purchaseVouchers : [];
-
+  // Links a voucher row to its stock item: by stock item id, else (goods rows only) by name or alternate name
+  function makeStockRowMatcher(stockItems) {
     const byId = new Map();
     const byName = new Map();
-    const bySku = new Map();
     stockItems.forEach(it => {
       byId.set(String(it.id), it);
-      bySku.set(String(it.sku).toLowerCase(), it);
       [it.name].concat(it.aliases || []).forEach(n => {
         const k = String(n || '').toLowerCase().trim();
         if (k && !byName.has(k)) byName.set(k, it);
       });
     });
-    const matchRow = row => {
+    return row => {
       if (!row) return null;
       if (row.stockItemId && byId.has(String(row.stockItemId))) return byId.get(String(row.stockItemId));
       if (row.itemType && row.itemType !== 'Product') return null;
       return byName.get(String(row.item || '').toLowerCase().trim()) || null;
     };
+  }
 
-    const perItem = new Map();
-    const stat = it => {
-      let s = perItem.get(it.id);
-      if (!s) { s = { out30: 0, lastActive: null }; perItem.set(it.id, s); }
-      return s;
+  // Voucher dates are YYYY-MM-DD (DD-MM-YYYY also read) → { y, m: 1-12, d }, or null
+  function voucherDateParts(s) {
+    const t = String(s || '').trim();
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return { y: +m[1], m: +m[2], d: +m[3] };
+    m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+    return m ? { y: +m[3], m: +m[2], d: +m[1] } : null;
+  }
+
+  // A voucher row's value without GST: row amounts include the tax, so take it back out
+  function rowTaxableValue(row) {
+    return (parseFloat(row.amount) || 0) / (1 + (parseFloat(row.tax) || 0) / 100);
+  }
+
+  // Voucher date as a sortable number (YYYYMMDD); 0 when it can't be read
+  function voucherDateKey(s) {
+    const p = voucherDateParts(s);
+    return p ? p.y * 10000 + p.m * 100 + p.d : 0;
+  }
+
+  // Posted vouchers that can move stock. Drafts and sales orders moved nothing, and nor did
+  // reversals of Pre Invoices / Pre Purchase documents.
+  function stockMovingVouchers() {
+    const store = window.KYA_STORE || {};
+    return {
+      purchases: (Array.isArray(store.purchaseVouchers) ? store.purchaseVouchers : []).filter(v => v && !v.isDraft && !v.reversedPreDoc),
+      sales: (Array.isArray(store.salesVouchers) ? store.salesVouchers : []).filter(v => v && !v.isDraft && !v.isOrder && !v.reversedPreInvoice)
     };
-    // Idle = no purchase, sale/return or movement at all, so raw materials that are
-    // bought in but never sold are not flagged just for lacking sales.
-    let hasActivityData = false;
-    const touch = (it, d) => {
-      const s = stat(it);
-      hasActivityData = true;
-      if (!s.lastActive || d > s.lastActive) s.lastActive = d;
-      return s;
-    };
+  }
 
-    const flowStart = new Date(today.getTime() - (SHO_FLOW_WEEKS * 7 - 1) * SHO_DAY_MS);
-    const weeks = Array.from({ length: SHO_FLOW_WEEKS }, (_, i) => {
-      const start = new Date(flowStart.getFullYear(), flowStart.getMonth(), flowStart.getDate() + i * 7);
-      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-      return { start, end, inVal: 0, outVal: 0 };
-    });
-    const weekOf = d => {
-      const idx = Math.floor(Math.round((d - flowStart) / SHO_DAY_MS) / 7);
-      return (idx >= 0 && idx < SHO_FLOW_WEEKS) ? weeks[idx] : null;
-    };
+  // Per stock item, what the stock figures need from Master Desk and the posted vouchers:
+  // opening qty and rate, purchases net of returns (also as FIFO layers, oldest first), the
+  // weighted average cost, every sale and sales return (date, qty, value without GST) and the
+  // latest sale rate (for NRV).
+  function buildStockLedger(stockItems) {
+    const vouchers = stockMovingVouchers();
+    const matchRow = makeStockRowMatcher(stockItems);
+    // Vouchers in date order, then in the order they were posted
+    const seq = v => Number(v.postedAt) || Number(v.id) || 0;
+    const byDate = (a, b) => (voucherDateKey(a.date) - voucherDateKey(b.date)) || (seq(a) - seq(b));
 
-    const sales = { cur: 0, prev: 0, items: new Set() };
-    const purch = { cur: 0, prev: 0, items: new Set() };
-    const activity = [];
+    const ledger = new Map(stockItems.map(it => [it.id, { inQty: 0, inVal: 0, outQty: 0, layers: [], sales: [], nrv: null }]));
 
-    salesVouchers.forEach(v => {
-      const d = shoParseDate(v.date) || shoParseDate(v.postedAt);
-      if (!d) return;
-      const age = shoDaysAgo(d, today);
-      const sign = v.isReturn ? -1 : 1;
-      let val = 0, qty = 0, lines = 0;
+    // Purchases add stock (and FIFO layers)
+    const purchases = vouchers.purchases.sort(byDate);
+    purchases.filter(v => !v.isReturn).forEach(v => {
       (v.rows || []).forEach(row => {
         const it = matchRow(row);
-        if (!it) return;
-        const q = (parseFloat(row.qty) || 0) * sign;
-        val += (parseFloat(row.amount) || 0) * sign;
-        qty += q;
-        lines++;
-        const s = touch(it, d);
-        if (age >= 0 && age < 30) {
-          s.out30 += q;
-          if (!v.isReturn) sales.items.add(it.id);
+        const qty = parseFloat(row.qty) || 0;
+        if (!it || qty <= 0) return;
+        const s = ledger.get(it.id);
+        const val = rowTaxableValue(row);
+        s.inQty += qty;
+        s.inVal += val;
+        s.layers.push({ vid: String(v.id), qty, rate: val / qty });
+      });
+    });
+    // Purchase returns send goods back: out of the invoice they came from first, then the newest layers
+    purchases.filter(v => v.isReturn).forEach(v => {
+      (v.rows || []).forEach(row => {
+        const it = matchRow(row);
+        const qty = parseFloat(row.qty) || 0;
+        if (!it || qty <= 0) return;
+        const s = ledger.get(it.id);
+        s.inQty -= qty;
+        s.inVal -= rowTaxableValue(row);
+        let left = qty;
+        const src = s.layers.find(l => v.returnAgainstId != null && l.vid === String(v.returnAgainstId));
+        if (src) { const take = Math.min(left, src.qty); src.qty -= take; left -= take; }
+        for (let i = s.layers.length - 1; i >= 0 && left > 0; i--) {
+          const take = Math.min(left, s.layers[i].qty);
+          s.layers[i].qty -= take;
+          left -= take;
         }
       });
-      if (!lines) return;
-      if (age >= 0 && age < 30) sales.cur += val;
-      else if (age >= 30 && age < 60) sales.prev += val;
-      const w = weekOf(d);
-      if (w) w.outVal += val;
-      activity.push({
-        kind: v.isReturn ? 'return' : 'sale', date: d, ts: Number(v.postedAt) || 0,
-        title: (v.isReturn ? 'Sales return ' : 'Sales invoice ') + (v.invoiceNo || ''),
-        party: v.customerName || '', lines, val: Math.abs(val)
-      });
     });
 
-    purchaseVouchers.forEach(v => {
-      // A reversal of a Pre Purchase document moved no goods
-      if (v.isDraft || v.reversedPreDoc) return;
-      const d = shoParseDate(v.date) || shoParseDate(v.postedAt);
-      if (!d) return;
-      const age = shoDaysAgo(d, today);
-      // A purchase reversal sends the goods back: it counts against what came in
-      const sign = v.isReturn ? -1 : 1;
-      let val = 0, lines = 0;
-      (v.rows || []).forEach(row => {
-        const it = matchRow(row);
-        if (!it) return;
-        val += (parseFloat(row.amount) || 0) * sign;
-        lines++;
-        if (age >= 0 && age < 30 && !v.isReturn) purch.items.add(it.id);
-        touch(it, d);
+    // Sales take stock out, sales returns bring it back; the latest sale sets NRV
+    vouchers.sales.sort(byDate)
+      .forEach(v => {
+        (v.rows || []).forEach(row => {
+          const it = matchRow(row);
+          const qty = parseFloat(row.qty) || 0;
+          if (!it || qty <= 0) return;
+          const s = ledger.get(it.id);
+          const value = rowTaxableValue(row);
+          s.sales.push({ dk: voucherDateKey(v.date), qty, value, isReturn: !!v.isReturn });
+          if (v.isReturn) { s.outQty -= qty; return; }
+          s.outQty += qty;
+          s.nrv = value / qty;
+        });
       });
-      if (!lines) return;
-      if (age >= 0 && age < 30) purch.cur += val;
-      else if (age >= 30 && age < 60) purch.prev += val;
-      const w = weekOf(d);
-      if (w) w.inVal += val;
-      activity.push({
-        kind: v.isReturn ? 'return' : 'purchase', date: d, ts: Number(v.postedAt) || 0,
-        title: (v.isReturn ? 'Purchase return ' : 'Purchase ') + (v.invoiceNo || ''), party: shoVendorName(v), lines, val: Math.abs(val)
-      });
-    });
 
-    _stockMovements.forEach(m => {
-      const d = shoParseDate(m.date);
-      if (!d) return;
-      const it = bySku.get(String(m.sku || '').toLowerCase()) || byName.get(String(m.itemName || '').toLowerCase().trim());
-      const age = shoDaysAgo(d, today);
-      if (it) {
-        const s = touch(it, d);
-        if (m.type === 'outward' && age >= 0 && age < 30) s.out30 += Math.abs(Number(m.qty) || 0);
+    stockItems.forEach(it => {
+      const s = ledger.get(it.id);
+      // Opening qty and rate from Master Desk (Stock Hub movements already adjust the qty)
+      s.openQty = Math.max(0, it.qty);
+      s.openRate = Math.max(0, it.cost);
+      const allQty = s.openQty + s.inQty;
+      s.avgRate = allQty > 0 ? Math.max(0, (s.openQty * s.openRate + s.inVal) / allQty) : s.openRate;
+    });
+    return ledger;
+  }
+
+  // Closing stock as per AS 2 / Ind AS 2 / ICDS II: each item at the lower of cost and net
+  // realisable value. Cost is the purchase value after trade discount and without recoverable
+  // GST, assigned by weighted average or FIFO. NRV is the item's latest sale rate without GST
+  // (costs to sell are not recorded); an item not sold yet is carried at cost.
+  // Returns a Map of stock item id → { qty, value }: closing qty and closing value.
+  function computeStockItemValues(stockItems, method) {
+    const ledger = buildStockLedger(stockItems);
+    const values = new Map();
+    stockItems.forEach(it => {
+      const s = ledger.get(it.id);
+      // Rounded so float leftovers (e.g. 0.1 + 0.2 - 0.3) don't count as stock on hand
+      const closingQty = Math.max(0, Math.round((s.openQty + s.inQty - s.outQty) * 10000) / 10000);
+      if (closingQty <= 0) {
+        values.set(it.id, { qty: 0, value: 0 });
+        return;
       }
-      activity.push({
-        kind: 'movement', type: m.type, date: d, ts: parseInt(String(m.id || '').replace(/\D/g, ''), 10) || 0,
-        title: (m.typeLabel || 'Stock movement') + (m.refNo ? ' ' + m.refNo : ''),
-        party: m.itemName || '', qty: Number(m.qty) || 0, uom: it ? it.uom : '', val: Number(m.totalVal) || 0
+
+      let cost;
+      if (method === 'fifo') {
+        // Closing stock is made up of the newest layers
+        const layers = [{ qty: s.openQty, rate: s.openRate }].concat(s.layers);
+        let left = closingQty;
+        cost = 0;
+        for (let i = layers.length - 1; i >= 0 && left > 0; i--) {
+          const take = Math.min(left, Math.max(0, layers[i].qty));
+          cost += take * layers[i].rate;
+          left -= take;
+        }
+        // More on hand than ever came in (e.g. sales returns): value the rest at average cost
+        if (left > 0) cost += left * s.avgRate;
+      } else {
+        cost = closingQty * s.avgRate;
+      }
+
+      const nrv = s.nrv !== null ? closingQty * Math.max(0, s.nrv) : Infinity;
+      values.set(it.id, { qty: closingQty, value: Math.min(cost, nrv) });
+    });
+    return values;
+  }
+
+  // Returns { value, available }: the closing stock value and how many items have stock on hand.
+  function computeStockValuation(stockItems, method) {
+    const values = computeStockItemValues(stockItems, method);
+    return stockItems.reduce((total, it) => {
+      const v = values.get(it.id);
+      if (v.qty > 0) {
+        total.available++;
+        total.value += v.value;
+      }
+      return total;
+    }, { value: 0, available: 0 });
+  }
+
+  // Revenue, expense (cost of goods sold) and profit/loss on stock items for one month (m: 0-11).
+  // Revenue is sales less sales returns, without GST. Cost of goods sold uses the same cost
+  // formula as the closing stock, so opening + purchases = cost of goods sold + closing stock:
+  // weighted average charges every unit at the average cost, FIFO charges the oldest units first.
+  function computeStockPnl(stockItems, method, y, m) {
+    const ledger = buildStockLedger(stockItems);
+    const from = y * 10000 + (m + 1) * 100 + 1;
+    const to = y * 10000 + (m + 1) * 100 + 31;
+    let revenue = 0;
+    let expense = 0;
+    stockItems.forEach(it => {
+      const s = ledger.get(it.id);
+      const layers = [{ qty: s.openQty, rate: s.openRate }].concat(s.layers);
+      // Cost of the first q units to go out
+      const costOf = q => {
+        if (q <= 0 || method !== 'fifo') return q * s.avgRate;
+        let left = q;
+        let c = 0;
+        for (let i = 0; i < layers.length && left > 0; i++) {
+          const take = Math.min(left, Math.max(0, layers[i].qty));
+          c += take * layers[i].rate;
+          left -= take;
+        }
+        // Sold more than ever came in: the rest at average cost
+        return c + left * s.avgRate;
+      };
+      // Units gone out (sales less returns) before the month and by its end
+      let before = 0;
+      let byEnd = 0;
+      s.sales.forEach(e => {
+        const q = e.isReturn ? -e.qty : e.qty;
+        if (e.dk < from) before += q;
+        if (e.dk <= to) byEnd += q;
+        if (e.dk >= from && e.dk <= to) revenue += e.isReturn ? -e.value : e.value;
       });
+      expense += costOf(byEnd) - costOf(before);
     });
+    return { revenue, expense, profit: revenue - expense };
+  }
 
-    // Stock position
-    const valueOf = it => Math.max(0, it.qty) * it.cost;
-    const totalVal = stockItems.reduce((s, it) => s + valueOf(it), 0);
-    const outItems = stockItems.filter(it => it.qty <= 0);
-    const lowItems = stockItems.filter(it => it.qty > 0 && it.reorder > 0 && it.qty <= it.reorder);
-    const inCount = stockItems.length - outItems.length - lowItems.length;
-    const noReorder = stockItems.filter(it => !(it.reorder > 0));
-    const noGodown = stockItems.filter(it => !it.warehouse);
+  // A Details card in the KYA Dashboard KPI style
+  function shdKpiCard(icon, value, label, extra) {
+    return `
+      <div class="db-kpi-card">
+        <div class="db-kpi-top">
+          <div class="db-kpi-icon-wrap">${icon}</div>
+          ${extra || ''}
+        </div>
+        <div class="db-kpi-value">${value}</div>
+        <div class="db-kpi-label">${label}</div>
+      </div>
+    `;
+  }
 
-    const coverDays = it => {
-      const s = perItem.get(it.id);
-      if (!s || !(s.out30 > 0) || it.qty <= 0) return null;
-      return it.qty / (s.out30 / 30);
+  // Revenue / Expense / Profit-Loss cards for the month the calendar shows
+  function renderShdPnlCards(stockItems) {
+    const cur = shdCalMonthNow();
+    const p = computeStockPnl(stockItems, _stockValMethod, cur.y, cur.m);
+    const money = v => {
+      const r = Math.round(v * 100) / 100;
+      return (r < 0 ? '−₹' : '₹') + formatInr(Math.abs(r));
     };
-
-    const attention = outItems.concat(lowItems).map(it => ({ it, cover: coverDays(it) })).sort((a, b) => {
-      const ao = a.it.qty <= 0 ? 0 : 1, bo = b.it.qty <= 0 ? 0 : 1;
-      if (ao !== bo) return ao - bo;
-      if (ao === 0) return valueOf(b.it) - valueOf(a.it) || a.it.name.localeCompare(b.it.name);
-      return (a.it.qty / a.it.reorder) - (b.it.qty / b.it.reorder);
-    });
-
-    const movers = stockItems
-      .map(it => ({ it, out: (perItem.get(it.id) || {}).out30 || 0 }))
-      .filter(x => x.out > 0)
-      .map(x => ({ ...x, outVal: x.out * x.it.cost, cover: coverDays(x.it) }))
-      .sort((a, b) => b.outVal - a.outVal || b.out - a.out);
-
-    const idleItems = hasActivityData ? stockItems.filter(it => {
-      if (it.qty <= 0) return false;
-      const s = perItem.get(it.id);
-      return !s || !s.lastActive || shoDaysAgo(s.lastActive, today) >= SHO_IDLE_DAYS;
-    }) : [];
-    const idleVal = idleItems.reduce((s, it) => s + valueOf(it), 0);
-
-    // Value breakdowns
-    const breakdown = {};
-    [['group', it => it.group || 'General'], ['category', it => it.category || 'Uncategorised'], ['warehouse', it => it.warehouse || 'No godown']].forEach(([key, fn]) => {
-      const map = {};
-      stockItems.forEach(it => {
-        const k = fn(it);
-        if (!map[k]) map[k] = { name: k, count: 0, val: 0 };
-        map[k].count++;
-        map[k].val += valueOf(it);
-      });
-      breakdown[key] = Object.values(map).sort((a, b) => b.val - a.val || b.count - a.count);
-    });
-
-    // ABC: an item's class is set by the cumulative share *before* it, so the item that
-    // crosses 70% is still A and a single dominant item is never pushed into C.
-    const byValue = stockItems.map(it => ({ it, val: valueOf(it) })).sort((a, b) => b.val - a.val);
-    const abc = { A: { count: 0, val: 0 }, B: { count: 0, val: 0 }, C: { count: 0, val: 0 } };
-    let cum = 0;
-    byValue.forEach(x => {
-      const before = totalVal > 0 ? (cum / totalVal) * 100 : 100;
-      x.cls = x.val <= 0 ? 'C' : before < 70 ? 'A' : before < 90 ? 'B' : 'C';
-      cum += x.val;
-      abc[x.cls].count++;
-      abc[x.cls].val += x.val;
-    });
-
-    activity.sort((a, b) => (b.date - a.date) || (b.ts - a.ts));
-
-    return {
-      today, totalVal, inCount, lowItems, outItems, noReorder, noGodown,
-      sales, purch, weeks, hasActivityData, attention, movers, idleItems, idleVal,
-      breakdown, byValue, abc, activity,
-      groupsCount: breakdown.group.length,
-      godownCount: breakdown.warehouse.filter(w => w.name !== 'No godown').length
-    };
-  }
-
-  function shoDeltaHtml(cur, prev, upIsGood) {
-    if (!(prev > 0)) return '';
-    const pct = ((cur - prev) / prev) * 100;
-    if (Math.abs(pct) < 0.5) return `<span class="sho-delta neutral">No change vs prior 30d</span>`;
-    const up = pct > 0;
-    const tone = upIsGood === null ? 'neutral' : (up === upIsGood ? 'good' : 'bad');
-    return `<span class="sho-delta ${tone}">${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0)}% vs prior 30d</span>`;
-  }
-
-  function shoRenderEmpty() {
-    return `
-      <div class="sho-empty">
-        <div class="sho-empty-ico">${shoIcon('box', 28, 1.8)}</div>
-        <div class="sho-empty-title">Set up your stock</div>
-        <div class="sho-empty-sub">Create your first stock item and this overview fills in with stock value, health, reorder alerts and movement trends.</div>
-        <div class="sho-empty-steps">
-          <div class="sho-step"><span class="sho-step-n">1</span><div><strong>Add stock items</strong><span>Name, code, unit, rate and reorder level</span></div></div>
-          <div class="sho-step"><span class="sho-step-n">2</span><div><strong>Assign godowns</strong><span>Know where every rupee of stock sits</span></div></div>
-          <div class="sho-step"><span class="sho-step-n">3</span><div><strong>Record movements</strong><span>Receipts, dispatches, transfers and adjustments</span></div></div>
-        </div>
-        <div class="sho-actions" style="justify-content: center;">
-          <button type="button" class="sho-btn primary" data-sho-act="new-item">${shoIcon('plus', 14, 2.2)} New stock item</button>
-          <button type="button" class="sho-btn" data-sho-act="new-godown">${shoIcon('home', 14)} Add godown</button>
-        </div>
-      </div>
-    `;
-  }
-
-  function shoRenderHero(o, stockItems) {
-    const total = stockItems.length;
-    const outN = o.outItems.length, lowN = o.lowItems.length, inN = o.inCount;
-    const pct = n => total ? (n / total) * 100 : 0;
-    const healthPct = Math.round(pct(inN));
-    const parts = formatInr(o.totalVal).split('.');
-    const seg = (n, color, label) => n > 0 ? `<span style="flex: ${n} 1 0; background: ${color};" title="${label}: ${n} of ${total}"></span>` : '';
-    const asOf = o.today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-
-    return `
-      <section class="sho-hero" aria-label="Stock value and health">
-        <div class="sho-hero-top">
-          <div style="min-width: 0;">
-            <div class="sho-eyebrow">Stock value at cost <span class="sho-dot-sep"></span> as of ${asOf}</div>
-            <div class="sho-hero-val"><span class="sho-cur">₹</span>${parts[0]}<span class="sho-dec">.${parts[1] || '00'}</span></div>
-            <div class="sho-hero-meta">
-              <span><strong>${total}</strong> ${total === 1 ? 'item' : 'items'}</span>
-              <span><strong>${o.groupsCount}</strong> ${o.groupsCount === 1 ? 'group' : 'groups'}</span>
-              <span><strong>${o.godownCount}</strong> ${o.godownCount === 1 ? 'godown' : 'godowns'}</span>
-              <span><strong>${_stockMovements.length}</strong> ${_stockMovements.length === 1 ? 'movement' : 'movements'} logged</span>
-            </div>
-          </div>
-          <div class="sho-actions">
-            <button type="button" class="sho-btn primary" data-sho-act="record">${shoIcon('swap', 14, 2.2)} Record movement</button>
-            <button type="button" class="sho-btn" data-sho-act="list">${shoIcon('list', 14)} Stock list</button>
-            <button type="button" class="sho-btn" data-sho-act="new-item">${shoIcon('plus', 14, 2.2)} New item</button>
-          </div>
-        </div>
-
-        <div class="sho-health">
-          <div class="sho-health-head">
-            <span>Stock health</span>
-            <span><strong>${healthPct}%</strong> of items in stock</span>
-          </div>
-          <div class="sho-meter" role="img" aria-label="${inN} in stock, ${lowN} running low, ${outN} out of stock">
-            ${seg(inN, 'var(--emerald-500)', 'In stock')}${seg(lowN, 'var(--warning)', 'Running low')}${seg(outN, 'var(--danger)', 'Out of stock')}
-          </div>
-          <div class="sho-legend">
-            <span class="sho-legend-item"><span class="sho-status-ico" style="background: var(--emerald-500);">${shoIcon('check', 10, 3.2)}</span>In stock <strong>${inN}</strong></span>
-            <span class="sho-legend-item"><span class="sho-status-ico" style="background: var(--warning);">${shoIcon('bang', 10, 3.2)}</span>Running low <strong>${lowN}</strong></span>
-            <span class="sho-legend-item"><span class="sho-status-ico" style="background: var(--danger);">${shoIcon('x', 10, 3.2)}</span>Out of stock <strong>${outN}</strong></span>
-          </div>
-        </div>
-      </section>
-    `;
-  }
-
-  function shoRenderTiles(o) {
-    const needN = o.outItems.length + o.lowItems.length;
-    const tile = (opts) => `
-      <div class="sho-tile ${opts.act ? 'clickable' : ''}" ${opts.act ? `data-sho-act="${opts.act}" role="button" tabindex="0"` : ''} title="${opts.title || ''}">
-        <div class="sho-tile-head">
-          <span class="sho-tile-ico" style="background: ${opts.bg}; color: ${opts.fg};">${shoIcon(opts.icon, 14, 2.2)}</span>
-          <span>${opts.label}</span>
-        </div>
-        <div class="sho-tile-val" ${opts.valColor ? `style="color: ${opts.valColor};"` : ''}>${opts.value}</div>
-        <div class="sho-tile-sub">${opts.sub}</div>
-        ${opts.delta ? `<div class="sho-tile-sub">${opts.delta}</div>` : ''}
-      </div>
-    `;
-    return `
-      <div class="sho-tiles">
-        ${tile({
-          label: 'Purchases · 30d', icon: 'down', bg: 'var(--blue-50)', fg: 'var(--blue-600)',
-          value: shoTileInr(o.purch.cur), title: '₹ ' + formatInr(o.purch.cur),
-          sub: o.purch.items.size ? `${o.purch.items.size} ${o.purch.items.size === 1 ? 'item' : 'items'} bought in` : 'No stock items purchased',
-          delta: shoDeltaHtml(o.purch.cur, o.purch.prev, null)
-        })}
-        ${tile({
-          label: 'Sales · 30d', icon: 'up', bg: '#fff4ed', fg: '#c2410c',
-          value: shoTileInr(o.sales.cur), title: '₹ ' + formatInr(o.sales.cur),
-          sub: o.sales.items.size ? `${o.sales.items.size} ${o.sales.items.size === 1 ? 'item' : 'items'} sold` : 'No stock items sold',
-          delta: shoDeltaHtml(o.sales.cur, o.sales.prev, true)
-        })}
-        ${tile({
-          label: 'Needs reorder', icon: 'alert', bg: '#fffbeb', fg: '#d97706', act: 'analysis',
-          value: `${needN} ${needN === 1 ? 'item' : 'items'}`, valColor: needN ? '#b45309' : '',
-          sub: needN ? `${o.outItems.length} out of stock · ${o.lowItems.length} running low` : 'Everything above reorder level'
-        })}
-        ${tile({
-          label: `Idle · ${SHO_IDLE_DAYS}d+`, icon: 'clock', bg: 'var(--slate-100)', fg: 'var(--slate-600)',
-          value: o.hasActivityData ? shoTileInr(o.idleVal) : '—', title: o.hasActivityData ? '₹ ' + formatInr(o.idleVal) : '',
-          sub: o.hasActivityData
-            ? (o.idleItems.length ? `${o.idleItems.length} ${o.idleItems.length === 1 ? 'item' : 'items'} with no purchase, sale or movement` : 'Every stocked item has recent activity')
-            : 'Shows once purchases, sales or movements are recorded'
-        })}
-      </div>
-    `;
-  }
-
-  function shoRenderAttention(o) {
-    const rows = o.attention.slice(0, 5);
-    const more = o.attention.length - rows.length;
-    return `
-      <section class="sho-card" aria-label="Needs attention">
-        <div class="sho-card-head">
-          <div>
-            <div class="sho-card-title">Needs attention</div>
-            <div class="sho-card-sub">Out of stock or at reorder level</div>
-          </div>
-          ${o.attention.length ? `<button type="button" class="sho-link" data-sho-act="analysis">Replenishment plan ${shoIcon('arrow', 12, 2.2)}</button>` : ''}
-        </div>
-        ${rows.length === 0 ? `
-          <div class="sho-ok">
-            <span class="sho-ok-ico">${shoIcon('check', 16, 2.6)}</span>
-            <div><strong>All items are above their reorder level.</strong><span>Nothing to restock right now.</span></div>
-          </div>
-        ` : `
-          <div class="sho-att-list">
-            ${rows.map(({ it, cover }) => {
-              const isOut = it.qty <= 0;
-              const fill = isOut ? 0 : Math.min(100, (it.qty / it.reorder) * 100);
-              const coverTxt = cover !== null ? ` · ≈ ${Math.max(1, Math.round(cover))} ${Math.round(cover) <= 1 ? 'day' : 'days'} left` : '';
-              return `
-                <div class="sho-att-row">
-                  <div class="sho-att-main">
-                    <div class="sho-att-name">
-                      <span class="sho-pill ${isOut ? 'out' : 'low'}">${isOut ? 'Out' : 'Low'}</span>
-                      <span class="sho-trunc" title="${ohEscapeHtml(it.name)}">${ohEscapeHtml(it.name)}</span>
-                    </div>
-                    <div class="sho-mini-meter ${isOut ? 'out' : 'low'}"><span style="width: ${fill}%;"></span></div>
-                    <div class="sho-att-qty">${isOut ? 'None on hand' : `${shoFmtQty(it.qty)} ${ohEscapeHtml(it.uom)} on hand · reorder at ${shoFmtQty(it.reorder)}`}${coverTxt}</div>
-                  </div>
-                  <button type="button" class="sho-btn sm btn-quick-move" data-id="${ohEscapeHtml(it.id)}" title="Record a receipt for ${ohEscapeHtml(it.name)}">${shoIcon('plus', 12, 2.4)} Restock</button>
-                </div>
-              `;
-            }).join('')}
-          </div>
-          ${more > 0 ? `<button type="button" class="sho-link sho-more" data-sho-act="analysis">+ ${more} more ${more === 1 ? 'item' : 'items'} need attention</button>` : ''}
-        `}
-      </section>
-    `;
-  }
-
-  function shoRenderInsights(o, stockItems) {
-    const list = [];
-    const total = stockItems.length;
-
-    const soonest = o.movers.filter(m => m.cover !== null && m.cover < 14 && m.it.qty > m.it.reorder).sort((a, b) => a.cover - b.cover)[0];
-    if (soonest) {
-      const d = Math.max(1, Math.round(soonest.cover));
-      list.push({ icon: 'clock', tone: 'warn', html: `<strong>${ohEscapeHtml(soonest.it.name)}</strong> runs out in about <strong>${d} ${d === 1 ? 'day' : 'days'}</strong> at the last 30 days' pace, before it reaches its reorder level.` });
-    }
-    if (total >= 4 && o.totalVal > 0) {
-      const top = o.byValue.slice(0, 3).reduce((s, x) => s + x.val, 0);
-      const share = Math.round((top / o.totalVal) * 100);
-      if (share >= 50) list.push({ icon: 'pie', tone: 'info', html: `Your top 3 items hold <strong>${share}%</strong> of stock value. Count and insure these first.` });
-    }
-    if (o.hasActivityData && o.idleItems.length && o.totalVal > 0) {
-      const share = Math.round((o.idleVal / o.totalVal) * 100);
-      list.push({ icon: 'clock', tone: 'muted', html: `<strong>${shoCompactInr(o.idleVal)}</strong> (${share}% of stock value) across ${o.idleItems.length} ${o.idleItems.length === 1 ? 'item has' : 'items have'} had no purchase, sale or movement in ${SHO_IDLE_DAYS}+ days.` });
-    }
-    if (o.noReorder.length) {
-      list.push({ icon: 'bang', tone: 'warn', html: `<strong>${o.noReorder.length} ${o.noReorder.length === 1 ? 'item has' : 'items have'} no reorder level</strong>, so low-stock alerts can't fire for ${o.noReorder.length === 1 ? 'it' : 'them'}. Set one in Master Desk.` });
-    }
-    if (o.noGodown.length && o.noGodown.length < total) {
-      list.push({ icon: 'home', tone: 'muted', html: `<strong>${o.noGodown.length} ${o.noGodown.length === 1 ? 'item is' : 'items are'}</strong> not assigned to a godown.` });
-    } else if (o.noGodown.length && o.noGodown.length === total && total > 0) {
-      list.push({ icon: 'home', tone: 'muted', html: `No item is assigned to a godown yet. Assign godowns to see where stock sits.` });
-    }
-
-    const shown = list.slice(0, 4);
-    return `
-      <section class="sho-card" aria-label="Insights">
-        <div class="sho-card-head">
-          <div>
-            <div class="sho-card-title">Insights</div>
-            <div class="sho-card-sub">Spotted in your stock and voucher data</div>
-          </div>
-        </div>
-        ${shown.length === 0 ? `
-          <div class="sho-ok">
-            <span class="sho-ok-ico">${shoIcon('check', 16, 2.6)}</span>
-            <div><strong>Nothing unusual.</strong><span>Reorder levels, godowns and movement all look healthy.</span></div>
-          </div>
-        ` : `
-          <div class="sho-insights">
-            ${shown.map(i => `
-              <div class="sho-insight">
-                <span class="sho-insight-ico ${i.tone}">${shoIcon(i.icon, 14, 2.2)}</span>
-                <div>${i.html}</div>
-              </div>
-            `).join('')}
-          </div>
-        `}
-      </section>
-    `;
-  }
-
-  function shoRenderFlow(o) {
-    const weeks = o.weeks;
-    const peak = Math.max(0, ...weeks.map(w => Math.max(w.inVal, w.outVal)));
-    const max = shoNiceMax(peak);
-    const hasData = peak > 0;
-    const range = w => `${shoShortDate(w.start)} – ${shoShortDate(w.end)}`;
-    const totalIn = weeks.reduce((s, w) => s + w.inVal, 0);
-    const totalOut = weeks.reduce((s, w) => s + w.outVal, 0);
-
-    const chart = `
-      <div class="sho-chart" id="shoFlowChart">
-        <div class="sho-plot">
-          ${[1, 0.5, 0].map(f => `
-            <div class="sho-grid-line" style="bottom: ${f * 100}%;"></div>
-            <div class="sho-ytick" style="bottom: ${f * 100}%;">${hasData ? shoCompactInr(max * f) : (f === 0 ? '₹0' : '')}</div>
-          `).join('')}
-          <div class="sho-cols">
-            ${weeks.map((w, i) => `
-              <div class="sho-col" tabindex="0" data-idx="${i}"
-                   data-range="${range(w)}" data-in="${formatInr(w.inVal)}" data-out="${formatInr(w.outVal)}"
-                   aria-label="Week ${range(w)}: purchases ₹${formatInr(w.inVal)}, sales ₹${formatInr(w.outVal)}">
-                <span class="sho-bar" style="height: ${hasData ? (Math.max(0, w.inVal) / max) * 100 : 0}%; background: ${SHO_CLR_IN};"></span>
-                <span class="sho-bar" style="height: ${hasData ? (Math.max(0, w.outVal) / max) * 100 : 0}%; background: ${SHO_CLR_OUT};"></span>
-              </div>
-            `).join('')}
-          </div>
-          ${hasData ? '' : `<div class="sho-plot-empty">No purchase or sales vouchers with stock items in the last ${SHO_FLOW_WEEKS} weeks.</div>`}
-          <div class="sho-tip" id="shoFlowTip" role="tooltip"></div>
-        </div>
-        <div class="sho-xlabels">
-          ${weeks.map((w, i) => `<span>${i % 2 === 1 || i === weeks.length - 1 ? '' : shoShortDate(w.start)}</span>`).join('')}
-        </div>
-      </div>
-    `;
-
-    const table = `
-      <div class="sho-table-wrap">
-        <table class="sho-table">
-          <thead><tr><th>Week</th><th class="num">Purchases</th><th class="num">Sales</th></tr></thead>
-          <tbody>
-            ${weeks.slice().reverse().map(w => `
-              <tr><td>${range(w)}</td><td class="num">${shoTileInr(w.inVal)}</td><td class="num">${shoTileInr(w.outVal)}</td></tr>
-            `).join('')}
-          </tbody>
-          <tfoot><tr><td>Total</td><td class="num">${shoTileInr(totalIn)}</td><td class="num">${shoTileInr(totalOut)}</td></tr></tfoot>
-        </table>
-      </div>
-    `;
-
-    return `
-      <section class="sho-card" aria-label="Purchases versus sales">
-        <div class="sho-card-head">
-          <div>
-            <div class="sho-card-title">Purchases vs sales</div>
-            <div class="sho-card-sub">Weekly value of stock items · last ${SHO_FLOW_WEEKS} weeks</div>
-          </div>
-          <button type="button" class="sho-link" data-sho-act="flow-view">${_shoFlowAsTable ? 'Chart' : 'Table'}</button>
-        </div>
-        <div class="sho-legend" style="margin: -4px 0 12px;">
-          <span class="sho-legend-item"><span class="sho-swatch" style="background: ${SHO_CLR_IN};"></span>Purchases <strong>${shoCompactInr(totalIn)}</strong></span>
-          <span class="sho-legend-item"><span class="sho-swatch" style="background: ${SHO_CLR_OUT};"></span>Sales <strong>${shoCompactInr(totalOut)}</strong></span>
-        </div>
-        ${_shoFlowAsTable ? table : chart}
-      </section>
-    `;
-  }
-
-  function shoRenderMovers(o) {
-    const rows = o.movers.slice(0, 5);
-    return `
-      <section class="sho-card" aria-label="Top movers">
-        <div class="sho-card-head">
-          <div>
-            <div class="sho-card-title">Top movers</div>
-            <div class="sho-card-sub">Most stock out by value · last 30 days</div>
-          </div>
-        </div>
-        ${rows.length === 0 ? `
-          <div class="sho-muted-empty">No sales or dispatches of stock items in the last 30 days.</div>
-        ` : `
-          <div class="sho-rank-list">
-            ${rows.map((m, i) => {
-              const c = m.cover !== null ? Math.round(m.cover) : null;
-              const tone = c === null ? '' : c < 7 ? 'warn' : '';
-              return `
-                <div class="sho-rank-row">
-                  <span class="sho-rank-n">${i + 1}</span>
-                  <div class="sho-rank-main">
-                    <div class="sho-trunc sho-rank-name" title="${ohEscapeHtml(m.it.name)}">${ohEscapeHtml(m.it.name)}</div>
-                    <div class="sho-rank-sub">${shoFmtQty(m.out)} ${ohEscapeHtml(m.it.uom)} out · ${shoCompactInr(m.outVal)} at cost</div>
-                  </div>
-                  <span class="sho-cover ${tone}" title="Days the current stock lasts at the last 30 days' pace">${c === null ? 'No stock left' : `≈ ${Math.max(1, c)} ${c <= 1 ? 'day' : 'days'} cover`}</span>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `}
-      </section>
-    `;
-  }
-
-  function shoRenderBreakdown(o) {
-    const dims = [['group', 'Group'], ['category', 'Category'], ['warehouse', 'Godown']];
-    const all = o.breakdown[_shoBreakdown] || [];
-    const LIMIT = 6;
-    let rows = all.slice(0, LIMIT);
-    if (all.length > LIMIT) {
-      const rest = all.slice(LIMIT - 1);
-      rows = all.slice(0, LIMIT - 1).concat([{
-        name: `Other (${rest.length})`, count: rest.reduce((s, r) => s + r.count, 0), val: rest.reduce((s, r) => s + r.val, 0), other: true
-      }]);
-    }
-    const maxVal = Math.max(0, ...rows.map(r => r.val));
-    const label = dims.find(d => d[0] === _shoBreakdown)[1].toLowerCase();
-
-    return `
-      <section class="sho-card" aria-label="Where the value sits">
-        <div class="sho-card-head">
-          <div>
-            <div class="sho-card-title">Where the value sits</div>
-            <div class="sho-card-sub">Stock value at cost by ${label}</div>
-          </div>
-        </div>
-        <div class="sho-seg" role="tablist" aria-label="Break down by">
-          ${dims.map(([k, l]) => `<button type="button" role="tab" aria-selected="${_shoBreakdown === k}" class="${_shoBreakdown === k ? 'active' : ''}" data-sho-dim="${k}">${l}</button>`).join('')}
-        </div>
-        <div class="sho-hbars">
-          ${rows.map(r => {
-            const pct = o.totalVal > 0 ? (r.val / o.totalVal) * 100 : 0;
-            const w = maxVal > 0 ? (r.val / maxVal) * 100 : 0;
-            return `
-              <div class="sho-hbar-row" title="${ohEscapeHtml(r.name)}: ₹ ${formatInr(r.val)} · ${r.count} ${r.count === 1 ? 'item' : 'items'}">
-                <div class="sho-hbar-line">
-                  <div class="sho-hbar-name">
-                    <span class="sho-trunc ${r.other ? 'muted' : ''}">${ohEscapeHtml(r.name)}</span>
-                    <span class="sho-hbar-count">${r.count} ${r.count === 1 ? 'item' : 'items'}</span>
-                  </div>
-                  <div class="sho-hbar-val">${shoCompactInr(r.val)} <span>${pct < 1 && pct > 0 ? '<1' : Math.round(pct)}%</span></div>
-                </div>
-                <div class="sho-hbar-track"><span style="width: ${w}%;"></span></div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </section>
-    `;
-  }
-
-  function shoRenderConcentration(o) {
-    const classes = ['A', 'B', 'C'];
-    const share = k => o.totalVal > 0 ? (o.abc[k].val / o.totalVal) * 100 : 0;
-    const top = o.byValue.filter(x => x.val > 0).slice(0, 5);
-
-    return `
-      <section class="sho-card" aria-label="Value concentration">
-        <div class="sho-card-head">
-          <div>
-            <div class="sho-card-title">Value concentration</div>
-            <div class="sho-card-sub">ABC classes by share of stock value</div>
-          </div>
-          <button type="button" class="sho-link" data-sho-act="analysis">ABC analysis ${shoIcon('arrow', 12, 2.2)}</button>
-        </div>
-        <div class="sho-meter abc" role="img" aria-label="${classes.map(k => `Class ${k}: ${o.abc[k].count} items, ${Math.round(share(k))}% of value`).join('; ')}">
-          ${o.totalVal > 0 ? classes.map(k => o.abc[k].val > 0 ? `<span style="flex: ${o.abc[k].val} 1 0; background: ${SHO_CLR_ABC[k]};" title="Class ${k}: ${Math.round(share(k))}% of value"></span>` : '').join('') : ''}
-        </div>
-        <div class="sho-abc-rows">
-          ${classes.map(k => `
-            <div class="sho-abc-row">
-              <span class="sho-swatch" style="background: ${SHO_CLR_ABC[k]};"></span>
-              <span class="sho-abc-k">Class ${k}</span>
-              <span class="sho-abc-n">${o.abc[k].count} ${o.abc[k].count === 1 ? 'item' : 'items'}</span>
-              <span class="sho-abc-v">${shoCompactInr(o.abc[k].val)} <span>${Math.round(share(k))}%</span></span>
-            </div>
-          `).join('')}
-        </div>
-        <div class="sho-subhead">Highest value items</div>
-        ${top.length === 0 ? `<div class="sho-muted-empty">No stock on hand yet.</div>` : `
-          <div class="sho-top-list">
-            ${top.map(x => `
-              <div class="sho-top-row">
-                <span class="sho-abc-badge" style="background: ${SHO_CLR_ABC[x.cls]};">${x.cls}</span>
-                <span class="sho-trunc" title="${ohEscapeHtml(x.it.name)}">${ohEscapeHtml(x.it.name)}</span>
-                <span class="sho-top-qty">${shoFmtQty(x.it.qty)} ${ohEscapeHtml(x.it.uom)}</span>
-                <span class="sho-top-val">₹ ${formatInr(x.val)}</span>
-              </div>
-            `).join('')}
-          </div>
-        `}
-      </section>
-    `;
-  }
-
-  function shoRenderActivity(o) {
-    const rows = o.activity.slice(0, 6);
-    const look = a => {
-      if (a.kind === 'purchase') return { icon: 'cart', bg: 'var(--blue-50)', fg: 'var(--blue-700)' };
-      if (a.kind === 'sale') return { icon: 'receipt', bg: '#fff4ed', fg: '#c2410c' };
-      if (a.kind === 'return') return { icon: 'undo', bg: 'var(--slate-100)', fg: 'var(--slate-600)' };
-      if (a.type === 'outward') return { icon: 'up', bg: '#fff4ed', fg: '#c2410c' };
-      if (a.type === 'transfer') return { icon: 'swap', bg: '#f5f3ff', fg: '#6d28d9' };
-      if (a.type === 'adjustment') return { icon: 'tag', bg: '#fffbeb', fg: '#b45309' };
-      return { icon: 'down', bg: 'var(--blue-50)', fg: 'var(--blue-700)' };
-    };
-    return `
-      <section class="sho-card" aria-label="Recent activity">
-        <div class="sho-card-head">
-          <div>
-            <div class="sho-card-title">Recent activity</div>
-            <div class="sho-card-sub">Vouchers and movements that touched stock items</div>
-          </div>
-          <button type="button" class="sho-link" data-sho-act="movement">Movement log ${shoIcon('arrow', 12, 2.2)}</button>
-        </div>
-        ${rows.length === 0 ? `<div class="sho-muted-empty">No stock activity yet. Purchases, sales and movements of stock items will show here.</div>` : `
-          <div class="sho-act-list">
-            ${rows.map(a => {
-              const l = look(a);
-              const sub = a.kind === 'movement'
-                ? `${ohEscapeHtml(a.party)} · ${a.qty > 0 ? '+' : ''}${shoFmtQty(a.qty)} ${ohEscapeHtml(a.uom || '')}`
-                : `${a.party ? ohEscapeHtml(a.party) + ' · ' : ''}${a.lines} stock ${a.lines === 1 ? 'line' : 'lines'}`;
-              return `
-                <div class="sho-act-row">
-                  <span class="sho-act-ico" style="background: ${l.bg}; color: ${l.fg};">${shoIcon(l.icon, 15, 2.1)}</span>
-                  <div class="sho-act-main">
-                    <div class="sho-trunc sho-act-title">${ohEscapeHtml(a.title.trim())}</div>
-                    <div class="sho-trunc sho-act-sub">${sub}</div>
-                  </div>
-                  <div class="sho-act-right">
-                    <div class="sho-act-val">₹ ${formatInr(a.val)}</div>
-                    <div class="sho-act-date">${shoRelDate(a.date, o.today)}</div>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `}
-      </section>
-    `;
+    return [
+      shdKpiCard('<svg viewBox="0 0 20 20" fill="none"><path d="M10 2v16M6 6h6a2 2 0 1 1 0 4H8a2 2 0 1 0 0 4h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>', money(p.revenue), 'Revenue'),
+      shdKpiCard('<svg viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h10M3 14h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="14" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M15 13v1l.7.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>', money(p.expense), 'Expense'),
+      shdKpiCard('<svg viewBox="0 0 20 20" fill="none"><path d="M3 14l4-5 3 3 4-6 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="5" r="2" fill="currentColor" opacity="0.4"/></svg>', money(p.profit), 'Profit / Loss')
+    ].join('');
   }
 
   function renderDetailsSubtab(stockItems) {
-    if (stockItems.length === 0) return `<div class="sho">${shoRenderEmpty()}</div>`;
-    const o = computeStockOverview(stockItems);
+    const stock = computeStockValuation(stockItems, _stockValMethod);
+    const methodSwitch = `
+      <div class="shd-method" role="group" aria-label="Valuation method">
+        <button type="button" data-shd-method="avg" class="${_stockValMethod === 'avg' ? 'active' : ''}" aria-pressed="${_stockValMethod === 'avg'}" title="Weighted average cost">Wt. Avg</button>
+        <button type="button" data-shd-method="fifo" class="${_stockValMethod === 'fifo' ? 'active' : ''}" aria-pressed="${_stockValMethod === 'fifo'}" title="First in, first out">FIFO</button>
+      </div>
+    `;
+    const card = shdKpiCard;
     return `
-      <div class="sho">
-        ${shoRenderHero(o, stockItems)}
-        ${shoRenderTiles(o)}
-        <div class="sho-grid-2">
-          ${shoRenderAttention(o)}
-          ${shoRenderInsights(o, stockItems)}
+      <div class="shd">
+        <div class="shd-kpi-strip">
+          ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M10 2l7 4v8l-7 4-7-4V6l7-4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M3 6l7 4 7-4M10 10v8" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>', stock.available.toLocaleString('en-IN'), 'Available Items')}
+          ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M5 4h10M5 8h10M9 4c3 0 4.5 1.5 4.5 4S12 12 9 12H6l7 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>', '₹' + formatInr(stock.value), 'Stock Valuation', methodSwitch)}
+          ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M2.5 6a1.5 1.5 0 0 1 1.5-1.5h3.5l2 2H16a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 16 16H4a1.5 1.5 0 0 1-1.5-1.5V6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>', getStockGroups().length.toLocaleString('en-IN'), 'Total Groups')}
+          ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M17 11l-6 6a1.5 1.5 0 0 1-2.1 0L2.5 10.6V2.5h8.1L17 8.9a1.5 1.5 0 0 1 0 2.1z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/></svg>', getStockCategories().length.toLocaleString('en-IN'), 'Total Categories')}
         </div>
-        <div class="sho-grid-2">
-          ${shoRenderFlow(o)}
-          ${shoRenderMovers(o)}
-        </div>
-        <div class="sho-grid-2">
-          ${shoRenderBreakdown(o)}
-          ${shoRenderConcentration(o)}
-        </div>
-        ${shoRenderActivity(o)}
+        ${renderShdCalendar(stockItems)}
+        <div class="shd-pnl-strip">${renderShdPnlCards(stockItems)}</div>
       </div>
     `;
   }
 
-  // Overview interactions: quick actions, breakdown toggle, chart/table toggle and the chart tooltip.
-  function attachStockOverviewEvents(panel) {
-    const root = panel.querySelector('.sho');
-    if (!root) return;
+  // Details calendar: vouchers that moved stock items, day by day, one voucher type at a time.
+  // Each type has its own one-hue ramp; a darker day had a bigger total (value without GST).
+  const SHD_CAL_TYPES = [
+    { key: 'sales', label: 'Sales', countLabel: 'No. of sales', avgLabel: 'Avg sales / day', ramp: ['#dbeafe', '#93c5fd', '#3b82f6', '#1d4ed8'] },
+    { key: 'salesReturn', label: 'Sales Return', countLabel: 'No. of sales returns', avgLabel: 'Avg sales returns / day', ramp: ['#ffedd5', '#fdba74', '#f97316', '#c2410c'] },
+    { key: 'purchase', label: 'Purchase', countLabel: 'No. of purchases', avgLabel: 'Avg purchases / day', ramp: ['#d1fae5', '#6ee7b7', '#10b981', '#047857'] },
+    { key: 'purchaseReturn', label: 'Purchase Return', countLabel: 'No. of purchase returns', avgLabel: 'Avg purchase returns / day', ramp: ['#ede9fe', '#c4b5fd', '#8b5cf6', '#6d28d9'] }
+  ];
+  let _shdCalType = 'sales';
+  let _shdCalMonth = null;   // { y, m: 0-11 }; null = the current month
+  let _shdCalShown = null;   // what the grid shows now, for the hover popup
 
-    const runAct = act => {
-      if (act === 'record') openRecordMovementModal();
-      else if (act === 'new-item') openCreateStockItemModal();
-      else if (act === 'new-godown') openCreateStockWarehouseModal();
-      else if (act === 'list') { _activeLeftSubtab = 'items'; renderStockHubPanel(); }
-      else if (act === 'analysis') { _activeLeftSubtab = 'analysis'; renderStockHubPanel(); }
-      else if (act === 'movement') { _activeLeftSubtab = 'movement'; renderStockHubPanel(); }
-      else if (act === 'flow-view') { _shoFlowAsTable = !_shoFlowAsTable; renderStockHubPanel(); }
-    };
-    root.querySelectorAll('[data-sho-act]').forEach(el => {
-      el.addEventListener('click', () => runAct(el.dataset.shoAct));
-      if (el.getAttribute('role') === 'button') {
-        el.addEventListener('keydown', e => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); runAct(el.dataset.shoAct); }
-        });
-      }
-    });
+  function shdCalTypeInfo() {
+    return SHD_CAL_TYPES.find(t => t.key === _shdCalType) || SHD_CAL_TYPES[0];
+  }
 
-    root.querySelectorAll('[data-sho-dim]').forEach(btn => {
-      btn.addEventListener('click', () => { _shoBreakdown = btn.dataset.shoDim; renderStockHubPanel(); });
-    });
+  function shdCalMonthNow() {
+    if (_shdCalMonth) return _shdCalMonth;
+    const t = new Date();
+    return { y: t.getFullYear(), m: t.getMonth() };
+  }
 
-    const tip = root.querySelector('#shoFlowTip');
-    const plot = tip ? tip.parentElement : null;
-    if (tip && plot) {
-      const show = col => {
-        tip.innerHTML = `
-          <div class="sho-tip-head">${col.dataset.range}</div>
-          <div class="sho-tip-row"><span><span class="sho-swatch" style="background: ${SHO_CLR_IN};"></span>Purchases</span><strong>₹ ${col.dataset.in}</strong></div>
-          <div class="sho-tip-row"><span><span class="sho-swatch" style="background: ${SHO_CLR_OUT};"></span>Sales</span><strong>₹ ${col.dataset.out}</strong></div>
-        `;
-        const pr = plot.getBoundingClientRect();
-        const cr = col.getBoundingClientRect();
-        const half = tip.offsetWidth / 2;
-        const x = Math.min(Math.max(cr.left - pr.left + cr.width / 2, half), pr.width - half);
-        tip.style.left = x + 'px';
-        tip.classList.add('show');
-      };
-      const hide = () => tip.classList.remove('show');
-      root.querySelectorAll('.sho-col').forEach(col => {
-        col.addEventListener('mouseenter', () => show(col));
-        col.addEventListener('focus', () => show(col));
-        col.addEventListener('mouseleave', hide);
-        col.addEventListener('blur', hide);
+  function shdCalMonthTitle() {
+    const cur = shdCalMonthNow();
+    return new Date(cur.y, cur.m, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  }
+
+  // Posted vouchers of one type in one month that have stock item lines, by day of month:
+  // { [day]: { total, count, items } } where total is the stock lines' value without GST,
+  // count the number of vouchers and items the set of distinct stock item ids.
+  function getShdCalendarDays(stockItems, typeKey, y, m) {
+    const matchRow = makeStockRowMatcher(stockItems);
+    const isSales = typeKey === 'sales' || typeKey === 'salesReturn';
+    const wantReturn = typeKey === 'salesReturn' || typeKey === 'purchaseReturn';
+    const vouchers = stockMovingVouchers();
+    const list = isSales ? vouchers.sales : vouchers.purchases;
+    const days = {};
+    list.forEach(v => {
+      if (!!v.isReturn !== wantReturn) return;
+      const p = voucherDateParts(v.date);
+      if (!p || p.y !== y || p.m !== m + 1) return;
+      const ids = [];
+      let value = 0;
+      (v.rows || []).forEach(row => {
+        const it = matchRow(row);
+        const qty = parseFloat(row.qty) || 0;
+        if (!it || qty <= 0) return;
+        ids.push(it.id);
+        value += rowTaxableValue(row);
       });
+      if (!ids.length) return;
+      const day = days[p.d] || (days[p.d] = { total: 0, count: 0, items: new Set() });
+      day.total += value;
+      day.count++;
+      ids.forEach(id => day.items.add(id));
+    });
+    return days;
+  }
+
+  function renderShdCalendarBody(stockItems) {
+    const today = new Date();
+    const cur = shdCalMonthNow();
+    const type = shdCalTypeInfo();
+    const days = getShdCalendarDays(stockItems, type.key, cur.y, cur.m);
+    // Average over the days of the month that had this type of voucher
+    const active = Object.values(days);
+    const avg = active.length ? active.reduce((sum, d) => sum + d.total, 0) / active.length : 0;
+    _shdCalShown = { y: cur.y, m: cur.m, type, days, avg };
+
+    const max = Math.max(0, ...active.map(d => d.total));
+    const daysInMonth = new Date(cur.y, cur.m + 1, 0).getDate();
+    const lead = (new Date(cur.y, cur.m, 1).getDay() + 6) % 7; // weeks start on Monday
+    const isThisMonth = cur.y === today.getFullYear() && cur.m === today.getMonth();
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<div class="shd-cal-cell blank" aria-hidden="true"></div>');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const info = days[d];
+      const isToday = isThisMonth && d === today.getDate();
+      if (!info) {
+        cells.push(`<div class="shd-cal-cell${isToday ? ' today' : ''}"><span>${d}</span></div>`);
+        continue;
+      }
+      // Four shades: the day's share of the month's biggest day
+      const step = max > 0 ? Math.min(3, Math.max(0, Math.ceil((info.total / max) * 4) - 1)) : 0;
+      const n = info.count;
+      cells.push(`
+        <div class="shd-cal-cell has${isToday ? ' today' : ''}" data-day="${d}" tabindex="0"
+             style="background: ${type.ramp[step]}; color: ${step === 3 ? '#ffffff' : 'var(--slate-900)'};"
+             aria-label="${d} ${shdCalMonthTitle()}: ${n} ${n === 1 ? 'voucher' : 'vouchers'}, ₹${formatInr(info.total)}"><span>${d}</span></div>
+      `);
     }
+    return `
+      <div class="shd-cal-week">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(w => `<span data-short="${w.slice(0, 2)}">${w}</span>`).join('')}</div>
+      <div class="shd-cal-grid">${cells.join('')}</div>
+      <div class="shd-cal-legend" aria-hidden="true">
+        <span>Less</span>${type.ramp.map(c => `<i style="background: ${c};"></i>`).join('')}<span>More</span>
+      </div>
+    `;
+  }
+
+  function renderShdCalendar(stockItems) {
+    const chevron = d => `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" aria-hidden="true"><path d="${d}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    return `
+      <section class="shd-cal" aria-label="Voucher calendar">
+        <div class="shd-cal-head">
+          <div class="shd-slider no-anim" role="tablist" aria-label="Voucher type">
+            <span class="shd-slider-thumb" aria-hidden="true"></span>
+            ${SHD_CAL_TYPES.map(t => `
+              <button type="button" role="tab" data-shd-cal-type="${t.key}" class="${t.key === _shdCalType ? 'active' : ''}" aria-selected="${t.key === _shdCalType}">
+                <span class="shd-slider-dot" style="background: ${t.ramp[2]};"></span>${t.label}
+              </button>
+            `).join('')}
+          </div>
+          <div class="shd-cal-nav">
+            <button type="button" data-shd-cal-nav="-1" aria-label="Previous month">${chevron('M12.5 15l-5-5 5-5')}</button>
+            <span class="shd-cal-title" aria-live="polite">${shdCalMonthTitle()}</span>
+            <button type="button" data-shd-cal-nav="1" aria-label="Next month">${chevron('M7.5 15l5-5-5-5')}</button>
+          </div>
+        </div>
+        <div class="shd-cal-body">${renderShdCalendarBody(stockItems)}</div>
+        <div class="shd-cal-tip" role="tooltip"></div>
+      </section>
+    `;
+  }
+
+  function shdCalTipHtml(d) {
+    const s = _shdCalShown;
+    const info = s && s.days[d];
+    if (!info) return '';
+    const dateTxt = new Date(s.y, s.m, d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    // This day against the average day: ▲ above / ▼ below, by how much
+    let vsAvg = '—';
+    if (s.avg > 0) {
+      const pct = ((info.total - s.avg) / s.avg) * 100;
+      const abs = Math.abs(pct);
+      vsAvg = abs < 0.5
+        ? 'Same as avg'
+        : `${pct > 0 ? '▲' : '▼'} ${abs < 10 ? abs.toFixed(1).replace(/\.0$/, '') : Math.round(abs)}% ${pct > 0 ? 'above' : 'below'}`;
+    }
+    const kv = (label, value) => `<div class="shd-tip-kv"><span>${label}</span><strong>${value}</strong></div>`;
+    return `
+      <div class="shd-tip-head"><span class="shd-slider-dot" style="background: ${s.type.ramp[2]};"></span>${ohEscapeHtml(s.type.label)} · ${dateTxt}</div>
+      ${kv(s.type.countLabel, info.count.toLocaleString('en-IN'))}
+      ${kv('No. of stock items', info.items.size.toLocaleString('en-IN'))}
+      ${kv('Valuation', '₹' + formatInr(info.total))}
+      <div class="shd-tip-sep"></div>
+      ${kv(s.type.avgLabel, '₹' + formatInr(s.avg))}
+      ${kv('This day vs avg', vsAvg)}
+    `;
+  }
+
+  // Slider, month arrows and the day popup. Only the calendar body is redrawn, so the slider thumb can glide.
+  function attachShdCalendarEvents(panel) {
+    const root = panel.querySelector('.shd-cal');
+    if (!root) return;
+    const slider = root.querySelector('.shd-slider');
+    const thumb = root.querySelector('.shd-slider-thumb');
+    const body = root.querySelector('.shd-cal-body');
+    const title = root.querySelector('.shd-cal-title');
+    const tip = root.querySelector('.shd-cal-tip');
+
+    const placeThumb = () => {
+      const active = slider.querySelector('button.active');
+      if (!active || !active.offsetWidth) return;
+      thumb.style.left = active.offsetLeft + 'px';
+      thumb.style.width = active.offsetWidth + 'px';
+      // On a narrow screen the slider scrolls: keep the chosen tab in view
+      if (slider.scrollWidth > slider.clientWidth) {
+        slider.scrollLeft = active.offsetLeft - (slider.clientWidth - active.offsetWidth) / 2;
+      }
+    };
+    placeThumb();
+    // Also places it once the panel becomes visible (it can be drawn while hidden)
+    if (typeof ResizeObserver === 'function') new ResizeObserver(placeThumb).observe(slider);
+    requestAnimationFrame(() => slider.classList.remove('no-anim'));
+
+    const hideTip = () => tip.classList.remove('show');
+    const showTip = cell => {
+      tip.innerHTML = shdCalTipHtml(cell.dataset.day);
+      const rr = root.getBoundingClientRect();
+      const cr = cell.getBoundingClientRect();
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      const left = Math.min(Math.max(cr.left - rr.left + cr.width / 2 - w / 2, 8), rr.width - w - 8);
+      let top = cr.top - rr.top - h - 8;
+      if (top < 8) top = cr.bottom - rr.top + 8;
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+      tip.classList.add('show');
+    };
+    const bindCells = () => {
+      body.querySelectorAll('.shd-cal-cell.has').forEach(cell => {
+        cell.addEventListener('mouseenter', () => showTip(cell));
+        cell.addEventListener('focus', () => showTip(cell));
+        cell.addEventListener('mouseleave', hideTip);
+        cell.addEventListener('blur', hideTip);
+      });
+    };
+    const redraw = () => {
+      hideTip();
+      body.innerHTML = renderShdCalendarBody(getStockItems());
+      title.textContent = shdCalMonthTitle();
+      bindCells();
+    };
+    bindCells();
+
+    slider.querySelectorAll('[data-shd-cal-type]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _shdCalType = btn.dataset.shdCalType;
+        slider.querySelectorAll('[data-shd-cal-type]').forEach(b => {
+          const on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-selected', String(on));
+        });
+        placeThumb();
+        redraw();
+      });
+    });
+    root.querySelectorAll('[data-shd-cal-nav]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cur = shdCalMonthNow();
+        const d = new Date(cur.y, cur.m + Number(btn.dataset.shdCalNav), 1);
+        _shdCalMonth = { y: d.getFullYear(), m: d.getMonth() };
+        redraw();
+        // The Revenue / Expense / Profit-Loss cards follow the calendar's month
+        const pnl = panel.querySelector('.shd-pnl-strip');
+        if (pnl) pnl.innerHTML = renderShdPnlCards(getStockItems());
+      });
+    });
   }
 
   // ==========================================
   // SUB-TAB 2: STOCK LIST VIEW (Full Screen with Back Button)
   // ==========================================
-  function renderStockListSubtab(stockItems, showBackButton = true) {
-    const filteredItems = stockItems.filter(item => {
-      const matchSearch = !_searchQuery ||
-        item.name.toLowerCase().includes(_searchQuery) ||
-        item.sku.toLowerCase().includes(_searchQuery) ||
-        (item.category && item.category.toLowerCase().includes(_searchQuery)) ||
-        (item.location && item.location.toLowerCase().includes(_searchQuery)) ||
-        (item.group && item.group.toLowerCase().includes(_searchQuery));
+  // Stock List columns. Main columns always show; optional ones are picked in the Columns menu.
+  // Quantity, Rate and Valuation are closing figures as per AS 2 (see computeStockItemValues):
+  // Rate is the valuation per unit, i.e. cost or NRV, whichever is lower.
+  const STOCK_LIST_COLS = [
+    { key: 'code', label: 'Code', main: true, text: r => r.item.sku },
+    { key: 'item', label: 'Item', main: true, text: r => r.item.name },
+    { key: 'group', label: 'Group', text: r => r.item.group || 'Inventories' },
+    { key: 'category', label: 'Category', text: r => r.item.category || '' },
+    { key: 'warehouse', label: 'Warehouse', text: r => r.item.location || r.item.warehouse || '' },
+    { key: 'unit', label: 'Unit', main: true, text: r => r.item.uom },
+    { key: 'qty', label: 'Quantity', main: true, num: true, val: r => r.qty },
+    { key: 'rate', label: 'Rate (₹)', main: true, num: true, val: r => r.rate },
+    { key: 'value', label: 'Valuation (₹)', main: true, num: true, val: r => r.value },
+    { key: 'gst', label: 'Tax Rate', num: true, val: r => r.item.gst }
+  ];
 
-      return matchSearch;
+  function stockListMatchesSearch(item) {
+    return !_searchQuery ||
+      item.name.toLowerCase().includes(_searchQuery) ||
+      item.sku.toLowerCase().includes(_searchQuery) ||
+      (item.category && item.category.toLowerCase().includes(_searchQuery)) ||
+      (item.location && item.location.toLowerCase().includes(_searchQuery)) ||
+      (item.group && item.group.toLowerCase().includes(_searchQuery));
+  }
+
+  // What the Stock List shows (and exports): the visible columns and the searched, sorted rows
+  function getStockListView(stockItems) {
+    const values = computeStockItemValues(stockItems, _stockValMethod);
+    const cols = STOCK_LIST_COLS.filter(c => c.main || _stockItemOptionalCols[c.key]);
+    let rows = stockItems.filter(stockListMatchesSearch).map(item => {
+      const v = values.get(item.id) || { qty: 0, value: 0 };
+      return { item, qty: v.qty, value: v.value, rate: v.qty > 0 ? v.value / v.qty : null };
     });
+    const sortCol = cols.find(c => c.key === _stockListSort.col);
+    if (sortCol && _stockListSort.dir) {
+      const dir = _stockListSort.dir === 'desc' ? -1 : 1;
+      rows = rows.slice().sort((a, b) => {
+        if (sortCol.num) {
+          const x = sortCol.val(a);
+          const y = sortCol.val(b);
+          // Items with no stock have no rate: they stay at the bottom either way
+          if (x === null || y === null) return x === null ? (y === null ? 0 : 1) : -1;
+          return (x - y) * dir;
+        }
+        return String(sortCol.text(a)).localeCompare(String(sortCol.text(b)), 'en', { numeric: true, sensitivity: 'base' }) * dir;
+      });
+    }
+    return { cols, rows, total: rows.reduce((sum, r) => sum + r.value, 0) };
+  }
 
-    const totalFilteredVal = filteredItems.reduce((sum, i) => sum + (i.qty * i.cost), 0);
+  function stockListCellHtml(col, r) {
+    const it = r.item;
+    switch (col.key) {
+      case 'code': return `<td style="font-family: monospace; font-weight: 700; color: var(--slate-900);">${ohEscapeHtml(it.sku)}</td>`;
+      case 'item': return `<td style="font-weight: 600;">${ohEscapeHtml(it.name)}</td>`;
+      case 'group': return `<td><span class="stock-category-badge">${ohEscapeHtml(it.group || 'Inventories')}</span></td>`;
+      case 'category': return `<td>${ohEscapeHtml(it.category || '-')}</td>`;
+      case 'warehouse': return `<td style="font-size: 12px; color: var(--slate-600);">${ohEscapeHtml(it.location || it.warehouse || '-')}</td>`;
+      case 'qty': return `<td style="text-align: right; font-weight: 700; font-size: 13.5px;">${r.qty.toLocaleString('en-IN', { maximumFractionDigits: 4 })}</td>`;
+      case 'unit': return `<td>${ohEscapeHtml(it.uom)}</td>`;
+      case 'rate': return `<td style="text-align: right; font-weight: 600;">${r.rate === null ? '—' : '₹ ' + formatInr(r.rate)}</td>`;
+      case 'value': return `<td style="text-align: right; font-weight: 700; color: var(--slate-900);">₹ ${formatInr(r.value)}</td>`;
+      case 'gst': return `<td style="text-align: center;"><span style="font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #eff6ff; color: #1d4ed8;">${it.gst}%</span></td>`;
+      default: return '<td></td>';
+    }
+  }
 
-    const activeOptionalCount = (_stockItemOptionalCols.unit ? 1 : 0) +
-      (_stockItemOptionalCols.group ? 1 : 0) +
-      (_stockItemOptionalCols.category ? 1 : 0) +
-      (_stockItemOptionalCols.warehouse ? 1 : 0);
+  // Columns icon and ⋮ (Export) menu for the blue title card while the Item tab is open
+  function renderStockListHeaderActions() {
+    const optional = STOCK_LIST_COLS.filter(c => !c.main);
+    return `
+      <div class="stock-head-actions">
+        <div class="stock-col-wrap">
+          <button type="button" class="rpt-more-btn" id="stockColToggleBtn" title="Columns" aria-label="Columns" aria-haspopup="true" aria-expanded="${_isStockColDropdownOpen}">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+              <path d="M1.5 2.5h13v11h-13zM5.5 2.5v11M10.5 2.5v11" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div id="stockColDropdown" class="rpt-col-dropdown ${_isStockColDropdownOpen ? 'open' : ''}" style="display: ${_isStockColDropdownOpen ? 'flex' : 'none'}; top: calc(100% + 8px); right: 0; left: auto;">
+            ${optional.map(c => `
+              <label>
+                <input type="checkbox" id="col-stock-${c.key}-check" ${_stockItemOptionalCols[c.key] ? 'checked' : ''} style="accent-color: var(--blue-600); width: 15px; height: 15px; cursor: pointer;"> ${c.label}
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        ${renderStockMoreMenu()}
+      </div>
+    `;
+  }
+
+  // ⋮ menu (Export → PDF / Excel) shared by the Item tab and Stock Movement title cards
+  function renderStockMoreMenu() {
+    return `
+      <div class="rpt-more-wrap">
+        <button class="rpt-more-btn" id="stockMoreBtn" title="More Options" type="button" aria-label="More Options" aria-haspopup="menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="1.5"></circle>
+            <circle cx="12" cy="5" r="1.5"></circle>
+            <circle cx="12" cy="19" r="1.5"></circle>
+          </svg>
+        </button>
+        <div class="rpt-more-dropdown" id="stockMoreDropdown">
+          <div class="rpt-submenu-wrap" id="stockExportSubmenuWrap">
+            <button class="rpt-menu-item rpt-submenu-btn" id="stockExportMenuBtn" type="button">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Export</span>
+              </div>
+              <svg class="rpt-submenu-caret" width="10" height="10" viewBox="0 0 14 14" fill="none">
+                <path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="rpt-submenu-dropdown" id="stockExportSubmenu">
+              <button class="rpt-menu-item" id="stockExportPdf" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                PDF
+              </button>
+              <button class="rpt-menu-item" id="stockExportExcel" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="8" y1="13" x2="16" y2="17"></line>
+                  <line x1="16" y1="13" x2="8" y2="17"></line>
+                </svg>
+                Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function stockCompanyName() {
+    const el = document.getElementById('sidebarCompanyName');
+    if (el && el.textContent && el.textContent.trim()) return el.textContent.trim();
+    try {
+      const saved = JSON.parse(localStorage.getItem('kya_company_details') || 'null');
+      if (saved && saved.companyName) return saved.companyName;
+    } catch (e) {}
+    return 'KYA Accounting';
+  }
+
+  // The Stock List as shown (columns, search, sort) for the PDF / Excel export
+  function getStockListExportData() {
+    const view = getStockListView(getStockItems());
+    return {
+      companyName: stockCompanyName(),
+      method: _stockValMethod === 'fifo' ? 'FIFO' : 'Weighted Average',
+      columns: view.cols.map(c => ({
+        label: c.label.replace('(₹)', '(INR)'),
+        kind: c.key === 'rate' || c.key === 'value' ? 'money' : c.key === 'qty' ? 'qty' : c.key === 'gst' ? 'pct' : 'text'
+      })),
+      rows: view.rows.map(r => view.cols.map(c => (c.num ? c.val(r) : c.text(r)))),
+      totalValue: view.total,
+      itemCount: view.rows.length
+    };
+  }
+
+  function renderStockListSubtab(stockItems) {
+    const view = getStockListView(stockItems);
+    const sortIcon = key => {
+      if (_stockListSort.col !== key || !_stockListSort.dir) return '<span class="stock-sort-ico">⇅</span>';
+      return `<span class="stock-sort-ico on">${_stockListSort.dir === 'asc' ? '▲' : '▼'}</span>`;
+    };
+    const ariaSort = key => (_stockListSort.col === key && _stockListSort.dir) ? (_stockListSort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
 
     return `
-      ${showBackButton ? `
-        <div style="margin-bottom: 14px;">
-          <button type="button" class="kya-back-btn btn-back-to-details" title="Back to Details" aria-label="Back to Details">
-            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
-      ` : ''}
-
-      <!-- Filter Toolbar -->
+      <!-- Search Toolbar -->
       <div class="stock-filter-toolbar">
         <div class="stock-search-box">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2187,34 +1451,6 @@
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
           <input type="text" class="stock-search-input" id="stockSearchInp" placeholder="Search item name, SKU, category, godown..." value="${ohEscapeHtml(_searchQuery)}">
-        </div>
-        <div class="stock-filter-group">
-          <!-- Columns Option (Trial Balance style) -->
-          <div class="rpt-col-wrap" style="position: relative;">
-            <button type="button" class="btn-stock-action" id="stockColToggleBtn" style="display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; height: 36px; font-weight: 600;">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M1.5 2.5h13v11h-13zM5.5 2.5v11M10.5 2.5v11" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Columns
-            </button>
-            <div id="stockColDropdown" class="rpt-col-dropdown ${_isStockColDropdownOpen ? 'open' : ''}" style="display: ${_isStockColDropdownOpen ? 'flex' : 'none'}; position: absolute; top: calc(100% + 6px); right: 0; left: auto; z-index: 200; min-width: 170px; padding: 12px 14px; flex-direction: column; gap: 8px; border: 1.5px solid var(--slate-200); border-radius: 10px; background: #fff; box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1));">
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                <input type="checkbox" id="col-stock-unit-check" ${_stockItemOptionalCols.unit ? 'checked' : ''} style="accent-color: var(--blue-600); width: 15px; height: 15px; cursor: pointer;"> Unit
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                <input type="checkbox" id="col-stock-group-check" ${_stockItemOptionalCols.group ? 'checked' : ''} style="accent-color: var(--blue-600); width: 15px; height: 15px; cursor: pointer;"> Group
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                <input type="checkbox" id="col-stock-category-check" ${_stockItemOptionalCols.category ? 'checked' : ''} style="accent-color: var(--blue-600); width: 15px; height: 15px; cursor: pointer;"> Category
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; user-select: none;">
-                <input type="checkbox" id="col-stock-warehouse-check" ${_stockItemOptionalCols.warehouse ? 'checked' : ''} style="accent-color: var(--blue-600); width: 15px; height: 15px; cursor: pointer;"> Warehouse
-              </label>
-            </div>
-          </div>
-          <button type="button" class="btn-stock-action" id="stockResetFiltersBtn" style="padding: 0 12px; height: 36px;">
-            Reset
-          </button>
         </div>
       </div>
 
@@ -2224,21 +1460,16 @@
           <table class="stock-table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Item</th>
-                ${_stockItemOptionalCols.unit ? '<th>Unit</th>' : ''}
-                ${_stockItemOptionalCols.group ? '<th>Group</th>' : ''}
-                ${_stockItemOptionalCols.category ? '<th>Category</th>' : ''}
-                ${_stockItemOptionalCols.warehouse ? '<th>Warehouse</th>' : ''}
-                <th style="text-align: right;">Quantity</th>
-                <th style="text-align: right;">Rate (₹)</th>
-                <th style="text-align: center;">Tax Rate</th>
+                ${view.cols.map(c => `
+                  <th data-stock-sort="${c.key}" tabindex="0" aria-sort="${ariaSort(c.key)}" title="Sort by ${c.label}"
+                      style="${c.key === 'gst' ? 'text-align: center;' : c.num ? 'text-align: right;' : ''}">${c.label}${sortIcon(c.key)}</th>
+                `).join('')}
               </tr>
             </thead>
             <tbody>
-              ${filteredItems.length === 0 ? `
+              ${view.rows.length === 0 ? `
                 <tr>
-                  <td colspan="${5 + activeOptionalCount}" class="stock-empty-state">
+                  <td colspan="${view.cols.length}" class="stock-empty-state">
                     <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 8px; color: var(--slate-300);">
                       <circle cx="12" cy="12" r="10"></circle>
                       <line x1="12" y1="8" x2="12" y2="12"></line>
@@ -2247,143 +1478,218 @@
                     <div>${stockItems.length === 0 ? 'No stock items found. Create items from Master Desk or the action bar above.' : 'No stock items match your search criteria.'}</div>
                   </td>
                 </tr>
-              ` : filteredItems.map(item => {
-                return `
-                  <tr>
-                    <td style="font-family: monospace; font-weight: 700; color: var(--slate-900);">${ohEscapeHtml(item.sku)}</td>
-                    <td style="font-weight: 600;">${ohEscapeHtml(item.name)}</td>
-                    ${_stockItemOptionalCols.unit ? `<td><strong>${ohEscapeHtml(item.uom)}</strong></td>` : ''}
-                    ${_stockItemOptionalCols.group ? `<td><span class="stock-category-badge">${ohEscapeHtml(item.group || 'Inventories')}</span></td>` : ''}
-                    ${_stockItemOptionalCols.category ? `<td>${ohEscapeHtml(item.category || '-')}</td>` : ''}
-                    ${_stockItemOptionalCols.warehouse ? `<td style="font-size: 12px; color: var(--slate-600);">${ohEscapeHtml(item.location || item.warehouse || '-')}</td>` : ''}
-                    <td style="text-align: right; font-weight: 700; font-size: 13.5px;">${item.qty.toLocaleString('en-IN')}</td>
-                    <td style="text-align: right; font-weight: 600;">₹ ${formatInr(item.cost || item.rate || 0)}</td>
-                    <td style="text-align: center;"><span style="font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #eff6ff; color: #1d4ed8;">${item.gst || 18}%</span></td>
-                  </tr>
-                `;
-              }).join('')}
+              ` : view.rows.map(r => `<tr>${view.cols.map(c => stockListCellHtml(c, r)).join('')}</tr>`).join('')}
             </tbody>
           </table>
         </div>
         <div class="stock-table-footer">
-          <span>Showing <strong>${filteredItems.length}</strong> of <strong>${stockItems.length}</strong> items</span>
-          <span style="font-size: 13px; font-weight: 700; color: var(--slate-800);">Total Valuation: ₹ ${formatInr(totalFilteredVal)}</span>
+          <span>Showing <strong>${view.rows.length}</strong> of <strong>${stockItems.length}</strong> items</span>
+          <span style="font-size: 13px; font-weight: 700; color: var(--slate-800);">Total Valuation: ₹ ${formatInr(view.total)}</span>
         </div>
       </div>
     `;
   }
 
   // ==========================================
-  // SUB-TAB 3: MOVEMENT LOG VIEW (Full Screen with Back Button)
+  // SUB-TAB 3: STOCK MOVEMENT VIEW (Full Screen with Back Button)
   // ==========================================
-  function renderMovementSubtab(stockItems) {
-    const filteredMovements = _stockMovements.filter(m => {
-      if (_movementTypeFilter !== 'all' && m.type !== _movementTypeFilter) return false;
-      return true;
+  // Period of the Stock Movement report (YYYY-MM-DD); blank = this financial year (1 April) to today
+  let _movFrom = '';
+  let _movTo = '';
+  // Search text (code or item name) and column sort of the report
+  let _movSearch = '';
+  let _movSort = { col: '', dir: '' };
+
+  function stockMovementPeriod() {
+    const today = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    const fyStartYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+    return { from: _movFrom || `${fyStartYear}-04-01`, to: _movTo || todayIso };
+  }
+
+  // Quantity movement of each stock item in a period:
+  // B/F = stock before the From date; IN = purchases + sales returns; OUT = sales + purchase
+  // returns; Adj = receipts (+) and dispatches (−) entered by hand in Stock Hub;
+  // Balance = B/F + IN − OUT + Adj.
+  function computeStockMovement(stockItems, fromIso, toIso) {
+    const from = voucherDateKey(fromIso);
+    const to = voucherDateKey(toIso);
+    const matchRow = makeStockRowMatcher(stockItems);
+    const rows = new Map(stockItems.map(it => [it.id, { item: it, bf: Math.max(0, it.qty), inQ: 0, outQ: 0, adj: 0 }]));
+
+    // Puts a dated change in B/F (before the period) or in its column (inside it)
+    const add = (it, dk, col, q) => {
+      const r = rows.get(it.id);
+      if (dk < from) r.bf += col === 'outQ' ? -q : q;
+      else if (dk <= to) r[col] += q;
+    };
+
+    const vouchers = stockMovingVouchers();
+    vouchers.purchases.forEach(v => {
+      const dk = voucherDateKey(v.date);
+      (v.rows || []).forEach(row => {
+        const it = matchRow(row);
+        const qty = parseFloat(row.qty) || 0;
+        if (it && qty > 0) add(it, dk, v.isReturn ? 'outQ' : 'inQ', qty);
+      });
+    });
+    vouchers.sales.forEach(v => {
+      const dk = voucherDateKey(v.date);
+      (v.rows || []).forEach(row => {
+        const it = matchRow(row);
+        const qty = parseFloat(row.qty) || 0;
+        if (it && qty > 0) add(it, dk, v.isReturn ? 'inQ' : 'outQ', qty);
+      });
     });
 
+    // Hand-entered receipts / dispatches already changed the master qty, so they are taken back
+    // out of the opening and put in on their own dates
+    const bySku = new Map(stockItems.map(it => [String(it.sku).toLowerCase(), it]));
+    const byName = new Map(stockItems.map(it => [String(it.name).toLowerCase().trim(), it]));
+    _stockMovements.forEach(m => {
+      if (m.type !== 'inward' && m.type !== 'outward') return;
+      const it = bySku.get(String(m.sku || '').toLowerCase()) || byName.get(String(m.itemName || '').toLowerCase().trim());
+      if (!it) return;
+      const q = (m.type === 'inward' ? 1 : -1) * Math.abs(Number(m.qty) || 0);
+      rows.get(it.id).bf -= q;
+      add(it, voucherDateKey(m.date), 'adj', q);
+    });
+
+    return stockItems.map(it => {
+      const r = rows.get(it.id);
+      r.bal = r.bf + r.inQ - r.outQ + r.adj;
+      return r;
+    });
+  }
+
+  function fmtMovQty(q) {
+    const r = Math.round(q * 10000) / 10000;
+    return (r === 0 ? 0 : r).toLocaleString('en-IN', { maximumFractionDigits: 4 });
+  }
+
+  // From / To dates and the ⋮ (Export) menu for the blue title card while Movement is open
+  function renderStockMovementHeaderActions() {
+    const p = stockMovementPeriod();
     return `
-      <!-- Back Button & Movement Action Strip -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1.5px solid var(--slate-100); padding-bottom: 14px; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <button type="button" class="kya-back-btn btn-back-to-details" title="Back to Details" aria-label="Back to Details">
-            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <div style="font-weight: 800; font-size: 16px; color: var(--slate-900);">Stock Movement Journal</div>
-        </div>
+      <div class="stock-head-actions">
+        <input type="date" id="movFrom" class="cl-glass-control" value="${p.from}" style="width: 125px;" title="From date" aria-label="From date" />
+        <input type="date" id="movTo" class="cl-glass-control" value="${p.to}" style="width: 125px;" title="To date" aria-label="To date" />
+        ${renderStockMoreMenu()}
+      </div>
+    `;
+  }
 
-        <button type="button" class="btn btn-primary" id="btnOpenRecordMovementModal" style="display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          + Record Stock Movement
+  function stockMovementTotals(rows) {
+    return rows.reduce((t, r) => {
+      t.bf += r.bf; t.inQ += r.inQ; t.outQ += r.outQ; t.adj += r.adj; t.bal += r.bal;
+      return t;
+    }, { bf: 0, inQ: 0, outQ: 0, adj: 0, bal: 0 });
+  }
+
+  // Report columns for sorting: Code and Item sort A–Z, the Qty columns by number
+  const MOV_COLS = [
+    { key: 'code', label: 'Code', text: r => r.item.sku },
+    { key: 'item', label: 'Item', text: r => r.item.name },
+    { key: 'bf', label: 'B/F' },
+    { key: 'inQ', label: 'IN' },
+    { key: 'outQ', label: 'OUT' },
+    { key: 'adj', label: 'Adj' },
+    { key: 'bal', label: 'Balance' }
+  ];
+
+  // What the report shows (and exports): the period, the searched and sorted rows, their totals
+  function getStockMovementView(stockItems) {
+    const p = stockMovementPeriod();
+    const q = _movSearch.toLowerCase().trim();
+    let rows = computeStockMovement(stockItems, p.from, p.to)
+      .filter(r => !q || r.item.name.toLowerCase().includes(q) || String(r.item.sku).toLowerCase().includes(q));
+    const col = MOV_COLS.find(c => c.key === _movSort.col);
+    if (col && _movSort.dir) {
+      const dir = _movSort.dir === 'desc' ? -1 : 1;
+      rows = rows.slice().sort((a, b) => col.text
+        ? String(col.text(a)).localeCompare(String(col.text(b)), 'en', { numeric: true, sensitivity: 'base' }) * dir
+        : (a[col.key] - b[col.key]) * dir);
+    }
+    return { period: p, rows, totals: stockMovementTotals(rows) };
+  }
+
+  // The Stock Movement report for the PDF / Excel export, as shown (search and sort)
+  function getStockMovementExportData() {
+    const view = getStockMovementView(getStockItems());
+    const t = view.totals;
+    const dmy = iso => iso.split('-').reverse().join('-');
+    return {
+      companyName: stockCompanyName(),
+      from: dmy(view.period.from),
+      to: dmy(view.period.to),
+      rows: view.rows.map(r => [r.item.sku, r.item.name, r.bf, r.inQ, r.outQ, r.adj, r.bal]),
+      totals: [t.bf, t.inQ, t.outQ, t.adj, t.bal]
+    };
+  }
+
+  function renderMovementSubtab(stockItems) {
+    const view = getStockMovementView(stockItems);
+    const rows = view.rows;
+    const t = view.totals;
+    const qtyCells = r => [r.bf, r.inQ, r.outQ, r.adj, r.bal].map((q, i) =>
+      `<td class="num"${i === 4 ? ' style="font-weight: 700; color: var(--slate-900);"' : ''}>${fmtMovQty(q)}</td>`).join('');
+    // Sortable header cell: ⇅ / ▲ / ▼ as on the Item tab
+    const th = (key, extra) => {
+      const c = MOV_COLS.find(x => x.key === key);
+      const on = _movSort.col === key && _movSort.dir;
+      const icon = on ? `<span class="stock-sort-ico on">${_movSort.dir === 'asc' ? '▲' : '▼'}</span>` : '<span class="stock-sort-ico">⇅</span>';
+      const aria = on ? (_movSort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+      return `<th data-mov-sort="${key}" tabindex="0" aria-sort="${aria}" title="Sort by ${c.label}" ${extra || ''}>${c.label}${icon}</th>`;
+    };
+
+    return `
+      <div class="stock-mov-toolbar">
+        <button type="button" class="kya-back-btn btn-back-to-details" title="Back to Details" aria-label="Back to Details">
+          <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-      </div>
-
-      <!-- Movement Filter Bar -->
-      <div class="stock-filter-toolbar">
-        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-          <select class="stock-select-filter" id="movementTypeFilter">
-            <option value="all" ${_movementTypeFilter === 'all' ? 'selected' : ''}>All Movement Types</option>
-            <option value="inward" ${_movementTypeFilter === 'inward' ? 'selected' : ''}>Goods Receipts (Inward)</option>
-            <option value="outward" ${_movementTypeFilter === 'outward' ? 'selected' : ''}>Sales Dispatches (Outward)</option>
-            <option value="transfer" ${_movementTypeFilter === 'transfer' ? 'selected' : ''}>Warehouse Transfers</option>
-            <option value="adjustment" ${_movementTypeFilter === 'adjustment' ? 'selected' : ''}>Physical Adjustments</option>
-          </select>
-        </div>
-        <div style="font-size: 12.5px; color: var(--slate-500);">
-          Tracking <strong>${filteredMovements.length}</strong> transactions
+        <div class="stock-search-box">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" class="stock-search-input" id="movSearchInp" placeholder="Search code or item name..." value="${ohEscapeHtml(_movSearch)}" aria-label="Search code or item name">
         </div>
       </div>
 
-      <!-- Full-Width Movement Log Table -->
       <div class="stock-table-card">
         <div style="overflow-x: auto;">
-          <table class="stock-table">
+          <table class="stock-table stock-mov-table">
             <thead>
               <tr>
-                <th>Date & Time</th>
-                <th>Voucher / Ref #</th>
-                <th>Movement Type</th>
-                <th>Item & SKU</th>
-                <th>Source Location</th>
-                <th>Destination Location</th>
-                <th style="text-align: right;">Qty Moved</th>
-                <th style="text-align: right;">Rate (₹)</th>
-                <th style="text-align: right;">Total Value (₹)</th>
-                <th>User / Remarks</th>
+                ${th('code', 'rowspan="2"')}
+                ${th('item', 'rowspan="2"')}
+                <th colspan="5" class="grp">Qty</th>
+              </tr>
+              <tr>
+                ${['bf', 'inQ', 'outQ', 'adj', 'bal'].map(k => th(k, 'class="num"')).join('')}
               </tr>
             </thead>
             <tbody>
-              ${filteredMovements.length === 0 ? `
+              ${rows.length === 0 ? `
+                <tr><td colspan="7" class="stock-empty-state">${stockItems.length === 0 ? 'No stock items found. Create items from Master Desk.' : 'No stock items match your search.'}</td></tr>
+              ` : rows.map(r => `
                 <tr>
-                  <td colspan="10" class="stock-empty-state">
-                    No movement records found for the selected filter.
-                  </td>
+                  <td style="font-family: monospace; font-weight: 700; color: var(--slate-900);">${ohEscapeHtml(r.item.sku)}</td>
+                  <td style="font-weight: 600;">${ohEscapeHtml(r.item.name)}</td>
+                  ${qtyCells(r)}
                 </tr>
-              ` : filteredMovements.map(m => {
-                const isPositive = m.qty > 0;
-                let typeBg = '#ecfdf5', typeClr = '#047857';
-                if (m.type === 'outward') { typeBg = '#eff6ff'; typeClr = '#1d4ed8'; }
-                else if (m.type === 'transfer') { typeBg = '#f5f3ff'; typeClr = '#6d28d9'; }
-                else if (m.type === 'adjustment') { typeBg = '#fffbeb'; typeClr = '#b45309'; }
-
-                return `
-                  <tr>
-                    <td style="color: var(--slate-500); font-size: 12px;">${m.date}</td>
-                    <td style="font-family: monospace; font-weight: 700; color: var(--slate-900);">${m.refNo}</td>
-                    <td>
-                      <span style="font-size: 11px; font-weight: 700; padding: 2.5px 8px; border-radius: 6px; background: ${typeBg}; color: ${typeClr};">
-                        ${m.typeLabel}
-                      </span>
-                    </td>
-                    <td>
-                      <div class="stock-item-name">
-                        <span>${ohEscapeHtml(m.itemName)}</span>
-                        <span class="stock-item-sku">${m.sku}</span>
-                      </div>
-                    </td>
-                    <td style="font-size: 12px; color: var(--slate-600);">${ohEscapeHtml(m.fromLoc)}</td>
-                    <td style="font-size: 12px; color: var(--slate-600);">${ohEscapeHtml(m.toLoc)}</td>
-                    <td style="text-align: right; font-weight: 800; font-size: 13.5px; color: ${isPositive ? '#047857' : '#dc2626'};">
-                      ${isPositive ? '+' : ''}${m.qty}
-                    </td>
-                    <td style="text-align: right;">₹ ${formatInr(m.unitCost)}</td>
-                    <td style="text-align: right; font-weight: 700; color: var(--slate-900);">₹ ${formatInr(m.totalVal)}</td>
-                    <td style="font-size: 11.5px; color: var(--slate-500);">
-                      <div>${ohEscapeHtml(m.user)}</div>
-                      <div style="font-style: italic; color: var(--slate-400);">${ohEscapeHtml(m.remarks)}</div>
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
+              `).join('')}
             </tbody>
+            ${rows.length ? `
+              <tfoot>
+                <tr>
+                  <td colspan="2">Grand Total</td>
+                  ${qtyCells(t)}
+                </tr>
+              </tfoot>
+            ` : ''}
           </table>
-        </div>
-        <div class="stock-table-footer">
-          <span>Showing <strong>${filteredMovements.length}</strong> transactions</span>
-          <span style="font-size: 11.5px; color: var(--slate-400);">Audit-verified Stock Movement Journal</span>
         </div>
       </div>
     `;
@@ -2583,7 +1889,7 @@
   // TOP MASTER VIEWS: Item, Group, Category, Unit, Warehouse
   // ==========================================
   function renderMasterItemView(stockItems) {
-    return renderStockListSubtab(stockItems, false);
+    return renderStockListSubtab(stockItems);
   }
 
   function renderMasterGroupView() {
@@ -2885,6 +2191,7 @@
     if (!panel) return;
 
     const stockItems = getStockItems();
+    const isMovementView = _activeTopTab === 'overview' && _activeLeftSubtab === 'movement';
 
     // Determine Main Content HTML based on _activeTopTab and _activeLeftSubtab
     let bodyContentHtml = '';
@@ -2904,11 +2211,9 @@
           </div>
         `;
       } else {
-        // Full screen view with Back button for Stock List, Movement, and Analysis
+        // Full screen view with Back button for Movement and Analysis
         let subtabHtml = '';
-        if (_activeLeftSubtab === 'items') {
-          subtabHtml = renderStockListSubtab(stockItems);
-        } else if (_activeLeftSubtab === 'movement') {
+        if (_activeLeftSubtab === 'movement') {
           subtabHtml = renderMovementSubtab(stockItems);
         } else if (_activeLeftSubtab === 'analysis') {
           subtabHtml = renderAnalysisSubtab(stockItems);
@@ -2954,11 +2259,11 @@
                 </svg>
               </div>
               <div>
-                <div class="je-card-title-text">Stock Hub</div>
+                <div class="je-card-title-text">${isMovementView ? 'Stock Movement' : 'Stock Hub'}</div>
                 <div class="je-card-subtitle-text">Real-time inventory levels, stock valuation, godown logistics and analytics</div>
               </div>
             </div>
-            <div class="je-voucher-chip" style="background: rgba(255,255,255,.2); font-weight: 700;">INVENTORY HUB</div>
+            ${_activeTopTab === 'item' ? renderStockListHeaderActions() : isMovementView ? renderStockMovementHeaderActions() : ''}
           </div>
 
           <!-- Card Body -->
@@ -3031,13 +2336,15 @@
     if (colToggleBtn && colDropdown) {
       colToggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        closeStockMoreMenu();
         _isStockColDropdownOpen = !_isStockColDropdownOpen;
+        colToggleBtn.setAttribute('aria-expanded', String(_isStockColDropdownOpen));
         colDropdown.style.display = _isStockColDropdownOpen ? 'flex' : 'none';
         colDropdown.classList.toggle('open', _isStockColDropdownOpen);
       });
     }
 
-    ['unit', 'group', 'category', 'warehouse'].forEach(col => {
+    Object.keys(_stockItemOptionalCols).forEach(col => {
       const chk = panel.querySelector(`#col-stock-${col}-check`);
       if (chk) {
         chk.addEventListener('change', (e) => {
@@ -3047,34 +2354,113 @@
       }
     });
 
-    const resetBtn = panel.querySelector('#stockResetFiltersBtn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        _searchQuery = '';
-        _stockItemOptionalCols = { unit: false, group: false, category: false, warehouse: false };
-        _isStockColDropdownOpen = false;
+    // Stock List sort: a header click goes ascending → descending → off
+    panel.querySelectorAll('th[data-stock-sort]').forEach(th => {
+      const cycle = () => {
+        const key = th.dataset.stockSort;
+        if (_stockListSort.col !== key) _stockListSort = { col: key, dir: 'asc' };
+        else if (_stockListSort.dir === 'asc') _stockListSort = { col: key, dir: 'desc' };
+        else _stockListSort = { col: '', dir: '' };
         renderStockHubPanel();
+      };
+      th.addEventListener('click', cycle);
+      th.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); }
+      });
+    });
+
+    // Stock List ⋮ menu: Export → PDF / Excel of the list as shown
+    const moreBtn = panel.querySelector('#stockMoreBtn');
+    const moreDropdown = panel.querySelector('#stockMoreDropdown');
+    const exportWrap = panel.querySelector('#stockExportSubmenuWrap');
+    const exportBtn = panel.querySelector('#stockExportMenuBtn');
+    const exportSubmenu = panel.querySelector('#stockExportSubmenu');
+    if (moreBtn && moreDropdown) {
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = moreDropdown.classList.contains('active');
+        closeStockMoreMenu();
+        if (colDropdown && _isStockColDropdownOpen) {
+          _isStockColDropdownOpen = false;
+          colDropdown.style.display = 'none';
+          colDropdown.classList.remove('open');
+        }
+        if (!isOpen) moreDropdown.classList.add('active');
+      });
+    }
+    if (exportWrap && exportBtn && exportSubmenu) {
+      let closeTimer = null;
+      exportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exportSubmenu.classList.toggle('active');
+      });
+      exportWrap.addEventListener('mouseenter', () => {
+        if (closeTimer) clearTimeout(closeTimer);
+        exportSubmenu.classList.add('active');
+      });
+      exportWrap.addEventListener('mouseleave', () => {
+        closeTimer = setTimeout(() => exportSubmenu.classList.remove('active'), 300);
+      });
+    }
+    // The ⋮ export follows the open view: Stock Movement report or the Item list
+    const isMovementView = _activeTopTab === 'overview' && _activeLeftSubtab === 'movement';
+    [['#stockExportPdf', 'PDF'], ['#stockExportExcel', 'Excel']].forEach(([sel, kind]) => {
+      const btn = panel.querySelector(sel);
+      if (!btn) return;
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeStockMoreMenu();
+        const fn = isMovementView ? 'exportStockMovementTo' + kind : 'exportStockListTo' + kind;
+        if (typeof window[fn] === 'function') {
+          await window[fn](isMovementView ? getStockMovementExportData() : getStockListExportData());
+        }
+      });
+    });
+
+    // Stock Movement: search by code or item name, keeping the cursor in the box as it redraws
+    const movSearch = panel.querySelector('#movSearchInp');
+    if (movSearch) {
+      movSearch.addEventListener('input', (e) => {
+        _movSearch = e.target.value;
+        renderStockHubPanel();
+        const re = document.getElementById('movSearchInp');
+        if (re) {
+          re.focus();
+          re.setSelectionRange(re.value.length, re.value.length);
+        }
       });
     }
 
-    const movFilter = panel.querySelector('#movementTypeFilter');
-    if (movFilter) {
-      movFilter.addEventListener('change', (e) => {
-        _movementTypeFilter = e.target.value;
+    // Stock Movement sort: a header click goes ascending → descending → off
+    panel.querySelectorAll('th[data-mov-sort]').forEach(th => {
+      const cycle = () => {
+        const key = th.dataset.movSort;
+        if (_movSort.col !== key) _movSort = { col: key, dir: 'asc' };
+        else if (_movSort.dir === 'asc') _movSort = { col: key, dir: 'desc' };
+        else _movSort = { col: '', dir: '' };
         renderStockHubPanel();
+      };
+      th.addEventListener('click', cycle);
+      th.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); }
       });
-    }
+    });
 
-    // 5. Modal triggers
-    const recordMovBtn = panel.querySelector('#btnOpenRecordMovementModal');
-    if (recordMovBtn) {
-      recordMovBtn.addEventListener('click', () => openRecordMovementModal());
-    }
-
-    panel.querySelectorAll('.btn-quick-move').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const itemId = btn.dataset.id;
-        openRecordMovementModal(itemId);
+    // Stock Movement: From / To dates (as on the Balance Sheet); the other date moves along if they cross
+    ['#movFrom', '#movTo'].forEach((sel, i) => {
+      const inp = panel.querySelector(sel);
+      if (!inp) return;
+      inp.addEventListener('change', () => {
+        if (!inp.value) return;
+        const p = stockMovementPeriod();
+        if (i === 0) {
+          _movFrom = inp.value;
+          _movTo = inp.value > p.to ? inp.value : p.to;
+        } else {
+          _movTo = inp.value;
+          _movFrom = inp.value < p.from ? inp.value : p.from;
+        }
+        renderStockHubPanel();
       });
     });
 
@@ -3117,141 +2503,22 @@
       createWhBtn.addEventListener('click', () => openCreateStockWarehouseModal());
     }
 
-    attachStockOverviewEvents(panel);
+    // Details: Wt. Avg / FIFO switch on the Stock Valuation card
+    panel.querySelectorAll('[data-shd-method]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _stockValMethod = btn.dataset.shdMethod === 'fifo' ? 'fifo' : 'avg';
+        try { localStorage.setItem(KYA_STOCK_VAL_METHOD_KEY, _stockValMethod); } catch (e) {}
+        renderStockHubPanel();
+      });
+    });
+
+    // Details: Sales / Returns / Purchase calendar
+    attachShdCalendarEvents(panel);
   }
 
   // ==========================================
   // MODALS
   // ==========================================
-  function openRecordMovementModal(preselectedItemId) {
-    const stockItems = getStockItems();
-
-    const overlay = document.createElement('div');
-    overlay.className = 'stock-modal-overlay';
-    overlay.innerHTML = `
-      <div class="stock-modal-box">
-        <div class="stock-modal-header">
-          <div style="font-weight: 700; font-size: 15px;">Record Stock Movement</div>
-          <button type="button" id="closeStockModal" style="background: none; border: none; color: #fff; font-size: 18px; cursor: pointer;">&times;</button>
-        </div>
-        <div class="stock-modal-body">
-          <div class="stock-form-fg">
-            <label class="stock-form-label">Movement Type *</label>
-            <select class="stock-form-select" id="movFormType">
-              <option value="inward">Goods Receipt (Inward +)</option>
-              <option value="outward">Sales Dispatch (Outward -)</option>
-              <option value="transfer">Warehouse Transfer</option>
-              <option value="adjustment">Stock Adjustment (Audit / Variance)</option>
-            </select>
-          </div>
-
-          <div class="stock-form-fg">
-            <label class="stock-form-label">Select Stock Item *</label>
-            <select class="stock-form-select" id="movFormItem">
-              ${stockItems.map(i => `<option value="${i.id}" ${i.id === preselectedItemId ? 'selected' : ''}>${ohEscapeHtml(i.name)} (${i.sku}) - Avail: ${i.qty} ${i.uom}</option>`).join('')}
-            </select>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="stock-form-fg">
-              <label class="stock-form-label">Source / From Location</label>
-              <input type="text" class="stock-form-input" id="movFormFrom" placeholder="e.g. Main Warehouse (WH-A) or Supplier" value="Supplier / Vendor">
-            </div>
-            <div class="stock-form-fg">
-              <label class="stock-form-label">Destination / To Location</label>
-              <input type="text" class="stock-form-input" id="movFormTo" placeholder="e.g. Store Showroom (WH-B)" value="Main Warehouse (WH-A)">
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="stock-form-fg">
-              <label class="stock-form-label">Quantity Moved *</label>
-              <input type="number" class="stock-form-input" id="movFormQty" min="1" value="10" placeholder="Qty">
-            </div>
-            <div class="stock-form-fg">
-              <label class="stock-form-label">Voucher / Ref #</label>
-              <input type="text" class="stock-form-input" id="movFormRef" value="MOV-${Math.floor(1000 + Math.random() * 9000)}" placeholder="Ref #">
-            </div>
-          </div>
-
-          <div class="stock-form-fg">
-            <label class="stock-form-label">Remarks / Notes</label>
-            <textarea class="stock-form-textarea" id="movFormRemarks" rows="2" placeholder="Movement batch details, truck number, or reason"></textarea>
-          </div>
-        </div>
-        <div class="stock-modal-footer">
-          <button type="button" class="btn-stock-action" id="cancelStockModal">Cancel</button>
-          <button type="button" class="btn btn-primary" id="saveStockMovementBtn" style="padding: 0 18px;">Post Movement</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('#closeStockModal').addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#cancelStockModal').addEventListener('click', () => overlay.remove());
-
-    overlay.querySelector('#saveStockMovementBtn').addEventListener('click', () => {
-      const type = overlay.querySelector('#movFormType').value;
-      const itemId = overlay.querySelector('#movFormItem').value;
-      const fromLoc = overlay.querySelector('#movFormFrom').value || 'Location';
-      const toLoc = overlay.querySelector('#movFormTo').value || 'Location';
-      const qty = parseInt(overlay.querySelector('#movFormQty').value, 10) || 1;
-      const refNo = overlay.querySelector('#movFormRef').value || 'MOV-AUTO';
-      const remarks = overlay.querySelector('#movFormRemarks').value || 'Stock movement entry';
-
-      const item = stockItems.find(i => i.id === itemId) || stockItems[0];
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
-
-      let effectiveQty = qty;
-      let typeLabel = 'Goods Receipt';
-      if (type === 'outward') {
-        effectiveQty = -qty;
-        typeLabel = 'Sales Dispatch';
-      } else if (type === 'transfer') {
-        typeLabel = 'Warehouse Transfer';
-      } else if (type === 'adjustment') {
-        typeLabel = 'Stock Adjustment';
-      }
-
-      // Update item quantity on the master record (getStockItems() hands out copies)
-      if (item && (type === 'inward' || type === 'outward')) {
-        item.qty = type === 'inward' ? item.qty + qty : Math.max(0, item.qty - qty);
-        const master = Array.isArray(window._masterStockItems)
-          ? window._masterStockItems.find(i => String(i.id) === String(item.id))
-          : null;
-        if (master) {
-          master.qty = item.qty;
-          if (typeof window.saveMasterStockItems === 'function') window.saveMasterStockItems();
-          else saveStockHubStorage(KYA_STOCK_ITEMS_KEY, window._masterStockItems);
-        }
-      }
-
-      // Prepend to movements log
-      _stockMovements.unshift({
-        id: 'MOV-' + Date.now(),
-        date: dateStr,
-        refNo: refNo,
-        type: type,
-        typeLabel: typeLabel,
-        itemName: item ? item.name : 'Stock Item',
-        sku: item ? item.sku : 'SKU',
-        fromLoc: fromLoc,
-        toLoc: toLoc,
-        qty: effectiveQty,
-        unitCost: item ? item.cost : 100,
-        totalVal: qty * (item ? item.cost : 100),
-        user: 'Active User',
-        remarks: remarks
-      });
-      saveStockHubStorage(KYA_STOCK_MOVEMENTS_KEY, _stockMovements);
-
-      overlay.remove();
-      renderStockHubPanel();
-    });
-  }
-
   function openItemDetailsModal(itemId) {
     const stockItems = getStockItems();
     const item = stockItems.find(i => i.id === itemId);
@@ -3372,7 +2639,7 @@
             <div style="max-height: 140px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; background: #fff;">
               ${linked.map(item => `
                 <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px;">
-                  <span style="font-weight: 600; color: var(--slate-800);">${ohEscapeHtml(item.name)} <span style="font-size: 11px; color: var(--slate-400);">(${item.sku})</span></span>
+                  <span style="font-weight: 600; color: var(--slate-800);">${ohEscapeHtml(item.name)}${item.sku ? ` <span style="font-size: 11px; color: var(--slate-400);">(${item.sku})</span>` : ''}</span>
                   <span style="font-weight: 700; color: var(--slate-700);">${item.qty} ${item.uom || ''}</span>
                 </div>
               `).join('')}
@@ -3411,7 +2678,7 @@
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="stock-form-fg">
-              <label class="stock-form-label">SKU / Item Code *</label>
+              <label class="stock-form-label">SKU / Item Code</label>
               <input type="text" class="stock-form-input" id="newItemSku" placeholder="e.g. RAW-SLK-01" style="text-transform: uppercase;">
             </div>
             <div class="stock-form-fg">
@@ -3490,8 +2757,9 @@
     overlay.querySelector('#saveNewStockItemBtn').addEventListener('click', () => {
       const name = overlay.querySelector('#newItemName').value.trim();
       const sku = overlay.querySelector('#newItemSku').value.trim().toUpperCase();
-      if (!name || !sku) {
-        alert('Please provide both Item Name and SKU.');
+      // SKU is optional: left blank, it stays blank
+      if (!name) {
+        alert('Please provide the Item Name.');
         return;
       }
 
@@ -3760,7 +3028,14 @@
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // Global document click listener for Columns dropdown
+  function closeStockMoreMenu() {
+    const dd = document.getElementById('stockMoreDropdown');
+    const sub = document.getElementById('stockExportSubmenu');
+    if (dd) dd.classList.remove('active');
+    if (sub) sub.classList.remove('active');
+  }
+
+  // Global document click listener for the Columns dropdown and the ⋮ menu
   document.addEventListener('click', (e) => {
     const dd = document.getElementById('stockColDropdown');
     const btn = document.getElementById('stockColToggleBtn');
@@ -3771,6 +3046,8 @@
         dd.classList.remove('open');
       }
     }
+    const more = document.getElementById('stockMoreDropdown');
+    if (more && more.classList.contains('active') && !more.contains(e.target)) closeStockMoreMenu();
   });
 
   // Global exports

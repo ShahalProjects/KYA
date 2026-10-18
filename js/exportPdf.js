@@ -2797,7 +2797,200 @@
     }
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // STOCK LIST PDF EXPORT (Stock Hub → Stock List, as shown on screen)
+  // data: { companyName, method, columns: [{ label, kind: text|qty|money|pct }], rows, totalValue, itemCount }
+  // ════════════════════════════════════════════════════════════════════
+  async function exportStockListToPDF(data) {
+    try {
+      await ensureJsPDFLoaded();
+      const { jsPDF } = global.jspdf || global;
+      if (!jsPDF) throw new Error('jsPDF library could not be loaded.');
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      doc.setFillColor(30, 58, 138);
+      doc.rect(0, 0, pageWidth, 5, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(30, 58, 138);
+      doc.text((data.companyName || 'KYA Accounting').toUpperCase(), 14, 16);
+
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text('STOCK LIST', 14, 23);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 116, 139);
+      const asOn = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      doc.text(`Items: ${data.itemCount || 0} • Valuation: ${data.method || 'Weighted Average'}, lower of cost and NRV • As on ${asOn}`, 14, 29);
+      const genDateStr = `Generated on: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      doc.text(genDateStr, pageWidth - 14, 29, { align: 'right' });
+
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(14, 32, pageWidth - 14, 32);
+
+      const cols = [{ label: '#', kind: 'index' }].concat(data.columns || []);
+      const alignOf = kind => (kind === 'qty' || kind === 'money') ? 'right' : (kind === 'index' || kind === 'pct') ? 'center' : 'left';
+      const show = (v, kind) => {
+        if (v === null || v === undefined || v === '') return '—';
+        if (kind === 'money') return fmtNum(v);
+        if (kind === 'qty') return Number(v).toLocaleString('en-IN', { maximumFractionDigits: 4 });
+        if (kind === 'pct') return `${v}%`;
+        return String(v);
+      };
+
+      const tableBody = (data.rows || []).map((values, idx) => [String(idx + 1)].concat(values.map((v, i) => show(v, cols[i + 1].kind))));
+
+      // Total valuation under the Valuation column
+      const valIdx = cols.findIndex(c => /^Valuation/.test(c.label));
+      const totStyle = { fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [30, 58, 138] };
+      if (valIdx > 0) {
+        const totRow = [{ content: 'TOTAL', colSpan: valIdx, styles: Object.assign({ halign: 'left' }, totStyle) },
+          { content: fmtNum(Number(data.totalValue) || 0), styles: Object.assign({ halign: 'right' }, totStyle) }];
+        for (let i = valIdx + 1; i < cols.length; i++) totRow.push({ content: '', styles: totStyle });
+        tableBody.push(totRow);
+      }
+
+      const columnStyles = {};
+      cols.forEach((c, i) => {
+        columnStyles[i] = { halign: alignOf(c.kind) };
+        if (c.kind === 'index') columnStyles[i].cellWidth = 10;
+        if (c.label === 'Item') columnStyles[i].fontStyle = 'bold';
+      });
+
+      const autoTableConfig = {
+        startY: 36,
+        head: [cols.map(c => c.label)],
+        body: tableBody,
+        theme: 'plain',
+        styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, textColor: [51, 65, 85], lineColor: [241, 245, 249], lineWidth: 0.2 },
+        headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        columnStyles,
+        didParseCell: function (hookData) {
+          if (hookData.section === 'head') hookData.cell.styles.halign = alignOf(cols[hookData.column.index].kind);
+        },
+        didDrawPage: function () {
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(str, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
+          doc.text('KYA Accounting • Confidential', 14, doc.internal.pageSize.getHeight() - 8);
+        },
+        margin: { left: 14, right: 14, bottom: 16 }
+      };
+
+      if (typeof doc.autoTable === 'function') doc.autoTable(autoTableConfig);
+      else if (global.jspdf && typeof global.jspdf.autoTable === 'function') global.jspdf.autoTable(doc, autoTableConfig);
+      else if (typeof global.autoTable === 'function') global.autoTable(doc, autoTableConfig);
+
+      doc.save('Stock_List.pdf');
+      return true;
+    } catch (err) {
+      console.error('Failed to export Stock List to PDF:', err);
+      alert('Could not export PDF: ' + err.message);
+      return false;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // STOCK MOVEMENT PDF EXPORT (Stock Hub → Movement)
+  // data: { companyName, from, to (DD-MM-YYYY), rows: [[code, item, bf, in, out, adj, balance]], totals: [bf, in, out, adj, balance] }
+  // ════════════════════════════════════════════════════════════════════
+  async function exportStockMovementToPDF(data) {
+    try {
+      await ensureJsPDFLoaded();
+      const { jsPDF } = global.jspdf || global;
+      if (!jsPDF) throw new Error('jsPDF library could not be loaded.');
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      doc.setFillColor(30, 58, 138);
+      doc.rect(0, 0, pageWidth, 5, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(30, 58, 138);
+      doc.text((data.companyName || 'KYA Accounting').toUpperCase(), 14, 16);
+
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text('STOCK MOVEMENT', 14, 23);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Period: ${data.from} to ${data.to} • Items: ${(data.rows || []).length}`, 14, 29);
+      const genDateStr = `Generated on: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      doc.text(genDateStr, pageWidth - 14, 29, { align: 'right' });
+
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(14, 32, pageWidth - 14, 32);
+
+      const qty = v => {
+        const r = Math.round((Number(v) || 0) * 10000) / 10000;
+        return (r === 0 ? 0 : r).toLocaleString('en-IN', { maximumFractionDigits: 4 });
+      };
+      const tableBody = (data.rows || []).map((r, idx) => [String(idx + 1), r[0], r[1]].concat(r.slice(2).map(qty)));
+      const totStyle = { fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [30, 58, 138] };
+      tableBody.push([{ content: 'Grand Total', colSpan: 3, styles: Object.assign({ halign: 'left' }, totStyle) }]
+        .concat((data.totals || [0, 0, 0, 0, 0]).map(v => ({ content: qty(v), styles: Object.assign({ halign: 'right' }, totStyle) }))));
+
+      const autoTableConfig = {
+        startY: 36,
+        head: [
+          [{ content: '#', rowSpan: 2 }, { content: 'Code', rowSpan: 2 }, { content: 'Item', rowSpan: 2 }, { content: 'Qty', colSpan: 5, styles: { halign: 'center' } }],
+          ['B/F', 'IN', 'OUT', 'Adj', 'Balance']
+        ],
+        body: tableBody,
+        theme: 'plain',
+        styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, textColor: [51, 65, 85], lineColor: [241, 245, 249], lineWidth: 0.2 },
+        headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, valign: 'middle' },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 'auto', fontStyle: 'bold' },
+          3: { cellWidth: 26, halign: 'right' },
+          4: { cellWidth: 26, halign: 'right' },
+          5: { cellWidth: 26, halign: 'right' },
+          6: { cellWidth: 26, halign: 'right' },
+          7: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: function (hookData) {
+          if (hookData.section === 'head' && hookData.row.index === 1) hookData.cell.styles.halign = 'right';
+        },
+        didDrawPage: function () {
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(str, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
+          doc.text('KYA Accounting • Confidential', 14, doc.internal.pageSize.getHeight() - 8);
+        },
+        margin: { left: 14, right: 14, bottom: 16 }
+      };
+
+      if (typeof doc.autoTable === 'function') doc.autoTable(autoTableConfig);
+      else if (global.jspdf && typeof global.jspdf.autoTable === 'function') global.jspdf.autoTable(doc, autoTableConfig);
+      else if (typeof global.autoTable === 'function') global.autoTable(doc, autoTableConfig);
+
+      doc.save('Stock_Movement.pdf');
+      return true;
+    } catch (err) {
+      console.error('Failed to export Stock Movement to PDF:', err);
+      alert('Could not export PDF: ' + err.message);
+      return false;
+    }
+  }
+
   // Export to global scope
+  global.exportStockMovementToPDF = exportStockMovementToPDF;
+  global.exportStockListToPDF = exportStockListToPDF;
   global.exportPnLToPDF = exportPnLToPDF;
   global.exportBalanceSheetToPDF = exportBalanceSheetToPDF;
   global.exportTrialBalanceToPDF = exportTrialBalanceToPDF;

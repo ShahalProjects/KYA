@@ -2556,7 +2556,221 @@
     }
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // STOCK LIST EXCEL EXPORT (Stock Hub → Stock List, as shown on screen)
+  // data: { companyName, method, columns: [{ label, kind: text|qty|money|pct }], rows, totalValue, itemCount }
+  // ════════════════════════════════════════════════════════════════════
+  async function exportStockListToExcel(data) {
+    try {
+      await ensureExcelJSLoaded();
+      if (!global.ExcelJS) throw new Error('ExcelJS library could not be loaded.');
+
+      const workbook = new global.ExcelJS.Workbook();
+      workbook.creator = 'KYA Accounting';
+      workbook.created = new Date();
+
+      const sheet = workbook.addWorksheet('Stock List', {
+        views: [{ state: 'frozen', ySplit: 5, showGridLines: true }]
+      });
+
+      const cols = [{ label: '#', kind: 'index' }].concat(data.columns || []);
+      const maxCols = cols.length;
+      const lastColLetter = String.fromCharCode(64 + maxCols);
+      const widths = { index: 6, qty: 12, money: 18, pct: 10 };
+      cols.forEach((c, i) => {
+        sheet.getColumn(i + 1).width = widths[c.kind] || (c.label === 'Item' ? 34 : 16);
+      });
+      const alignOf = kind => (kind === 'qty' || kind === 'money') ? 'right' : (kind === 'index' || kind === 'pct') ? 'center' : 'left';
+
+      const compName = (data.companyName || 'KYA Accounting').toUpperCase();
+      sheet.addRow([compName]).height = 24;
+      sheet.mergeCells(`A1:${lastColLetter}1`);
+      sheet.getCell('A1').font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF1E3A8A' } };
+      sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
+
+      sheet.addRow(['STOCK LIST']).height = 20;
+      sheet.mergeCells(`A2:${lastColLetter}2`);
+      sheet.getCell('A2').font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF0F172A' } };
+      sheet.getCell('A2').alignment = { vertical: 'middle', horizontal: 'left' };
+
+      const asOn = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      sheet.addRow([`Items: ${data.itemCount || 0} • Valuation: ${data.method || 'Weighted Average'}, lower of cost and NRV • As on ${asOn}`]).height = 18;
+      sheet.mergeCells(`A3:${lastColLetter}3`);
+      sheet.getCell('A3').font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } };
+      sheet.getCell('A3').alignment = { vertical: 'middle', horizontal: 'left' };
+
+      sheet.addRow([]).height = 8;
+
+      const head = sheet.addRow(cols.map(c => c.label));
+      head.height = 24;
+      cols.forEach((c, i) => {
+        const cell = head.getCell(i + 1);
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+        cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
+        cell.alignment = { vertical: 'middle', horizontal: alignOf(c.kind), indent: alignOf(c.kind) === 'left' ? 1 : 0 };
+      });
+
+      (data.rows || []).forEach((values, idx) => {
+        const row = sheet.addRow([idx + 1].concat(values.map((v, i) => {
+          const kind = cols[i + 1].kind;
+          if (v === null || v === undefined || v === '') return kind === 'text' ? '' : '—';
+          return v;
+        })));
+        row.height = 20;
+        cols.forEach((c, i) => {
+          const cell = row.getCell(i + 1);
+          cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF334155' } };
+          cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+          cell.alignment = { vertical: 'middle', horizontal: alignOf(c.kind), indent: alignOf(c.kind) === 'left' ? 1 : 0 };
+          if (typeof cell.value === 'number') {
+            if (c.kind === 'money') cell.numFmt = numFormat;
+            else if (c.kind === 'qty') cell.numFmt = '#,##0.####';
+            else if (c.kind === 'pct') cell.numFmt = '0.##"%"';
+          }
+        });
+      });
+
+      // Total valuation under the Valuation column
+      const valIdx = cols.findIndex(c => /^Valuation/.test(c.label));
+      const totValues = cols.map((c, i) => (i === 0 ? 'TOTAL' : i === valIdx ? (Number(data.totalValue) || 0) : ''));
+      const totRow = sheet.addRow(totValues);
+      totRow.height = 22;
+      cols.forEach((c, i) => {
+        const cell = totRow.getCell(i + 1);
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E3A8A' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+        cell.border = { top: mediumBorder, bottom: doubleBorder, left: thinBorder, right: thinBorder };
+        cell.alignment = { vertical: 'middle', horizontal: i === valIdx ? 'right' : 'left', indent: i === valIdx ? 0 : 1 };
+        if (i === valIdx) cell.numFmt = numFormat;
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'Stock_List.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      return true;
+    } catch (err) {
+      console.error('Failed to export Stock List to Excel:', err);
+      alert('Could not export Excel: ' + err.message);
+      return false;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // STOCK MOVEMENT EXCEL EXPORT (Stock Hub → Movement)
+  // data: { companyName, from, to (DD-MM-YYYY), rows: [[code, item, bf, in, out, adj, balance]], totals: [bf, in, out, adj, balance] }
+  // ════════════════════════════════════════════════════════════════════
+  async function exportStockMovementToExcel(data) {
+    try {
+      await ensureExcelJSLoaded();
+      if (!global.ExcelJS) throw new Error('ExcelJS library could not be loaded.');
+
+      const workbook = new global.ExcelJS.Workbook();
+      workbook.creator = 'KYA Accounting';
+      workbook.created = new Date();
+
+      const sheet = workbook.addWorksheet('Stock Movement', {
+        views: [{ state: 'frozen', ySplit: 6, showGridLines: true }]
+      });
+
+      const maxCols = 8; // #, Code, Item, B/F, IN, OUT, Adj, Balance
+      [6, 14, 34, 13, 13, 13, 13, 14].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
+      const qtyFmt = '#,##0.####;-#,##0.####;0';
+
+      sheet.addRow([(data.companyName || 'KYA Accounting').toUpperCase()]).height = 24;
+      sheet.mergeCells('A1:H1');
+      sheet.getCell('A1').font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF1E3A8A' } };
+      sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
+
+      sheet.addRow(['STOCK MOVEMENT']).height = 20;
+      sheet.mergeCells('A2:H2');
+      sheet.getCell('A2').font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF0F172A' } };
+      sheet.getCell('A2').alignment = { vertical: 'middle', horizontal: 'left' };
+
+      sheet.addRow([`Period: ${data.from} to ${data.to} • Items: ${(data.rows || []).length}`]).height = 18;
+      sheet.mergeCells('A3:H3');
+      sheet.getCell('A3').font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } };
+      sheet.getCell('A3').alignment = { vertical: 'middle', horizontal: 'left' };
+
+      sheet.addRow([]).height = 8;
+
+      // Two header rows: Qty spans B/F … Balance
+      const h1 = sheet.addRow(['#', 'Code', 'Item', 'Qty', '', '', '', '']);
+      const h2 = sheet.addRow(['', '', '', 'B/F', 'IN', 'OUT', 'Adj', 'Balance']);
+      h1.height = 20;
+      h2.height = 20;
+      sheet.mergeCells(`A${h1.number}:A${h2.number}`);
+      sheet.mergeCells(`B${h1.number}:B${h2.number}`);
+      sheet.mergeCells(`C${h1.number}:C${h2.number}`);
+      sheet.mergeCells(`D${h1.number}:H${h1.number}`);
+      [h1, h2].forEach(r => {
+        for (let c = 1; c <= maxCols; c++) {
+          const cell = r.getCell(c);
+          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+          cell.border = { top: thinBorder, bottom: r === h2 ? mediumBorder : thinBorder, left: thinBorder, right: thinBorder };
+          cell.alignment = { vertical: 'middle', horizontal: c >= 4 ? (r === h1 ? 'center' : 'right') : (c === 1 ? 'center' : 'left'), indent: (c === 2 || c === 3) ? 1 : 0 };
+        }
+      });
+
+      (data.rows || []).forEach((values, idx) => {
+        const row = sheet.addRow([idx + 1].concat(values));
+        row.height = 20;
+        for (let c = 1; c <= maxCols; c++) {
+          const cell = row.getCell(c);
+          cell.font = { name: 'Calibri', size: 10, bold: c === 8, color: { argb: 'FF334155' } };
+          cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+          if (c >= 4) {
+            cell.numFmt = qtyFmt;
+            cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          } else {
+            cell.alignment = { vertical: 'middle', horizontal: c === 1 ? 'center' : 'left', indent: c === 1 ? 0 : 1 };
+          }
+        }
+      });
+
+      const totRow = sheet.addRow(['Grand Total', '', ''].concat(data.totals || [0, 0, 0, 0, 0]));
+      totRow.height = 22;
+      sheet.mergeCells(`A${totRow.number}:C${totRow.number}`);
+      for (let c = 1; c <= maxCols; c++) {
+        const cell = totRow.getCell(c);
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E3A8A' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+        cell.border = { top: mediumBorder, bottom: doubleBorder, left: thinBorder, right: thinBorder };
+        if (c >= 4) {
+          cell.numFmt = qtyFmt;
+          cell.alignment = { vertical: 'middle', horizontal: 'right' };
+        } else {
+          cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        }
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'Stock_Movement.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      return true;
+    } catch (err) {
+      console.error('Failed to export Stock Movement to Excel:', err);
+      alert('Could not export Excel: ' + err.message);
+      return false;
+    }
+  }
+
   // Export to global scope
+  global.exportStockMovementToExcel = exportStockMovementToExcel;
+  global.exportStockListToExcel = exportStockListToExcel;
   global.exportPnLToExcel = exportPnLToExcel;
   global.exportBalanceSheetToExcel = exportBalanceSheetToExcel;
   global.exportTrialBalanceToExcel = exportTrialBalanceToExcel;

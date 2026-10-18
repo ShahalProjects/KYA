@@ -128,10 +128,69 @@
       }
     }
 
+    // The rate each product / service was last sold at: the Rate (before discount, without
+    // GST) on the latest posted Sales Invoice, by invoice date and then posting order.
+    // Drafts, orders, returns, Pre Invoice reversals and the invoice being edited don't count.
+    // Returns { forProduct(item), forService(ledger) }, each giving the rate or 0 if never sold.
+    function buildLastSoldRates() {
+      const store = window.KYA_STORE || {};
+      const editing = window._editingSalesInvoice;
+      // YYYY-MM-DD (DD-MM-YYYY also read) as a sortable number; 0 when it can't be read
+      const dateKey = (s) => {
+        const t = String(s || '').trim();
+        let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m) return +m[1] * 10000 + +m[2] * 100 + +m[3];
+        m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+        return m ? +m[3] * 10000 + +m[2] * 100 + +m[1] : 0;
+      };
+      const seq = v => Number(v.postedAt) || Number(v.id) || 0;
+      const invoices = (Array.isArray(store.salesVouchers) ? store.salesVouchers : [])
+        .filter(v => v && !v.isDraft && !v.isOrder && !v.isReturn && !v.reversedPreInvoice &&
+          !(editing && String(editing.id) === String(v.id)))
+        .sort((a, b) => (dateKey(a.date) - dateKey(b.date)) || (seq(a) - seq(b)));
+
+      // A linked row is keyed by its master id, a typed one by its description; `ord` grows
+      // with each row, so the highest one is the latest sale
+      const byKey = new Map();
+      let ord = 0;
+      invoices.forEach(v => {
+        (v.rows || []).forEach(row => {
+          const qty = parseFloat(row.qty) || 0;
+          let rate = parseFloat(row.rate) || 0;
+          // Old Service-type invoices kept a Base Amount instead of a Rate
+          if (rate <= 0 && parseFloat(row.baseAmount) > 0) rate = parseFloat(row.baseAmount) / (qty > 0 ? qty : 1);
+          if (rate <= 0) return;
+          const hit = { rate: Math.round(rate * 100) / 100, ord: ord++ };
+          const isService = row.itemType === 'Service' || (!row.itemType && v.type === 'Service');
+          const name = String(row.item || row.serviceName || '').toLowerCase().trim();
+          if (row.stockItemId) byKey.set('P#' + row.stockItemId, hit);
+          else if (isService && row.revenueLedgerId) byKey.set('S#' + row.revenueLedgerId, hit);
+          else if (name) byKey.set((isService ? 'S:' : 'P:') + name, hit);
+        });
+      });
+
+      const latest = (keys) => {
+        let best = null;
+        keys.forEach(k => {
+          const h = byKey.get(k);
+          if (h && (!best || h.ord > best.ord)) best = h;
+        });
+        return best ? best.rate : 0;
+      };
+      const nameKeys = (x, prefix) => [x.name].concat(x.aliases || [])
+        .map(n => String(n || '').toLowerCase().trim()).filter(Boolean).map(n => prefix + n);
+      return {
+        forProduct: (it) => latest((it.id ? ['P#' + it.id] : []).concat(nameKeys(it, 'P:'))),
+        forService: (l) => latest((l.id ? ['S#' + l.id] : []).concat(nameKeys(l, 'S:')))
+      };
+    }
+
     // Products come from the Stock Item master (Master Desk / Stock Hub), carrying their
-    // HSN code, GST rate, unit and selling price so the row can fill itself in. A purchase
-    // takes the item's cost (its master Rate) instead of the selling price.
-    function toProductPick(it, purchase) {
+    // HSN code, GST rate, unit and selling price so the row can fill itself in. A sale takes
+    // the Master Desk Selling Price; with none, the rate it was last sold at; never sold, the
+    // rate is left empty. A purchase takes the item's cost (its master Rate) instead.
+    // `lastSold` (from buildLastSoldRates) is passed when picking many items at once.
+    function toProductPick(it, purchase, lastSold) {
       const cost = parseFloat(it.rate) || parseFloat(it.cost) || 0;
       return {
         name: it.name || 'Unnamed Item',
@@ -139,7 +198,7 @@
         id: it.id || '',
         sku: it.sku || '',
         unit: it.uom || '',
-        rate: purchase ? cost : ((typeof it.price === 'number' && it.price > 0) ? it.price : (parseFloat(it.rate) || 0)),
+        rate: purchase ? cost : ((typeof it.price === 'number' && it.price > 0) ? it.price : (lastSold || buildLastSoldRates()).forProduct(it)),
         stockQty: parseFloat(it.qty) || 0,
         hsn: it.hsnCode || '',
         hsnDesc: it.hsnDesc || '',
@@ -148,12 +207,13 @@
       };
     }
     function getProductsList() {
-      return getMasterStockItemList().map(it => toProductPick(it, _purchase));
+      const lastSold = _purchase ? null : buildLastSoldRates();
+      return getMasterStockItemList().map(it => toProductPick(it, _purchase, lastSold));
     }
 
-    // Services come from the Revenue from Operations ledgers, carrying their SAC code
-    // and GST rate.
-    function toServicePick(l) {
+    // Services come from the Revenue from Operations ledgers, carrying their SAC code,
+    // GST rate and the rate they were last sold at (none in Master Desk; empty if never sold).
+    function toServicePick(l, lastSold) {
       return {
         name: l.name,
         type: 'Service',
@@ -162,12 +222,14 @@
         code: l.code,
         sac: (l.sacInfo && l.sacInfo.sacCode) || '',
         sacDesc: (l.sacInfo && l.sacInfo.sacDesc) || '',
-        gst: (l.sacInfo && typeof l.sacInfo.gstRate === 'number') ? l.sacInfo.gstRate : undefined
+        gst: (l.sacInfo && typeof l.sacInfo.gstRate === 'number') ? l.sacInfo.gstRate : undefined,
+        rate: (lastSold || buildLastSoldRates()).forService(l)
       };
     }
     function getServicesList() {
       if (_purchase) return getPurchaseExpenseLedgers().map(toExpensePick);
-      return getRevenueFromOperationsLedgers().map(toServicePick);
+      const lastSold = buildLastSoldRates();
+      return getRevenueFromOperationsLedgers().map(l => toServicePick(l, lastSold));
     }
 
     // Purchase Voucher: an expense line posts to its own Expense ledger
@@ -2675,7 +2737,8 @@
       row.hsn = selectedItem.sac || '';
       row.hsnDesc = selectedItem.sacDesc || '';
       row.unit = '';
-      row.rate = 0;
+      // The rate the service was last sold at (0 if never sold)
+      row.rate = parseFloat(selectedItem.rate) || 0;
     } else if (selectedItem.type === 'Expense') {
       // Purchase Voucher: the line is booked to this Expense ledger
       row.expenseLedgerId = selectedItem.id || '';
