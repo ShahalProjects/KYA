@@ -890,6 +890,12 @@
       btnWarehouse.classList.toggle('active', tab === 'warehouse');
       btnWarehouse.setAttribute('aria-selected', tab === 'warehouse');
     }
+    [['masterTabDepartment', 'department'], ['masterTabEmployee', 'employee']].forEach(([id, t]) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.classList.toggle('active', tab === t);
+      btn.setAttribute('aria-selected', tab === t);
+    });
     updateMasterDeskContent();
   }
 
@@ -5212,8 +5218,8 @@
   // Boxes that get Title Case: Names (every row), Alternate Names and the popup's
   // name / address / bank text fields, plus a Unit's Formal Name. GSTIN, PAN, IFSC,
   // numbers and Unit Symbols (mm, kg...) are left as typed.
-  const MASTER_TITLE_CASE_NAME_ID = /^master(Alter)?(Group|Ledger|Customer|Supplier|StockGroup|StockItem|StockCategory|Warehouse)Name\d*$/;
-  const MASTER_TITLE_CASE_FIELD_ID = /^(master(Alter)?(Ledger|Customer|Supplier)(ContactName|Address|City|State|Country|BankName|Branch|BankAcctHolder|BankAcctBranch)|master(Alter)?UnitFormalName|master(Alter)?Warehouse(Address|City|State|Country|Supervisor|Type))$/;
+  const MASTER_TITLE_CASE_NAME_ID = /^master(Alter)?(Group|Ledger|Customer|Supplier|StockGroup|StockItem|StockCategory|Warehouse|Department|Employee)Name\d*$/;
+  const MASTER_TITLE_CASE_FIELD_ID = /^(master(Alter)?(Ledger|Customer|Supplier)(ContactName|Address|City|State|Country|BankName|Branch|BankAcctHolder|BankAcctBranch)|master(Alter)?UnitFormalName|master(Alter)?Warehouse(Address|City|State|Country|Supervisor|Type)|master(Alter)?Employee(Designation|Address))$/;
   const MASTER_TITLE_CASE_ALIAS_BOXES = ['masterGroupAliasesContainer', 'masterLedgerAliasesContainer', 'masterCustomerAliasesContainer', 'masterSupplierAliasesContainer', 'masterStockGroupAliasesContainer', 'masterStockItemAliasesContainer', 'masterStockCategoryAliasesContainer', 'masterWarehouseAliasesContainer',
     'masterAlterGroupAliasesContainer', 'masterAlterLedgerAliasesContainer', 'masterAlterCustomerAliasesContainer', 'masterAlterSupplierAliasesContainer',
     'masterAlterStockGroupAliasesContainer', 'masterAlterStockItemAliasesContainer', 'masterAlterStockCategoryAliasesContainer', 'masterAlterWarehouseAliasesContainer'];
@@ -5259,9 +5265,12 @@
     const stockCategoryCount = Array.isArray(_masterStockCategories) ? _masterStockCategories.length : 0;
     const unitCount = Array.isArray(_masterUnits) ? _masterUnits.length : 0;
     const warehouseCount = Array.isArray(_masterWarehouses) ? _masterWarehouses.length : 0;
+    const departmentCount = getMasterTeamDepts().length;
+    const employeeCount = getMasterTeamEmps().length;
     return {
       groupCount, ledgerCount, customerCount, supplierCount,
-      stockGroupCount, stockItemCount, stockCategoryCount, unitCount, warehouseCount
+      stockGroupCount, stockItemCount, stockCategoryCount, unitCount, warehouseCount,
+      departmentCount, employeeCount
     };
   }
 
@@ -5287,6 +5296,8 @@
     const icoGrid = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>';
     const icoUnit = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
     const icoWarehouse = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg>';
+    const icoDepartment = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M6 6V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    const icoEmployee = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6" r="3.5" stroke="currentColor" stroke-width="1.6"/><path d="M3 18c0-4 3.1-7 7-7s7 3 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
     return `
       <div class="coa-modal-card" style="max-width: 640px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0 0 20px 0;">
@@ -5314,6 +5325,12 @@
           ${tile(counts.unitCount, 'Units', icoUnit)}
           ${tile(counts.warehouseCount, 'Warehouses', icoWarehouse)}
         </div>
+
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); margin: 22px 0 10px 0;">Team Masters</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          ${tile(counts.departmentCount, 'Departments', icoDepartment)}
+          ${tile(counts.employeeCount, 'Employees', icoEmployee)}
+        </div>
       </div>
     `;
   }
@@ -5327,7 +5344,7 @@
     wireMasterTitleCase(contentArea);
 
     // Group, Ledger, Customer, Supplier and all Inventory master modules open full screen (sidebar hidden) with a Back button to return to Overview.
-    const isFullScreenTab = ['group', 'ledger', 'customers', 'suppliers', 'stock_group', 'stock_item', 'stock_category', 'unit', 'warehouse'].includes(currentMasterDeskTab);
+    const isFullScreenTab = ['group', 'ledger', 'customers', 'suppliers', 'stock_group', 'stock_item', 'stock_category', 'unit', 'warehouse', 'department', 'employee'].includes(currentMasterDeskTab);
     const layoutContainer = document.getElementById('masterDeskLayoutContainer');
     const sidebar = document.getElementById('masterDeskSidebar');
     const backBar = document.getElementById('masterDeskBackBar');
@@ -5337,10 +5354,12 @@
     }
     if (backBar) {
       backBar.style.display = isFullScreenTab ? 'flex' : 'none';
-      // Quick-jump buttons: all masters of the current section (Accounting or Inventory)
-      // stay visible, and the screen you are on is highlighted in blue
+      // Quick-jump buttons: all masters of the current section (Accounting, Inventory or
+      // Team) stay visible, and the screen you are on is highlighted in blue
       const inventoryTabs = ['stock_group', 'stock_item', 'stock_category', 'unit', 'warehouse'];
-      const currentSection = inventoryTabs.includes(currentMasterDeskTab) ? 'inventory' : 'accounting';
+      const teamTabs = ['department', 'employee'];
+      const currentSection = inventoryTabs.includes(currentMasterDeskTab) ? 'inventory'
+        : (teamTabs.includes(currentMasterDeskTab) ? 'team' : 'accounting');
       backBar.querySelectorAll('.master-back-bar-nav').forEach(btn => {
         const inSection = btn.getAttribute('data-section') === currentSection;
         btn.style.display = inSection ? 'inline-flex' : 'none';
@@ -11118,6 +11137,10 @@
           updateMasterDeskContent();
         });
       }
+    } else if (currentMasterDeskSubtype === 'Create' && currentMasterDeskTab === 'department') {
+      renderMasterDepartmentCreate(contentArea);
+    } else if (currentMasterDeskSubtype === 'Create' && currentMasterDeskTab === 'employee') {
+      renderMasterEmployeeCreate(contentArea);
     } else if (currentMasterDeskSubtype === 'Alter') {
       // ══════════════════════════════════════════════════════════════════
       //  ALTER MODE: Groups, Ledgers, Customers, and Suppliers
@@ -14706,8 +14729,1071 @@
             updateMasterDeskContent();
           });
         }
+      } else if (currentMasterDeskTab === 'department') {
+        renderMasterDepartmentAlter(contentArea);
+      } else if (currentMasterDeskTab === 'employee') {
+        renderMasterEmployeeAlter(contentArea);
       }
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  TEAM MASTERS — Department and Employee. These are KeepOne's own records
+  //  (ohDepartments / ohEmployees and their id counters, declared in app-shell.js),
+  //  so a department or employee made here shows in KeepOne, the Sales Executive
+  //  pickers and the department lists, and the other way round. KeepOne's rules apply:
+  //  a department with employees can't be deleted, and a head who moves to another
+  //  department or is deleted stops being its head.
+  // ══════════════════════════════════════════════════════════════════
+  const MASTER_TEAM_LABEL_STYLE = 'font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;';
+  const MASTER_TEAM_INPUT_STYLE = 'width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none;';
+  const MASTER_TEAM_ADD_BTN_STYLE = 'display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; color: var(--blue-600); background: #ffffff; border: 1.5px dashed var(--blue-600); border-radius: 8px; cursor: pointer; transition: all 0.15s ease;';
+  const MASTER_TEAM_DUSTBIN_BTN_STYLE = 'width: 38px; height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #ffffff; color: var(--slate-400); cursor: pointer; transition: all 0.15s ease;';
+  const MASTER_TEAM_DUSTBIN_SVG = `
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6h18"/>
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+      <line x1="10" y1="11" x2="10" y2="17"/>
+      <line x1="14" y1="11" x2="14" y2="17"/>
+    </svg>`;
+
+  let _masterAlterSelectedDepartmentId = null;
+  let _masterAlterSelectedEmployeeId = null;
+
+  function getMasterTeamDepts() {
+    return (typeof ohDepartments !== 'undefined' && Array.isArray(ohDepartments)) ? ohDepartments : [];
+  }
+  function getMasterTeamEmps() {
+    return (typeof ohEmployees !== 'undefined' && Array.isArray(ohEmployees)) ? ohEmployees : [];
+  }
+  // KeepOne's auto code: EMP-001, EMP-002... (the number is the employee's id)
+  function masterTeamEmpCode(n) { return 'EMP-' + String(n).padStart(3, '0'); }
+
+  // After a save or delete: KeepOne's badges and lists follow, then the backup
+  function afterMasterTeamChange() {
+    if (typeof updateOhBadges === 'function') updateOhBadges();
+    if (typeof renderOhDeptView === 'function') renderOhDeptView();
+    if (typeof renderOhEmpView === 'function') renderOhEmpView();
+    if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+  }
+
+  function masterTeamNotify(msg, type) {
+    if (typeof showToast === 'function') showToast(msg, type);
+    else alert(msg);
+  }
+
+  // Searchable dropdown (hidden <select> + trigger + list), the same control as "Under"
+  function buildMasterTeamSelectHtml(selId, optsHtml, triggerLabel, searchPlaceholder) {
+    return `
+      <select class="coa-modal-sel" id="${selId}" style="display: none;">${optsHtml}</select>
+      <div class="kya-searchable-select-wrap" id="${selId}SearchableWrap" style="position: relative; width: 100%;">
+        <div class="kya-searchable-select-trigger" id="${selId}Trigger" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1.5px solid var(--slate-200); border-radius: 8px; background: #fff; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--slate-700);">
+          <span id="${selId}TriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(triggerLabel)}</span>
+          <span style="font-size: 10px; color: var(--slate-400); flex-shrink: 0; margin-left: 6px;">▼</span>
+        </div>
+        <div class="kya-searchable-select-dropdown" id="${selId}Dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+          <input type="text" id="${selId}Search" placeholder="${searchPlaceholder}" class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+          <div id="${selId}OptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+        </div>
+      </div>`;
+  }
+
+  // Department Head choices, as in KeepOne: "No head assigned", then every employee
+  function masterTeamHeadOptionsHtml(selectedId) {
+    return '<option value="">— No head assigned —</option>' + getMasterTeamEmps().map(e =>
+      `<option value="${e.id}" ${String(e.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(e.name)}${e.designation ? ' – ' + escapeHtml(e.designation) : ''}</option>`).join('');
+  }
+  function masterTeamDeptOptionsHtml(selectedId) {
+    return getMasterTeamDepts().map(d =>
+      `<option value="${d.id}" ${String(d.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
+  }
+
+  // Count of records in the form (1, 2, 3...) in the Back bar's right corner
+  function renderMasterTeamCount(count, title) {
+    const countWrap = document.getElementById('masterDeskBackBarGroupCount');
+    if (!countWrap) return;
+    countWrap.innerHTML = `<span title="${title}" style="height: 34px; min-width: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 6px; background: var(--white); border: 1px solid var(--slate-200); color: var(--slate-600); font-family: var(--font-main); font-size: 12.5px; font-weight: 600;">${count}</span>`;
+  }
+
+  function wireMasterTeamDustbinHover(btn) {
+    if (!btn) return;
+    btn.addEventListener('mouseenter', () => {
+      btn.style.background = '#fef2f2';
+      btn.style.color = '#dc2626';
+      btn.style.borderColor = '#fecaca';
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.background = '#ffffff';
+      btn.style.color = 'var(--slate-400)';
+      btn.style.borderColor = 'var(--slate-200)';
+    });
+  }
+
+  function wireMasterTeamAddBtn(btn, onClick) {
+    if (!btn) return;
+    btn.addEventListener('mouseenter', () => { btn.style.background = 'var(--blue-50, #eff6ff)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.background = '#ffffff'; });
+    btn.addEventListener('click', onClick);
+  }
+
+  // Employee Code: an Auto | Manual slider (the same slider as Stock Group's Yes / No) over
+  // the code box. The hidden PREFIXCodeMode input holds the mode.
+  function buildMasterTeamCodeHtml(prefix, mode, code) {
+    const isAuto = mode !== 'Manual';
+    return `
+      <label class="coa-modal-label" for="${prefix}Code" style="${MASTER_TEAM_LABEL_STYLE}">Employee Code *</label>
+      <input type="hidden" id="${prefix}CodeMode" value="${isAuto ? 'Auto' : 'Manual'}">
+      <div class="je-tx-slider-wrap" role="radiogroup" aria-label="Employee Code">
+        <div class="je-tx-slider-bg ${isAuto ? 'non-budget-active' : 'budget-active'}" id="${prefix}CodeModeBg"></div>
+        <button type="button" class="je-tx-slider-btn ${isAuto ? 'active' : ''}" id="${prefix}CodeAutoBtn" role="radio" aria-checked="${isAuto}">Auto</button>
+        <button type="button" class="je-tx-slider-btn ${isAuto ? '' : 'active'}" id="${prefix}CodeManualBtn" role="radio" aria-checked="${!isAuto}">Manual</button>
+      </div>
+      <input class="coa-modal-inp" id="${prefix}Code" value="${escapeHtml(code || '')}" placeholder="Employee code" style="${MASTER_TEAM_INPUT_STYLE} margin-top: 10px;">`;
+  }
+
+  // Keeps the slider and the code box in step with the mode: Auto shows autoCode() read-only
+  // (as KeepOne does), Manual lets you type your own. Returns { apply } to re-sync from code.
+  function wireMasterTeamCode(contentArea, prefix, autoCode) {
+    const modeInp = contentArea.querySelector('#' + prefix + 'CodeMode');
+    const bg = contentArea.querySelector('#' + prefix + 'CodeModeBg');
+    const autoBtn = contentArea.querySelector('#' + prefix + 'CodeAutoBtn');
+    const manualBtn = contentArea.querySelector('#' + prefix + 'CodeManualBtn');
+    const codeInp = contentArea.querySelector('#' + prefix + 'Code');
+    const apply = () => {
+      const isAuto = !modeInp || modeInp.value !== 'Manual';
+      if (bg) bg.className = 'je-tx-slider-bg ' + (isAuto ? 'non-budget-active' : 'budget-active');
+      if (autoBtn) { autoBtn.classList.toggle('active', isAuto); autoBtn.setAttribute('aria-checked', String(isAuto)); }
+      if (manualBtn) { manualBtn.classList.toggle('active', !isAuto); manualBtn.setAttribute('aria-checked', String(!isAuto)); }
+      if (codeInp) {
+        if (isAuto) codeInp.value = autoCode();
+        codeInp.readOnly = isAuto;
+        codeInp.style.background = isAuto ? 'var(--slate-50)' : '#ffffff';
+        codeInp.style.color = isAuto ? 'var(--slate-400)' : 'var(--slate-800)';
+      }
+    };
+    [[autoBtn, 'Auto'], [manualBtn, 'Manual']].forEach(([btn, val]) => {
+      if (!btn) return;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (modeInp) modeInp.value = val;
+        apply();
+        if (val === 'Manual' && codeInp) { codeInp.focus(); codeInp.select(); }
+      });
+    });
+    // Multi Alter puts a parked mode back by value: follow it
+    if (modeInp) modeInp.addEventListener('change', apply);
+    apply();
+    return { apply };
+  }
+
+  // Employee "Additional Details" popup (Joining Date, Salary, Phone, Email, PAN, Address —
+  // KeepOne's other employee fields), the same popup as Stock Item's
+  function buildMasterTeamEmpAddlHtml(prefix, emp) {
+    const v = (k) => (emp && emp[k] !== undefined && emp[k] !== null) ? escapeHtml(String(emp[k])) : '';
+    const half = 'display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-bottom: 16px;';
+    return `
+      <div class="oh-modal-overlay" id="${prefix}AddlModal" style="display: none;">
+        <div style="background: var(--white); border-radius: 14px; width: 94%; max-width: 640px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 40px 100px rgba(0,0,0,.24);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--slate-200);">
+            <div style="min-width: 0;">
+              <div style="font-size: 15px; font-weight: 700; color: var(--slate-800);">Additional Details</div>
+              <div id="${prefix}AddlModalSub" style="font-size: 12.5px; color: var(--slate-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+            </div>
+            <button type="button" class="oh-modal-close" id="${prefix}AddlCloseBtn" title="Close">✕</button>
+          </div>
+          <div class="master-alter-addl-body" style="padding: 20px 24px; overflow-y: auto; overflow-x: hidden;">
+            <div style="${half}">
+              <div style="min-width: 0;">
+                <label class="coa-modal-label" for="${prefix}Joining" style="${MASTER_TEAM_LABEL_STYLE}">Joining Date</label>
+                <input type="date" class="coa-modal-inp" id="${prefix}Joining" value="${v('joiningDate')}" style="${MASTER_TEAM_INPUT_STYLE}">
+              </div>
+              <div style="min-width: 0;">
+                <label class="coa-modal-label" for="${prefix}Salary" style="${MASTER_TEAM_LABEL_STYLE}">Salary (₹)</label>
+                <input type="number" min="0" step="0.01" class="coa-modal-inp" id="${prefix}Salary" value="${v('salary')}" placeholder="e.g. 50000" style="${MASTER_TEAM_INPUT_STYLE}">
+              </div>
+            </div>
+
+            <div style="border-top: 1px dashed var(--slate-200); margin-bottom: 16px;"></div>
+            <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--slate-500); margin-bottom: 8px;">Contact Details</div>
+
+            <div style="${half}">
+              <div style="min-width: 0;">
+                <label class="coa-modal-label" for="${prefix}Phone" style="${MASTER_TEAM_LABEL_STYLE}">Phone No.</label>
+                <input type="tel" class="coa-modal-inp" id="${prefix}Phone" value="${v('phone')}" placeholder="+91 XXXXX XXXXX" style="${MASTER_TEAM_INPUT_STYLE}">
+              </div>
+              <div style="min-width: 0;">
+                <label class="coa-modal-label" for="${prefix}Email" style="${MASTER_TEAM_LABEL_STYLE}">Email</label>
+                <input type="email" class="coa-modal-inp" id="${prefix}Email" value="${v('email')}" placeholder="employee@company.com" style="${MASTER_TEAM_INPUT_STYLE}">
+              </div>
+            </div>
+            <div style="${half}">
+              <div style="min-width: 0;">
+                <label class="coa-modal-label" for="${prefix}Pan" style="${MASTER_TEAM_LABEL_STYLE}">PAN Number</label>
+                <input type="text" class="coa-modal-inp" id="${prefix}Pan" value="${v('pan')}" placeholder="ABCDE1234F" maxlength="10" style="${MASTER_TEAM_INPUT_STYLE} text-transform: uppercase;">
+              </div>
+            </div>
+            <div>
+              <label class="coa-modal-label" for="${prefix}Address" style="${MASTER_TEAM_LABEL_STYLE}">Address</label>
+              <input type="text" class="coa-modal-inp" id="${prefix}Address" value="${v('address')}" placeholder="Full address…" style="${MASTER_TEAM_INPUT_STYLE}">
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--slate-200);">
+            <button type="button" class="btn btn-primary" id="${prefix}AddlDoneBtn" style="height: 38px; padding: 8px 18px; font-size: 13px; font-weight: 600;">Done</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function buildMasterTeamAddlBtnHtml(prefix) {
+    return `
+      <div id="${prefix}AddlBtnWrap" style="margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" id="${prefix}AddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          Additional Details
+        </button>
+      </div>`;
+  }
+
+  // "Nothing to alter yet" card, like the other Alter forms
+  function renderMasterTeamAlterEmpty(contentArea, noun, btnId) {
+    contentArea.innerHTML = `
+      <div class="coa-modal-card" style="max-width: 600px; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 32px 24px; background: var(--white); text-align: center; margin: 0 0 20px 0;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--slate-600); margin-bottom: 8px;">No ${noun.toLowerCase()}s found to alter.</div>
+        <div style="font-size: 12.5px; color: var(--slate-400); margin-bottom: 16px;">Create a new ${noun.toLowerCase()} first using the Create tab.</div>
+        <button class="btn btn-primary" id="${btnId}" style="font-size: 13px; font-weight: 600; padding: 8px 16px;">Go to Create ${noun}</button>
+      </div>
+    `;
+    const btnGo = contentArea.querySelector('#' + btnId);
+    if (btnGo) btnGo.addEventListener('click', () => setMasterDeskSubtype('Create'));
+  }
+
+  // ── Create Department: "Name + Department Head" rows, like Create Stock Group ──
+  function renderMasterDepartmentCreate(contentArea) {
+    let extraRowKeys = [];
+    let rowSeq = 0;
+    const headOpts = masterTeamHeadOptionsHtml('');
+
+    // idx 0 is the first row (ids without a suffix, "clean" dustbin); added rows get a suffix
+    const buildRowHtml = (idx) => {
+      const sfx = idx ? String(idx) : '';
+      const btnClass = idx ? 'master-department-row-remove' : 'master-department-row-clean';
+      const btnId = idx ? '' : 'id="masterDepartmentRowCleanBtn"';
+      const btnTitle = idx ? 'Remove this department' : 'Clean this department';
+      return `
+        <div class="master-department-row" data-row-index="${idx}" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+          <div>
+            <label class="coa-modal-label" for="masterDepartmentName${sfx}" style="${MASTER_TEAM_LABEL_STYLE}">Name *</label>
+            <input class="coa-modal-inp" id="masterDepartmentName${sfx}" placeholder="Enter Name" style="${MASTER_TEAM_INPUT_STYLE}">
+            <div id="masterDepartmentName${sfx}Error" style="display: none; font-size: 12px; font-weight: 600; color: #dc2626; margin-top: 5px;"></div>
+          </div>
+          <div>
+            <label class="coa-modal-label" for="masterDepartmentHeadSel${sfx}" style="${MASTER_TEAM_LABEL_STYLE}">Department Head</label>
+            ${buildMasterTeamSelectHtml('masterDepartmentHeadSel' + sfx, headOpts, '— No head assigned —', 'Search employee...')}
+          </div>
+          <div>
+            <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+            <button type="button" class="${btnClass}" ${btnId} data-row-index="${idx}" title="${btnTitle}" style="${MASTER_TEAM_DUSTBIN_BTN_STYLE}">
+              ${MASTER_TEAM_DUSTBIN_SVG}
+            </button>
+          </div>
+        </div>`;
+    };
+
+    contentArea.innerHTML = `
+      <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+        <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+          ${buildRowHtml(0)}
+
+          <!-- Additional departments (added row-by-row via the Add button, like Create Group) -->
+          <div id="masterDepartmentExtraRowsContainer"></div>
+
+          <!-- Add another department — shown once the last row's Name is filled in -->
+          <div id="masterDepartmentAddRowWrap" style="display: none; margin: -4px 0 16px 0;">
+            <button type="button" id="masterDepartmentAddRowBtn" title="Add another department" style="${MASTER_TEAM_ADD_BTN_STYLE}">＋ Add Another Department</button>
+          </div>
+
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <button class="btn btn-primary" id="masterDepartmentSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Create Department</button>
+            <button class="btn btn-secondary" id="masterDepartmentCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const extraContainer = contentArea.querySelector('#masterDepartmentExtraRowsContainer');
+    const addRowWrap = contentArea.querySelector('#masterDepartmentAddRowWrap');
+    const nameInput = (idx) => contentArea.querySelector('#masterDepartmentName' + (idx ? idx : ''));
+    const headSel = (idx) => contentArea.querySelector('#masterDepartmentHeadSel' + (idx ? idx : ''));
+    const headControls = {};
+    headControls[0] = initSearchableSelectHelper(contentArea, 'masterDepartmentHeadSel', 'Select Department Head');
+
+    // Live "already exists" check for a row's Name
+    const validateNameLive = (idx) => {
+      const inp = nameInput(idx);
+      const err = contentArea.querySelector('#masterDepartmentName' + (idx ? idx : '') + 'Error');
+      const val = inp ? inp.value.trim() : '';
+      const setErr = (text) => {
+        if (err) { err.textContent = text || ''; err.style.display = text ? 'block' : 'none'; }
+        if (inp) inp.style.borderColor = text ? '#ef4444' : 'var(--slate-200)';
+      };
+      const lower = val.toLowerCase();
+      if (val && getMasterTeamDepts().some(d => (d.name || '').trim().toLowerCase() === lower)) {
+        const errorText = `"${val}" already exists (Department).`;
+        setErr(errorText);
+        return errorText;
+      }
+      setErr('');
+      return null;
+    };
+
+    // "Add Another Department" shows only when the last row's Name has a value
+    const refreshAddRowBtn = () => {
+      renderMasterTeamCount(1 + extraRowKeys.length, 'Departments in this form');
+      if (!addRowWrap) return;
+      const lastIdx = extraRowKeys.length ? extraRowKeys[extraRowKeys.length - 1] : 0;
+      const lastInp = nameInput(lastIdx);
+      addRowWrap.style.display = lastInp && lastInp.value.trim() ? 'block' : 'none';
+    };
+
+    const wireRowInputs = (idx) => {
+      const inp = nameInput(idx);
+      if (!inp) return;
+      inp.addEventListener('input', () => {
+        validateNameLive(idx);
+        refreshAddRowBtn();
+      });
+    };
+
+    const wireRowRemoveBtn = (idx) => {
+      const btn = extraContainer.querySelector('.master-department-row-remove[data-row-index="' + idx + '"]');
+      if (!btn) return;
+      wireMasterTeamDustbinHover(btn);
+      btn.addEventListener('click', () => {
+        const rowEl = extraContainer.querySelector('.master-department-row[data-row-index="' + idx + '"]');
+        if (rowEl) rowEl.remove();
+        const pos = extraRowKeys.indexOf(idx);
+        const prevIdx = pos > 0 ? extraRowKeys[pos - 1] : 0;
+        extraRowKeys = extraRowKeys.filter(k => k !== idx);
+        delete headControls[idx];
+        refreshAddRowBtn();
+        const prevInp = nameInput(prevIdx);
+        if (prevInp) prevInp.focus();
+      });
+    };
+
+    wireMasterTeamAddBtn(contentArea.querySelector('#masterDepartmentAddRowBtn'), () => {
+      rowSeq++;
+      const idx = rowSeq;
+      extraContainer.insertAdjacentHTML('beforeend', buildRowHtml(idx));
+      headControls[idx] = initSearchableSelectHelper(contentArea, 'masterDepartmentHeadSel' + idx, 'Select Department Head');
+      wireRowInputs(idx);
+      wireRowRemoveBtn(idx);
+      extraRowKeys.push(idx);
+      refreshAddRowBtn();
+      const inp = nameInput(idx);
+      if (inp) inp.focus();
+    });
+
+    // First row's dustbin: with more rows below, removes this department and moves the next
+    // row up; on its own, just clears it
+    const cleanBtn = contentArea.querySelector('#masterDepartmentRowCleanBtn');
+    wireMasterTeamDustbinHover(cleanBtn);
+    if (cleanBtn) {
+      cleanBtn.addEventListener('click', () => {
+        const nameInp0 = nameInput(0);
+        const headSel0 = headSel(0);
+        if (extraRowKeys.length > 0) {
+          const nextIdx = extraRowKeys[0];
+          const nextName = nameInput(nextIdx);
+          const nextHead = headSel(nextIdx);
+          if (nameInp0) nameInp0.value = nextName ? nextName.value : '';
+          if (headSel0 && nextHead) headSel0.value = nextHead.value;
+          delete headControls[nextIdx];
+          const nextRowEl = extraContainer.querySelector('.master-department-row[data-row-index="' + nextIdx + '"]');
+          if (nextRowEl) nextRowEl.remove();
+          extraRowKeys = extraRowKeys.slice(1);
+        } else {
+          if (nameInp0) nameInp0.value = '';
+          if (headSel0) headSel0.value = '';
+        }
+        if (headControls[0] && typeof headControls[0].refresh === 'function') headControls[0].refresh();
+        validateNameLive(0);
+        refreshAddRowBtn();
+        if (nameInp0) nameInp0.focus();
+      });
+    }
+
+    wireRowInputs(0);
+    refreshAddRowBtn();
+
+    const saveBtn = contentArea.querySelector('#masterDepartmentSaveBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        const rows = [];
+        const formNames = new Set();
+        for (const idx of [0, ...extraRowKeys]) {
+          const inp = nameInput(idx);
+          const name = inp ? inp.value.trim() : '';
+          if (!name) {
+            // A row left empty below the first is just unfilled — it's skipped, not an error
+            if (idx !== 0) continue;
+            masterTeamNotify('Please enter a department name.', 'warning');
+            if (inp) inp.focus();
+            return;
+          }
+          const errText = validateNameLive(idx);
+          if (errText) {
+            masterTeamNotify(errText, 'error');
+            if (inp) inp.focus();
+            return;
+          }
+          const lower = name.toLowerCase();
+          if (formNames.has(lower)) {
+            masterTeamNotify(`Duplicate entry "${name}" found in the form. Each department name must be unique.`, 'error');
+            if (inp) inp.focus();
+            return;
+          }
+          formNames.add(lower);
+          const hs = headSel(idx);
+          rows.push({ name: name, headEmpId: hs && hs.value ? Number(hs.value) : null });
+        }
+
+        const depts = getMasterTeamDepts();
+        rows.forEach(row => {
+          depts.push({ id: _ohDeptCtr++, name: row.name, headEmpId: row.headEmpId });
+        });
+        afterMasterTeamChange();
+
+        if (rows.length > 1) masterTeamNotify(`${rows.length} departments created successfully.`, 'success');
+        else masterTeamNotify(`Department "${rows[0].name}" created successfully.`, 'success');
+        updateMasterDeskContent();
+      });
+    }
+
+    const cancelBtn = contentArea.querySelector('#masterDepartmentCancelBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => updateMasterDeskContent());
+  }
+
+  // ── Create Employee: "Name + Department" rows, with Employee Code and Designation in the
+  // side box and the rest in the Additional Details popup — like Create Stock Item ──
+  function renderMasterEmployeeCreate(contentArea) {
+    let extraRowKeys = [];
+    let rowSeq = 0;
+    let activeIdx = 0;
+    // The side box and popup always show the active row; other rows' values are parked here
+    const rowState = {};
+    const FIELD_DEFAULTS = {
+      masterEmployeeCodeMode: 'Auto', masterEmployeeCode: '', masterEmployeeDesignation: '',
+      masterEmployeeJoining: '', masterEmployeeSalary: '', masterEmployeePhone: '',
+      masterEmployeeEmail: '', masterEmployeePan: '', masterEmployeeAddress: ''
+    };
+    const newRowState = () => Object.assign({}, FIELD_DEFAULTS);
+    const deptOpts = masterTeamDeptOptionsHtml('');
+    const hasDepts = getMasterTeamDepts().length > 0;
+
+    const buildRowHtml = (idx) => {
+      const sfx = idx ? String(idx) : '';
+      const btnClass = idx ? 'master-employee-row-remove' : 'master-employee-row-clean';
+      const btnId = idx ? '' : 'id="masterEmployeeRowCleanBtn"';
+      const btnTitle = idx ? 'Remove this employee' : 'Clean this employee';
+      return `
+        <div class="master-employee-row" data-row-index="${idx}" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; gap: 14px; margin-bottom: 16px;">
+          <div>
+            <label class="coa-modal-label" for="masterEmployeeName${sfx}" style="${MASTER_TEAM_LABEL_STYLE}">Name *</label>
+            <input class="coa-modal-inp" id="masterEmployeeName${sfx}" placeholder="Enter Name" style="${MASTER_TEAM_INPUT_STYLE}">
+          </div>
+          <div>
+            <label class="coa-modal-label" for="masterEmployeeDeptSel${sfx}" style="${MASTER_TEAM_LABEL_STYLE}">Department *</label>
+            ${buildMasterTeamSelectHtml('masterEmployeeDeptSel' + sfx, deptOpts, 'Select Department', 'Search department...')}
+          </div>
+          <div>
+            <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
+            <button type="button" class="${btnClass}" ${btnId} data-row-index="${idx}" title="${btnTitle}" style="${MASTER_TEAM_DUSTBIN_BTN_STYLE}">
+              ${MASTER_TEAM_DUSTBIN_SVG}
+            </button>
+          </div>
+        </div>`;
+    };
+
+    contentArea.innerHTML = `
+      <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+        <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+          ${buildRowHtml(0)}
+
+          <!-- Additional employees (added row-by-row via the Add button, like Create Group) -->
+          <div id="masterEmployeeExtraRowsContainer"></div>
+
+          <!-- Add another employee — shown once the last row's Name is filled in -->
+          <div id="masterEmployeeAddRowWrap" style="display: none; margin: -4px 0 16px 0;">
+            <button type="button" id="masterEmployeeAddRowBtn" title="Add another employee" style="${MASTER_TEAM_ADD_BTN_STYLE}">＋ Add Another Employee</button>
+          </div>
+
+          ${hasDepts ? '' : '<div style="font-size: 12px; font-weight: 600; color: #d97706; margin: -6px 0 16px 0;">⚠ No departments yet. Create one first.</div>'}
+
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <button class="btn btn-primary" id="masterEmployeeSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Create Employee</button>
+            <button class="btn btn-secondary" id="masterEmployeeCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Second box: Employee Code, Designation, then Additional Details -->
+        <div class="coa-modal-card" id="masterEmployeeSidePanel" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+          ${buildMasterTeamCodeHtml('masterEmployee', 'Auto', '')}
+
+          <label class="coa-modal-label" for="masterEmployeeDesignation" style="${MASTER_TEAM_LABEL_STYLE} margin-top: 16px;">Designation</label>
+          <input class="coa-modal-inp" id="masterEmployeeDesignation" placeholder="e.g. Manager, Engineer…" style="${MASTER_TEAM_INPUT_STYLE}">
+
+          ${buildMasterTeamAddlBtnHtml('masterEmployee')}
+        </div>
+      </div>
+
+      ${buildMasterTeamEmpAddlHtml('masterEmployee', null)}
+    `;
+
+    const extraContainer = contentArea.querySelector('#masterEmployeeExtraRowsContainer');
+    const addRowWrap = contentArea.querySelector('#masterEmployeeAddRowWrap');
+    const nameInput = (idx) => contentArea.querySelector('#masterEmployeeName' + (idx ? idx : ''));
+    const deptSel = (idx) => contentArea.querySelector('#masterEmployeeDeptSel' + (idx ? idx : ''));
+    const deptControls = {};
+    const firstDeptSel = deptSel(0);
+    if (firstDeptSel) firstDeptSel.selectedIndex = -1; // "Select Department" until one is picked
+    deptControls[0] = initSearchableSelectHelper(contentArea, 'masterEmployeeDeptSel', 'Select Department');
+
+    // Auto code for the row on screen: the next codes in row order (EMP-00n, EMP-00n+1...)
+    const rowPos = (idx) => Math.max(0, [0, ...extraRowKeys].indexOf(idx));
+    const codeCtl = wireMasterTeamCode(contentArea, 'masterEmployee', () => masterTeamEmpCode(_ohEmpCtr + rowPos(activeIdx || 0)));
+
+    wireAlterAddlPopup(contentArea, 'masterEmployee', {
+      subtitle: () => {
+        const inp = nameInput(activeIdx || 0);
+        return inp ? inp.value.trim() : '';
+      }
+    });
+
+    const captureActiveRow = () => {
+      if (activeIdx === null) return;
+      const st = rowState[activeIdx] || newRowState();
+      Object.keys(FIELD_DEFAULTS).forEach(id => {
+        const el = contentArea.querySelector('#' + id);
+        if (el) st[id] = el.value;
+      });
+      rowState[activeIdx] = st;
+    };
+    const loadRow = (idx) => {
+      const st = rowState[idx] || newRowState();
+      rowState[idx] = st;
+      Object.keys(FIELD_DEFAULTS).forEach(id => {
+        const el = contentArea.querySelector('#' + id);
+        if (el) el.value = st[id] !== undefined ? st[id] : FIELD_DEFAULTS[id];
+      });
+      codeCtl.apply();
+    };
+    const setActiveRow = (idx) => {
+      if (idx === activeIdx) return;
+      captureActiveRow();
+      activeIdx = idx;
+      loadRow(idx);
+    };
+
+    // "Add Another Employee" shows only when the last row's Name has a value
+    const refreshAddRowBtn = () => {
+      renderMasterTeamCount(1 + extraRowKeys.length, 'Employees in this form');
+      if (!addRowWrap) return;
+      const lastIdx = extraRowKeys.length ? extraRowKeys[extraRowKeys.length - 1] : 0;
+      const lastInp = nameInput(lastIdx);
+      addRowWrap.style.display = lastInp && lastInp.value.trim() ? 'block' : 'none';
+    };
+
+    const wireRowInputs = (idx) => {
+      const inp = nameInput(idx);
+      if (!inp) return;
+      inp.addEventListener('focus', () => setActiveRow(idx));
+      inp.addEventListener('input', () => {
+        setActiveRow(idx);
+        refreshAddRowBtn();
+      });
+    };
+
+    const wireRowRemoveBtn = (idx) => {
+      const btn = extraContainer.querySelector('.master-employee-row-remove[data-row-index="' + idx + '"]');
+      if (!btn) return;
+      wireMasterTeamDustbinHover(btn);
+      btn.addEventListener('click', () => {
+        const rowEl = extraContainer.querySelector('.master-employee-row[data-row-index="' + idx + '"]');
+        if (rowEl) rowEl.remove();
+        const pos = extraRowKeys.indexOf(idx);
+        const prevIdx = pos > 0 ? extraRowKeys[pos - 1] : 0;
+        extraRowKeys = extraRowKeys.filter(k => k !== idx);
+        delete rowState[idx];
+        delete deptControls[idx];
+        if (activeIdx === idx) {
+          // The removed row's values go with it — the side box switches to the row above
+          activeIdx = null;
+          setActiveRow(prevIdx);
+          const prevInp = nameInput(prevIdx);
+          if (prevInp) prevInp.focus();
+        } else {
+          codeCtl.apply(); // rows below moved up, so the auto code on screen may change
+        }
+        refreshAddRowBtn();
+      });
+    };
+
+    wireMasterTeamAddBtn(contentArea.querySelector('#masterEmployeeAddRowBtn'), () => {
+      rowSeq++;
+      const idx = rowSeq;
+      // New row's Department defaults to the row above it
+      const prevIdx = extraRowKeys.length ? extraRowKeys[extraRowKeys.length - 1] : 0;
+      const prevDeptSel = deptSel(prevIdx);
+      extraContainer.insertAdjacentHTML('beforeend', buildRowHtml(idx));
+      const newDeptSel = deptSel(idx);
+      if (newDeptSel) {
+        if (prevDeptSel && prevDeptSel.value) newDeptSel.value = prevDeptSel.value;
+        else newDeptSel.selectedIndex = -1;
+      }
+      deptControls[idx] = initSearchableSelectHelper(contentArea, 'masterEmployeeDeptSel' + idx, 'Select Department');
+      rowState[idx] = newRowState();
+      wireRowInputs(idx);
+      wireRowRemoveBtn(idx);
+      extraRowKeys.push(idx);
+      refreshAddRowBtn();
+      const inp = nameInput(idx);
+      if (inp) {
+        inp.focus();
+        setActiveRow(idx);
+      }
+    });
+
+    // First row's dustbin: with more rows below, removes this employee and moves the next row
+    // (Name, Department and its side-box values) up; on its own, just clears it
+    const cleanBtn = contentArea.querySelector('#masterEmployeeRowCleanBtn');
+    wireMasterTeamDustbinHover(cleanBtn);
+    if (cleanBtn) {
+      cleanBtn.addEventListener('click', () => {
+        captureActiveRow();
+        const nameInp0 = nameInput(0);
+        const deptSel0 = deptSel(0);
+        if (extraRowKeys.length > 0) {
+          const nextIdx = extraRowKeys[0];
+          const nextName = nameInput(nextIdx);
+          const nextDept = deptSel(nextIdx);
+          if (nameInp0) nameInp0.value = nextName ? nextName.value : '';
+          if (deptSel0) {
+            if (nextDept && nextDept.value) deptSel0.value = nextDept.value;
+            else deptSel0.selectedIndex = -1;
+          }
+          rowState[0] = rowState[nextIdx] || newRowState();
+          delete rowState[nextIdx];
+          delete deptControls[nextIdx];
+          const nextRowEl = extraContainer.querySelector('.master-employee-row[data-row-index="' + nextIdx + '"]');
+          if (nextRowEl) nextRowEl.remove();
+          extraRowKeys = extraRowKeys.slice(1);
+        } else {
+          if (nameInp0) nameInp0.value = '';
+          if (deptSel0) deptSel0.selectedIndex = -1;
+          rowState[0] = newRowState();
+        }
+        if (deptControls[0] && typeof deptControls[0].refresh === 'function') deptControls[0].refresh();
+        activeIdx = null;
+        setActiveRow(0);
+        refreshAddRowBtn();
+        if (nameInp0) nameInp0.focus();
+      });
+    }
+
+    rowState[0] = newRowState();
+    wireRowInputs(0);
+    refreshAddRowBtn();
+
+    const saveBtn = contentArea.querySelector('#masterEmployeeSaveBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        captureActiveRow();
+        const existingCodes = new Set(getMasterTeamEmps().map(e => String(e.code || '').trim().toLowerCase()));
+        const formCodes = new Set();
+        const rows = [];
+        let nextId = _ohEmpCtr;
+        for (const idx of [0, ...extraRowKeys]) {
+          const inp = nameInput(idx);
+          const name = inp ? inp.value.trim() : '';
+          const st = rowState[idx] || newRowState();
+          if (!name) {
+            // A row left empty below the first is just unfilled — it's skipped, not an error
+            if (idx !== 0) continue;
+            masterTeamNotify('Please enter an employee name.', 'warning');
+            if (inp) inp.focus();
+            return;
+          }
+          const ds = deptSel(idx);
+          const deptId = ds && ds.value ? Number(ds.value) : null;
+          if (!deptId) {
+            masterTeamNotify(`Please select a Department for "${name}".`, 'warning');
+            return;
+          }
+          // KeepOne's auto code uses the employee's own id: EMP-00<id>
+          const id = nextId++;
+          const code = st.masterEmployeeCodeMode === 'Manual' ? String(st.masterEmployeeCode || '').trim() : masterTeamEmpCode(id);
+          if (!code) {
+            masterTeamNotify(`Please enter an Employee Code for "${name}".`, 'warning');
+            setActiveRow(idx);
+            return;
+          }
+          const codeLower = code.toLowerCase();
+          if (existingCodes.has(codeLower) || formCodes.has(codeLower)) {
+            masterTeamNotify(`Employee code "${code}" is already in use.`, 'error');
+            setActiveRow(idx);
+            return;
+          }
+          formCodes.add(codeLower);
+          const salary = String(st.masterEmployeeSalary || '').trim();
+          rows.push({
+            id: id, code: code, name: name,
+            designation: String(st.masterEmployeeDesignation || '').trim(),
+            deptId: deptId,
+            joiningDate: st.masterEmployeeJoining || '',
+            salary: salary !== '' ? Number(salary) : null,
+            pan: String(st.masterEmployeePan || '').trim().toUpperCase(),
+            phone: String(st.masterEmployeePhone || '').trim(),
+            email: String(st.masterEmployeeEmail || '').trim(),
+            address: String(st.masterEmployeeAddress || '').trim()
+          });
+        }
+
+        const emps = getMasterTeamEmps();
+        rows.forEach(row => emps.push(row));
+        _ohEmpCtr = nextId;
+        afterMasterTeamChange();
+
+        if (rows.length > 1) masterTeamNotify(`${rows.length} employees added successfully.`, 'success');
+        else masterTeamNotify(`Employee "${rows[0].name}" added successfully.`, 'success');
+        updateMasterDeskContent();
+      });
+    }
+
+    const cancelBtn = contentArea.querySelector('#masterEmployeeCancelBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => updateMasterDeskContent());
+  }
+
+  // ── Alter Department: pick it (Name) and its Head on the left, rename it on the right ──
+  function renderMasterDepartmentAlter(contentArea) {
+    const depts = getMasterTeamDepts();
+    if (depts.length === 0) {
+      renderMasterTeamAlterEmpty(contentArea, 'Department', 'btnAlterGoToCreateDepartment');
+      return;
+    }
+    let dept = depts.find(d => String(d.id) === String(_masterAlterSelectedDepartmentId));
+    if (!dept) {
+      dept = depts[0];
+      _masterAlterSelectedDepartmentId = dept.id;
+    }
+    const selectorOpts = depts.map(d =>
+      `<option value="${d.id}" ${d.id === dept.id ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
+    const head = dept.headEmpId ? getMasterTeamEmps().find(e => e.id === dept.headEmpId) : null;
+
+    contentArea.innerHTML = `
+      <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+        <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+          <!-- Row: pick the record to alter (Name) + its row fields, like the Create form -->
+          <div class="master-alter-row" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-bottom: 8px;">
+            <div class="master-alter-picker">
+              <div class="coa-modal-fg" style="margin-bottom: 16px;">
+                <label class="coa-modal-label" for="masterAlterDepartmentSelector" style="${MASTER_TEAM_LABEL_STYLE}">Name *</label>
+                ${buildMasterTeamSelectHtml('masterAlterDepartmentSelector', selectorOpts, dept.name, 'Search department...')}
+              </div>
+            </div>
+            <div>
+              <div class="coa-modal-fg" style="margin-bottom: 16px;">
+                <label class="coa-modal-label" for="masterAlterDepartmentHeadSel" style="${MASTER_TEAM_LABEL_STYLE}">Department Head</label>
+                ${buildMasterTeamSelectHtml('masterAlterDepartmentHeadSel', masterTeamHeadOptionsHtml(dept.headEmpId), head ? head.name : '— No head assigned —', 'Search employee...')}
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <button class="btn btn-primary" id="masterAlterDepartmentSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Save Changes</button>
+              <button class="btn btn-secondary" id="masterAlterDepartmentCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+            </div>
+            <button class="btn btn-secondary" id="masterAlterDepartmentDelBtn" style="height: 38px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: #dc2626; border-color: #fecaca; background: #fef2f2; display: inline-flex; align-items: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+              </svg>
+              Delete Department
+            </button>
+          </div>
+        </div>
+
+        <!-- Second box: Name (to rename) -->
+        <div class="coa-modal-card" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+          <div class="coa-modal-fg" style="margin-bottom: 16px;">
+            <label class="coa-modal-label" for="masterAlterDepartmentName" style="${MASTER_TEAM_LABEL_STYLE}">Name *</label>
+            <input class="coa-modal-inp" id="masterAlterDepartmentName" value="${escapeHtml(dept.name)}" placeholder="Enter Name" style="${MASTER_TEAM_INPUT_STYLE}">
+          </div>
+        </div>
+      </div>
+    `;
+
+    initSearchableSelectHelper(contentArea, 'masterAlterDepartmentSelector', 'Select department');
+    const selector = contentArea.querySelector('#masterAlterDepartmentSelector');
+    if (selector) {
+      selector.addEventListener('change', () => {
+        _masterAlterSelectedDepartmentId = selector.value;
+        updateMasterDeskContent();
+      });
+    }
+    initSearchableSelectHelper(contentArea, 'masterAlterDepartmentHeadSel', 'Select Department Head');
+
+    const nameInp = contentArea.querySelector('#masterAlterDepartmentName');
+
+    // Named so Multi Alter can run this form's save for each row in the list
+    const applyAlterCurrent = () => {
+      const name = nameInp ? nameInp.value.trim() : '';
+      if (!name) {
+        masterTeamNotify('Please enter a department name.', 'warning');
+        if (nameInp) nameInp.focus();
+        return;
+      }
+      const lower = name.toLowerCase();
+      if (getMasterTeamDepts().some(d => d.id !== dept.id && (d.name || '').trim().toLowerCase() === lower)) {
+        masterTeamNotify(`Department "${name}" already exists.`, 'error');
+        if (nameInp) nameInp.focus();
+        return;
+      }
+      const headSel = contentArea.querySelector('#masterAlterDepartmentHeadSel');
+      dept.name = name;
+      dept.headEmpId = headSel && headSel.value ? Number(headSel.value) : null;
+      afterMasterTeamChange();
+      masterTeamNotify(`Department "${name}" updated successfully.`, 'success');
+      updateMasterDeskContent();
+    };
+    const saveBtn = contentArea.querySelector('#masterAlterDepartmentSaveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', applyAlterCurrent);
+    // Multi Alter: extra rows under the picker ("Alter Another Department")
+    setupMasterAlterMultiRow(contentArea, {
+      tab: 'department', noun: 'Department', saveBtnId: 'masterAlterDepartmentSaveBtn',
+      selectorId: 'masterAlterDepartmentSelector',
+      records: depts.map(d => ({ id: d.id, name: d.name })),
+      currentId: dept.id,
+      setSelectedId: (id) => { _masterAlterSelectedDepartmentId = id; },
+      apply: applyAlterCurrent
+    });
+
+    const delBtn = contentArea.querySelector('#masterAlterDepartmentDelBtn');
+    if (delBtn) {
+      delBtn.addEventListener('click', () => {
+        // KeepOne's rule: a department with employees can't be deleted
+        const empCount = getMasterTeamEmps().filter(e => e.deptId === dept.id).length;
+        if (empCount > 0) {
+          masterTeamNotify(`Cannot delete "${dept.name}" — it has ${empCount} employee${empCount > 1 ? 's' : ''}. Transfer or remove them first.`, 'error');
+          return;
+        }
+        masterConfirmDelete('Delete Department', `Are you sure you want to delete department "${dept.name}"? This cannot be undone.`, () => {
+          const list = getMasterTeamDepts();
+          const idx = list.findIndex(d => d.id === dept.id);
+          if (idx >= 0) {
+            list.splice(idx, 1);
+            afterMasterTeamChange();
+            masterTeamNotify(`Department "${dept.name}" deleted.`, 'info');
+            _masterAlterSelectedDepartmentId = null;
+            markMasterAlterUnpicked('department'); // back to "Select ..." after a delete
+            updateMasterDeskContent();
+          }
+        });
+      });
+    }
+
+    const cancelBtn = contentArea.querySelector('#masterAlterDepartmentCancelBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => updateMasterDeskContent());
+  }
+
+  // ── Alter Employee: pick them (Name) and their Department on the left; Name, Employee
+  // Code, Designation and Additional Details on the right, like the Create form ──
+  function renderMasterEmployeeAlter(contentArea) {
+    const emps = getMasterTeamEmps();
+    if (emps.length === 0) {
+      renderMasterTeamAlterEmpty(contentArea, 'Employee', 'btnAlterGoToCreateEmployee');
+      return;
+    }
+    let emp = emps.find(e => String(e.id) === String(_masterAlterSelectedEmployeeId));
+    if (!emp) {
+      emp = emps[0];
+      _masterAlterSelectedEmployeeId = emp.id;
+    }
+    const empLabel = (e) => e.name + (e.code ? ' (' + e.code + ')' : '');
+    const selectorOpts = emps.map(e =>
+      `<option value="${e.id}" ${e.id === emp.id ? 'selected' : ''}>${escapeHtml(empLabel(e))}</option>`).join('');
+    const curDept = getMasterTeamDepts().find(d => d.id === emp.deptId);
+
+    contentArea.innerHTML = `
+      <div style="display: grid; grid-template-columns: minmax(0, 620px) 1fr; gap: 20px; align-items: start;">
+        <div class="coa-modal-card" style="max-width: 620px; box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+          <!-- Row: pick the record to alter (Name) + its row fields, like the Create form -->
+          <div class="master-alter-row" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-bottom: 8px;">
+            <div class="master-alter-picker">
+              <div class="coa-modal-fg" style="margin-bottom: 16px;">
+                <label class="coa-modal-label" for="masterAlterEmployeeSelector" style="${MASTER_TEAM_LABEL_STYLE}">Name *</label>
+                ${buildMasterTeamSelectHtml('masterAlterEmployeeSelector', selectorOpts, empLabel(emp), 'Search employee...')}
+              </div>
+            </div>
+            <div>
+              <div class="coa-modal-fg" style="margin-bottom: 16px;">
+                <label class="coa-modal-label" for="masterAlterEmployeeDeptSel" style="${MASTER_TEAM_LABEL_STYLE}">Department *</label>
+                ${buildMasterTeamSelectHtml('masterAlterEmployeeDeptSel', masterTeamDeptOptionsHtml(emp.deptId), curDept ? curDept.name : 'Select Department', 'Search department...')}
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <button class="btn btn-primary" id="masterAlterEmployeeSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Save Changes</button>
+              <button class="btn btn-secondary" id="masterAlterEmployeeCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+            </div>
+            <button class="btn btn-secondary" id="masterAlterEmployeeDelBtn" style="height: 38px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: #dc2626; border-color: #fecaca; background: #fef2f2; display: inline-flex; align-items: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+              </svg>
+              Delete Employee
+            </button>
+          </div>
+        </div>
+
+        <!-- Second box: Name (to rename), Employee Code, Designation, then Additional Details -->
+        <div class="coa-modal-card" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
+          <div class="coa-modal-fg" style="margin-bottom: 16px;">
+            <label class="coa-modal-label" for="masterAlterEmployeeName" style="${MASTER_TEAM_LABEL_STYLE}">Name *</label>
+            <input class="coa-modal-inp" id="masterAlterEmployeeName" value="${escapeHtml(emp.name || '')}" placeholder="Enter Name" style="${MASTER_TEAM_INPUT_STYLE}">
+          </div>
+
+          ${buildMasterTeamCodeHtml('masterAlterEmployee', 'Auto', emp.code || '')}
+
+          <label class="coa-modal-label" for="masterAlterEmployeeDesignation" style="${MASTER_TEAM_LABEL_STYLE} margin-top: 16px;">Designation</label>
+          <input class="coa-modal-inp" id="masterAlterEmployeeDesignation" value="${escapeHtml(emp.designation || '')}" placeholder="e.g. Manager, Engineer…" style="${MASTER_TEAM_INPUT_STYLE}">
+
+          ${buildMasterTeamAddlBtnHtml('masterAlterEmployee')}
+        </div>
+      </div>
+
+      ${buildMasterTeamEmpAddlHtml('masterAlterEmployee', emp)}
+    `;
+
+    initSearchableSelectHelper(contentArea, 'masterAlterEmployeeSelector', 'Select employee');
+    const selector = contentArea.querySelector('#masterAlterEmployeeSelector');
+    if (selector) {
+      selector.addEventListener('change', () => {
+        _masterAlterSelectedEmployeeId = selector.value;
+        updateMasterDeskContent();
+      });
+    }
+    const deptSelEl = contentArea.querySelector('#masterAlterEmployeeDeptSel');
+    if (deptSelEl && !curDept) deptSelEl.selectedIndex = -1;
+    initSearchableSelectHelper(contentArea, 'masterAlterEmployeeDeptSel', 'Select Department');
+    // Auto keeps the employee's current code, as in KeepOne
+    wireMasterTeamCode(contentArea, 'masterAlterEmployee', () => emp.code || '');
+    wireAlterAddlPopup(contentArea, 'masterAlterEmployee', {
+      subtitle: () => {
+        const nm = contentArea.querySelector('#masterAlterEmployeeName');
+        return nm ? nm.value.trim() : '';
+      }
+    });
+
+    const val = (id) => {
+      const el = contentArea.querySelector('#' + id);
+      return el ? String(el.value || '').trim() : '';
+    };
+
+    // Named so Multi Alter can run this form's save for each row in the list
+    const applyAlterCurrent = () => {
+      const nameInp = contentArea.querySelector('#masterAlterEmployeeName');
+      const name = val('masterAlterEmployeeName');
+      if (!name) {
+        masterTeamNotify('Please enter an employee name.', 'warning');
+        if (nameInp) nameInp.focus();
+        return;
+      }
+      const deptId = deptSelEl && deptSelEl.value ? Number(deptSelEl.value) : null;
+      if (!deptId) {
+        masterTeamNotify(`Please select a Department for "${name}".`, 'warning');
+        return;
+      }
+      const code = val('masterAlterEmployeeCode');
+      if (!code) {
+        masterTeamNotify(`Please enter an Employee Code for "${name}".`, 'warning');
+        return;
+      }
+      if (getMasterTeamEmps().some(e => e.id !== emp.id && String(e.code || '').trim().toLowerCase() === code.toLowerCase())) {
+        masterTeamNotify(`Employee code "${code}" is already in use.`, 'error');
+        return;
+      }
+
+      // KeepOne's transfer rule: the head of the old department stops being its head
+      if (emp.deptId && emp.deptId !== deptId) {
+        const oldDept = getMasterTeamDepts().find(d => d.id === emp.deptId);
+        if (oldDept && oldDept.headEmpId === emp.id) {
+          oldDept.headEmpId = null;
+          masterTeamNotify(`${name} was transferred. Head of "${oldDept.name}" has been cleared automatically.`, 'success');
+        }
+      }
+
+      const salary = val('masterAlterEmployeeSalary');
+      emp.code = code;
+      emp.name = name;
+      emp.designation = val('masterAlterEmployeeDesignation');
+      emp.deptId = deptId;
+      emp.joiningDate = val('masterAlterEmployeeJoining');
+      emp.salary = salary !== '' ? Number(salary) : null;
+      emp.pan = val('masterAlterEmployeePan').toUpperCase();
+      emp.phone = val('masterAlterEmployeePhone');
+      emp.email = val('masterAlterEmployeeEmail');
+      emp.address = val('masterAlterEmployeeAddress');
+
+      afterMasterTeamChange();
+      masterTeamNotify(`Employee "${name}" updated successfully.`, 'success');
+      updateMasterDeskContent();
+    };
+    const saveBtn = contentArea.querySelector('#masterAlterEmployeeSaveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', applyAlterCurrent);
+    // Multi Alter: extra rows under the picker ("Alter Another Employee")
+    setupMasterAlterMultiRow(contentArea, {
+      tab: 'employee', noun: 'Employee', saveBtnId: 'masterAlterEmployeeSaveBtn',
+      selectorId: 'masterAlterEmployeeSelector',
+      records: emps.map(e => ({ id: e.id, name: empLabel(e) })),
+      currentId: emp.id,
+      setSelectedId: (id) => { _masterAlterSelectedEmployeeId = id; },
+      apply: applyAlterCurrent
+    });
+
+    const delBtn = contentArea.querySelector('#masterAlterEmployeeDelBtn');
+    if (delBtn) {
+      delBtn.addEventListener('click', () => {
+        masterConfirmDelete('Delete Employee', `Are you sure you want to delete employee "${emp.name}" (${emp.code})? This cannot be undone.`, () => {
+          const list = getMasterTeamEmps();
+          const idx = list.findIndex(e => e.id === emp.id);
+          if (idx >= 0) {
+            // KeepOne's rule: a deleted employee stops being head of any department
+            getMasterTeamDepts().forEach(d => { if (d.headEmpId === emp.id) d.headEmpId = null; });
+            list.splice(idx, 1);
+            afterMasterTeamChange();
+            masterTeamNotify(`Employee "${emp.name}" deleted.`, 'info');
+            _masterAlterSelectedEmployeeId = null;
+            markMasterAlterUnpicked('employee'); // back to "Select ..." after a delete
+            updateMasterDeskContent();
+          }
+        });
+      });
+    }
+
+    const cancelBtn = contentArea.querySelector('#masterAlterEmployeeCancelBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => updateMasterDeskContent());
   }
 
   function initMasterDesk(container) {
@@ -14912,6 +15998,28 @@
               </div>
               <span class="oh-tab-text">Warehouse</span>
             </button>
+
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); padding: 14px 12px 6px 12px; margin-top: 6px; border-top: 1px solid var(--slate-100);">Team Masters</div>
+
+            <button class="oh-sub-tab" id="masterTabDepartment" role="tab" aria-selected="false">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                  <rect x="2" y="6" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M6 6V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Department</span>
+            </button>
+
+            <button class="oh-sub-tab" id="masterTabEmployee" role="tab" aria-selected="false">
+              <div class="oh-tab-icon-wrap">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="6" r="3.5" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M3 18c0-4 3.1-7 7-7s7 3 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span class="oh-tab-text">Employee</span>
+            </button>
           </div>
 
           <!-- Right Content View Area -->
@@ -14930,6 +16038,8 @@
                 <button class="btn btn-secondary master-back-bar-nav" type="button" data-section="inventory" data-tab="stock_category" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Stock Category</button>
                 <button class="btn btn-secondary master-back-bar-nav" type="button" data-section="inventory" data-tab="unit" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Unit</button>
                 <button class="btn btn-secondary master-back-bar-nav" type="button" data-section="inventory" data-tab="warehouse" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Warehouse</button>
+                <button class="btn btn-secondary master-back-bar-nav" type="button" data-section="team" data-tab="department" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Department</button>
+                <button class="btn btn-secondary master-back-bar-nav" type="button" data-section="team" data-tab="employee" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">Employee</button>
               </div>
               <div id="masterDeskBackBarGroupCount" style="display: flex; align-items: center;"></div>
             </div>
@@ -14996,6 +16106,14 @@
     }
     if (btnWarehouse) {
       btnWarehouse.addEventListener('click', () => setMasterDeskTab('warehouse'));
+    }
+    const btnDepartment = container.querySelector('#masterTabDepartment');
+    if (btnDepartment) {
+      btnDepartment.addEventListener('click', () => setMasterDeskTab('department'));
+    }
+    const btnEmployee = container.querySelector('#masterTabEmployee');
+    if (btnEmployee) {
+      btnEmployee.addEventListener('click', () => setMasterDeskTab('employee'));
     }
 
     // Wire Master Desk 3-dot dropdown

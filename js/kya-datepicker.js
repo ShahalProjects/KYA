@@ -374,4 +374,75 @@
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => attachMarkedKyaDatePickers());
     }
+
+    // Every other date field in KYA works like the Sales Invoice date. The browser's
+    // <input type="date"> stays as the value holder (same id, YYYY-MM-DD value, change / input
+    // events, so each screen's own code is untouched) but turns hidden; a typeable DD-MM-YYYY
+    // box with the field's own class and inline style (glass stays glass, white stays white) and
+    // a calendar icon takes its place. Date fields added later (re-rendered panels, modals) are
+    // switched as they appear.
+    const NATIVE_SYNC_ATTRS = ['class', 'style', 'disabled', 'readonly', 'hidden', 'title'];
+
+    function upgradeNativeDateInput(el) {
+      if (!el || el.type !== 'date' || el._kyaDatePicker || !el.parentNode) return;
+      const display = document.createElement('input');
+      display.type = 'text';
+      display.inputMode = 'numeric';
+      display.maxLength = 10;
+      display.placeholder = 'DD-MM-YYYY';
+      display.setAttribute('aria-label', el.getAttribute('aria-label') || el.title || 'Date (DD-MM-YYYY)');
+      // Light text (glass boxes in blue title cards) gets a white calendar icon
+      const rgb = (getComputedStyle(el).color.match(/\d+/g) || []).map(Number);
+      const onDark = rgb.length >= 3 && (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) > 186;
+      // The box follows the field: its look, and being disabled, read-only or hidden
+      const sync = () => {
+        const invalid = display.classList.contains('kya-dp-invalid');
+        display.className = (el.className ? el.className + ' ' : '') + 'kya-dp-native-inp' +
+          (onDark ? ' kya-dp-on-dark' : '') + (invalid ? ' kya-dp-invalid' : '');
+        const style = el.getAttribute('style');
+        if (style) display.setAttribute('style', style);
+        else display.removeAttribute('style');
+        display.disabled = el.disabled;
+        display.readOnly = el.readOnly;
+        display.hidden = el.hidden;
+        if (el.title) display.title = el.title;
+      };
+      sync();
+      el.type = 'hidden';
+      el.insertAdjacentElement('afterend', display);
+      attachKyaDatePicker(el, display);
+      new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: NATIVE_SYNC_ATTRS });
+    }
+
+    function upgradeNativeDateInputs(root) {
+      const scope = root || document;
+      if (scope.matches && scope.matches('input[type="date"]')) upgradeNativeDateInput(scope);
+      if (scope.querySelectorAll) scope.querySelectorAll('input[type="date"]').forEach(upgradeNativeDateInput);
+    }
+    window.upgradeNativeDateInputs = upgradeNativeDateInputs;
+
+    const startNativeDateUpgrade = () => {
+      upgradeNativeDateInputs(document);
+      new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+        if (n.nodeType === 1) upgradeNativeDateInputs(n);
+      }))).observe(document.body, { childList: true, subtree: true });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startNativeDateUpgrade);
+    else startNativeDateUpgrade();
+    // Safety nets: look again once the page has loaded or comes back from the back/forward cache,
+    // and switch a browser date box at the moment it is about to be clicked or focused
+    window.addEventListener('load', () => upgradeNativeDateInputs(document));
+    window.addEventListener('pageshow', () => upgradeNativeDateInputs(document));
+    const upgradeOnTouch = (e) => {
+      const el = e.target;
+      if (!el || el.tagName !== 'INPUT' || el.type !== 'date') return;
+      upgradeNativeDateInput(el);
+      const display = el._kyaDatePicker && el._kyaDatePicker.display;
+      if (display) {
+        e.preventDefault();
+        display.focus();
+      }
+    };
+    document.addEventListener('pointerdown', upgradeOnTouch, true);
+    document.addEventListener('focusin', upgradeOnTouch, true);
   })();

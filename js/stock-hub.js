@@ -46,7 +46,7 @@
   // Navigation State
   // Top Action Buttons: 'overview', 'item', 'group', 'category', 'unit', 'warehouse'
   let _activeTopTab = 'overview';
-  // Sub-tabs: 'details', 'movement', 'analysis'
+  // Sub-tabs: 'details', 'movement'
   let _activeLeftSubtab = 'details';
 
   // Filters state
@@ -107,6 +107,28 @@
       return window._masterStockGroups;
     }
     return loadStockHubStorage(KYA_STOCK_GROUPS_KEY, []);
+  }
+
+  // Stock Groups as Stock Hub shows them: every group saved in Master Desk, plus any "Stock Group *"
+  // chosen on a stock item that isn't saved as a group (while no stock group exists, Master Desk's
+  // item form offers a built-in list: Inventories, Raw Materials, Finished Goods, …)
+  function getStockHubGroups(items) {
+    const groups = getStockGroups().slice();
+    const known = new Set();
+    groups.forEach(g => {
+      [g.name].concat(g.aliases || []).forEach(n => known.add(String(n || '').toLowerCase().trim()));
+    });
+    items.forEach(i => {
+      const name = String(i.group || '').trim();
+      const key = name.toLowerCase();
+      if (!name || known.has(key)) return;
+      known.add(key);
+      // Same defaults as a new stock group in Master Desk: under Inventories, adds quantities
+      // ("Inventories" itself is the top of the tree)
+      const isTop = /^(inventories|primary)$/i.test(name);
+      groups.push({ id: '', name, parent: isTop ? '—' : 'Inventories', addQty: 'Yes', aliases: [] });
+    });
+    return groups;
   }
 
   function getStockCategories() {
@@ -201,61 +223,6 @@
         border-color: #93c5fd;
         transform: translateX(-2px);
         box-shadow: 0 2px 6px rgba(37, 99, 235, 0.1);
-      }
-
-      /* KPI Cards Grid */
-      .stock-kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-        gap: 16px;
-        margin-bottom: 22px;
-      }
-      .stock-kpi-card {
-        background: #ffffff;
-        border: 1px solid var(--slate-200, #e2e8f0);
-        border-radius: 12px;
-        padding: 16px 18px;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-      }
-      .stock-kpi-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-      }
-      .stock-kpi-icon-wrap {
-        width: 44px;
-        height: 44px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .stock-kpi-content {
-        flex: 1;
-        min-width: 0;
-      }
-      .stock-kpi-label {
-        font-size: 11.5px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: var(--slate-500, #64748b);
-        margin-bottom: 2px;
-      }
-      .stock-kpi-val {
-        font-size: 19px;
-        font-weight: 800;
-        color: var(--slate-900, #0f172a);
-        line-height: 1.2;
-      }
-      .stock-kpi-sub {
-        font-size: 11px;
-        color: var(--slate-400, #94a3b8);
-        margin-top: 2px;
       }
 
       /* Filter Toolbar */
@@ -706,11 +673,7 @@
   // ==========================================
   // RENDER: Left Sidebar Sub-tabs in KeepOne style
   // ==========================================
-  function renderKeepOneLeftSidebar(stockItems) {
-    const lowStockCount = stockItems.filter(i => i.qty > 0 && i.qty <= i.reorder).length;
-    const outStockCount = stockItems.filter(i => i.qty <= 0).length;
-    const alertTotal = lowStockCount + outStockCount;
-
+  function renderKeepOneLeftSidebar() {
     return `
       <div class="oh-sub-tabs" role="tablist" aria-label="KeepOne Stock Navigation">
 
@@ -737,20 +700,6 @@
             </svg>
           </div>
           <span class="oh-tab-text">Movement</span>
-          <span class="oh-sub-tab-badge">${_stockMovements.length}</span>
-        </button>
-
-        <!-- 3. Analysis (Third!) -->
-        <button class="oh-sub-tab ${_activeLeftSubtab === 'analysis' ? 'active' : ''}" data-subtab="analysis" role="tab" aria-selected="${_activeLeftSubtab === 'analysis'}">
-          <div class="oh-tab-icon-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10"></line>
-              <line x1="12" y1="20" x2="12" y2="4"></line>
-              <line x1="6" y1="20" x2="6" y2="14"></line>
-            </svg>
-          </div>
-          <span class="oh-tab-text">Analysis</span>
-          ${alertTotal > 0 ? `<span class="oh-sub-tab-badge" style="background: #fef2f2; color: #dc2626;">${alertTotal}</span>` : ''}
         </button>
       </div>
     `;
@@ -1023,7 +972,7 @@
         <div class="shd-kpi-strip">
           ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M10 2l7 4v8l-7 4-7-4V6l7-4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M3 6l7 4 7-4M10 10v8" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>', stock.available.toLocaleString('en-IN'), 'Available Items')}
           ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M5 4h10M5 8h10M9 4c3 0 4.5 1.5 4.5 4S12 12 9 12H6l7 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>', '₹' + formatInr(stock.value), 'Stock Valuation', methodSwitch)}
-          ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M2.5 6a1.5 1.5 0 0 1 1.5-1.5h3.5l2 2H16a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 16 16H4a1.5 1.5 0 0 1-1.5-1.5V6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>', getStockGroups().length.toLocaleString('en-IN'), 'Total Groups')}
+          ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M2.5 6a1.5 1.5 0 0 1 1.5-1.5h3.5l2 2H16a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 16 16H4a1.5 1.5 0 0 1-1.5-1.5V6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>', getStockHubGroups(stockItems).length.toLocaleString('en-IN'), 'Total Groups')}
           ${card('<svg viewBox="0 0 20 20" fill="none"><path d="M17 11l-6 6a1.5 1.5 0 0 1-2.1 0L2.5 10.6V2.5h8.1L17 8.9a1.5 1.5 0 0 1 0 2.1z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/></svg>', getStockCategories().length.toLocaleString('en-IN'), 'Total Categories')}
         </div>
         ${renderShdCalendar(stockItems)}
@@ -1696,196 +1645,6 @@
   }
 
   // ==========================================
-  // SUB-TAB 4: ANALYSIS & VALUATION VIEW (Full Screen with Back Button)
-  // ==========================================
-  function renderAnalysisSubtab(stockItems) {
-    const totalVal = stockItems.reduce((sum, i) => sum + (Math.max(0, i.qty) * i.cost), 0);
-    const sortedByVal = [...stockItems].sort((a, b) => (Math.max(0, b.qty) * b.cost) - (Math.max(0, a.qty) * a.cost));
-
-    // ABC Pareto Analysis: class is set by the cumulative share before the item (same rule as the overview)
-    let cumulative = 0;
-    const abcItems = sortedByVal.map(item => {
-      const val = Math.max(0, item.qty) * item.cost;
-      const before = totalVal > 0 ? (cumulative / totalVal) * 100 : 100;
-      cumulative += val;
-      const cumPct = (cumulative / (totalVal || 1)) * 100;
-      const category = val <= 0 ? 'C' : before < 70 ? 'A' : before < 90 ? 'B' : 'C';
-      return { ...item, val, cumPct, abcClass: category };
-    });
-
-    const lowOrOutItems = stockItems.filter(i => i.qty <= i.reorder);
-
-    return `
-      <!-- Back Button & Analytics Header Strip -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1.5px solid var(--slate-100); padding-bottom: 14px; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <button type="button" class="kya-back-btn btn-back-to-details" title="Back to Details" aria-label="Back to Details">
-            <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <div style="font-weight: 800; font-size: 16px; color: var(--slate-900);">Stock Valuation & Analytics</div>
-        </div>
-
-        <div style="font-size: 12px; font-weight: 600; color: var(--slate-500);">
-          ABC Pareto Model & Replenishment Dashboard
-        </div>
-      </div>
-
-      <!-- Valuation Summary Metric Strip -->
-      <div class="stock-kpi-grid">
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #eff6ff; color: #2563eb;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Weighted Valuation</div>
-            <div class="stock-kpi-val">₹ ${formatInr(totalVal)}</div>
-            <div class="stock-kpi-sub">Calculated via Cost basis</div>
-          </div>
-        </div>
-
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #ecfdf5; color: #059669;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 6 13.5 15.5 8.5 10.5 18 18"></polyline>
-              <polyline points="17 6 23 6 23 12"></polyline>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Estimated Realization</div>
-            <div class="stock-kpi-val">₹ ${formatInr(stockItems.reduce((s, i) => s + (i.qty * i.price), 0))}</div>
-            <div class="stock-kpi-sub">Total sales turnover potential</div>
-          </div>
-        </div>
-
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #fdf2f8; color: #db2777;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Class A High-Value</div>
-            <div class="stock-kpi-val">${abcItems.filter(i => i.abcClass === 'A').length} SKUs</div>
-            <div class="stock-kpi-sub">70% of total capital</div>
-          </div>
-        </div>
-
-        <div class="stock-kpi-card">
-          <div class="stock-kpi-icon-wrap" style="background: #fef2f2; color: #dc2626;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-            </svg>
-          </div>
-          <div class="stock-kpi-content">
-            <div class="stock-kpi-label">Reorder Urgent</div>
-            <div class="stock-kpi-val" style="color: #dc2626;">${lowOrOutItems.length} SKUs</div>
-            <div class="stock-kpi-sub">Immediate PO required</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ABC Classification & Replenishment Full-Width Grid -->
-      <div class="stock-details-grid">
-        
-        <div class="stock-section-card">
-          <div class="stock-section-title">
-            <span>ABC Pareto Classification</span>
-            <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #eff6ff; color: #1d4ed8;">Capital Focus</span>
-          </div>
-          <p style="font-size: 12px; color: var(--slate-500); margin-bottom: 12px;">
-            Categorizes stock based on value contribution: <strong>A</strong> (High Value), <strong>B</strong> (Medium), <strong>C</strong> (Low Value).
-          </p>
-          <div style="overflow-x: auto;">
-            <table class="stock-table" style="font-size: 12px;">
-              <thead>
-                <tr>
-                  <th>Class</th>
-                  <th>Item Name</th>
-                  <th style="text-align: right;">Qty</th>
-                  <th style="text-align: right;">Valuation</th>
-                  <th style="text-align: right;">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${abcItems.length === 0 ? `
-                  <tr>
-                    <td colspan="5" class="stock-empty-state" style="text-align: center; padding: 24px; color: var(--slate-400);">
-                      No stock items available for analysis.
-                    </td>
-                  </tr>
-                ` : abcItems.slice(0, 8).map(i => {
-                  let badgeStyle = 'background: #eff6ff; color: #1d4ed8;';
-                  if (i.abcClass === 'B') badgeStyle = 'background: #ecfdf5; color: #047857;';
-                  if (i.abcClass === 'C') badgeStyle = 'background: #f8fafc; color: #64748b;';
-                  const pct = ((i.val / (totalVal || 1)) * 100).toFixed(1);
-
-                  return `
-                    <tr>
-                      <td><span style="font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 4px; ${badgeStyle}">Class ${i.abcClass}</span></td>
-                      <td style="font-weight: 600;">${ohEscapeHtml(i.name)}</td>
-                      <td style="text-align: right;">${i.qty}</td>
-                      <td style="text-align: right; font-weight: 700;">₹ ${formatInr(i.val)}</td>
-                      <td style="text-align: right; color: var(--slate-500);">${pct}%</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Replenishment Recommendations -->
-        <div class="stock-section-card">
-          <div class="stock-section-title">
-            <span>Reorder & Replenishment Alert</span>
-            <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #fef2f2; color: #dc2626;">Action Required</span>
-          </div>
-          <p style="font-size: 12px; color: var(--slate-500); margin-bottom: 12px;">
-            Suggested purchase quantities calculated to reach safe buffer above minimum reorder points.
-          </p>
-          <div style="overflow-x: auto;">
-            <table class="stock-table" style="font-size: 12px;">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th style="text-align: right;">On Hand</th>
-                  <th style="text-align: right;">Min Level</th>
-                  <th style="text-align: right;">Suggested PO</th>
-                  <th style="text-align: right;">Est. Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${stockItems.length === 0 ? `
-                  <tr><td colspan="5" style="text-align: center; color: var(--slate-400); padding: 20px;">No stock items recorded yet.</td></tr>
-                ` : lowOrOutItems.length === 0 ? `
-                  <tr><td colspan="5" style="text-align: center; color: #047857; padding: 20px;">All items are at optimal stock levels!</td></tr>
-                ` : lowOrOutItems.map(i => {
-                  const suggestedPo = Math.max(i.reorder * 2 - i.qty, i.reorder);
-                  const estCost = suggestedPo * i.cost;
-                  return `
-                    <tr>
-                      <td style="font-weight: 600; color: #b91c1c;">${ohEscapeHtml(i.name)}</td>
-                      <td style="text-align: right; font-weight: 700; color: ${i.qty === 0 ? '#dc2626' : '#d97706'};">${i.qty}</td>
-                      <td style="text-align: right;">${i.reorder}</td>
-                      <td style="text-align: right; font-weight: 700; color: #2563eb;">+${suggestedPo} ${i.uom}</td>
-                      <td style="text-align: right; font-weight: 600;">₹ ${formatInr(estCost)}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-    `;
-  }
-
-  // ==========================================
   // TOP MASTER VIEWS: Item, Group, Category, Unit, Warehouse
   // ==========================================
   function renderMasterItemView(stockItems) {
@@ -1893,15 +1652,16 @@
   }
 
   function renderMasterGroupView() {
-    const groups = getStockGroups();
     const items = getStockItems();
+    const groups = getStockHubGroups(items);
 
     function getLinkedItemsForGroup(targetGroup, allGroups, allItems) {
+      // Names / ids that mean this group (blank ones left out, or every item would match)
       const groupNames = new Set([
         targetGroup.name.toLowerCase().trim(),
         (targetGroup.id || '').toLowerCase().trim(),
         ...(targetGroup.aliases || []).map(a => a.toLowerCase().trim())
-      ]);
+      ].filter(Boolean));
 
       let added = true;
       while (added) {
@@ -1911,7 +1671,7 @@
             const p = (otherG.parent || '').toLowerCase().trim();
             if (p && groupNames.has(p)) {
               groupNames.add(otherG.name.toLowerCase().trim());
-              groupNames.add((otherG.id || '').toLowerCase().trim());
+              if (otherG.id) groupNames.add(String(otherG.id).toLowerCase().trim());
               added = true;
             }
           }
@@ -1926,13 +1686,19 @@
       });
     }
 
-    let totalAllGroupsVal = 0;
+    // Closing stock value of each item, by law (same as Details and the Item tab)
+    const itemValues = computeStockItemValues(items, _stockValMethod);
+    const valueOf = i => (itemValues.get(i.id) || { value: 0 }).value;
+
+    // A group's value includes its sub-groups' items, so the total counts each item only once
+    const countedItems = new Set();
     const groupRowsData = groups.map(g => {
       const linked = getLinkedItemsForGroup(g, groups, items);
-      const groupVal = linked.reduce((sum, i) => sum + (Number(i.qty || 0) * Number(i.cost || i.rate || 0)), 0);
-      totalAllGroupsVal += groupVal;
+      linked.forEach(i => countedItems.add(i.id));
+      const groupVal = linked.reduce((sum, i) => sum + valueOf(i), 0);
       return { g, linked, groupVal, parentText: g.parent || 'Inventories' };
     });
+    const totalAllGroupsVal = items.filter(i => countedItems.has(i.id)).reduce((sum, i) => sum + valueOf(i), 0);
 
     return `
       <div class="stock-table-card">
@@ -2202,7 +1968,7 @@
         bodyContentHtml = `
           <div class="oh-layout">
             <!-- Left: KeepOne-Style Sub-Navigation Tabs -->
-            ${renderKeepOneLeftSidebar(stockItems)}
+            ${renderKeepOneLeftSidebar()}
 
             <!-- Right: Content Panels Area -->
             <div class="oh-content-area" id="stockHubContentArea" style="min-height: 480px; padding: 24px;">
@@ -2211,12 +1977,10 @@
           </div>
         `;
       } else {
-        // Full screen view with Back button for Movement and Analysis
+        // Full screen view with Back button for Movement
         let subtabHtml = '';
         if (_activeLeftSubtab === 'movement') {
           subtabHtml = renderMovementSubtab(stockItems);
-        } else if (_activeLeftSubtab === 'analysis') {
-          subtabHtml = renderAnalysisSubtab(stockItems);
         }
 
         bodyContentHtml = `
@@ -2259,7 +2023,7 @@
                 </svg>
               </div>
               <div>
-                <div class="je-card-title-text">${isMovementView ? 'Stock Movement' : 'Stock Hub'}</div>
+                <div class="je-card-title-text">${isMovementView ? 'Stock Movement' : 'Stock Book'}</div>
                 <div class="je-card-subtitle-text">Real-time inventory levels, stock valuation, godown logistics and analytics</div>
               </div>
             </div>

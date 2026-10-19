@@ -77,7 +77,8 @@
           left: 0;
           cursor: pointer;
         }
-        .oh-date-input-wrap input[type="date"] {
+        .oh-date-input-wrap input[type="date"],
+        .oh-date-input-wrap input.kya-dp-native-inp {
           width: 100%;
           height: 34px;
           border: 1px solid #e2e8f0;
@@ -90,10 +91,14 @@
           color: var(--slate-800);
           transition: all 0.15s ease;
         }
-        .oh-date-input-wrap input[type="date"]:hover {
+        .oh-date-input-wrap input[type="date"]:hover,
+        .oh-date-input-wrap input.kya-dp-native-inp:hover {
           border-color: #cbd5e1;
         }
-        .oh-date-input-wrap input[type="date"]:focus {
+        /* The wrap draws its own calendar icon */
+        .oh-date-input-wrap input.kya-dp-native-inp.kya-dp-native-inp { background-image: none !important; }
+        .oh-date-input-wrap input[type="date"]:focus,
+        .oh-date-input-wrap input.kya-dp-native-inp:focus {
           border-color: #3b82f6;
           box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
         }

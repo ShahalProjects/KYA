@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/styles.css?v=20261012_p1" />
+  <link rel="stylesheet" href="css/styles.css?v=20261019_1" />
 </head>
 <body>
 
@@ -159,6 +159,17 @@
         <span class="nav-label">Cashline</span>
       </div>
 
+      <div class="nav-item" id="nav-stock-hub" data-panel="stock-hub" role="button" tabindex="0" aria-label="Stock Book">
+        <!-- Stock / Inventory Box icon -->
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+          <path d="M10 2.5L3.5 6.25V13.75L10 17.5L16.5 13.75V6.25L10 2.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M10 2.5V17.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M3.5 6.25L10 10L16.5 6.25" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M6.75 4.375L13.25 8.125" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        <span class="nav-label">Stock Book</span>
+      </div>
+
       <div class="nav-item" id="nav-voucher-desk" data-panel="voucher-desk" role="button" tabindex="0" aria-label="Voucher Desk">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
           <rect x="3" y="4" width="14" height="12" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
@@ -216,17 +227,6 @@
       </div>
 
       <div class="nav-section-label">Hub</div>
-
-      <div class="nav-item" id="nav-stock-hub" data-panel="stock-hub" role="button" tabindex="0" aria-label="Stock Hub">
-        <!-- Stock / Inventory Box icon -->
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-          <path d="M10 2.5L3.5 6.25V13.75L10 17.5L16.5 13.75V6.25L10 2.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-          <path d="M10 2.5V17.5" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M3.5 6.25L10 10L16.5 6.25" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M6.75 4.375L13.25 8.125" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-        <span class="nav-label">Stock Hub</span>
-      </div>
 
       <div class="nav-item" id="nav-onehub" data-panel="onehub" role="button" tabindex="0" aria-label="KeepOne">
         <!-- Hub / layers icon -->
@@ -5163,7 +5163,7 @@
       <div id="panel-cashline" role="region" aria-label="Cashline" style="display:none"></div>
 
       <!-- Stock Hub Panel -->
-      <div id="panel-stock-hub" role="region" aria-label="Stock Hub" style="display:none"></div>
+      <div id="panel-stock-hub" role="region" aria-label="Stock Book" style="display:none"></div>
 
       <!-- Reports Panel -->
       <div id="panel-reports" role="region" aria-label="Reports" style="display:none"></div>
@@ -5181,28 +5181,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-<script src="js/exportPdf.js?v=20261013_pp1"></script>
-<script src="js/exportExcel.js?v=20261013_pp1"></script>
-<script src="js/app-shell.js?v=20261012_p1"></script>
+<script src="js/exportPdf.js?v=20261018_1"></script>
+<script src="js/exportExcel.js?v=20261018_1"></script>
+<script src="js/app-shell.js?v=20261019_2"></script>
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
-<script src="js/master-desk.js?v=20261012_p1"></script>
+<script src="js/master-desk.js?v=20261019_t1"></script>
 <script src="js/journal.js?v=20261013_pr1"></script>
 <script src="js/coa.js?v=20261012_p1"></script>
 <script src="js/reports.js"></script>
-<script src="js/stock-hub.js?v=20261013_pr1"></script>
+<script src="js/stock-hub.js?v=20261019_6"></script>
 <script src="js/reports-hub.js?v=20261013_pr1"></script>
 <script src="js/onehub-shell.js"></script>
 <script src="js/onehub-departments.js"></script>
 <script src="js/onehub-employees.js"></script>
 <script src="js/onehub-budget.js"></script>
 <script src="js/onehub-reminders-core.js"></script>
-<script src="js/onehub-reminders-view.js"></script>
+<script src="js/onehub-reminders-view.js?v=20261019_1"></script>
 <script src="js/vault-core.js"></script>
 <script src="js/ledgers.js?v=20261013_pr1"></script>
 <script src="js/vault-settings.js?v=20261013_pr1"></script>
-<script src="js/kya-datepicker.js?v=20261004_1"></script>
-<script src="js/sales-form.js?v=20261013_pr1"></script>
+<script src="js/kya-datepicker.js?v=20261019_1"></script>
+<script src="js/sales-form.js?v=20261019_t1"></script>
 <script src="js/sales-posting.js?v=20261011_v6"></script>
 <script src="js/sales-helpers.js?v=20261013_pp1"></script>
 <script src="js/sales-credit-adjust.js?v=20261008_d1"></script>

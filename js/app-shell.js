@@ -771,7 +771,7 @@
     },
     stock_hub: {
       id: 'stock_hub',
-      label: 'Stock Hub',
+      label: 'Stock Book',
       panelId: 'panel-stock-hub',
       navId: 'nav-stock-hub',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M10 2.5L3.5 6.25V13.75L10 17.5L16.5 13.75V6.25L10 2.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 2.5V17.5" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 6.25L10 10L16.5 6.25" stroke="currentColor" stroke-width="1.4"/></svg>`

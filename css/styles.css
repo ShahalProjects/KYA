@@ -5228,6 +5228,28 @@
       transition: background .15s, color .15s;
     }
     .kya-dp-icon:hover { background: var(--blue-50, #eff6ff); color: var(--blue-600, #2563eb); }
+    /* Browser date fields switched to the KYA picker (kya-datepicker.js): own look + calendar icon.
+       The class is doubled so the icon outranks the inputs' own :hover / :focus background resets
+       (e.g. .cl-glass-control:hover), which would otherwise move and tile it. */
+    input.kya-dp-native-inp.kya-dp-native-inp {
+      padding-right: 30px !important;
+      letter-spacing: .02em;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: right 9px center !important;
+      background-size: 14px 14px !important;
+    }
+    input.kya-dp-native-inp.kya-dp-native-inp.je-input {
+      padding-right: 40px !important;
+      background-position: right 13px center !important;
+      background-size: 16px 16px !important;
+    }
+    input.kya-dp-native-inp.kya-dp-native-inp.kya-dp-on-dark {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E") !important;
+    }
+    input.kya-dp-native-inp.kya-dp-on-dark::placeholder { color: rgba(255, 255, 255, 0.7); }
+    input.kya-dp-native-inp.kya-dp-invalid,
+    input.kya-dp-native-inp.kya-dp-invalid:focus { border-color: var(--red-500, #ef4444) !important; }
     .kya-dp-pop {
       position: fixed; z-index: 99999; width: 232px; box-sizing: border-box;
       padding: 9px; background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 12px;
