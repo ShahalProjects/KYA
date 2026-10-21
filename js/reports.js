@@ -4004,7 +4004,7 @@
         if (typeof renderSupplierStatementView === 'function') renderSupplierStatementView();
         if (typeof renderLedgerListView === 'function') renderLedgerListView();
       }
-      if (activeTabId === 'onehub' && typeof renderOhBudgetView === 'function') renderOhBudgetView();
+      if (activeTabId === 'track_recorder' && typeof renderOhBudgetView === 'function') renderOhBudgetView();
       if ((activeTabId === 'sales_voucher' || activeTabId === 'sales_posted') && typeof renderSalesPostedPanel === 'function') {
         renderSalesPostedPanel();
       }

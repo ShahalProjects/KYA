@@ -14770,11 +14770,8 @@
   // KeepOne's auto code: EMP-001, EMP-002... (the number is the employee's id)
   function masterTeamEmpCode(n) { return 'EMP-' + String(n).padStart(3, '0'); }
 
-  // After a save or delete: KeepOne's badges and lists follow, then the backup
+  // After a save or delete: back up
   function afterMasterTeamChange() {
-    if (typeof updateOhBadges === 'function') updateOhBadges();
-    if (typeof renderOhDeptView === 'function') renderOhDeptView();
-    if (typeof renderOhEmpView === 'function') renderOhEmpView();
     if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
   }
 

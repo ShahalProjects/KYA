@@ -8,7 +8,6 @@
     if (activeTabId === 'balance') renderBalanceSheetPanel();
     if (activeTabId === 'pnl') renderPnlPanel();
     if (activeTabId === 'trial') renderTrialBalancePanel();
-    if (activeTabId === 'onehub') renderOneHubPanel();
     if (activeTabId === 'sales_voucher') initSalesForm();
     if (activeTabId === 'journal') { populateJeDepartments(); if (typeof initFormDefaults === 'function') initFormDefaults(); }
   }

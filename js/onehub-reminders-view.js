@@ -3,8 +3,39 @@
   //  (Split from onehub.js for maintainability)
   // ══════════════════════════════════════════════════════════════════
 
+  // Reminders are shown in Track Recorder → Reminders
+  function ohRemindersViewWrap() {
+    const inTr = typeof isTrackRecorderShowing === 'function' && isTrackRecorderShowing('reminders');
+    return inTr ? document.getElementById('trRemindersView') : null;
+  }
+
+  // Track Recorder: the reminder form (Add Reminder / Edit) opens as a popup. The form keeps its
+  // element ids, so the wiring below serves it as it does KeepOne's form above the list.
+  // A click outside the form closes it, like Cancel.
+  function ohSyncReminderFormPopup(show) {
+    let overlay = document.getElementById('ohReminderFormOverlay');
+    if (!show) {
+      overlay?.remove();
+      return;
+    }
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'oh-modal-overlay';
+      overlay.id = 'ohReminderFormOverlay';
+      overlay.style.zIndex = '10000';   // under the Day picker popover (10005)
+      // Wide enough for the journal lines' Particulars box (the Journal Entry columns keep their widths)
+      overlay.innerHTML = '<div class="oh-modal-card" role="dialog" aria-modal="true" style="max-width: 920px;"></div>';
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) document.getElementById('ohCancelNewReminder')?.click();
+      });
+      document.body.appendChild(overlay);
+    }
+    // Only the card's content is redrawn, so the popup doesn't pop in again on each change
+    overlay.firstElementChild.innerHTML = renderNewReminderFormHtml(true);
+  }
+
   function renderOhRemindersView() {
-    const wrap = document.getElementById('ohRemindersViewInner');
+    const wrap = ohRemindersViewWrap();
     if (!wrap) return;
 
     if (!document.getElementById('ohDayPickerStyles')) {
@@ -95,6 +126,58 @@
         .oh-date-input-wrap input.kya-dp-native-inp:hover {
           border-color: #cbd5e1;
         }
+        /* Track Recorder's popup is the card: the form inside drops its own border and shadow */
+        #ohReminderFormOverlay .oh-reminder-form-card {
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          animation: none !important;
+        }
+        /* Track Recorder's popup: Type / Due Date / Alert Before, Task Name and the Auto Journal
+           Posting slider take the New Budget popup's sizes (.oh-label / .oh-input). Their styles
+           are inline, hence !important. The journal block keeps the Journal Entry screen's look. */
+        #ohReminderFormOverlay .oh-reminder-form-grid {
+          gap: 14px !important;
+          align-items: end;   /* a label on two lines doesn't push its box out of line */
+        }
+        #ohReminderFormOverlay .oh-reminder-form-grid > div > label {
+          font-size: 11px !important;
+          font-weight: 700 !important;
+          text-transform: uppercase;
+          letter-spacing: .07em;
+          color: var(--slate-500) !important;
+          margin-bottom: 6px !important;
+        }
+        #ohReminderFormOverlay #ohNewReminderTitle,
+        #ohReminderFormOverlay #ohNewReminderShowDaysBefore,
+        #ohReminderFormOverlay #ohNewReminderDayBtn,
+        #ohReminderFormOverlay .oh-date-input-wrap input {
+          height: 42px !important;
+          padding: 0 12px !important;
+          border: 1.5px solid var(--slate-200) !important;
+          border-radius: 11px !important;
+          font-size: 13.5px !important;
+          color: var(--slate-800);
+        }
+        #ohReminderFormOverlay .oh-date-input-wrap input { padding-right: 34px !important; }
+        #ohReminderFormOverlay #ohNewReminderTitle:focus,
+        #ohReminderFormOverlay #ohNewReminderShowDaysBefore:focus,
+        #ohReminderFormOverlay #ohNewReminderDayBtn:focus,
+        #ohReminderFormOverlay .oh-date-input-wrap input:focus {
+          border-color: var(--blue-400) !important;
+          box-shadow: 0 0 0 3px rgba(96,165,250,.15) !important;
+        }
+        /* Sliders: Type and Auto Journal Posting */
+        #ohReminderFormOverlay .oh-reminder-form-grid > div > .oh-segmented-control {
+          height: 42px !important;
+          padding: 3px !important;
+          border-radius: 11px !important;
+        }
+        #ohReminderFormOverlay .oh-reminder-form-grid > div > .oh-segmented-control button {
+          font-size: 13px !important;
+          border-radius: 8px !important;
+        }
         /* The wrap draws its own calendar icon */
         .oh-date-input-wrap input.kya-dp-native-inp.kya-dp-native-inp { background-image: none !important; }
         .oh-date-input-wrap input[type="date"]:focus,
@@ -161,8 +244,9 @@
       </div>
     `;
 
-    // Render form at the top if open
-    if (_ohReminderFormOpen) {
+    // Render form at the top if open (Track Recorder shows it as a popup instead)
+    const formInPopup = typeof isTrackRecorderShowing === 'function' && isTrackRecorderShowing('reminders');
+    if (_ohReminderFormOpen && !formInPopup) {
       html += renderNewReminderFormHtml();
     }
 
@@ -309,8 +393,8 @@
                   ${r.amount ? ` <span style="color:#64748b; font-weight:500; font-size:12px;">(&#8377;${parseFloat(r.amount).toLocaleString('en-IN')} ${r.drCr === 'Credit' ? 'Cr' : 'Dr'})</span>` : ''}
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
-                  <span style="font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: ${getLedgerColor(coaLedgers.find(l => l.id == r.ledgerId)?.name || r.category || 'General')}; color: #ffffff; letter-spacing:0.02em;">
-                    ${coaLedgers.find(l => l.id == r.ledgerId)?.name || r.category || 'General'}
+                  <span style="font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: ${getLedgerColor(ohReminderLedgerLabel(r))}; color: #ffffff; letter-spacing:0.02em;">
+                    ${ohEsc(ohReminderLedgerLabel(r))}
                   </span>
                   <span style="font-size: 10px; color: var(--slate-400); font-weight:500;">&middot; ${r.type}</span>
                 </div>
@@ -360,6 +444,7 @@
     }
 
     wrap.innerHTML = html;
+    ohSyncReminderFormPopup(formInPopup && _ohReminderFormOpen);
 
     // Attach filters click listeners
     const filterUpcoming = document.getElementById('ohFilterUpcoming');
@@ -549,6 +634,7 @@
             part.style.display = _ohNewReminderAutoJournal ? 'block' : 'none';
             if (_ohNewReminderAutoJournal) {
               renderOppEntriesListHtml();
+              renderOhReminderJeRows();   // Track Recorder's popup: its journal lines
             } else {
               renderReminderJePreview();
             }
@@ -600,6 +686,8 @@
       if (_ohReminderFormOpen && _ohNewReminderAutoJournal) {
         renderOppEntriesListHtml();
       }
+      // Track Recorder's popup: Department, Transaction Type, journal lines and Narration
+      wireOhReminderJeBlock();
 
       // Dr/Cr Segment buttons click listeners
       const drcrBtns = document.querySelectorAll('.oh-drcr-segment-btn');
@@ -635,36 +723,71 @@
             return;
           }
 
+          // Track Recorder's popup: the journal lines replace Ledger / Amount / Opposite Entries.
+          // They must balance; the first line gives the ledger, amount and Dr / Cr the list shows.
+          let ledgerIdVal = _ohNewReminderLedgerId;
+          let amountVal = amount;
+          let drCrVal = _ohNewReminderDrCr;
+          let oppVal = _ohNewReminderOppEntries;
+          let journalRows = null;
+          if (document.getElementById('ohReminderFormOverlay')) {
+            if (_ohNewReminderAutoJournal) {
+              const check = ohReminderJeLinesForSave();
+              if (check.error) {
+                showToast(check.error, 'error');
+                return;
+              }
+              journalRows = check.rows;
+            } else {
+              // A plain reminder: no ledger, amount or journal details
+              _ohNewReminderDeptId = '';
+              _ohNewReminderIsBudget = false;
+              _ohNewReminderNarration = '';
+            }
+            const ledgerIdOf = name => (coaLedgers.find(l => l.type === 'ledger' && l.name === name) || {}).id || '';
+            const first = journalRows ? journalRows[0] : null;
+            ledgerIdVal = first ? ledgerIdOf(first.particular) : '';
+            amountVal = first ? first.amount : '';
+            drCrVal = first && first.type === 'To' ? 'Credit' : 'Debit';
+            oppVal = journalRows ? journalRows.slice(1).map(x => ({
+              ledgerId: ledgerIdOf(x.particular), drCr: x.type === 'To' ? 'Credit' : 'Debit', amount: x.amount
+            })) : [];
+          }
+
           const isEdit = _ohReminderEditIndex !== null;
           if (isEdit) {
             const r = ohReminders[_ohReminderEditIndex];
             r.title = title;
             r.type = _ohNewReminderType;
             r.dueDate = _ohNewReminderDueDate;
-            r.ledgerId = _ohNewReminderLedgerId;
-            r.amount = amount;
-            r.drCr = _ohNewReminderDrCr;
+            r.ledgerId = ledgerIdVal;
+            r.amount = amountVal;
+            r.drCr = drCrVal;
             r.autoJournal = _ohNewReminderAutoJournal;
             r.departmentId = _ohNewReminderDeptId;
             r.isBudget = _ohNewReminderIsBudget;
             r.transactionType = _ohNewReminderIsBudget ? 'Budget' : 'Non Budget';
             r.narration = _ohNewReminderNarration;
-            r.oppEntries = _ohNewReminderOppEntries;
+            r.oppEntries = oppVal;
             r.showDaysBefore = _ohNewReminderShowDaysBefore;
+            // Saved from KeepOne's form, the ledger / opposite entries above are what posts
+            if (journalRows) r.journalRows = journalRows;
+            else delete r.journalRows;
           } else {
             ohReminders.push({
               title: title,
               type: _ohNewReminderType,
               dueDate: _ohNewReminderDueDate,
-              ledgerId: _ohNewReminderLedgerId,
-              amount: amount,
-              drCr: _ohNewReminderDrCr,
+              ledgerId: ledgerIdVal,
+              amount: amountVal,
+              drCr: drCrVal,
               autoJournal: _ohNewReminderAutoJournal,
               departmentId: _ohNewReminderDeptId,
               isBudget: _ohNewReminderIsBudget,
               transactionType: _ohNewReminderIsBudget ? 'Budget' : 'Non Budget',
               narration: _ohNewReminderNarration,
-              oppEntries: _ohNewReminderOppEntries,
+              oppEntries: oppVal,
+              ...(journalRows ? { journalRows } : {}),
               showDaysBefore: _ohNewReminderShowDaysBefore,
               status: 'Pending'
             });
@@ -681,7 +804,7 @@
           _ohNewReminderNarration = '';
           _ohNewReminderOppEntries = [];
           _ohNewReminderShowDaysBefore = 7;
-          updateOhBadges();
+          _ohNewReminderJeRows = [];
           renderOhRemindersView();
           triggerAutoBackup();
           showToast(isEdit ? 'Reminder updated successfully.' : 'Reminder created successfully.', 'success');
@@ -702,6 +825,7 @@
           _ohNewReminderNarration = '';
           _ohNewReminderOppEntries = [];
           _ohNewReminderShowDaysBefore = 7;
+          _ohNewReminderJeRows = [];
           renderOhRemindersView();
         });
       }
@@ -736,26 +860,11 @@
 
             let entryId = '';
             if (r.autoJournal && r.amount) {
-              const mainAmt = parseFloat(r.amount) || 0;
-              let totalOppDr = 0;
-              let totalOppCr = 0;
-              
-              (r.oppEntries || []).forEach(opp => {
-                const amt = parseFloat(opp.amount) || 0;
-                if (opp.drCr === 'Debit') totalOppDr += amt;
-                else totalOppCr += amt;
-              });
-
-              const mainIsDr = r.drCr !== 'Credit';
-              const mainDr = mainIsDr ? mainAmt : 0;
-              const mainCr = mainIsDr ? 0 : mainAmt;
-
-              const finalDr = mainDr + totalOppDr;
-              const finalCr = mainCr + totalOppCr;
+              // Journal lines (Track Recorder) or ledger + opposite entries
+              const { dr: finalDr, cr: finalCr } = ohReminderJournalTotals(r);
 
               if (Math.abs(finalDr - finalCr) > 0.01) {
                 showToast('Cannot auto-post journal entry: Debits and Credits do not balance.', 'error');
-                updateOhBadges();
                 renderOhRemindersView();
                 return;
               }
@@ -791,6 +900,7 @@
                 transactionType: r.transactionType,
                 narration: r.narration,
                 oppEntries: JSON.parse(JSON.stringify(r.oppEntries || [])),
+                ...(r.journalRows ? { journalRows: JSON.parse(JSON.stringify(r.journalRows)) } : {}),
                 showDaysBefore: r.showDaysBefore,
                 status: 'Completed',
                 postedJournalId: entryId || undefined,
@@ -802,7 +912,6 @@
               if (entryId) r.postedJournalId = entryId;
             }
 
-            updateOhBadges();
             renderOhRemindersView();
             triggerAutoBackup();
             showToast('Reminder marked as completed.', 'success');
@@ -836,7 +945,6 @@
                   }
                 }
 
-                updateOhBadges();
                 renderOhRemindersView();
                 triggerAutoBackup();
                 showToast('Reminder reverted to Pending.', 'success');
@@ -872,6 +980,7 @@
             _ohNewReminderNarration = r.narration || '';
             _ohNewReminderOppEntries = JSON.parse(JSON.stringify(r.oppEntries || []));
             _ohNewReminderShowDaysBefore = r.showDaysBefore !== undefined ? r.showDaysBefore : 7;
+            _ohNewReminderJeRows = ohReminderJeRowsFrom(r);
             renderOhRemindersView();
             
             // Focus and scroll
@@ -903,7 +1012,6 @@
                   }
                 }
                 ohReminders.splice(index, 1);
-                updateOhBadges();
                 renderOhRemindersView();
                 triggerAutoBackup();
                 showToast('Reminder deleted successfully.', 'success');

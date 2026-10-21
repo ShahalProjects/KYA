@@ -118,6 +118,36 @@
     const rows = [];
     let rowId = 1;
 
+    // Track Recorder's reminders carry their journal lines as entered
+    if (Array.isArray(r.journalRows) && r.journalRows.length) {
+      r.journalRows.forEach(x => {
+        const amt = parseFloat(x.amount) || 0;
+        const isDr = x.type !== 'To';
+        rows.push({
+          id: rowId++,
+          type: isDr ? 'By' : 'To',
+          particular: x.particular,
+          debit: isDr ? amt.toFixed(2) : '',
+          credit: isDr ? '' : amt.toFixed(2)
+        });
+      });
+      const lineEntry = {
+        id:             entryId,
+        date:           dateVal,
+        voucherNo:      voucherNoVal,
+        preparedBy:     'Reminders Module',
+        departmentId:   r.departmentId || '',
+        isBudget:       r.isBudget === true,
+        firstParticular: rows[0].particular,
+        amount:         fmtNum(ohReminderJournalTotals(r).dr),
+        allRows:        rows,
+        narration:      r.narration || r.title || 'Auto posted from reminders'
+      };
+      postedEntries.unshift(lineEntry);
+      if (typeof refreshAllReports === 'function') refreshAllReports();
+      return entryId;
+    }
+
     const mainLedger = coaLedgers.find(l => l.id == r.ledgerId) || { name: 'General Ledger' };
     const mainAmt = parseFloat(r.amount) || 0;
     const mainIsDr = r.drCr !== 'Credit';
@@ -275,10 +305,10 @@
   function renderOppEntriesListHtml() {
     const listContainer = document.getElementById('ohOppEntriesList');
     if (!listContainer) return;
-    
+
     const ledgers = coaLedgers.filter(l => l.type === 'ledger');
     const oppDrCr = _ohNewReminderDrCr === 'Debit' ? 'Credit' : 'Debit';
-    
+
     let html = '';
     if (_ohNewReminderOppEntries.length === 0) {
       html = `<div style="padding: 10px; font-size: 11px; color: var(--slate-400); text-align: center;">No balancing accounts added yet.</div>`;
@@ -318,7 +348,7 @@
       });
     }
     listContainer.innerHTML = html;
-    
+
     wireOppEntriesListEvents();
     renderReminderJePreview();
   }
@@ -408,7 +438,7 @@
         
         const dropdown = document.getElementById(`ohOppLedgerDropdown-${rowIdx}`);
         if (dropdown) dropdown.style.display = 'none';
-        
+
         renderReminderJePreview();
       }
     });
@@ -422,7 +452,369 @@
     });
   }
 
-  function renderNewReminderFormHtml() {
+  // ── Track Recorder's reminder popup: journal lines like the Journal Entry screen ─────────
+  // Same classes as Journal Entry (je-form-card, je-fields-bar, je-table, je-add-row-btn,
+  // je-narration-input, je-totals) and the same ledger list (_jePortal). No Date, Journal
+  // Voucher No. or Upload. The lines are kept in _ohNewReminderJeRows.
+  let _ohReminderJeCtr = 1;
+
+  function ohNewReminderJeRow(type) {
+    return { id: _ohReminderJeCtr++, type: type === 'To' ? 'To' : 'By', particular: '', amount: '' };
+  }
+
+  // Lines of a saved reminder: its journalRows, or (reminders saved before) its ledger,
+  // amount and Dr / Cr plus the opposite entries
+  function ohReminderJeRowsFrom(r) {
+    if (Array.isArray(r.journalRows) && r.journalRows.length) {
+      return r.journalRows.map(x => ({
+        id: _ohReminderJeCtr++, type: x.type === 'To' ? 'To' : 'By', particular: x.particular || '', amount: x.amount || ''
+      }));
+    }
+    if (!r.autoJournal || !r.amount) return [];
+    const mainIsDr = r.drCr !== 'Credit';
+    const ledgerName = id => (coaLedgers.find(l => l.id == id) || {}).name || '';
+    const rows = [{ id: _ohReminderJeCtr++, type: mainIsDr ? 'By' : 'To', particular: ledgerName(r.ledgerId), amount: r.amount }];
+    (r.oppEntries || []).forEach(opp => {
+      rows.push({ id: _ohReminderJeCtr++, type: mainIsDr ? 'To' : 'By', particular: ledgerName(opp.ledgerId), amount: opp.amount || '' });
+    });
+    return rows;
+  }
+
+  function ohReminderJeTotals(rows) {
+    let dr = 0, cr = 0;
+    rows.forEach(x => {
+      const amt = parseAmt(x.amount) || 0;
+      if (x.type === 'To') cr += amt;
+      else dr += amt;
+    });
+    return { dr, cr };
+  }
+
+  // Debit / credit totals a reminder will post: its journal lines, or its ledger + opposite entries
+  function ohReminderJournalTotals(r) {
+    if (Array.isArray(r.journalRows) && r.journalRows.length) return ohReminderJeTotals(r.journalRows);
+    const mainAmt = parseFloat(r.amount) || 0;
+    const mainIsDr = r.drCr !== 'Credit';
+    let dr = mainIsDr ? mainAmt : 0;
+    let cr = mainIsDr ? 0 : mainAmt;
+    (r.oppEntries || []).forEach(opp => {
+      const amt = parseFloat(opp.amount) || 0;
+      if (opp.drCr === 'Debit') dr += amt;
+      else cr += amt;
+    });
+    return { dr, cr };
+  }
+
+  // On save: the filled lines (blank ones are left out), or why they can't be saved
+  function ohReminderJeLinesForSave() {
+    const rows = _ohNewReminderJeRows.filter(x => String(x.particular || '').trim() || parseAmt(x.amount));
+    if (!rows.length) return { error: 'Please add the journal lines for Auto Journal Posting.' };
+    if (rows.some(x => !String(x.particular || '').trim())) {
+      return { error: 'Please select a ledger, customer, or supplier in Particulars.' };
+    }
+    if (rows.some(x => !(parseAmt(x.amount) > 0))) return { error: 'Please enter an amount greater than zero.' };
+    const { dr, cr } = ohReminderJeTotals(rows);
+    if (Math.abs(dr - cr) >= 0.005) return { error: 'Cannot save: Debits and Credits do not balance.' };
+    return {
+      rows: rows.map(x => ({ type: x.type === 'To' ? 'To' : 'By', particular: x.particular.trim(), amount: parseAmt(x.amount).toFixed(2) }))
+    };
+  }
+
+  // Name shown on a reminder in the list: its first journal line, else its ledger
+  function ohReminderLedgerLabel(r) {
+    const first = Array.isArray(r.journalRows) && r.journalRows[0];
+    return (first && first.particular) || coaLedgers.find(l => l.id == r.ledgerId)?.name || r.category || 'General';
+  }
+
+  // Auto Journal Posting slider, and (when Enabled) the journal block
+  function ohReminderPopupJournalHtml() {
+    const aj = _ohNewReminderAutoJournal === true;
+    const segBtn = (val, label, on) => `
+              <button type="button" class="oh-autojournal-segment-btn" data-value="${val}" style="flex:1; border:none; outline:none; font-size:12px; font-weight:700; border-radius:6px; cursor:pointer; transition:all 0.15s ease; background:${on ? '#ffffff' : 'transparent'}; color:${on ? 'var(--blue-600)' : '#64748b'}; box-shadow:${on ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'};">${label}</button>`;
+    const budget = _ohNewReminderIsBudget === true;
+    return `
+          <div>
+            <label style="display:block; font-size:11px; font-weight:600; color:var(--slate-500); margin-bottom:4px;">Auto Journal Posting</label>
+            <div class="oh-segmented-control" style="display:flex; background:#f1f5f9; border-radius:8px; padding:3px; height:36px; box-sizing:border-box; width:100%; border:1px solid #e2e8f0;">
+              ${segBtn('false', 'Disabled', !aj)}
+              ${segBtn('true', 'Enabled', aj)}
+            </div>
+          </div>
+          <div id="ohNewReminderAutoJournalPart" style="grid-column: span 3; display: ${aj ? 'block' : 'none'};">
+            <div class="je-form-card" style="margin: 4px 0 0; box-shadow: none; border: 1.5px solid var(--slate-200);">
+              <div class="je-fields-bar">
+                <div class="je-field">
+                  <label for="ohRemJeDept">Department</label>
+                  <select id="ohRemJeDept" class="je-input" aria-label="Department selection">
+                    <option value="">&mdash; Select Department &mdash;</option>
+                    ${ohDepartments.map(d => `<option value="${d.id}" ${String(_ohNewReminderDeptId) === String(d.id) ? 'selected' : ''}>${ohEsc(d.name)}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="je-field">
+                  <label>Transaction Type</label>
+                  <div class="je-tx-slider-wrap">
+                    <div class="je-tx-slider-bg ${budget ? 'budget-active' : 'non-budget-active'}" id="ohRemJeTxBg"></div>
+                    <button type="button" class="je-tx-slider-btn ${budget ? '' : 'active'}" data-rem-budget="false">Non Budget</button>
+                    <button type="button" class="je-tx-slider-btn ${budget ? 'active' : ''}" data-rem-budget="true">Budget</button>
+                  </div>
+                </div>
+              </div>
+              <div class="je-table-section">
+                <div class="je-table-label">Entry Lines</div>
+                <div class="je-table-wrap">
+                  <table class="je-table" aria-label="Journal entry lines">
+                    <thead>
+                      <tr>
+                        <th class="col-sno">#</th>
+                        <th class="col-type">Type</th>
+                        <th class="col-part">Particulars</th>
+                        <th class="col-amount">Amount</th>
+                        <th class="col-del"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="ohRemJeBody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="je-add-row-wrap">
+                <button type="button" class="je-add-row-btn" id="ohRemJeAddRow" aria-label="Add entry line">
+                  <svg viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  Add Line
+                </button>
+              </div>
+              <div class="je-narration-wrap">
+                <label for="ohRemJeNarration" class="je-narration-label">Narration / Description</label>
+                <textarea id="ohRemJeNarration" class="je-narration-input" placeholder="Being the entry for..." aria-label="Narration">${ohEsc(_ohNewReminderNarration)}</textarea>
+              </div>
+              <div class="je-totals" style="justify-content: flex-end;">
+                <div class="je-totals-right">
+                  <div class="je-total-item">
+                    <span class="je-total-label">Total Debit</span>
+                    <span class="je-total-value debit" id="ohRemJeTotalDebit">0.00</span>
+                  </div>
+                  <div class="je-total-divider"></div>
+                  <div class="je-total-item">
+                    <span class="je-total-label">Total Credit</span>
+                    <span class="je-total-value credit" id="ohRemJeTotalCredit">0.00</span>
+                  </div>
+                  <div class="je-total-divider"></div>
+                  <div class="je-balance-indicator unbalanced" id="ohRemJeBalanceChip" aria-live="polite">
+                    <span class="je-balance-dot"></span>
+                    <span id="ohRemJeBalanceText">Unbalanced</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>`;
+  }
+
+  function ohRefreshReminderJeTotals() {
+    const { dr, cr } = ohReminderJeTotals(_ohNewReminderJeRows);
+    const drEl = document.getElementById('ohRemJeTotalDebit');
+    const crEl = document.getElementById('ohRemJeTotalCredit');
+    if (drEl) drEl.textContent = fmtNum(dr);
+    if (crEl) crEl.textContent = fmtNum(cr);
+    const balanced = Math.abs(dr - cr) < 0.005;
+    const chip = document.getElementById('ohRemJeBalanceChip');
+    const txt = document.getElementById('ohRemJeBalanceText');
+    if (chip) chip.className = 'je-balance-indicator ' + (balanced ? 'balanced' : 'unbalanced');
+    if (txt) txt.textContent = balanced ? 'Balanced ✓' : 'Unbalanced';
+  }
+
+  // The Journal Entry ledger list, without its "Create Ledger" (that belongs to the Journal screen)
+  function ohOpenReminderJePortal(inp, onSelect) {
+    if (typeof _jePortal === 'undefined') return;
+    _jePortal.open(inp, inp.value, onSelect);
+    document.querySelector('#je-portal-dropdown #jeDropCreateLedgerBtn')?.remove();
+  }
+
+  function ohFocusReminderJeRow(rowId, field) {
+    const tr = document.querySelector(`#ohRemJeBody tr[data-rem-row="${rowId}"]`);
+    tr?.querySelector(field === 'amount' ? '.je-amount-input' : '.je-particulars-input')?.focus();
+  }
+
+  function ohAddReminderJeRow(type) {
+    const row = ohNewReminderJeRow(type);
+    _ohNewReminderJeRows.push(row);
+    renderOhReminderJeRows();
+    ohFocusReminderJeRow(row.id, 'particular');
+  }
+
+  // Journal lines: # | By / To | Particulars | Amount | 🗑, wired like the Journal Entry screen
+  function renderOhReminderJeRows() {
+    const tbody = document.getElementById('ohRemJeBody');
+    if (!tbody) return;
+    if (!_ohNewReminderJeRows.length) _ohNewReminderJeRows.push(ohNewReminderJeRow('By'));
+
+    tbody.innerHTML = _ohNewReminderJeRows.map((row, idx) => {
+      const isBy = row.type !== 'To';
+      return `
+        <tr class="je-row" data-rem-row="${row.id}">
+          <td><span class="je-sno">${idx + 1}</span></td>
+          <td>
+            <select class="je-type-select ${isBy ? 'type-by' : 'type-to'}" aria-label="Entry type">
+              <option value="By" ${isBy ? 'selected' : ''}>By</option>
+              <option value="To" ${isBy ? '' : 'selected'}>To</option>
+            </select>
+          </td>
+          <td>
+            <div class="je-particulars-wrap">
+              <input type="text" class="je-particulars-input" value="${ohEsc(row.particular)}" placeholder="Select or search ledger, customer, supplier…" aria-label="Particulars / ledger account, customer, or supplier" autocomplete="off" spellcheck="false">
+              <div class="je-particulars-right-addons">
+                <span class="je-particulars-arrow"><svg viewBox="0 0 14 14" fill="none"><path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align: right;">
+            <input type="text" inputmode="decimal" class="je-amount-input ${isBy ? 'amt-debit' : 'amt-credit'}" value="${ohEsc(row.amount)}" placeholder="${isBy ? 'Dr Amount' : 'Cr Amount'}" aria-label="${isBy ? 'Debit amount' : 'Credit amount'}">
+          </td>
+          <td>
+            <button type="button" class="je-del-btn" aria-label="Delete row">
+              <svg viewBox="0 0 15 15" fill="none" style="width: 13px; height: 13px;"><path d="M5.5 2h4M1.5 4h12M2.5 4l1 9.5a1 1 0 001 .5h6a1 1 0 001-.5l1-9.5M5.5 6.5v5M9.5 6.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            </button>
+          </td>
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('tr[data-rem-row]').forEach(tr => {
+      const row = _ohNewReminderJeRows.find(x => String(x.id) === tr.dataset.remRow);
+      if (!row) return;
+      const isFirst = _ohNewReminderJeRows[0] === row;
+      const typeSel = tr.querySelector('.je-type-select');
+      const partInp = tr.querySelector('.je-particulars-input');
+      const amtInp = tr.querySelector('.je-amount-input');
+
+      // By / To: the amount moves to the other side
+      typeSel.addEventListener('change', () => {
+        row.type = typeSel.value === 'To' ? 'To' : 'By';
+        renderOhReminderJeRows();
+      });
+
+      // Particulars: the Journal Entry ledger list
+      const select = acct => {
+        partInp.value = acct.name;
+        row.particular = acct.name;
+        ohFocusReminderJeRow(row.id, 'amount');
+      };
+      partInp.addEventListener('focus', () => ohOpenReminderJePortal(partInp, select));
+      partInp.addEventListener('input', () => {
+        row.particular = partInp.value;
+        ohOpenReminderJePortal(partInp, select);
+      });
+      partInp.addEventListener('keydown', e => {
+        const open = _jePortal.isOpen();
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!open) ohOpenReminderJePortal(partInp, select);
+          _jePortal.moveHighlight(1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          _jePortal.moveHighlight(-1);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (open) _jePortal.selectHighlighted();
+          else if (partInp.value.trim()) ohFocusReminderJeRow(row.id, 'amount');
+        } else if (e.key === 'Escape') {
+          if (open) { e.preventDefault(); _jePortal.close(); }
+        }
+      });
+      partInp.addEventListener('blur', () => {
+        // Give the list's mousedown time to fire before checking the name
+        setTimeout(() => {
+          if (_jePortal.isOpen()) return;
+          const val = partInp.value.trim().toLowerCase();
+          if (!val) { row.particular = ''; return; }
+          const custs = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
+          const supps = typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : [];
+          const match = coaLedgers.find(l => l.type === 'ledger' && (l.name || '').toLowerCase() === val)
+            || custs.find(c => (c.name || '').toLowerCase() === val)
+            || supps.find(s => (s.name || '').toLowerCase() === val);
+          if (match) {
+            partInp.value = match.name;
+            row.particular = match.name;
+          } else {
+            partInp.value = '';
+            row.particular = '';
+            showToast('Please select a valid ledger, customer, or supplier.', 'error');
+          }
+        }, 200);
+      });
+
+      // Amount
+      amtInp.addEventListener('input', () => {
+        row.amount = amtInp.value;
+        ohRefreshReminderJeTotals();
+      });
+      amtInp.addEventListener('blur', () => {
+        const v = parseAmt(amtInp.value);
+        amtInp.value = v ? v.toFixed(2) : '';
+        row.amount = amtInp.value;
+        ohRefreshReminderJeTotals();
+      });
+      // Enter: an empty amount takes the balancing figure; then the next line, or Narration once balanced
+      amtInp.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        let v = parseAmt(amtInp.value);
+        if (!v && amtInp.value.trim() === '') {
+          const others = ohReminderJeTotals(_ohNewReminderJeRows.filter(x => x !== row));
+          if (row.type === 'To' && others.dr > others.cr) v = others.dr - others.cr;
+          else if (row.type === 'By' && others.cr > others.dr) v = others.cr - others.dr;
+        }
+        if (!v || v <= 0) {
+          showToast('Please enter an amount greater than zero.', 'warning');
+          return;
+        }
+        amtInp.value = v.toFixed(2);
+        row.amount = amtInp.value;
+        ohRefreshReminderJeTotals();
+        const { dr, cr } = ohReminderJeTotals(_ohNewReminderJeRows);
+        if (dr > 0 && Math.abs(dr - cr) < 0.005) document.getElementById('ohRemJeNarration')?.focus();
+        else ohAddReminderJeRow(dr > cr ? 'To' : 'By');
+      });
+
+      // 🗑: the first line is cleared, the others removed
+      tr.querySelector('.je-del-btn').addEventListener('click', () => {
+        if (isFirst) {
+          row.particular = '';
+          row.amount = '';
+        } else {
+          _ohNewReminderJeRows = _ohNewReminderJeRows.filter(x => x !== row);
+        }
+        renderOhReminderJeRows();
+      });
+    });
+
+    ohRefreshReminderJeTotals();
+  }
+
+  // Department, Transaction Type, Add Line and Narration of the popup's journal block
+  function wireOhReminderJeBlock() {
+    if (!document.getElementById('ohRemJeBody')) return;
+    document.getElementById('ohRemJeDept')?.addEventListener('change', e => {
+      _ohNewReminderDeptId = e.target.value;
+    });
+    document.querySelectorAll('[data-rem-budget]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _ohNewReminderIsBudget = btn.dataset.remBudget === 'true';
+        const bg = document.getElementById('ohRemJeTxBg');
+        if (bg) bg.className = 'je-tx-slider-bg ' + (_ohNewReminderIsBudget ? 'budget-active' : 'non-budget-active');
+        document.querySelectorAll('[data-rem-budget]').forEach(b => {
+          b.classList.toggle('active', (b.dataset.remBudget === 'true') === _ohNewReminderIsBudget);
+        });
+      });
+    });
+    document.getElementById('ohRemJeAddRow')?.addEventListener('click', () => ohAddReminderJeRow('By'));
+    document.getElementById('ohRemJeNarration')?.addEventListener('input', e => {
+      _ohNewReminderNarration = e.target.value;
+    });
+    renderOhReminderJeRows();
+  }
+
+  // inPopup: Track Recorder's popup form — Type / Due Date / Alert Before, then Task Name with the
+  // Auto Journal Posting slider beside it; when Enabled, journal lines laid out like the Journal
+  // Entry screen (no date, voucher no. or upload). No Ledger / Amount / Opposite Entries there.
+  function renderNewReminderFormHtml(inPopup) {
     let dateInputHtml = '';
     if (_ohNewReminderType === 'Recurring') {
       const selectedDay = parseInt(_ohNewReminderDueDate) || 1;
@@ -461,11 +853,12 @@
 
     return `
       <div class="oh-reminder-form-card" style="background:#ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); animation: ohPopIn 0.2s ease-out;">
+        ${inPopup ? '' : `
         <div style="font-size: 14px; font-weight: 700; color: var(--slate-800); margin-bottom: 12px; display:flex; align-items:center; gap:6px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--blue-600);"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           ${isEdit ? 'Edit Reminder Details' : 'Create New Reminder'}
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        </div>`}
+        <div class="oh-reminder-form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
           <div>
             <label style="display:block; font-size:11px; font-weight:600; color:var(--slate-500); margin-bottom:4px;">Type</label>
             <div class="oh-segmented-control" style="display:flex; background:#f1f5f9; border-radius:8px; padding:3px; height:36px; box-sizing:border-box; width:100%; border:1px solid #e2e8f0;">
@@ -482,13 +875,14 @@
             ${dateInputHtml}
           </div>
           <div>
-            <label style="display:block; font-size:11px; font-weight:600; color:var(--slate-500); margin-bottom:4px;">Show in Upcoming (Days Before)</label>
+            <label style="display:block; font-size:11px; font-weight:600; color:var(--slate-500); margin-bottom:4px;">${inPopup ? 'Alert Before (Days)' : 'Show in Upcoming (Days Before)'}</label>
             <input type="number" id="ohNewReminderShowDaysBefore" value="${_ohNewReminderShowDaysBefore !== undefined ? _ohNewReminderShowDaysBefore : '7'}" placeholder="e.g. 7" style="width:100%; height:36px; border:1px solid #e2e8f0; border-radius:6px; padding:0 12px; font-size:13px; outline:none; box-sizing:border-box;">
           </div>
-          <div style="grid-column: span 3;">
+          <div style="grid-column: span ${inPopup ? 2 : 3};">
             <label style="display:block; font-size:11px; font-weight:600; color:var(--slate-500); margin-bottom:4px;">Reminder / Task Name</label>
             <input type="text" id="ohNewReminderTitle" value="${ohEsc(_ohNewReminderTitle)}" placeholder="e.g. GST filing, ROC returns" style="width:100%; height:36px; border:1px solid #e2e8f0; border-radius:6px; padding:0 12px; font-size:13px; outline:none; box-sizing:border-box;">
           </div>
+          ${inPopup ? ohReminderPopupJournalHtml() : `
           <div style="grid-column: span 3; position: relative;">
             <label style="display:block; font-size:11px; font-weight:600; color:var(--slate-500); margin-bottom:4px;">Ledger</label>
             <div class="oh-searchable-select" style="position:relative; width:100%;">
@@ -530,7 +924,7 @@
                 Enabled
               </button>
             </div>
-            
+
             <div id="ohNewReminderAutoJournalPart" style="display: ${_ohNewReminderAutoJournal === true ? 'block' : 'none'}; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; background: #f8fafc; animation: ohPopIn 0.2s ease-out; margin-top: 8px;">
               <div style="font-size:11px; font-weight:700; color:var(--slate-700); margin-bottom:10px; display:flex; align-items:center; gap:4px;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:12px;height:12px;color:var(--blue-600);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -566,7 +960,7 @@
                     Add Row
                   </button>
                 </div>
-                
+
                 <div id="ohOppEntriesList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
                   <!-- Opposite rows list -->
                 </div>
@@ -581,12 +975,18 @@
                 <!-- Drafted Journal Entry Preview -->
               </div>
             </div>
-          </div>
+          </div>`}
         </div>
+        ${inPopup ? `
+        <!-- Popup: KYA's small popup buttons, right-aligned (as in the Number Format popup) -->
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button type="button" id="ohCancelNewReminder" class="btn btn-secondary" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+          <button type="button" id="ohSubmitNewReminder" class="btn btn-primary" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">${isEdit ? 'Save Changes' : 'Create Reminder'}</button>
+        </div>` : `
         <div style="display:flex; justify-content:flex-end; gap:8px;">
           <button id="ohCancelNewReminder" class="btn" style="background:#f1f5f9; color:#475569; border:none; height:34px; padding:0 16px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s;">Cancel</button>
           <button id="ohSubmitNewReminder" class="btn" style="background:var(--blue-600); color:#ffffff; border:none; height:34px; padding:0 16px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s;">${isEdit ? 'Save Changes' : 'Create Reminder'}</button>
-        </div>
+        </div>`}
       </div>
     `;
   }
@@ -658,7 +1058,6 @@
         }
         
         popover.remove();
-        updateOhBadges();
         renderOhRemindersView();
         triggerAutoBackup();
       }

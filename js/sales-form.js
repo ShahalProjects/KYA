@@ -1416,7 +1416,8 @@
   // and the Purchase Voucher
   const SALES_NUMBER_DEFAULT_CODES = {
     invoice: 'INV', return: 'REV', quotation: 'QT', proforma: 'PI', salesOrder: 'SO', deliveryChallan: 'DC',
-    purchase: 'PUR', purchaseQuotation: 'PQT', purchaseProforma: 'PPI', purchaseOrder: 'PO', goodsReceipt: 'GRN'
+    purchase: 'PUR', purchaseQuotation: 'PQT', purchaseProforma: 'PPI', purchaseOrder: 'PO', goodsReceipt: 'GRN',
+    budget: 'BGT'   // Track Recorder → Budget No. (onehub-budget.js)
   };
 
   function getSalesNumberingSettings(kind) {
