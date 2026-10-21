@@ -1,4 +1,4 @@
-  // ── OneHub Global State (declared at top to prevent bootstrapping ReferenceErrors) ──
+  // ── Departments, Employees, Budgets and Reminders (declared at top to prevent bootstrapping ReferenceErrors) ──
   let ohDepartments = [];
   let ohEmployees   = [];
   let ohBudgets     = [];
@@ -654,7 +654,6 @@
   const panelBalance    = document.getElementById('panel-balance');
   const panelPnl        = document.getElementById('panel-pnl');
   const panelTrial      = document.getElementById('panel-trial');
-  const panelOneHub     = document.getElementById('panel-onehub');
   const panelSettings   = document.getElementById('panel-settings');
   const qsJournal       = document.getElementById('qs-journal');
 
@@ -666,7 +665,6 @@
     balance: panelBalance,
     pnl:     panelPnl,
     trial:   panelTrial,
-    onehub:  panelOneHub,
     settings: panelSettings,
     sales_voucher: document.getElementById('panel-sales-voucher'),
     purchase_voucher: document.getElementById('panel-purchase-voucher'),
@@ -675,6 +673,7 @@
     stock_hub: document.getElementById('panel-stock-hub'),
     reports: document.getElementById('panel-reports'),
     master_desk: document.getElementById('panel-master-desk'),
+    track_recorder: document.getElementById('panel-track-recorder'),
   };
 
   const TAB_DEFS = {
@@ -685,7 +684,14 @@
       navId: 'nav-master-desk',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 8h14M8 8v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
     },
-    journal: { 
+    track_recorder: {
+      id: 'track_recorder',
+      label: 'Track Recorder',
+      panelId: 'panel-track-recorder',
+      navId: 'nav-track-recorder',
+      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><rect x="4" y="3.5" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 3.5V2.5h5v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10.5l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    },
+    journal: {
       id: 'journal', 
       label: 'New Journal Entry', 
       panelId: 'panel-journal', 
@@ -727,14 +733,7 @@
       navId: 'nav-trial',
       icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><path d="M10 3v14M6 10l4-7 4 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`
     },
-    onehub:  { 
-      id: 'onehub',  
-      label: 'KeepOne',           
-      panelId: 'panel-onehub',  
-      navId: 'nav-onehub',
-      icon: `<svg viewBox="0 0 20 20" fill="none" width="16" height="16" style="display:block;"><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M10 2a8 8 0 100 16A8 8 0 0010 2z" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.5 2.5"/><path d="M10 6v8M6 10h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`
-    },
-    settings: { 
+    settings: {
       id: 'settings', 
       label: 'Settings',        
       panelId: 'panel-settings', 
@@ -793,6 +792,7 @@
     dashboard: { tabId: null, navId: 'nav-dashboard' },
     welcome:   { tabId: null, navId: 'nav-dashboard' },
     master_desk: { tabId: 'master_desk' },
+    track_recorder: { tabId: 'track_recorder' },
     journal:   { tabId: 'journal' },
     voucher_desk: { tabId: 'voucher_desk' },
     chart:     { tabId: 'chart' },
@@ -802,7 +802,6 @@
     pnl:       { tabId: 'pnl' },
     reports:   { tabId: 'reports' },
     trial:     { tabId: 'trial' },
-    onehub:    { tabId: 'onehub' },
     settings:  { tabId: 'settings' },
     configuration: { tabId: 'settings' },
     sales:     { tabId: 'sales_voucher' },
@@ -817,6 +816,7 @@
   const NAV_ID_TO_ROUTE = {
     'nav-dashboard': 'dashboard',
     'nav-master-desk': 'master_desk',
+    'nav-track-recorder': 'track_recorder',
     'nav-voucher-desk': 'voucher_desk',
     'nav-chart': 'chart',
     'nav-reports': 'reports',
@@ -824,7 +824,6 @@
     'nav-pnl': 'pnl',
     'nav-balance': 'balance',
     'nav-stock-hub': 'stock_hub',
-    'nav-onehub': 'onehub',
     'nav-settings': 'settings',
     'nav-journal': 'journal',
     'nav-sales': 'sales_voucher',
@@ -978,15 +977,9 @@
       renderSalesDraftedPanel();
     }
 
-    // 6. OneHub & Budget Views
+    // 6. Track Recorder → Budget
     if (typeof renderOhBudgetView === 'function') {
       renderOhBudgetView();
-    }
-    if (typeof renderOneHubPanel === 'function') {
-      const ohPanel = document.getElementById('panel-onehub');
-      if (ohPanel && ohPanel.style.display !== 'none') {
-        renderOneHubPanel();
-      }
     }
 
     // 7. Financial Reports (P&L, Balance Sheet, Trial Balance)
@@ -1029,6 +1022,7 @@
 
       // Load panel specific data
       if (activeTabId === 'master_desk'   && typeof renderMasterDeskPanel   === 'function') renderMasterDeskPanel();
+      if (activeTabId === 'track_recorder' && typeof renderTrackRecorderPanel === 'function') renderTrackRecorderPanel();
       if (activeTabId === 'journal') {
         if (typeof populateJeDepartments === 'function') populateJeDepartments();
         if (typeof jeRows !== 'undefined' && jeRows.length === 0 && typeof initFormDefaults === 'function') {
@@ -1043,7 +1037,6 @@
       if (activeTabId === 'balance'       && typeof renderBalanceSheetPanel === 'function') renderBalanceSheetPanel();
       if (activeTabId === 'pnl'           && typeof renderPnlPanel          === 'function') renderPnlPanel();
       if (activeTabId === 'trial'         && typeof renderTrialBalancePanel === 'function') renderTrialBalancePanel();
-      if (activeTabId === 'onehub'        && typeof renderOneHubPanel       === 'function') renderOneHubPanel();
       if (activeTabId === 'settings'      && typeof renderSettingsPanel     === 'function') renderSettingsPanel();
       if (activeTabId === 'sales_voucher') {
         if (typeof salesRows !== 'undefined' && salesRows.length === 0 && typeof initSalesForm === 'function') {
@@ -1175,15 +1168,12 @@
       updateCeilingSliderControls();
     });
 
-    // Alert icon click handler: opens Reminders/Notifications
+    // Alert icon click handler: opens Track Recorder → Reminders
     const alertBtn = document.getElementById('topbarAlertBtn');
     if (alertBtn) {
       alertBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        navigateTo('onehub');
-        if (typeof switchOhTab === 'function') {
-          switchOhTab('reminders');
-        }
+        if (typeof openTrackRecorderSection === 'function') openTrackRecorderSection('reminders');
       });
     }
   }
@@ -1767,7 +1757,6 @@
         't': 'trial',
         'p': 'pnl',
         'b': 'balance',
-        'k': 'onehub',
         'd': 'dashboard',
         'e': 'settings',
         'u': 'vault'
@@ -1901,10 +1890,6 @@
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
           <span style="font-size: 13px; color: #475569; font-weight: 500;">Balance Sheet</span>
           <kbd style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1px 6px; font-family: monospace; font-size: 11px; font-weight: bold; color: #0f172a;">Space + B</kbd>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
-          <span style="font-size: 13px; color: #475569; font-weight: 500;">KeepOne</span>
-          <kbd style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1px 6px; font-family: monospace; font-size: 11px; font-weight: bold; color: #0f172a;">Space + K</kbd>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
           <span style="font-size: 13px; color: #475569; font-weight: 500;">Settings</span>
