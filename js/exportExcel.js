@@ -685,7 +685,9 @@
       });
 
       const optCols = data.optionalCols || {};
-      const headers = ['Sl No', 'Particulars'];
+      const showSl = optCols.sl !== false;
+      const slColNum = showSl ? 1 : 0;
+      const headers = showSl ? ['Sl No', 'Particulars'] : ['Particulars'];
       if (optCols.gl) headers.push('Group Ledger');
       if (optCols.sg) headers.push('Sub Group');
       if (optCols.mg) headers.push('Main Group');
@@ -695,9 +697,9 @@
       const maxCols = headers.length;
       const lastColLetter = String.fromCharCode(64 + maxCols);
 
-      sheet.getColumn(1).width = 10;
-      sheet.getColumn(2).width = 40;
-      let currCol = 3;
+      let currCol = 1;
+      if (showSl) { sheet.getColumn(currCol++).width = 10; }
+      sheet.getColumn(currCol++).width = 40;
       if (optCols.gl) { sheet.getColumn(currCol++).width = 24; }
       if (optCols.sg) { sheet.getColumn(currCol++).width = 24; }
       if (optCols.mg) { sheet.getColumn(currCol++).width = 20; }
@@ -750,16 +752,15 @@
         cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
         cell.alignment = {
           vertical: 'middle',
-          horizontal: (c === drColNum || c === crColNum) ? 'right' : (c === 1 ? 'center' : 'left'),
-          indent: (c !== 1 && c !== drColNum && c !== crColNum) ? 1 : 0
+          horizontal: (c === drColNum || c === crColNum) ? 'right' : (c === slColNum ? 'center' : 'left'),
+          indent: (c !== slColNum && c !== drColNum && c !== crColNum) ? 1 : 0
         };
       }
 
       (data.items || []).forEach(item => {
-        const rowVals = [
-          item.slNo,
-          item.name + (item.code ? ` (${item.code})` : '')
-        ];
+        const rowVals = [];
+        if (showSl) rowVals.push(item.slNo);
+        rowVals.push(item.name + (item.code ? ` (${item.code})` : ''));
         if (optCols.gl) rowVals.push(item.gl || '-');
         if (optCols.sg) rowVals.push(item.sg || '-');
         if (optCols.mg) rowVals.push(item.mg || '-');
@@ -786,7 +787,7 @@
               cell.numFmt = numFormat;
             }
             cell.alignment = { vertical: 'middle', horizontal: 'right' };
-          } else if (c === 1) {
+          } else if (c === slColNum) {
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
           } else {
             cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
@@ -805,7 +806,10 @@
       totRow.height = 22;
 
       const nonAmtEndColLetter = String.fromCharCode(64 + maxCols - 2);
-      sheet.mergeCells(`A${totRow.number}:${nonAmtEndColLetter}${totRow.number}`);
+      // Particulars alone (no Sl No, no extra columns) is a single cell: nothing to merge
+      if (maxCols - 2 > 1) {
+        sheet.mergeCells(`A${totRow.number}:${nonAmtEndColLetter}${totRow.number}`);
+      }
 
       for (let c = 1; c <= maxCols; c++) {
         const cell = totRow.getCell(c);

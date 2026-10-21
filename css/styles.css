@@ -5294,13 +5294,16 @@
     .kya-dp-today:hover { background: var(--blue-600, #2563eb); border-color: var(--blue-600, #2563eb); color: #ffffff; }
 
     /* Customer box (Sales Invoice and the Quotation / Proforma / Sales Order / Delivery
-       Challan forms): same hover / open states as the .je-input boxes beside it */
+       Challan forms, and the Journal's Department box): same hover / open states as the
+       .je-input boxes beside it */
     #salesCustomerSelectTrigger:hover,
     #quoteCustomerSelectTrigger:hover,
     #proformaCustomerSelectTrigger:hover,
     #orderCustomerSelectTrigger:hover,
     #challanCustomerSelectTrigger:hover,
-    #purchaseVendorSelectTrigger:hover { border-color: var(--slate-400) !important; }
+    #purchaseVendorSelectTrigger:hover,
+    #jeDepartmentSelectTrigger:hover { border-color: var(--slate-400) !important; }
+    #jeDepartmentSelectWrap:has(#jeDepartmentSelectDropdown[style*="display: flex"]) #jeDepartmentSelectTrigger,
     #salesCustomerSelectWrap:has(#salesCustomerSelectDropdown[style*="display: flex"]) #salesCustomerSelectTrigger,
     #quoteCustomerSelectWrap:has(#quoteCustomerSelectDropdown[style*="display: flex"]) #quoteCustomerSelectTrigger,
     #proformaCustomerSelectWrap:has(#proformaCustomerSelectDropdown[style*="display: flex"]) #proformaCustomerSelectTrigger,

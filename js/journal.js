@@ -28,7 +28,48 @@
     const v = parseFloat(cleanStr);
     return isNaN(v) ? 0 : v;
   }
+  // Every voucher number in use (upper-case): posted and drafted journal entries, and
+  // sales vouchers
+  function getUsedJournalVoucherNos() {
+    const allEntries = [
+      ...(typeof postedEntries !== 'undefined' && Array.isArray(postedEntries) ? postedEntries : []),
+      ...(typeof draftedEntries !== 'undefined' && Array.isArray(draftedEntries) ? draftedEntries : []),
+      ...((typeof window !== 'undefined' && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [])
+    ];
+    const used = new Set();
+    allEntries.forEach(e => {
+      const vNo = (e && (e.voucherNo || e.invoiceNo)) ? String(e.voucherNo || e.invoiceNo).trim() : '';
+      if (vNo) used.add(vNo.toUpperCase());
+    });
+    return used;
+  }
+
+  // The format set with the pencil on Journal Voucher No. (prefix / starting number / digits);
+  // null until one is saved, and numbers then stay JV-<year of the date>-001
+  function getJournalNumberFormat() {
+    const saved = ((window.KYA_STORE || {}).salesNumbering || {}).journal;
+    if (!saved || typeof getSalesNumberingSettings !== 'function') return null;
+    return getSalesNumberingSettings('journal');
+  }
+
+  // Next number in a format: after the highest number already used with its prefix (never
+  // below the starting number), skipping any number in use
+  function nextJournalNoInFormat(fmt, used) {
+    const toNo = n => fmt.prefix + String(n).padStart(fmt.digits, '0');
+    const pre = fmt.prefix.toUpperCase();
+    let n = fmt.start;
+    used.forEach(no => {
+      const rest = no.startsWith(pre) ? no.slice(pre.length) : '';
+      if (/^\d+$/.test(rest)) n = Math.max(n, parseInt(rest, 10) + 1);
+    });
+    while (used.has(toNo(n).toUpperCase())) n++;
+    return toNo(n);
+  }
+
   function getNextJournalVoucherNo(dateStr, autoIncrement = true) {
+    const fmt = getJournalNumberFormat();
+    if (fmt) return nextJournalNoInFormat(fmt, getUsedJournalVoucherNos());
+
     let targetYear = new Date().getFullYear();
     if (dateStr) {
       const parsedDate = new Date(dateStr);
@@ -37,20 +78,10 @@
       }
     }
 
-    const allEntries = [
-      ...(typeof postedEntries !== 'undefined' && Array.isArray(postedEntries) ? postedEntries : []),
-      ...(typeof draftedEntries !== 'undefined' && Array.isArray(draftedEntries) ? draftedEntries : []),
-      ...((typeof window !== 'undefined' && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [])
-    ];
-
-    const existingVoucherSet = new Set();
+    const existingVoucherSet = getUsedJournalVoucherNos();
     let maxSeq = 0;
 
-    allEntries.forEach(e => {
-      const vNo = (e && (e.voucherNo || e.invoiceNo)) ? String(e.voucherNo || e.invoiceNo).trim() : '';
-      if (!vNo) return;
-      existingVoucherSet.add(vNo.toUpperCase());
-
+    existingVoucherSet.forEach(vNo => {
       const m = vNo.match(/JV-(?:(\d{4})-)?(\d+)/i);
       if (m) {
         const yr = m[1] ? parseInt(m[1], 10) : targetYear;
@@ -155,6 +186,36 @@
     if (e.key === 'Enter') { e.preventDefault(); focusFirstParticulars(); }
   });
 
+  // ── Voucher No pencil → Number Format popup (prefix / starting number / digits), the
+  // same popup as the Sales Invoice (openKyaNumberingModal in sales-form.js) ──
+  function refreshJeVoucherNoPlaceholder() {
+    const fmt = getJournalNumberFormat();
+    const inp = document.getElementById('jeVoucherNo');
+    if (inp && fmt) inp.placeholder = 'e.g. ' + fmt.prefix + String(fmt.start).padStart(fmt.digits, '0');
+  }
+  document.getElementById('jeVoucherNoFormatBtn')?.addEventListener('click', e => {
+    e.preventDefault();
+    if (typeof openKyaNumberingModal !== 'function') return;
+    openKyaNumberingModal({
+      kind: 'journal',
+      noun: 'Journal Voucher',
+      preview: f => {
+        const text = nextJournalNoInFormat(f, getUsedJournalVoucherNos());
+        const first = f.prefix + String(f.start).padStart(f.digits, '0');
+        return { text, note: text !== first ? 'Continues after the highest number already used with this prefix.' : '' };
+      },
+      onSaved: () => {
+        refreshJeVoucherNoPlaceholder();
+        // A new entry takes the new format; one being edited keeps its number
+        if (!window._editingJournalEntry) {
+          const vn = genVoucherNo();
+          document.getElementById('jeVoucherNo').value = vn;
+          document.getElementById('jeVoucherChipDisplay').textContent = vn;
+        }
+      }
+    });
+  });
+
   // ── Narration → Ctrl+Enter → Post Entry & Auto-grow height ─────────
   const jeNarrationEl = document.getElementById('jeNarration');
   if (jeNarrationEl) {
@@ -171,6 +232,9 @@
   }
 
   // ── Department helpers ────────────────────────────────────────────
+  // The Department box works like the Sales Customer box: a hidden <select> (#jeDepartment,
+  // read on save) behind a trigger, with a search box and a "Create new → + Department"
+  // footer (Master Desk → Create Department, then back here with it picked)
   function populateJeDepartments() {
     const sel = document.getElementById('jeDepartment');
     if (!sel) return;
@@ -187,7 +251,154 @@
     // Restore previous selection if still valid
     if ([...sel.options].some(o => o.value === String(cur))) sel.value = cur;
     else sel.value = '';
+    refreshJeDepartmentTrigger();
   }
+
+  function refreshJeDepartmentTrigger() {
+    const sel = document.getElementById('jeDepartment');
+    const txt = document.getElementById('jeDepartmentSelectTriggerText');
+    if (!sel || !txt) return;
+    const opt = sel.options[sel.selectedIndex];
+    txt.textContent = opt ? opt.textContent.trim() : '— Select Department —';
+    // Pencil (like the Sales Customer box): shown once a department is picked
+    const btn = document.getElementById('jeDepartmentAlterBtn');
+    if (btn) btn.hidden = !sel.value;
+    txt.style.paddingRight = sel.value ? '26px' : '';
+  }
+
+  function setJeDepartment(value) {
+    const sel = document.getElementById('jeDepartment');
+    if (!sel) return;
+    sel.value = value || '';
+    if (sel.selectedIndex < 0) sel.value = '';
+    refreshJeDepartmentTrigger();
+  }
+
+  function renderJeDepartmentList(filter) {
+    const sel = document.getElementById('jeDepartment');
+    const list = document.getElementById('jeDepartmentSelectOptionsList');
+    if (!sel || !list) return;
+    const q = (filter || '').toLowerCase().trim();
+    list.innerHTML = '';
+
+    [...sel.options].forEach(opt => {
+      if (!opt.value) return;
+      const text = opt.textContent.trim();
+      if (q && !text.toLowerCase().includes(q)) return;
+      const isSelected = sel.value === opt.value;
+      const item = document.createElement('div');
+      item.style.cssText = `
+        padding: 8px 12px; font-size: 13px; border-radius: 6px; cursor: pointer;
+        font-weight: ${isSelected ? '700' : '500'};
+        background: ${isSelected ? 'var(--blue-50)' : 'transparent'};
+        color: ${isSelected ? 'var(--blue-700)' : 'var(--slate-700)'};
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        transition: background 0.15s ease;
+      `;
+      item.textContent = text;
+      item.addEventListener('mouseenter', () => { if (!isSelected) item.style.background = 'var(--slate-50)'; });
+      item.addEventListener('mouseleave', () => { if (!isSelected) item.style.background = 'transparent'; });
+      item.addEventListener('click', () => {
+        setJeDepartment(opt.value);
+        closeJeDepartmentList();
+      });
+      list.appendChild(item);
+    });
+
+    if (!list.children.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding: 12px 10px; text-align: center; font-size: 13px; font-weight: 600; color: var(--slate-500);';
+      empty.textContent = 'No Department Found';
+      list.appendChild(empty);
+    }
+
+    // Sticky "Create new" footer, like the customer list's (sales-helpers.js)
+    const raw = (filter || '').trim();
+    const footer = document.createElement('div');
+    footer.className = 'kya-party-create-footer';
+    footer.style.cssText = 'position: sticky; bottom: -8px; z-index: 5; background: #fff; border-top: 1px solid var(--slate-200); margin: 4px -8px -8px; padding: 8px 10px 10px; border-radius: 0 0 12px 12px;';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size: 11px; font-weight: 600; color: var(--slate-500); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+    label.textContent = raw ? `Create "${raw}" as` : 'Create new';
+    footer.appendChild(label);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'je-drop-create-item';
+    btn.style.cssText = 'width: 100%; justify-content: center; padding: 7px 10px; font-size: 12px;';
+    btn.title = 'Create a department in Master Desk';
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Department</span>';
+    btn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeJeDepartmentList();
+      if (typeof window.openMasterDeskCreateDepartment === 'function') window.openMasterDeskCreateDepartment({ initialName: raw });
+    });
+    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+    footer.appendChild(btn);
+    list.appendChild(footer);
+  }
+
+  function openJeDepartmentList(searchText) {
+    const dd = document.getElementById('jeDepartmentSelectDropdown');
+    const search = document.getElementById('jeDepartmentSelectSearch');
+    if (!dd || !search) return;
+    dd.style.display = 'flex';
+    search.value = searchText || '';
+    renderJeDepartmentList(search.value);
+    setTimeout(() => search.focus(), 50);
+  }
+
+  function closeJeDepartmentList() {
+    const dd = document.getElementById('jeDepartmentSelectDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+
+  (function wireJeDepartmentBox() {
+    const trigger = document.getElementById('jeDepartmentSelectTrigger');
+    const dd = document.getElementById('jeDepartmentSelectDropdown');
+    const search = document.getElementById('jeDepartmentSelectSearch');
+    if (!trigger || !dd || !search) return;
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      if (dd.style.display === 'flex') closeJeDepartmentList();
+      else openJeDepartmentList('');
+    });
+    search.addEventListener('input', () => renderJeDepartmentList(search.value));
+    dd.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', e => {
+      if (!trigger.contains(e.target) && !dd.contains(e.target)) closeJeDepartmentList();
+    });
+
+    // Pencil → Master Desk → Alter Department; saving it comes back with the new name
+    const alterBtn = document.getElementById('jeDepartmentAlterBtn');
+    if (alterBtn) {
+      alterBtn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+      alterBtn.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = (document.getElementById('jeDepartment') || {}).value;
+        if (!id || typeof window.openVoucherMasterAlter !== 'function') return;
+        closeJeDepartmentList();
+        window.openVoucherMasterAlter('department', id, {
+          returnTab: 'journal',
+          onAltered: (tab, record) => {
+            populateJeDepartments();
+            setJeDepartment(String(record.id));
+          }
+        });
+      });
+    }
+  })();
+
+  window.onDepartmentCreatedForJournal = function(dept) {
+    populateJeDepartments();
+    if (dept) setJeDepartment(String(dept.id));
+  };
+
+  // Cancelled in Master Desk: the list opens again with the typed name, like the customer box
+  window.onDepartmentCreationCancelledForJournal = function(initialName) {
+    setTimeout(() => openJeDepartmentList(initialName), 60);
+  };
 
   // ── Budget toggle UI updater ──────────────────────────────────────
   function updateJeBudgetToggleUI() {
@@ -341,10 +552,10 @@
     const vn = genVoucherNo(targetDate);
     document.getElementById('jeVoucherNo').value = vn;
     document.getElementById('jeVoucherChipDisplay').textContent = vn;
+    refreshJeVoucherNoPlaceholder();
     document.getElementById('jeNarration').value = '';
     populateJeDepartments();
-    const deptSel = document.getElementById('jeDepartment');
-    if (deptSel) deptSel.value = '';
+    setJeDepartment('');
     const tog = document.getElementById('jeBudgetToggle');
     if (tog) { tog.checked = false; updateJeBudgetToggleUI(); }
     jeRows = [];
@@ -371,9 +582,8 @@
     if (prepEl) prepEl.value = entry.preparedBy || '';
     
     populateJeDepartments();
-    const deptSel = document.getElementById('jeDepartment');
-    if (deptSel) deptSel.value = entry.departmentId || '';
-    
+    setJeDepartment(entry.departmentId ? String(entry.departmentId) : '');
+
     const tog = document.getElementById('jeBudgetToggle');
     if (tog) {
       tog.checked = !!entry.isBudget;
@@ -834,30 +1044,8 @@
             <path d="M21 21l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
           <span class="je-drop-empty-txt">No account, customer, or supplier found</span>
-          <button type="button" class="je-drop-create-item" id="jeDropCreateLedgerBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>Create Ledger</span>
-          </button>
         `;
-        const createBtn = emptyDiv.querySelector('#jeDropCreateLedgerBtn');
-        if (createBtn) {
-          createBtn.addEventListener('mousedown', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            const targetInp = _activeInp;
-            const rowEl = targetInp ? targetInp.closest('[data-row-id]') : null;
-            const rowId = rowEl ? Number(rowEl.dataset.rowId) : null;
-            const searchVal = query ? query.trim() : (targetInp ? targetInp.value.trim() : '');
-            window._jeOpeningMasterDesk = true;
-            close();
-            triggerCreateLedgerFromJournal(searchVal, rowId);
-          });
-        }
         el.appendChild(emptyDiv);
-        _setHL(0);
       } else {
         const GROUP_LABELS = {
           assets: 'Assets', 'equity-liabilities': 'Equity & Liabilities',
@@ -900,6 +1088,36 @@
           el.appendChild(item);
         });
       }
+
+      // Sticky "Create new" footer at the bottom of the list: a ledger named with whatever is
+      // typed (Master Desk → Create Ledger, then back to this row)
+      const rawQuery = (query || '').trim();
+      const footer = document.createElement('div');
+      footer.id = 'jeDropCreateLedgerBtn';   // the Reminders form removes the footer by this id
+      footer.className = 'je-drop-create-wrap';
+      footer.style.cssText = 'position: sticky; bottom: 0; z-index: 10; background: #ffffff; border-top: 1px solid #e2e8f0; padding: 8px 10px 10px; border-radius: 0 0 12px 12px;';
+      const footerLabel = document.createElement('div');
+      footerLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+      footerLabel.textContent = rawQuery ? `Create "${rawQuery}" as` : 'Create new';
+      footer.appendChild(footerLabel);
+      const createBtn = document.createElement('button');
+      createBtn.type = 'button';
+      createBtn.className = 'je-drop-create-item';
+      createBtn.style.cssText = 'width: 100%; justify-content: center; padding: 7px 10px; font-size: 12px;';
+      createBtn.title = 'Create a ledger in Master Desk';
+      createBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Ledger</span>';
+      createBtn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rowEl = inp.closest('[data-row-id]');
+        const rowId = rowEl ? Number(rowEl.dataset.rowId) : null;
+        window._jeOpeningMasterDesk = true;
+        close();
+        triggerCreateLedgerFromJournal(rawQuery, rowId);
+      });
+      footer.appendChild(createBtn);
+      el.appendChild(footer);
+      if (!matches.length) _setHL(0);
 
       _position(inp);
       requestAnimationFrame(() => {
@@ -1162,6 +1380,49 @@
       balBadge.style.display = 'none';
       inp.classList.remove('has-bal-badge');
     }
+
+    // Alter pencil: shown when the line is a customer, supplier or ledger; the text then
+    // stops short of the badge + pencil + arrow
+    const pencil = wrap.querySelector('.kya-alter-pencil');
+    const addons = wrap.querySelector('.je-particulars-right-addons');
+    if (pencil) {
+      pencil.hidden = !getParticularMaster(particularName || inp.value);
+      inp.style.paddingRight = (pencil.hidden || !addons || !addons.offsetWidth) ? '' : (addons.offsetWidth + 16) + 'px';
+    }
+  }
+
+  // The master record a Particulars name stands for, checked in the balance badge's order:
+  // customer, supplier, then CoA ledger
+  function getParticularMaster(name) {
+    const n = (name || '').trim().toLowerCase();
+    if (!n) return null;
+    const cust = (typeof getKyaCustomers === 'function' ? getKyaCustomers() : []).find(c => (c.name || '').trim().toLowerCase() === n);
+    if (cust) return { tab: 'customers', id: cust.id };
+    const supp = (typeof getKyaSuppliers === 'function' ? getKyaSuppliers() : []).find(s => (s.name || '').trim().toLowerCase() === n);
+    if (supp) return { tab: 'suppliers', id: supp.id };
+    if (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) {
+      const ldg = coaLedgers.find(l => l.type === 'ledger' && (l.name || '').trim().toLowerCase() === n);
+      if (ldg) return { tab: 'ledger', id: ldg.id };
+    }
+    return null;
+  }
+
+  // Back from Master Desk → Alter: every line that used the old name shows the record's
+  // current name
+  function onJeParticularAltered(oldName, record) {
+    const newName = record && record.name ? record.name : '';
+    const old = (oldName || '').trim().toLowerCase();
+    if (newName && old) {
+      jeRows.forEach(r => {
+        if ((r.particular || '').trim().toLowerCase() === old) r.particular = newName;
+      });
+      document.querySelectorAll('#jeEntryBody [data-row-id]').forEach(tr => {
+        const row = jeRows.find(r => r.id === Number(tr.dataset.rowId));
+        const inp = tr.querySelector('.je-particulars-input');
+        if (row && inp) inp.value = row.particular || '';
+      });
+    }
+    updateAllParticularsBalanceBadges();
   }
 
   function updateAllParticularsBalanceBadges() {
@@ -1218,6 +1479,33 @@
         updateParticularsBalanceBadge(wrap, row.particular);
       }, 50);
     } else {
+      // Alter pencil (like the Sales Voucher's): opens this line's customer, supplier or
+      // ledger in Master Desk → Alter, then comes back here
+      const pencil = document.createElement('button');
+      pencil.type = 'button';
+      pencil.className = 'kya-alter-pencil';
+      pencil.title = 'Alter this account in Master Desk';
+      pencil.setAttribute('aria-label', 'Alter this account in Master Desk');
+      pencil.tabIndex = -1;
+      pencil.hidden = true;
+      pencil.style.cssText = 'position: static; transform: none; pointer-events: auto;';
+      pencil.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+      // Keep focus (and the list) where it is until the click lands
+      pencil.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+      pencil.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const name = (row.particular || inp.value).trim();
+        const m = getParticularMaster(name);
+        if (!m || typeof window.openVoucherMasterAlter !== 'function') return;
+        _jePortal.close();
+        window.openVoucherMasterAlter(m.tab, m.id, {
+          returnTab: 'journal',
+          onAltered: (tab, record) => onJeParticularAltered(name, record)
+        });
+      });
+      rightAddons.insertBefore(pencil, arrow);
+
       function _select(acct) {
         inp.value      = acct.name;
         row.particular = acct.name;
@@ -1499,47 +1787,6 @@
   document.getElementById('btnPostJE').addEventListener('click', () => {
     showSavePopup();
   });
-
-  // ── Reverse & Cancel Actions ──────────────────────────────────────
-  const reverseBtn = document.getElementById('btnJeReverse');
-  if (reverseBtn) {
-    reverseBtn.addEventListener('click', () => {
-      showToast('Reverse is an upcoming feature!', 'info');
-    });
-  }
-  const cancelBtn = document.getElementById('btnJeCancel');
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-      const returnContext = window._editingJournalEntry?.returnContext || window._pendingJournalReturnContext;
-      if (returnContext) {
-        if (returnContext.cashlineNavState && typeof window.setCashlineNavigationState === 'function') {
-          window.setCashlineNavigationState(returnContext.cashlineNavState);
-        } else if (typeof window.setCashlineNavigationState === 'function') {
-          window.setCashlineNavigationState({
-            activeTopTab: returnContext.clActiveTopTab,
-            activeBankingTab: returnContext.clActiveBankingTab,
-            reconBankId: returnContext.clReconBankId,
-            cashbookAccountId: returnContext.clCashbookAccountId,
-            reconSubSection: returnContext.clReconSubSection,
-            reconFilter: returnContext.clReconFilter
-          });
-        }
-        window._editingJournalEntry = null;
-        window._pendingJournalReturnContext = null;
-        initFormDefaults();
-        const returnTabId = returnContext.tabId || 'cashline';
-        if (typeof closeTab === 'function') closeTab('journal', null, returnTabId);
-        else if (typeof openTab === 'function') openTab(returnTabId);
-        if (returnTabId === 'cashline') {
-          if (typeof renderCashlinePanel === 'function') renderCashlinePanel();
-          else if (typeof window.renderCashlinePanel === 'function') window.renderCashlinePanel();
-        }
-      } else {
-        initFormDefaults();
-        showToast('Journal entry reset.', 'info');
-      }
-    });
-  }
 
   // ── Toast notification ────────────────────────────────────────────
   function showToast(msg, type) {
@@ -4179,5 +4426,5 @@
   // ── State ────────────────────────────────────────────────────────
   let _globalDateFrom = '2024-04-01';
   let _globalDateTo   = '2025-03-31';
-  let _tbOptionalCols = { gl: false, sg: false, mg: false, plbs: false };
+  let _tbOptionalCols = { sl: true, gl: false, sg: false, mg: false, plbs: false };
 

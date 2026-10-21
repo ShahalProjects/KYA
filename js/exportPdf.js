@@ -901,7 +901,8 @@
       }
 
       const optCols = data.optionalCols || {};
-      const headRow = ['Sl No', 'Particulars'];
+      const showSl = optCols.sl !== false;
+      const headRow = showSl ? ['Sl No', 'Particulars'] : ['Particulars'];
       if (optCols.gl) headRow.push('Group Ledger');
       if (optCols.sg) headRow.push('Sub Group');
       if (optCols.mg) headRow.push('Main Group');
@@ -958,10 +959,9 @@
       const rowMeta = [];
 
       (data.items || []).forEach(item => {
-        const row = [
-          { content: String(item.slNo), styles: { halign: 'center' } },
-          item.name + (item.code ? ` (${item.code})` : '')
-        ];
+        const row = [];
+        if (showSl) row.push({ content: String(item.slNo), styles: { halign: 'center' } });
+        row.push(item.name + (item.code ? ` (${item.code})` : ''));
         if (optCols.gl) row.push(item.gl || '—');
         if (optCols.sg) row.push(item.sg || '—');
         if (optCols.mg) row.push(item.mg || '—');
@@ -1003,19 +1003,20 @@
       rowMeta.push({ type: 'total' });
 
       // ── AutoTable Generation ────────────────────────────────────────
-      const columnStyles = {
-        0: { cellWidth: 16, halign: 'center' },
-        1: { cellWidth: 'auto', halign: 'left' }
-      };
+      // Particulars sits at index 1 with Sl No, or 0 without it
+      const partIdx = showSl ? 1 : 0;
+      const columnStyles = {};
+      if (showSl) columnStyles[0] = { cellWidth: 16, halign: 'center' };
+      columnStyles[partIdx] = { cellWidth: 'auto', halign: 'left' };
 
       if (optCols.gl) {
-        columnStyles[2] = { cellWidth: isLandscape ? 38 : 26, halign: 'left' };
+        columnStyles[partIdx + 1] = { cellWidth: isLandscape ? 38 : 26, halign: 'left' };
       }
       if (optCols.sg) {
-        columnStyles[optCols.gl ? 3 : 2] = { cellWidth: isLandscape ? 38 : 26, halign: 'left' };
+        columnStyles[partIdx + (optCols.gl ? 2 : 1)] = { cellWidth: isLandscape ? 38 : 26, halign: 'left' };
       }
       if (optCols.mg) {
-        columnStyles[(optCols.gl ? 1 : 0) + (optCols.sg ? 1 : 0) + 2] = { cellWidth: isLandscape ? 34 : 22, halign: 'left' };
+        columnStyles[(optCols.gl ? 1 : 0) + (optCols.sg ? 1 : 0) + partIdx + 1] = { cellWidth: isLandscape ? 34 : 22, halign: 'left' };
       }
       if (optCols.plbs) {
         columnStyles[drColIdx - 1] = { cellWidth: 16, halign: 'center' };
@@ -1047,7 +1048,7 @@
         columnStyles,
         didParseCell: function (hookData) {
           if (hookData.section === 'head') {
-            if (hookData.column.index === 0) {
+            if (showSl && hookData.column.index === 0) {
               hookData.cell.styles.halign = 'center';
             } else if (hookData.column.index >= drColIdx) {
               hookData.cell.styles.halign = 'right';

@@ -15162,19 +15162,36 @@
         }
 
         const depts = getMasterTeamDepts();
-        rows.forEach(row => {
-          depts.push({ id: _ohDeptCtr++, name: row.name, headEmpId: row.headEmpId });
+        const created = rows.map(row => {
+          const dept = { id: _ohDeptCtr++, name: row.name, headEmpId: row.headEmpId };
+          depts.push(dept);
+          return dept;
         });
         afterMasterTeamChange();
 
         if (rows.length > 1) masterTeamNotify(`${rows.length} departments created successfully.`, 'success');
         else masterTeamNotify(`Department "${rows[0].name}" created successfully.`, 'success');
         updateMasterDeskContent();
+
+        // Opened from the Journal's Department box: back to the journal with the
+        // (first) new department picked
+        const ctx = _masterDeskReturnContext;
+        if (ctx && ctx.purpose === 'journalDepartment') {
+          _masterDeskReturnContext = null;
+          if (typeof closeTab === 'function') closeTab('master_desk', null, 'journal');
+          if (typeof openTab === 'function') openTab('journal');
+          if (typeof window.onDepartmentCreatedForJournal === 'function') window.onDepartmentCreatedForJournal(created[0]);
+        }
       });
     }
 
     const cancelBtn = contentArea.querySelector('#masterDepartmentCancelBtn');
-    if (cancelBtn) cancelBtn.addEventListener('click', () => updateMasterDeskContent());
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        if (cancelMasterDeskReturn()) return;
+        updateMasterDeskContent();
+      });
+    }
   }
 
   // ── Create Employee: "Name + Department" rows, with Employee Code and Designation in the
@@ -15569,6 +15586,7 @@
       dept.headEmpId = headSel && headSel.value ? Number(headSel.value) : null;
       afterMasterTeamChange();
       masterTeamNotify(`Department "${name}" updated successfully.`, 'success');
+      if (returnAlterToVoucher('department', dept)) return;
       updateMasterDeskContent();
     };
     const saveBtn = contentArea.querySelector('#masterAlterDepartmentSaveBtn');
@@ -15608,7 +15626,12 @@
     }
 
     const cancelBtn = contentArea.querySelector('#masterAlterDepartmentCancelBtn');
-    if (cancelBtn) cancelBtn.addEventListener('click', () => updateMasterDeskContent());
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        if (cancelMasterDeskReturn()) return;
+        updateMasterDeskContent();
+      });
+    }
   }
 
   // ── Alter Employee: pick them (Name) and their Department on the left; Name, Employee
@@ -16344,15 +16367,16 @@
     }, 60);
   }
 
-  // Opens Alter on one record (customers / suppliers / ledger / stock_item / unit); used by
-  // the voucher's pencil icons. Saving that record returns to the voucher.
+  // Opens Alter on one record (customers / suppliers / ledger / stock_item / unit /
+  // department); used by the voucher's pencil icons. Saving that record returns to the voucher.
   function openMasterDeskAlter(options = {}) {
     const setSelected = {
       customers: (id) => { _masterAlterSelectedCustomerId = id; },
       suppliers: (id) => { _masterAlterSelectedSupplierId = id; },
       ledger: (id) => { _masterAlterSelectedLedgerId = id; },
       stock_item: (id) => { _masterAlterSelectedStockItemId = id; },
-      unit: (id) => { _masterAlterSelectedUnitId = id; }
+      unit: (id) => { _masterAlterSelectedUnitId = id; },
+      department: (id) => { _masterAlterSelectedDepartmentId = id; }
     }[options.tab];
     if (!setSelected) return;
     _masterDeskReturnContext = Object.assign({ purpose: 'voucherAlter' }, options);
@@ -16422,6 +16446,35 @@
     }, 60);
   }
 
+  // Opens Create Department; used by the Journal's Department box to add one and come back.
+  function openMasterDeskCreateDepartment(options = {}) {
+    _masterDeskReturnContext = Object.assign({ purpose: 'journalDepartment', returnTab: 'journal' }, options);
+
+    if (typeof openTab === 'function') openTab('master_desk');
+    else if (typeof window.openTab === 'function') window.openTab('master_desk');
+    else window.location.hash = '#master_desk';
+
+    const wrap = document.getElementById('panel-master-desk');
+    if (wrap && (!_masterDeskInitialized || !wrap.children.length)) {
+      initMasterDesk(wrap);
+      _masterDeskInitialized = true;
+    }
+
+    setMasterDeskSubtype('Create');
+    setMasterDeskTab('department');
+
+    setTimeout(() => {
+      const nameInp = document.getElementById('masterDepartmentName');
+      if (!nameInp) return;
+      if (options.initialName) {
+        nameInp.value = options.initialName;
+        nameInp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      nameInp.focus();
+      if (options.initialName) nameInp.select();
+    }, 60);
+  }
+
   function cancelMasterDeskReturn() {
     if (_masterDeskReturnContext) {
       const ctx = _masterDeskReturnContext;
@@ -16460,6 +16513,10 @@
         if (typeof window.onVoucherMasterAlterCancelled === 'function') {
           window.onVoucherMasterAlterCancelled(ctx);
         }
+      } else if (ctx.purpose === 'journalDepartment') {
+        if (typeof window.onDepartmentCreationCancelledForJournal === 'function') {
+          window.onDepartmentCreationCancelledForJournal(ctx.initialName);
+        }
       } else if (targetTab === 'sales_voucher') {
         if (typeof window.onPartyCreationCancelledForSales === 'function') {
           window.onPartyCreationCancelledForSales(ctx.initialName);
@@ -16497,6 +16554,7 @@
   window.openMasterDeskCreateParty = openMasterDeskCreateParty;
   window.openMasterDeskCreateStockItem = openMasterDeskCreateStockItem;
   window.openMasterDeskCreateUnit = openMasterDeskCreateUnit;
+  window.openMasterDeskCreateDepartment = openMasterDeskCreateDepartment;
   window.openMasterDeskAlter = openMasterDeskAlter;
   window.handleMasterDeskClosed = handleMasterDeskClosed;
   window.checkAndRestorePendingJournalState = checkAndRestorePendingJournalState;

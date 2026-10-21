@@ -12,6 +12,7 @@
   let _ohReminderFormOpen   = false;
   let _ohReminderEditIndex  = null;
   let _ohRemindersFilter     = 'upcoming';
+  let _ohRemindersSearch     = '';   // back bar search: task name or ledger
   let _ohNewReminderType     = 'One Time';
   let _ohNewReminderDueDate  = '';
   let _ohNewReminderLedgerId = '';

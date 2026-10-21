@@ -26,6 +26,34 @@
     return new Date(targetYear, targetMonth, clampedDay);
   }
 
+  // Days from today to a reminder's due date (a recurring one: its next occurrence), and that date
+  function ohReminderDueInfo(r) {
+    const nowTime = new Date().setHours(0, 0, 0, 0);
+    if (!r.dueDate) return { days: 999999, dateStr: '' };
+    if (r.type === 'Recurring') {
+      const next = getNextOccurrenceDate(parseInt(r.dueDate) || 1);
+      const dateStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+      return { days: Math.ceil((next.getTime() - nowTime) / 86400000), dateStr };
+    }
+    return { days: Math.ceil((new Date(r.dueDate).getTime() - nowTime) / 86400000), dateStr: r.dueDate };
+  }
+
+  // Not done and due within 7 days (or overdue): the Reminders screen's "Urgent (7 days)"
+  function ohRemindersDueSoonCount() {
+    return ohReminders.filter(r => r.status !== 'Completed' && r.dueDate && ohReminderDueInfo(r).days <= 7).length;
+  }
+
+  // Reminders in the Upcoming tab: within their Alert Before days and not done for this occurrence
+  function ohRemindersUpcomingCount() {
+    return ohReminders.filter(r => {
+      if (r.status === 'Completed') return false;
+      const due = ohReminderDueInfo(r);
+      const alertDays = r.showDaysBefore !== undefined ? parseInt(r.showDaysBefore) : 7;
+      if (due.days > alertDays) return false;
+      return r.type !== 'Recurring' || r.lastCompletedOccurrence !== due.dateStr;
+    }).length;
+  }
+
   function getLedgerColor(name) {
     if (!name) return '#64748b';
     const colors = ['#0284c7', '#7c3aed', '#059669', '#ea580c', '#db2777', '#0891b2', '#4f46e5'];

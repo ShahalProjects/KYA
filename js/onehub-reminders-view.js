@@ -23,8 +23,9 @@
       overlay.className = 'oh-modal-overlay';
       overlay.id = 'ohReminderFormOverlay';
       overlay.style.zIndex = '10000';   // under the Day picker popover (10005)
-      // Wide enough for the journal lines' Particulars box (the Journal Entry columns keep their widths)
-      overlay.innerHTML = '<div class="oh-modal-card" role="dialog" aria-modal="true" style="max-width: 920px;"></div>';
+      // 780px; the journal lines' #, Type, Amount and 🗑 columns are slimmer here (CSS below) so
+      // Particulars keeps its length
+      overlay.innerHTML = '<div class="oh-modal-card" role="dialog" aria-modal="true" style="max-width: 780px;"></div>';
       overlay.addEventListener('click', e => {
         if (e.target === overlay) document.getElementById('ohCancelNewReminder')?.click();
       });
@@ -178,6 +179,11 @@
           font-size: 13px !important;
           border-radius: 8px !important;
         }
+        /* Journal lines: slimmer #, Type, Amount and 🗑 columns, so Particulars stays long */
+        #ohReminderFormOverlay .je-table thead th.col-sno    { width: 40px; }
+        #ohReminderFormOverlay .je-table thead th.col-type   { width: 84px; }
+        #ohReminderFormOverlay .je-table thead th.col-amount { width: 136px; }
+        #ohReminderFormOverlay .je-table thead th.col-del    { width: 40px; }
         /* The wrap draws its own calendar icon */
         .oh-date-input-wrap input.kya-dp-native-inp.kya-dp-native-inp { background-image: none !important; }
         .oh-date-input-wrap input[type="date"]:focus,
@@ -193,18 +199,7 @@
     const recurring = ohReminders.filter(r => r.type === 'Recurring').length;
     
     const nowTime = new Date().setHours(0,0,0,0);
-    const urgent = ohReminders.filter(r => {
-      if (r.status === 'Completed' || !r.dueDate) return false;
-      let dueTime;
-      if (r.type === 'Recurring') {
-        const dayNum = parseInt(r.dueDate) || 1;
-        dueTime = getNextOccurrenceDate(dayNum).getTime();
-      } else {
-        dueTime = new Date(r.dueDate).getTime();
-      }
-      const diffDays = Math.ceil((dueTime - nowTime) / (1000 * 60 * 60 * 24));
-      return diffDays <= 7;
-    }).length;
+    const urgent = ohRemindersDueSoonCount();
 
     let html = `
       <div class="oh-stats-row">
@@ -350,22 +345,29 @@
       }
     });
 
-    if (filteredList.length === 0) {
+    // Back bar search (Track Recorder): task name or the ledger shown on the reminder
+    const searchQ = _ohRemindersSearch.trim().toLowerCase();
+    const shownList = searchQ
+      ? filteredList.filter(item => (item.title || '').toLowerCase().includes(searchQ)
+          || ohReminderLedgerLabel(ohReminders[item.originalIdx]).toLowerCase().includes(searchQ))
+      : filteredList;
+
+    if (shownList.length === 0) {
       html += `
         <div class="oh-empty" style="margin-top:10px; padding: 40px 20px; background:#fff; border: 1px dashed #e2e8f0; border-radius:12px;">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#94a3b8;">
             <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>
           </svg>
-          <div class="oh-empty-title" style="font-size:14px; font-weight:700; color:var(--slate-500); margin-top:8px;">No ${_ohRemindersFilter} reminders</div>
+          <div class="oh-empty-title" style="font-size:14px; font-weight:700; color:var(--slate-500); margin-top:8px;">${searchQ && filteredList.length ? 'No matching reminders found' : `No ${_ohRemindersFilter} reminders`}</div>
           <div class="oh-empty-desc" style="font-size:12px; color:var(--slate-400); margin-top:4px;">
-            ${_ohRemindersFilter === 'completed' ? 'Keep checking off your active reminders!' : _ohRemindersFilter === 'templates' ? 'Reminders and recurring templates configured will appear here.' : 'All clean! Active tasks scheduled to show up soon will appear here.'}
+            ${searchQ && filteredList.length ? 'Adjust your search query.' : _ohRemindersFilter === 'completed' ? 'Keep checking off your active reminders!' : _ohRemindersFilter === 'templates' ? 'Reminders and recurring templates configured will appear here.' : 'All clean! Active tasks scheduled to show up soon will appear here.'}
           </div>
         </div>
       `;
     } else {
       html += `<div class="oh-reminder-list-wrapper">`;
-      
-      filteredList.forEach((item) => {
+
+      shownList.forEach((item) => {
         const idx = item.originalIdx;
         const r = ohReminders[idx];
         

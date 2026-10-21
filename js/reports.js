@@ -3735,7 +3735,7 @@
       .tb-table td { padding: 12px 16px; border-bottom: 1.5px solid var(--slate-100); font-size: 13.5px; color: var(--slate-700); }
       .tb-table tr:hover { background: var(--slate-50); }
       .tb-table .num-col { text-align: right; font-family: var(--font-main); font-weight: 600; min-width: 140px; }
-      .tb-table .sl-col { width: 70px; color: var(--slate-400); font-weight: 600; font-size: 12px; }
+      .tb-table .sl-col { width: 70px; white-space: nowrap; }
       .tb-table .particulars-col { font-weight: 500; color: var(--slate-800); }
       
       .tb-total-row { background: var(--slate-50) !important; font-weight: 800; font-size: 14px; border-top: 1.5px solid var(--slate-300); border-bottom: 4px double var(--slate-800) !important; color: var(--slate-800); }
@@ -3804,7 +3804,7 @@
     const balances = computeTrialBalanceBalances(dateFrom, dateTo);
 
     // Sync column checkboxes in dropdown
-    ['gl', 'sg', 'mg', 'plbs'].forEach(col => {
+    ['sl', 'gl', 'sg', 'mg', 'plbs'].forEach(col => {
       const chk = document.getElementById(`col-${col}-check`);
       if (chk) {
         chk.checked = _tbOptionalCols[col];
@@ -3812,6 +3812,7 @@
     });
 
     let activeColsCount = 0;
+    if (_tbOptionalCols.sl) activeColsCount++;
     if (_tbOptionalCols.gl) activeColsCount++;
     if (_tbOptionalCols.sg) activeColsCount++;
     if (_tbOptionalCols.mg) activeColsCount++;
@@ -3821,7 +3822,7 @@
       <table class="tb-table">
         <thead>
           <tr>
-            <th class="sl-col">Sl No</th>
+            ${_tbOptionalCols.sl ? '<th class="sl-col">Sl No</th>' : ''}
             <th>Particulars</th>
     `;
 
@@ -3845,7 +3846,7 @@
     const ledgers = coaLedgers.filter(l => l.type === 'ledger');
 
     if (ledgers.length === 0) {
-      const colspan = 4 + activeColsCount;
+      const colspan = 3 + activeColsCount;
       tableHtml += `
         <tr>
           <td colspan="${colspan}" style="text-align:center;padding:48px;color:#94a3b8">
@@ -3922,7 +3923,7 @@
 
         tableHtml += `
           <tr>
-            <td class="sl-col">${slNo++}</td>
+            ${_tbOptionalCols.sl ? `<td class="sl-col">${slNo++}</td>` : ''}
             <td class="particulars-col">${l.name}${l.code ? `<span class="pnl-code">${l.code}</span>` : ''}</td>
         `;
 
@@ -3939,7 +3940,7 @@
       });
     }
 
-    const totalColspan = 2 + activeColsCount;
+    const totalColspan = 1 + activeColsCount;
     tableHtml += `
           <tr class="tb-total-row">
             <td colspan="${totalColspan}" style="font-weight: 700; text-align: left; padding-left: 28px;">Total</td>
@@ -4027,12 +4028,6 @@
       syncGlobalDates(_globalDateFrom, e.target.value);
       onDateFilterChange();
     });
-  });
-
-  // Clear filters
-  document.getElementById('trialClearFilters')?.addEventListener('click', () => {
-    syncGlobalDates('', '');
-    onDateFilterChange();
   });
 
   // Helper to compile structured Trial Balance Report Data for Export
@@ -4237,7 +4232,7 @@
     });
 
 
-    ['gl', 'sg', 'mg', 'plbs'].forEach(col => {
+    ['sl', 'gl', 'sg', 'mg', 'plbs'].forEach(col => {
       const chk = document.getElementById(`col-${col}-check`);
       if (chk) {
         chk.addEventListener('change', (e) => {

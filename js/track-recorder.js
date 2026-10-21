@@ -79,6 +79,18 @@
         outline: none;
         cursor: pointer;
       }
+      /* Overview: KPI cards in the KYA Dashboard style (as Stock Book's Details), no sparkline */
+      #panel-track-recorder .tr-kpi-strip { margin-bottom: 20px; }
+      #panel-track-recorder .tr-kpi-strip .db-kpi-card { padding-bottom: 18px; cursor: default; }
+      #panel-track-recorder .tr-kpi-strip .db-kpi-top { margin-bottom: 14px; }
+      #panel-track-recorder .tr-kpi-strip .db-kpi-value { overflow-wrap: anywhere; }
+      #panel-track-recorder .tr-kpi-strip .db-kpi-sub { margin-bottom: 0; }
+      /* Card / tile columns follow the Overview's own width (as Stock Book's Details) */
+      #panel-track-recorder .tr-ov { container-type: inline-size; }
+      #panel-track-recorder .tr-ov-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+      @container (max-width: 900px) { #panel-track-recorder .tr-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @container (max-width: 520px) { #panel-track-recorder .tr-ov-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @container (max-width: 380px) { #panel-track-recorder .tr-kpi-strip { grid-template-columns: 1fr; } }
     `;
     document.head.appendChild(style);
   }
@@ -131,10 +143,120 @@
     `;
   }
 
+  // Reminders list: search box in the back bar, next to the Back button (task name or ledger)
+  function renderTrRemindersSearch() {
+    if (_trActiveSection !== 'reminders') return '';
+    const search = typeof _ohRemindersSearch === 'string' ? _ohRemindersSearch : '';
+    return `
+      <div class="stock-search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="stock-search-input" id="trRemindersSearch" placeholder="Search by task name or ledger..." value="${ohEsc(search)}" aria-label="Search by task name or ledger">
+      </div>
+    `;
+  }
+
+  // Overview: Dashboard-style KPI cards, then a Master Desk-style card of count tiles.
+  // Figures follow the Budget and Reminders screens (paused budgets are left out of the totals).
+  function renderTrOverview() {
+    const budgets = typeof ohBudgets !== 'undefined' ? ohBudgets : [];
+    const reminders = typeof ohReminders !== 'undefined' ? ohReminders : [];
+    const now = new Date();
+    const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+    let totBudget = 0, totSpent = 0, active = 0, exceeded = 0, ongoing = 0, upcoming = 0, expired = 0;
+    budgets.forEach(b => {
+      if (b.fromDate <= today && b.toDate >= today) ongoing++;
+      else if (b.fromDate > today) upcoming++;
+      else if (b.toDate < today) expired++;
+      if (b.isPaused) return;
+      active++;
+      const u = ohBudgetUsage(b);
+      totBudget += u.limitVal;
+      totSpent += u.expVal;
+      if (u.realPct >= 100) exceeded++;
+    });
+    const remaining = totBudget - totSpent;
+    const spentPct = totBudget > 0 ? Math.round((totSpent / totBudget) * 100) : 0;
+    const dueSoon = ohRemindersDueSoonCount();
+
+    const kpi = (icon, value, label, sub) => `
+      <div class="db-kpi-card">
+        <div class="db-kpi-top"><div class="db-kpi-icon-wrap">${icon}</div></div>
+        <div class="db-kpi-value">${value}</div>
+        <div class="db-kpi-label">${label}</div>
+        <div class="db-kpi-sub">${sub}</div>
+      </div>`;
+
+    // Same tile as Master Desk's Overview
+    const tile = (count, label, iconSvg) => `
+      <div style="border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 16px 14px; text-align: center; background: #f8fafc;">
+        <div style="width: 32px; height: 32px; margin: 0 auto 8px auto; border-radius: 8px; background: var(--blue-50, #eff6ff); display: flex; align-items: center; justify-content: center; color: var(--blue-600);">
+          ${iconSvg}
+        </div>
+        <div style="font-size: 22px; font-weight: 700; color: var(--slate-800); line-height: 1.2;">${count}</div>
+        <div style="font-size: 11px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px;">${label}</div>
+      </div>`;
+    const sectionLabel = (text, first) => `<div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-400); margin: ${first ? '0' : '22px'} 0 10px 0;">${text}</div>`;
+
+    const icoRupee = '<svg viewBox="0 0 20 20" fill="none"><path d="M10 2v16M6 6h6a2 2 0 1 1 0 4H8a2 2 0 1 0 0 4h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+    const icoSpent = '<svg viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h10M3 14h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="14" r="3" stroke="currentColor" stroke-width="1.5"/></svg>';
+    const icoTrend = '<svg viewBox="0 0 20 20" fill="none"><path d="M3 14l4-5 3 3 4-6 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const icoBell = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+    const icoBudget = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 10h6M7 13h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M10 4V2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    const icoPlay = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>';
+    const icoCalendar = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+    const icoHistory = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+    const icoAlert = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+    const icoBellSm = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+    const icoRepeat = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+    const icoCheck = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>';
+
+    return `
+      <div class="tr-ov">
+      <div class="db-kpi-strip tr-kpi-strip">
+        ${kpi(icoRupee, ohFmtAmt(totBudget), 'Total Budget', `${active} active budget${active === 1 ? '' : 's'}`)}
+        ${kpi(icoSpent, ohFmtAmt(totSpent), 'Actual Spent', `${spentPct}% spent`)}
+        ${kpi(icoTrend, ohFmtAmt(Math.abs(remaining)), remaining >= 0 ? 'Remaining' : 'Over Budget', remaining >= 0 ? 'Within limit' : 'Over the limit')}
+        ${kpi(icoBell, dueSoon, 'Due in 7 Days', `reminder${dueSoon === 1 ? '' : 's'}`)}
+      </div>
+
+      <div class="coa-modal-card" style="max-width: none; width: auto; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0;">
+        <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          Overview
+        </h3>
+        <p style="font-size: 12.5px; color: var(--slate-500); margin: 0 0 18px 0;">Snapshot of your budgets and reminders.</p>
+
+        ${sectionLabel('Budgets', true)}
+        <div class="tr-ov-tiles">
+          ${tile(budgets.length, 'Total', icoBudget)}
+          ${tile(ongoing, 'Ongoing', icoPlay)}
+          ${tile(upcoming, 'Upcoming', icoCalendar)}
+          ${tile(expired, 'Expired', icoHistory)}
+          ${tile(exceeded, 'Exceeded', icoAlert)}
+        </div>
+
+        ${sectionLabel('Reminders')}
+        <div class="tr-ov-tiles">
+          ${tile(reminders.length, 'Total', icoBellSm)}
+          ${tile(reminders.filter(r => r.type === 'Recurring').length, 'Recurring', icoRepeat)}
+          ${tile(ohRemindersUpcomingCount(), 'Upcoming', icoCalendar)}
+          ${tile(reminders.filter(r => r.status === 'Completed').length, 'Completed', icoCheck)}
+        </div>
+      </div>
+      </div>
+    `;
+  }
+
   function renderTrContent() {
     if (_trActiveSection === 'budget') return '<div id="trBudgetView"></div>';
     if (_trActiveSection === 'reminders') return '<div id="trRemindersView"></div>';
-    return '';   // Overview: nothing for now
+    return renderTrOverview();
   }
 
   function renderTrackRecorderPanel() {
@@ -181,6 +303,7 @@
                 </button>
               </div>
               ${renderTrBudgetFilters()}
+              ${renderTrRemindersSearch()}
             </div>
             <div id="trContentArea">${renderTrContent()}</div>
           </div>
@@ -215,6 +338,10 @@
     container.querySelector('#trBudgetDeptFilter')?.addEventListener('change', e => {
       _ohBudgetDeptFilter = e.target.value;
       renderOhBudgetView();
+    });
+    container.querySelector('#trRemindersSearch')?.addEventListener('input', e => {
+      _ohRemindersSearch = e.target.value;
+      renderOhRemindersView();
     });
 
     if (_trActiveSection === 'budget' && typeof renderOhBudgetView === 'function') renderOhBudgetView();
