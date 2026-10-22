@@ -698,9 +698,15 @@
     }
     field('Amount Paid', d.paidAmount || 0, NUMF);
     const paidRow = r;
+    // Received / paid by Journal Entry against the voucher (journal-allocations.js)
+    let journalRef = '';
+    if ((d.journalReceived || 0) > 0) {
+      field(d.journalLabel || 'Received by Journal Entry', d.journalReceived, NUMF);
+      journalRef = '-C' + r;
+    }
     // The TDS the customer deducted is settled, not due
     const tdsRef = tdsRow ? '-C' + tdsRow : (tds ? '-' + tds : '');
-    field('Balance Due', fmla(`MAX(0,C${grandRow}${tdsRef}-C${paidRow})`, d.balanceDue), NUMF);
+    field('Balance Due', fmla(`MAX(0,C${grandRow}${tdsRef}-C${paidRow}${journalRef})`, d.balanceDue), NUMF);
     const balRow = r;
     [2, 3].forEach(col => {
       const c = ws.getCell(balRow, col);

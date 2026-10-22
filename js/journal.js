@@ -675,6 +675,7 @@
           // Move any existing amount to the correct bucket
           if (sel.value === 'By') { row.debit = row.credit || row.debit; row.credit = ''; }
           else                    { row.credit = row.debit || row.credit; row.debit  = ''; }
+          syncJeRowAllocations(row);
           refreshTotals();
           renderRows();
         });
@@ -684,6 +685,7 @@
       // ── Particulars
       const tdPart = document.createElement('td');
       tdPart.appendChild(buildParticularsCell(row, isFirst));
+      tdPart.appendChild(buildJeAllocChip(row));
 
       // ── Single Amount column (Debit if By, Credit if To)
       const tdAmt = document.createElement('td');
@@ -721,6 +723,7 @@
           if (isBy) { row.debit  = inpAmt.value; row.credit = ''; }
           else      { row.credit = inpAmt.value; row.debit  = ''; }
           refreshTotals();
+          refreshJeAllocChip(row);
         });
 
         inpAmt.addEventListener('blur', () => {
@@ -735,6 +738,7 @@
             if (isBy) row.debit = ''; else row.credit = '';
           }
           refreshTotals();
+          refreshJeAllocChip(row);
         });
 
         // ── Keyboard shortcuts on Amount field
@@ -778,21 +782,28 @@
             else                   { row.credit = fmt; row.debit = ''; }
 
             refreshTotals();
+            refreshJeAllocChip(row);
 
-            // After committing, re-check balance
-            let totalDr = 0, totalCr = 0;
-            jeRows.forEach(r => { totalDr += parseAmt(r.debit); totalCr += parseAmt(r.credit); });
-            const balanced = totalDr > 0 && Math.abs(totalDr - totalCr) < 0.005;
+            const key = e.key;
+            const goOn = () => {
+              // After committing, re-check balance
+              let totalDr = 0, totalCr = 0;
+              jeRows.forEach(r => { totalDr += parseAmt(r.debit); totalCr += parseAmt(r.credit); });
+              const balanced = totalDr > 0 && Math.abs(totalDr - totalCr) < 0.005;
 
-            if (balanced) {
-              // Entry is balanced → jump straight to Narration
-              document.getElementById('jeNarration').focus();
-            } else {
-              // Not balanced → create next row
-              const nextType = totalDr > totalCr ? 'To' : 'By';
-              if (e.key === 'Enter') addRow(nextType);
-              else                   addRow('By');
-            }
+              if (balanced) {
+                // Entry is balanced → jump straight to Narration
+                document.getElementById('jeNarration').focus();
+              } else {
+                // Not balanced → create next row
+                const nextType = totalDr > totalCr ? 'To' : 'By';
+                if (key === 'Enter') addRow(nextType);
+                else                 addRow('By');
+              }
+            };
+            // A customer receipt / supplier payment: first say what it is against
+            if (typeof getJournalRowAllocParty === 'function' && getJournalRowAllocParty(row)) openJeRowAllocation(row, goOn);
+            else goOn();
 
           } else if (e.key === 'Tab') {
             let v = parseAmt(inpAmt.value);
@@ -1415,6 +1426,7 @@
     if (newName && old) {
       jeRows.forEach(r => {
         if ((r.particular || '').trim().toLowerCase() === old) r.particular = newName;
+        if ((r.allocFor || '').trim().toLowerCase() === old) r.allocFor = newName;
       });
       document.querySelectorAll('#jeEntryBody [data-row-id]').forEach(tr => {
         const row = jeRows.find(r => r.id === Number(tr.dataset.rowId));
@@ -1423,6 +1435,88 @@
       });
     }
     updateAllParticularsBalanceBadges();
+  }
+
+  // ── Received / Paid Against (journal-allocations.js) ──────────────
+  // A customer / Trade Receivables line on To, or a supplier / Trade Payables line on By, says
+  // what its money is against: entering the amount opens the popup, and a chip under the
+  // Particulars shows the split (click it to change it)
+  function jeAllocCtx() {
+    const ed = window._editingJournalEntry;
+    return { excludeJournalEntryId: (ed && !ed.isDraft) ? ed.id : null };
+  }
+
+  // Drops a line's split once its party or side no longer matches
+  function syncJeRowAllocations(row) {
+    if (!row || !row.allocations) return;
+    if (typeof getJournalRowAllocations !== 'function' || !getJournalRowAllocations(row).length) {
+      delete row.allocations;
+      delete row.allocFor;
+    }
+  }
+
+  // after(): what Enter on the amount does next, once the popup is closed
+  function openJeRowAllocation(row, after) {
+    const party = typeof getJournalRowAllocParty === 'function' ? getJournalRowAllocParty(row) : null;
+    const amount = party ? getJournalRowAmount(row) : 0;
+    if (!party || !(amount > 0) || typeof openJournalAllocationModal !== 'function') {
+      if (after) after();
+      return;
+    }
+    openJournalAllocationModal({
+      party,
+      required: amount,
+      rows: getJournalAllocSources(party, jeAllocCtx()),
+      current: getJournalRowAllocations(row),
+      onSave: list => {
+        row.allocations = list;
+        row.allocFor = party.name;
+        refreshJeAllocChip(row);
+        if (after) after();
+      },
+      onCancel: () => {
+        refreshJeAllocChip(row);
+        if (after) after();
+      }
+    });
+  }
+
+  // The chip under a line's Particulars (the look of Invoice Balance's summary chip)
+  function buildJeAllocChip(row) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'je-line-alloc-chip';
+    chip.tabIndex = -1;
+    chip.style.cssText = 'display: none; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 5px 9px; margin-top: 4px; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: #0f766e; cursor: pointer; font-family: inherit; box-sizing: border-box; text-align: left;';
+    chip.addEventListener('click', () => openJeRowAllocation(row, null));
+    fillJeAllocChip(chip, row);
+    return chip;
+  }
+
+  function fillJeAllocChip(chip, row) {
+    const party = typeof getJournalRowAllocParty === 'function' ? getJournalRowAllocParty(row) : null;
+    const amount = party ? getJournalRowAmount(row) : 0;
+    if (!party || !(amount > 0)) {
+      chip.style.display = 'none';
+      chip.innerHTML = '';
+      return;
+    }
+    const esc = s => (typeof ohEsc === 'function' ? ohEsc(s) : String(s));
+    const list = getJournalRowAllocations(row);
+    chip.style.display = 'flex';
+    chip.title = `What this ${party.side === 'receivable' ? 'receipt' : 'payment'} is against — click to change`;
+    if (!list.length) {
+      chip.innerHTML = `<span>⇄ Advance — not against a document</span><span style="color: var(--blue-600); flex-shrink: 0;">Choose</span>`;
+      return;
+    }
+    const sum = list.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+    const matches = Math.abs(sum - amount) < 0.01;
+    chip.innerHTML = `<span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">⇄ ${esc(describeJournalAllocations(list))}${matches ? '' : ` <span style="color: #dc2626;">· ₹ ${fmtNum(sum)} of ₹ ${fmtNum(amount)}</span>`}</span><span style="color: var(--blue-600); flex-shrink: 0;">Edit</span>`;
+  }
+
+  function refreshJeAllocChip(row) {
+    const chip = document.querySelector(`#jeEntryBody [data-row-id="${row.id}"] .je-line-alloc-chip`);
+    if (chip) fillJeAllocChip(chip, row);
   }
 
   function updateAllParticularsBalanceBadges() {
@@ -1509,6 +1603,8 @@
       function _select(acct) {
         inp.value      = acct.name;
         row.particular = acct.name;
+        syncJeRowAllocations(row);
+        refreshJeAllocChip(row);
         updateAllParticularsBalanceBadges();
         const tr = inp.closest('[data-row-id]');
         if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
@@ -1517,6 +1613,8 @@
       inp.addEventListener('focus', () => _jePortal.open(inp, inp.value, _select));
       inp.addEventListener('input', () => {
         row.particular = inp.value;
+        syncJeRowAllocations(row);
+        refreshJeAllocChip(row);
         updateAllParticularsBalanceBadges();
         _jePortal.open(inp, inp.value, _select);
       });
@@ -1942,6 +2040,14 @@
     });
     if (invalidRow) {
       showToast(`Invalid account name: "${invalidRow.particular}". Please select a valid ledger, customer, or supplier.`, 'error');
+      return;
+    }
+    // What customer receipts / supplier payments are against: still matching their lines and
+    // still available on those documents
+    jeRows.forEach(syncJeRowAllocations);
+    const allocErr = typeof validateJournalAllocations === 'function' ? validateJournalAllocations(jeRows, jeAllocCtx()) : '';
+    if (allocErr) {
+      showToast(allocErr, 'error');
       return;
     }
 

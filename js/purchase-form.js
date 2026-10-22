@@ -715,6 +715,19 @@
     return { amount: a ? r2(a.amount) : 0, voucherNo: (a && a.voucherNo) || '' };
   }
 
+  // Paid by Journal Entry against this purchase (journal-allocations.js): on the posted
+  // purchase being edited, or on the Pre Purchase document it is made from. The form's payment
+  // is for what is left after it.
+  function getPurchaseFormJournalPaid() {
+    if (isPurchaseReturnMode() || typeof window.getPurchaseJournalPaid !== 'function') return 0;
+    const ed = _editingPurchaseVoucher;
+    return window.getPurchaseJournalPaid({
+      id: (ed && !ed.isDraft) ? ed.id : null,
+      preDocKind: _purchasePreLink ? _purchasePreLink.kind : null,
+      preDocId: _purchasePreLink ? _purchasePreLink.id : null
+    });
+  }
+
   // The part of the advance this purchase uses — never more than its Grand Total
   function getPurchaseAdvanceApplied(total) {
     return Math.max(0, Math.min(getPurchaseLinkedAdvance().amount, r2(total)));
@@ -733,7 +746,7 @@
     if (isPurchaseReturnMode()) return getPurchaseRefundMax(total);
     const excess = getPurchaseAdvanceExcess(total);
     if (excess > 0) return excess;
-    return Math.max(0, r2(total - getPurchaseAdvanceApplied(total)));
+    return Math.max(0, r2(total - getPurchaseAdvanceApplied(total) - getPurchaseFormJournalPaid()));
   }
 
   // Wording for the "amount adjusted" / "cannot exceed" messages
@@ -752,6 +765,11 @@
       return adjusted
         ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the balance after the advance.`
         : `Payment Amount cannot exceed the balance of ₹${fmt(maxVal)} after the advance.`;
+    }
+    if (getPurchaseFormJournalPaid() > 0) {
+      return adjusted
+        ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the balance after the Journal Entry payments.`
+        : `Payment Amount cannot exceed the balance of ₹${fmt(maxVal)} after the Journal Entry payments.`;
     }
     return adjusted
       ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the Grand Total.`
@@ -802,8 +820,10 @@
       btn.style.opacity = locked ? '0.5' : '';
     };
     setPurchasePaymentLabels(getPurchaseAdvanceExcess(t) > 0);
+    // Paid by Journal Entry against this purchase / its Pre Purchase document
+    const journal = getPurchaseFormJournalPaid();
 
-    if (adv.amount <= 0) {
+    if (adv.amount <= 0 && journal <= 0) {
       if (box) {
         box.dataset.active = '0';
         box.style.display = 'none';
@@ -815,7 +835,7 @@
     }
 
     const applied = getPurchaseAdvanceApplied(t);
-    const balance = Math.max(0, r2(t - applied));
+    const balance = Math.max(0, r2(t - applied - journal));
     const excess = getPurchaseAdvanceExcess(t);
     const party = getPurchaseParty({ vendorId: ($('purchaseVendor') || {}).value || '' });
     const inLedger = typeof window.isPurchaseLedgerVendor === 'function' && window.isPurchaseLedgerVendor(party);
@@ -823,7 +843,8 @@
     if (box) {
       box.dataset.active = '1';
       box.innerHTML = `
-        ${row(`Advance paid${adv.voucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${ohEsc(adv.voucherNo)}]</span>` : ''}`, `₹ ${fmt(adv.amount)}`, true)}
+        ${adv.amount > 0 ? row(`Advance paid${adv.voucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${ohEsc(adv.voucherNo)}]</span>` : ''}`, `₹ ${fmt(adv.amount)}`, true) : ''}
+        ${journal > 0 && excess <= 0 ? row('Paid by Journal Entry', `₹ ${fmt(journal)}`, true) : ''}
         ${excess > 0 ? `
           ${row('Purchase total', `₹ ${fmt(t)}`)}
           ${row('Excess advance', `₹ ${fmt(excess)}`, true)}
@@ -831,7 +852,7 @@
         : `
           ${row('Balance due', `₹ ${fmt(balance)}`, true)}
           ${balance <= 0.01
-            ? '<div style="margin-top: 4px; font-weight: 500;">Fully paid by the advance — no further payment needed.</div>'
+            ? `<div style="margin-top: 4px; font-weight: 500;">Fully paid by the ${adv.amount > 0 ? (journal > 0 ? 'advance and Journal Entry' : 'advance') : 'Journal Entry'} — no further payment needed.</div>`
             : '<div style="margin-top: 4px; font-weight: 500;">Payment below is for the balance only.</div>'}`}`;
     }
 
@@ -875,7 +896,7 @@
     const stored = getPurchasePaidAmount(v);
     const applied = getPurchaseAdvanceApplied(total);
     const further = Math.max(0, r2(stored - applied));
-    const balance = Math.max(0, r2(total - applied));
+    const balance = Math.max(0, r2(total - applied - getPurchaseFormJournalPaid()));
     if (further <= 0) {
       setPurchasePaymentStatus('NotPaid');
       // The document's account / split described the advance, not a new payment
@@ -1855,10 +1876,17 @@
       paymentAmount = total;
       paymentAccountId = '';
       paymentSplits = [];
-    } else if (advance.amount > 0) {
+    } else if (advance.amount > 0 || getPurchaseFormJournalPaid() > 0) {
+      // Journal Entry payments against the purchase stay on the journal, but count towards
+      // "Full Payment"
+      const journalPaid = getPurchaseFormJournalPaid();
       const received = r2(getPurchaseAdvanceApplied(total) + formAmount);
-      paymentStatus = received >= total - 0.01 ? 'Full Payment' : 'Partial Payment';
+      paymentStatus = received <= 0 ? 'Not Paid' : (received + journalPaid >= total - 0.01 ? 'Full Payment' : 'Partial Payment');
       paymentAmount = received;
+      if (received <= 0) {
+        paymentAccountId = '';
+        paymentSplits = [];
+      }
     }
     // A reversal: the status is the supplier's refund
     const isReturn = isPurchaseReturnMode();

@@ -219,7 +219,9 @@
     const p = partyOf(customerId);
     const ob = p ? (parseFloat(p.openingBalance) || 0) : 0;
     if (ob < 0) cr += -ob; // a credit opening balance is money held for the customer
-    return Math.max(0, r2(cr - dr));
+    // Journal receipts put against invoices / open pre-invoices are not free (journal-allocations.js)
+    const committed = typeof getCustomerJournalCommitted === 'function' ? getCustomerJournalCommitted(customerId, partyName) : 0;
+    return Math.max(0, r2(cr - dr - committed));
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -324,12 +326,19 @@
     return r2(applied);
   }
 
+  // Also less what Journal Entry received against it (journal-allocations.js); ctx.withoutJournal
+  // gives the figure before that
   function getInvoiceOutstanding(inv, ctx) {
     if (!inv || inv.isReturn) return 0;
+    ctx = ctx || {};
     const total = r2(inv.total);
-    const paid = inv.paymentStatus === 'Full Payment' ? total
-      : (inv.paymentStatus === 'Partial Payment' ? r2(inv.paymentAmount) : 0);
-    return Math.max(0, r2(total - paid - getInvoiceApplied(inv.id, ctx)));
+    const journal = typeof getInvoiceJournalReceived === 'function' ? getInvoiceJournalReceived(inv, ctx) : 0;
+    // With journal receipts, "Full Payment" is the voucher's own payment of the rest
+    const stored = r2(inv.paymentAmount);
+    const paid = inv.paymentStatus === 'Full Payment' ? ((journal > 0 && stored > 0) ? Math.min(stored, total) : total)
+      : (inv.paymentStatus === 'Partial Payment' ? stored : 0);
+    const due = Math.max(0, r2(total - paid - getInvoiceApplied(inv.id, ctx)));
+    return ctx.withoutJournal ? due : Math.max(0, r2(due - journal));
   }
 
   // ctx.excludeInvoiceId: an invoice that can't take the refund (the one giving it)

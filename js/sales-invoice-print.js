@@ -371,6 +371,14 @@
     return { lines };
   }
 
+  // Received by Journal Entry against an invoice (or the pre-invoice it was made from), as far
+  // as the invoice still owed it after its own payment (journal-allocations.js)
+  function getInvoiceSheetJournalReceived(inv, netTotal, paidAmount) {
+    if (!inv || inv.isReturn || typeof getInvoiceJournalReceived !== 'function') return 0;
+    const left = Math.max(0, netTotal - paidAmount);
+    return Math.round(Math.min(getInvoiceJournalReceived(inv), left) * 100) / 100;
+  }
+
   // ── Row + tax maths (mirrors how the voucher was posted) ─────────
   function getInvoiceLineRows(inv) {
     return (inv.rows || []).map(r => {
@@ -446,7 +454,11 @@
     const netTotal = parseFloat(inv.total) || (subTotal + totalTax + adjustments - tdsAmount);
     const grandTotal = netTotal + tdsAmount;
     const paidAmount = parseFloat(inv.paymentAmount) || 0;
-    const balanceDue = Math.max(0, netTotal - paidAmount);
+    // Received by Journal Entry against the invoice (journal-allocations.js) — never more than
+    // was left to pay
+    const journalReceived = getInvoiceSheetJournalReceived(inv, netTotal, paidAmount);
+    const balanceDue = Math.max(0, netTotal - paidAmount - journalReceived);
+    const payStatus = journalReceived > 0 ? getJournalSettledStatus(netTotal, paidAmount, journalReceived) : inv.paymentStatus;
 
     // One type scale shared by the company, Billed/Shipped To, bank and terms blocks
     // so every detail section reads at exactly the same size.
@@ -557,7 +569,8 @@
     const isFullyPaid = balanceDue <= 0.005;
     const payLines = [];
     if (inv.dueDate && !isFullyPaid) payLines.push(`<span style="color:#334155;">Due Date:</span> ${siEsc(siDate(inv.dueDate))}`);
-    if (paidAmount > 0) payLines.push(`<span style="color:#334155;">Paid (${siEsc(inv.paymentStatus)}):</span> ${siNum(paidAmount)}`);
+    if (paidAmount > 0) payLines.push(`<span style="color:#334155;">Paid (${siEsc(payStatus)}):</span> ${siNum(paidAmount)}`);
+    if (journalReceived > 0) payLines.push(`<span style="color:#334155;">Received by Journal Entry${paidAmount > 0 ? '' : ` (${siEsc(payStatus)})`}:</span> ${siNum(journalReceived)}`);
     if (!isFullyPaid) payLines.push(`<span style="color:#334155;">Balance Due:</span> ${siNum(balanceDue)}`);
     const payLinesHtml = payLines.map((line, i) => `<div${i === 0 ? ' style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"' : ''}>${line}</div>`).join('');
 
@@ -767,8 +780,11 @@
     const netTotal = parseFloat(inv.total) || (subTotal + totalTax + adjustments - tdsAmount);
     const grandTotal = netTotal + tdsAmount;
     const paidAmount = parseFloat(inv.paymentAmount) || 0;
-    const balanceDue = Math.max(0, netTotal - paidAmount);
+    // As on the sheet: Journal Entry receipts against the invoice count
+    const journalReceived = getInvoiceSheetJournalReceived(inv, netTotal, paidAmount);
+    const balanceDue = Math.max(0, netTotal - paidAmount - journalReceived);
     const isFullyPaid = balanceDue <= 0.005;
+    const payStatus = journalReceived > 0 ? getJournalSettledStatus(netTotal, paidAmount, journalReceived) : (inv.paymentStatus || '');
 
     const posFromParty = !!(parties.billed.state || parties.billed.country);
     const posState = posFromParty ? (parties.billed.state || '') : (co.state || '');
@@ -794,7 +810,8 @@
 
     const payLines = [];
     if (inv.dueDate && !isFullyPaid) payLines.push({ label: 'Due Date', value: siDate(inv.dueDate) });
-    if (paidAmount > 0) payLines.push({ label: 'Paid (' + (inv.paymentStatus || '') + ')', value: siNum(paidAmount) });
+    if (paidAmount > 0) payLines.push({ label: 'Paid (' + payStatus + ')', value: siNum(paidAmount) });
+    if (journalReceived > 0) payLines.push({ label: 'Received by Journal Entry' + (paidAmount > 0 ? '' : ' (' + payStatus + ')'), value: siNum(journalReceived) });
     if (!isFullyPaid) payLines.push({ label: 'Balance Due', value: siNum(balanceDue) });
 
     // Paid in full at the sale (or a cash sale): payment details in place of the bank
@@ -811,6 +828,7 @@
       subtitle: isReturn ? 'Against Invoice ' + (inv.returnAgainstInvoice || '') : (isDraft ? 'Draft — not posted' : 'Original for Recipient'),
       subTotal, grossTotal, totalTax, totalDiscount, adjustments, tdsTcsAmount, grandTotal,
       paidAmount, balanceDue, isFullyPaid, placeOfSupply, gstLines, payLines,
+      journalReceived, journalLabel: 'Received by Journal Entry',
       amountInWords: siAmountInWords(grandTotal),
       invoiceDate: siDate(inv.date),
       fileBase: (docTitle.replace(/\s+/g, '_') + '_' + (inv.invoiceNo || 'Invoice')).replace(/[^a-zA-Z0-9_-]/g, '_')

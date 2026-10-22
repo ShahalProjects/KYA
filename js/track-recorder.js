@@ -1,18 +1,23 @@
 /**
  * KYA Modular - Track Recorder Module
- * Overview, Budget and Reminders. Budget and Reminders open full screen (left menu hidden)
+ * Overview, Budget, Reminders and PayTracker. Budget, Reminders and PayTracker open full screen (left menu hidden)
  * with a Back button to return to Overview, like Reports and Master Desk.
- * Budget and Reminders reuse the KeepOne renderers (onehub-budget.js, onehub-reminders-view.js)
- * and the same saved data.
+ * Budget and Reminders use onehub-budget.js / onehub-reminders-view.js; PayTracker uses pay-tracker.js
+ * (Receivable | Payable, switched from the back bar).
  */
 
 (function() {
   'use strict';
 
-  let _trActiveSection = 'overview';   // overview | budget | reminders
+  let _trActiveSection = 'overview';   // overview | budget | reminders | paytracker
+  let _trPayView = 'receivable';       // PayTracker list: receivable | payable
+  let _trPaySearch = '';               // PayTracker back bar search: invoice no. or customer / vendor
 
   // Sections that open full screen (left menu hidden) with a Back button to return to Overview
-  const TR_FULL_SCREEN = ['budget', 'reminders'];
+  const TR_FULL_SCREEN = ['budget', 'reminders', 'paytracker'];
+
+  // PayTracker lists, switched from the back bar (as Master Desk's back-bar buttons)
+  const TR_PAY_VIEWS = [['receivable', 'Receivable'], ['payable', 'Payable']];
 
   const TR_ICONS = {
     overview: `
@@ -30,6 +35,10 @@
       </svg>`,
     reminders: `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+    paytracker: `
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <path d="M4 7h11l-3-3M16 13H5l3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`,
   };
 
   const TR_PLUS_ICON = '<svg viewBox="0 0 15 15" fill="none" style="width: 14px; height: 14px;"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
@@ -158,8 +167,28 @@
     `;
   }
 
+  // PayTracker back bar, after ←: the search box, then the Receivable | Payable buttons, the one
+  // on screen in blue (Master Desk's back-bar buttons)
+  function renderTrPayBar() {
+    if (_trActiveSection !== 'paytracker') return '';
+    const buttons = TR_PAY_VIEWS.map(([view, label]) => {
+      const on = _trPayView === view;
+      return `<button type="button" class="btn ${on ? 'btn-primary' : 'btn-secondary'} master-back-bar-nav" data-tr-pay="${view}" aria-current="${on ? 'page' : 'false'}" style="height:34px; font-size:12.5px; padding: 0 14px; font-weight:600; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; gap:6px;${on ? ' background: var(--blue-600); color: #ffffff; border-color: var(--blue-600);' : ''}">${label}</button>`;
+    }).join('');
+    return `
+      <div class="stock-search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="stock-search-input" id="trPaySearch" placeholder="Search by invoice no. or customer / vendor..." value="${ohEsc(_trPaySearch)}" aria-label="Search by invoice no. or customer / vendor">
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">${buttons}</div>
+    `;
+  }
+
   // Overview: Dashboard-style KPI cards, then a Master Desk-style card of count tiles.
-  // Figures follow the Budget and Reminders screens (paused budgets are left out of the totals).
+  // Figures follow the Budget, Reminders and PayTracker screens (paused budgets are left out of the totals).
   function renderTrOverview() {
     const budgets = typeof ohBudgets !== 'undefined' ? ohBudgets : [];
     const reminders = typeof ohReminders !== 'undefined' ? ohReminders : [];
@@ -181,6 +210,17 @@
     const remaining = totBudget - totSpent;
     const spentPct = totBudget > 0 ? Math.round((totSpent / totBudget) * 100) : 0;
     const dueSoon = ohRemindersDueSoonCount();
+
+    // PayTracker: balances still due (pay-tracker.js)
+    const pt = typeof getPayTrackerData === 'function'
+      ? getPayTrackerData() : { receivable: [], payable: [] };
+    const weekEnd = new Date(new Date(today + 'T00:00:00').getTime() + 7 * 86400000);
+    const week = new Date(weekEnd.getTime() - weekEnd.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const sumOf = list => list.reduce((s, x) => s + x.amount, 0);
+    const overdueOf = list => list.filter(x => x.dueDate && x.dueDate < today).length;
+    const overdueSumOf = list => sumOf(list.filter(x => x.dueDate && x.dueDate < today));
+    const dueSoonOf = list => list.filter(x => x.dueDate >= today && x.dueDate <= week).length;
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
     const kpi = (icon, value, label, sub) => `
       <div class="db-kpi-card">
@@ -213,6 +253,10 @@
     const icoBellSm = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
     const icoRepeat = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
     const icoCheck = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>';
+    const icoIn = '<svg viewBox="0 0 20 20" fill="none"><path d="M10 3v10M6 9l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+    const icoOut = '<svg viewBox="0 0 20 20" fill="none"><path d="M10 13V3M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+    const icoAlertKpi = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+    const icoDoc = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M5 2.5h7l3.5 3.5v11.5H5V2.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 10h5M8 13h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
 
     return `
       <div class="tr-ov">
@@ -222,6 +266,12 @@
         ${kpi(icoTrend, ohFmtAmt(Math.abs(remaining)), remaining >= 0 ? 'Remaining' : 'Over Budget', remaining >= 0 ? 'Within limit' : 'Over the limit')}
         ${kpi(icoBell, dueSoon, 'Due in 7 Days', `reminder${dueSoon === 1 ? '' : 's'}`)}
       </div>
+      <div class="db-kpi-strip tr-kpi-strip">
+        ${kpi(icoIn, ohFmtAmt(sumOf(pt.receivable)), 'Receivable', `${plural(pt.receivable.length, 'item')} from customers & vendors`)}
+        ${kpi(icoOut, ohFmtAmt(sumOf(pt.payable)), 'Payable', `${plural(pt.payable.length, 'item')} to vendors & customers`)}
+        ${kpi(icoAlertKpi, ohFmtAmt(overdueSumOf(pt.receivable)), 'Overdue Receivable', `${plural(overdueOf(pt.receivable), 'item')} overdue`)}
+        ${kpi(icoAlertKpi, ohFmtAmt(overdueSumOf(pt.payable)), 'Overdue Payable', `${plural(overdueOf(pt.payable), 'item')} overdue`)}
+      </div>
 
       <div class="coa-modal-card" style="max-width: none; width: auto; box-shadow: none; border: 1px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--white); margin: 0;">
         <h3 style="font-size: 15px; font-weight: 700; color: var(--slate-800); margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
@@ -230,7 +280,7 @@
           </svg>
           Overview
         </h3>
-        <p style="font-size: 12.5px; color: var(--slate-500); margin: 0 0 18px 0;">Snapshot of your budgets and reminders.</p>
+        <p style="font-size: 12.5px; color: var(--slate-500); margin: 0 0 18px 0;">Snapshot of your budgets, reminders and payments.</p>
 
         ${sectionLabel('Budgets', true)}
         <div class="tr-ov-tiles">
@@ -248,6 +298,20 @@
           ${tile(ohRemindersUpcomingCount(), 'Upcoming', icoCalendar)}
           ${tile(reminders.filter(r => r.status === 'Completed').length, 'Completed', icoCheck)}
         </div>
+
+        ${sectionLabel('Receivable')}
+        <div class="tr-ov-tiles">
+          ${tile(pt.receivable.length, 'Open', icoDoc)}
+          ${tile(overdueOf(pt.receivable), 'Overdue', icoAlert)}
+          ${tile(dueSoonOf(pt.receivable), 'Due in 7 Days', icoHistory)}
+        </div>
+
+        ${sectionLabel('Payable')}
+        <div class="tr-ov-tiles">
+          ${tile(pt.payable.length, 'Open', icoDoc)}
+          ${tile(overdueOf(pt.payable), 'Overdue', icoAlert)}
+          ${tile(dueSoonOf(pt.payable), 'Due in 7 Days', icoHistory)}
+        </div>
       </div>
       </div>
     `;
@@ -256,6 +320,9 @@
   function renderTrContent() {
     if (_trActiveSection === 'budget') return '<div id="trBudgetView"></div>';
     if (_trActiveSection === 'reminders') return '<div id="trRemindersView"></div>';
+    if (_trActiveSection === 'paytracker') {
+      return typeof renderPayTrackerListHtml === 'function' ? renderPayTrackerListHtml(_trPayView, _trPaySearch) : '';
+    }
     return renderTrOverview();
   }
 
@@ -280,7 +347,7 @@
             </div>
             <div>
               <div class="je-card-title-text" style="color: var(--white); font-weight: 700; font-size: 16px; margin: 0;">Track Recorder</div>
-              <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Budgets &amp; Reminders</div>
+              <div class="je-card-subtitle-text" style="color: rgba(255, 255, 255, 0.8); font-size: 12px; margin: 2px 0 0 0;">Budgets, Reminders &amp; PayTracker</div>
             </div>
           </div>
           <div class="panel-actions" style="display: flex; gap: 8px; align-items: center;">${renderTrHeaderActions()}</div>
@@ -292,6 +359,7 @@
             ${renderTrSubTab('overview', 'Overview')}
             ${renderTrSubTab('budget', 'Budget')}
             ${renderTrSubTab('reminders', 'Reminders')}
+            ${renderTrSubTab('paytracker', 'PayTracker')}
           </div>
 
           <!-- Right Content View Area -->
@@ -302,6 +370,7 @@
                   <svg viewBox="0 0 20 20" fill="none" width="18" height="18" aria-hidden="true"><path d="M12.5 15l-5-5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
               </div>
+              ${renderTrPayBar()}
               ${renderTrBudgetFilters()}
               ${renderTrRemindersSearch()}
             </div>
@@ -314,6 +383,10 @@
     container.querySelectorAll('.oh-sub-tab[data-tr-section]').forEach(btn => {
       btn.addEventListener('click', () => {
         _trActiveSection = btn.dataset.trSection;
+        if (_trActiveSection === 'paytracker') {   // PayTracker opens on Receivable, search cleared
+          _trPayView = 'receivable';
+          _trPaySearch = '';
+        }
         renderTrackRecorderPanel();
       });
     });
@@ -321,6 +394,19 @@
     container.querySelector('#trBackBtn')?.addEventListener('click', () => {
       _trActiveSection = 'overview';
       renderTrackRecorderPanel();
+    });
+
+    container.querySelectorAll('[data-tr-pay]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _trPayView = btn.dataset.trPay;
+        renderTrackRecorderPanel();
+      });
+    });
+    // PayTracker search re-draws only the list, so the search box keeps its focus
+    container.querySelector('#trPaySearch')?.addEventListener('input', e => {
+      _trPaySearch = e.target.value;
+      const area = document.getElementById('trContentArea');
+      if (area && typeof renderPayTrackerListHtml === 'function') area.innerHTML = renderPayTrackerListHtml(_trPayView, _trPaySearch);
     });
 
     container.querySelector('#trAddBudgetBtn')?.addEventListener('click', () => {

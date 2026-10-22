@@ -136,8 +136,13 @@
     const netTotal = (v.total !== undefined && v.total !== '') ? r2(v.total) : r2(subTotal + totalTax + adjustments - tdsAmount);
     const grandTotal = r2(netTotal + tdsAmount);
     const paidAmount = (typeof getPurchasePaidAmount === 'function') ? getPurchasePaidAmount(v) : r2(v.paymentAmount);
-    const balanceDue = Math.max(0, r2(netTotal - paidAmount));
+    // Paid by Journal Entry against the purchase (or the Pre Purchase document it was made
+    // from), as far as it still owed it after its own payment (journal-allocations.js)
+    const journalPaid = (!v.isReturn && typeof getPurchaseJournalPaid === 'function')
+      ? Math.min(getPurchaseJournalPaid(v), Math.max(0, r2(netTotal - paidAmount))) : 0;
+    const balanceDue = Math.max(0, r2(netTotal - paidAmount - journalPaid));
     const isFullyPaid = balanceDue <= 0.005;
+    const payStatus = journalPaid > 0 ? getJournalSettledStatus(netTotal, paidAmount, journalPaid) : (v.paymentStatus || '');
 
     // Place of Supply of an inward supply: the buyer's (this company's) state
     const posState = co.state || parties.billed.state || '';
@@ -165,7 +170,8 @@
     const payLines = [];
     if (v.dueDate && !isFullyPaid) payLines.push({ label: 'Due Date', value: dateOf(v.dueDate) });
     if (tdsAmount > 0) payLines.push({ label: 'TDS Deducted' + (v.tdsTcsRate ? ' @ ' + v.tdsTcsRate + '%' : ''), value: num(tdsAmount) });
-    if (paidAmount > 0) payLines.push({ label: (v.isReturn ? 'Refund Received (' : 'Paid (') + (v.paymentStatus || '') + ')', value: num(paidAmount) });
+    if (paidAmount > 0) payLines.push({ label: (v.isReturn ? 'Refund Received (' : 'Paid (') + payStatus + ')', value: num(paidAmount) });
+    if (journalPaid > 0) payLines.push({ label: 'Paid by Journal Entry' + (paidAmount > 0 ? '' : ' (' + payStatus + ')'), value: num(journalPaid) });
     if (!isFullyPaid) payLines.push({ label: 'Balance Due', value: num(balanceDue) });
 
     const vendorBank = parties.shipped && (parties.shipped.bankName || parties.shipped.accountNo) ? parties.shipped : parties.billed;
@@ -177,7 +183,7 @@
     return {
       co, parties, rows, taxMode, isDraft, bank,
       subTotal, grossTotal, totalTax, totalDiscount, adjustments, tdsTcsAmount, tdsAmount,
-      netTotal, grandTotal, paidAmount, balanceDue, isFullyPaid, placeOfSupply, gstLines, payLines,
+      netTotal, grandTotal, paidAmount, balanceDue, isFullyPaid, placeOfSupply, gstLines, payLines, journalPaid,
       paymentDetails: getPurchasePaymentDetails(v, paidAmount || netTotal)
     };
   }
@@ -408,6 +414,7 @@
       subTotal: d.subTotal, grossTotal: d.grossTotal, totalTax: d.totalTax, totalDiscount: d.totalDiscount,
       adjustments: d.adjustments, tdsTcsAmount: d.tdsTcsAmount, grandTotal: d.grandTotal,
       paidAmount: d.paidAmount, balanceDue: d.balanceDue, isFullyPaid: d.isFullyPaid,
+      journalReceived: d.journalPaid, journalLabel: 'Paid by Journal Entry',
       placeOfSupply: d.placeOfSupply, gstLines: d.gstLines,
       payLines: d.payLines,
       amountInWords: (typeof siAmountInWords === 'function') ? siAmountInWords(d.grandTotal) : '',

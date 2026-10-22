@@ -673,8 +673,7 @@
     stock_hub: document.getElementById('panel-stock-hub'),
     reports: document.getElementById('panel-reports'),
     master_desk: document.getElementById('panel-master-desk'),
-    track_recorder: document.getElementById('panel-track-recorder'),
-  };
+    track_recorder: document.getElementById('panel-track-recorder'),  };
 
   const TAB_DEFS = {
     master_desk: { 

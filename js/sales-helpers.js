@@ -1084,6 +1084,23 @@
     return { amount: 0, voucherNo: '' };
   }
 
+  // Received by Journal Entry against this invoice (journal-allocations.js): on the posted
+  // invoice being edited, or on the pre-invoice it is made from. The form's payment is for
+  // what is left after it.
+  function getSalesJournalReceived() {
+    if (currentSalesVoucherSubtype === 'Return' || typeof getInvoiceJournalReceived !== 'function') return 0;
+    const editing = window._editingSalesInvoice;
+    const inv = (editing && !editing.isDraft && editing.id && window.KYA_STORE)
+      ? (window.KYA_STORE.salesVouchers || []).find(v => String(v.id) === String(editing.id)) : null;
+    return getInvoiceJournalReceived({
+      id: inv ? inv.id : null,
+      convertedFromProformaId: window._pendingConvertProformaId || (inv && inv.convertedFromProformaId) || null,
+      convertedFromSalesOrderId: window._pendingConvertSalesOrderId || (inv && inv.convertedFromSalesOrderId) || null,
+      convertedFromDeliveryChallanId: window._pendingConvertDeliveryChallanId || (inv && inv.convertedFromDeliveryChallanId) || null
+    });
+  }
+  window.getSalesJournalReceived = getSalesJournalReceived;
+
   // The part of the advance this invoice uses — never more than its Grand Total
   function getSalesAdvanceApplied(total) {
     const adv = getSalesLinkedAdvance().amount;
@@ -1132,6 +1149,11 @@
         ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the balance after the advance.`
         : `Payment Amount cannot exceed the balance of ₹${fmt(maxVal)} after the advance.`;
     }
+    if (currentSalesVoucherSubtype !== 'Return' && getSalesJournalReceived() > 0) {
+      return adjusted
+        ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the balance after the Journal Entry receipts.`
+        : `Payment Amount cannot exceed the balance of ₹${fmt(maxVal)} after the Journal Entry receipts.`;
+    }
     return adjusted
       ? `Payment Amount adjusted to ₹${fmt(maxVal)} to not exceed the Grand Total.`
       : `Payment Amount cannot exceed the Grand Total of ₹${fmt(maxVal)}.`;
@@ -1139,13 +1161,16 @@
 
   // With an advance, the Payment Status and Amount on the form describe the balance only;
   // the invoice stores the full amount received (advance + this payment), which is what
-  // the payment journal entry and the customer statement read.
+  // the payment journal entry and the customer statement read. Journal Entry receipts
+  // against the invoice stay on the journal, but count towards "Full Payment".
   function toStoredSalesPayment(paymentStatus, paymentAmount, total) {
     const applied = getSalesAdvanceApplied(total);
-    if (applied <= 0) return { paymentStatus, paymentAmount };
+    const journal = getSalesJournalReceived();
+    if (applied <= 0 && journal <= 0) return { paymentStatus, paymentAmount };
     const received = Math.round((applied + (parseFloat(paymentAmount) || 0)) * 100) / 100;
     return {
-      paymentStatus: received >= (parseFloat(total) || 0) - 0.01 ? 'Full Payment' : 'Partial Payment',
+      paymentStatus: received <= 0 ? 'Not Paid'
+        : (received + journal >= (parseFloat(total) || 0) - 0.01 ? 'Full Payment' : 'Partial Payment'),
       paymentAmount: received
     };
   }
@@ -1219,7 +1244,9 @@
     // Reversal of an invoice: what was paid on it and what can still be refunded
     if (currentSalesVoucherSubtype === 'Return' && updateInvoiceReversalInfo(box, t)) return;
 
-    if (adv.amount <= 0) {
+    // Received by Journal Entry against this invoice / its pre-invoice
+    const journal = getSalesJournalReceived();
+    if (adv.amount <= 0 && journal <= 0) {
       box.dataset.active = '0';
       box.style.display = 'none';
       box.innerHTML = '';
@@ -1228,13 +1255,14 @@
     }
 
     const applied = Math.min(adv.amount, t);
-    const balance = Math.max(0, t - applied);
+    const balance = Math.max(0, Math.round((t - applied - journal) * 100) / 100);
     const excess = getSalesAdvanceExcess(t);
     const fmt = n => (typeof fmtNum === 'function') ? fmtNum(n) : n.toFixed(2);
     const row = (label, value, strong) => `<div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 2px;"><span>${label}</span>${strong ? `<strong>${value}</strong>` : `<span>${value}</span>`}</div>`;
     box.dataset.active = '1';
     box.innerHTML = `
-      ${row(`Advance received${adv.voucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${adv.voucherNo}]</span>` : ''}`, `₹ ${fmt(adv.amount)}`, true)}
+      ${adv.amount > 0 ? row(`Advance received${adv.voucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${adv.voucherNo}]</span>` : ''}`, `₹ ${fmt(adv.amount)}`, true) : ''}
+      ${journal > 0 && excess <= 0 ? row('Received by Journal Entry', `₹ ${fmt(journal)}`, true) : ''}
       ${excess > 0 ? `
         ${row('Invoice total', `₹ ${fmt(t)}`)}
         ${row('Excess advance', `₹ ${fmt(excess)}`, true)}
@@ -1242,7 +1270,7 @@
       : `
         ${row('Balance due', `₹ ${fmt(balance)}`, true)}
         ${balance <= 0.01
-          ? '<div style="margin-top: 4px; font-weight: 500;">Fully paid by the advance — no further payment needed.</div>'
+          ? `<div style="margin-top: 4px; font-weight: 500;">Fully paid by the ${adv.amount > 0 ? (journal > 0 ? 'advance and Journal Entry' : 'advance') : 'Journal Entry'} — no further payment needed.</div>`
           : '<div style="margin-top: 4px; font-weight: 500;">Payment below is for the balance only.</div>'}`}`;
 
     // Exactly paid by the advance: nothing to pay or refund, only "Not Paid" applies
@@ -1300,7 +1328,7 @@
       : (inv.paymentStatus === 'Partial Payment' ? (parseFloat(inv.paymentAmount) || 0) : 0);
     const applied = Math.min(adv.amount, total);
     const further = Math.max(0, Math.round((stored - applied) * 100) / 100);
-    const balance = Math.max(0, total - applied);
+    const balance = Math.max(0, Math.round((total - applied - getSalesJournalReceived()) * 100) / 100);
 
     const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     const fullBtn = document.getElementById('salesPaymentStatusFull');
@@ -1339,7 +1367,8 @@
       // With an advance, only the balance is left to pay — or, when the advance is more
       // than the invoice, only the excess can be refunded
       const excess = getSalesAdvanceExcess(total);
-      maxVal = excess > 0 ? excess : Math.max(0, total - getSalesAdvanceApplied(total));
+      maxVal = excess > 0 ? excess
+        : Math.max(0, Math.round((total - getSalesAdvanceApplied(total) - getSalesJournalReceived()) * 100) / 100);
     }
     if (currentSalesVoucherSubtype === 'Return') {
       // Reversing a pre-invoice: only its advance can be refunded
