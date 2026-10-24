@@ -233,6 +233,45 @@
     localStorage.setItem(KYA_COMPANY_KEY, JSON.stringify(data));
   }
 
+  /* ======================
+     PRIMARY BANK ACCOUNT
+     Exactly one bank account ledger is primary; its details print on invoices.
+     It is the bank ledger marked isPrimaryBank, else the first bank ledger, so the
+     first (or only) bank account is primary without being marked.
+  ====================== */
+  // A ledger under a bank group (e.g. Cash and Cash Equivalents → Bank Account),
+  // the same test Master Desk uses to show the Bank Account details.
+  function isBankAccountLedger(l) {
+    if (!l || l.type !== 'ledger') return false;
+    const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
+    if (l.glId) {
+      const gl = ledgers.find(g => String(g.id) === String(l.glId));
+      return !!gl && (gl.name || '').toLowerCase().includes('bank');
+    }
+    const sgs = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS : [];
+    const sg = sgs.find(s => s.id === l.sgId);
+    return !!sg && (sg.name || '').toLowerCase().includes('bank');
+  }
+
+  function getBankAccountLedgers() {
+    const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
+    return ledgers.filter(isBankAccountLedger);
+  }
+
+  function getPrimaryBankLedger() {
+    const banks = getBankAccountLedgers();
+    return banks.find(l => l.isPrimaryBank) || banks[0] || null;
+  }
+
+  // Makes this ledger the primary bank account; the previous primary loses the mark.
+  function setPrimaryBankLedger(id) {
+    const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
+    ledgers.forEach(l => {
+      if (String(l.id) === String(id)) l.isPrimaryBank = true;
+      else if (l.isPrimaryBank) delete l.isPrimaryBank;
+    });
+  }
+
   function getCompanyInitials(name) {
     if (!name) return 'KY';
     const words = name.trim().split(/\s+/);

@@ -1,9 +1,10 @@
 // ══════════════════════════════════════════════════════════════════
 //  PURCHASE POSTING — the journal entries of a posted Purchase Voucher, the mirror of a
 //  Sales Invoice's linked entries (sales-posting.js):
-//    • Purchase entry (the Purchase / Bill No.) ... Dr Purchase (stock item / product lines)
-//        or the line's own Expense ledger, Dr Input CGST + SGST / Input IGST, Dr TCS
-//        Receivable (TCS the supplier collected), round off to Adjustments Account;
+//    • Purchase entry (the Purchase / Bill No.) ... Dr Purchase (stock item / product lines;
+//        Raw Material Purchase for raw materials) or the line's own Expense ledger, Dr Input
+//        CGST + SGST / Input IGST, Dr TCS Receivable (TCS the supplier collected), round off
+//        to Adjustments Account;
 //        Cr Vendor with the full bill value
 //    • TDS entry (JV-…) ..... Dr Vendor; Cr TDS Payable — the TDS deducted from the bill
 //    • Payment entry (JV-…) . Dr Vendor; Cr Cash / Bank (or each Multi Payment account).
@@ -80,8 +81,10 @@
     return !!party && party.type === 'ledger' && party.sgId === 'sg-cce';
   }
 
-  // The debit lines: each line's own Expense ledger, or Purchase for stock items / products.
-  // On a reversal they are the credit lines: the Expense ledger, or Purchase Returns.
+  // The debit lines: each line's own Expense ledger, or Purchase for stock items / products —
+  // Raw Material Purchase (Cost of materials consumed) for an item in a raw-material Stock Group.
+  // On a reversal they are the credit lines: the Expense ledger, or Purchase Returns / Raw
+  // Material Purchase Returns.
   function getPurchaseDebitLines(v) {
     const ledgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []);
     const lines = [];
@@ -91,7 +94,10 @@
       const own = r.expenseLedgerId
         ? ledgers.find(l => l.type !== 'group-ledger' && String(l.id) === String(r.expenseLedgerId))
         : null;
-      const name = (own && own.name) || (v.isReturn ? ledgerNameOf('Purchase Returns', 'sg-pst') : ledgerNameOf('Purchase', 'sg-pst'));
+      const rawMaterial = !own && typeof isKyaRawMaterialRow === 'function' && isKyaRawMaterialRow(r);
+      const name = (own && own.name) || (rawMaterial
+        ? (v.isReturn ? ledgerNameOf('Raw Material Purchase Returns', 'sg-cmc') : ledgerNameOf('Raw Material Purchase', 'sg-cmc'))
+        : (v.isReturn ? ledgerNameOf('Purchase Returns', 'sg-pst') : ledgerNameOf('Purchase', 'sg-pst')));
       const line = lines.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
       if (line) line.amount = r2(line.amount + amt);
       else lines.push({ name, amount: amt });
@@ -202,7 +208,7 @@
       firstParticular: vendorName,
       amount: fmt(grossPayable),
       allRows: rows,
-      narration: `${cashPurchase ? `Cash purchase — Purchase No. ${v.invoiceNo} paid in full from ${vendorName}.` : `Purchase No. ${v.invoiceNo} posted for supplier ${vendorName}.`}${execText} ${v.notes || ''}`.trim(),
+      narration: `${cashPurchase ? `Cash purchase — Purchase No. ${v.invoiceNo} paid in full from ${vendorName}.` : `Purchase No. ${v.invoiceNo} posted for supplier ${vendorName}.`}${execText} ${v.narration || ''}`.trim(),
       jeType: 'purchase',
       vendorId: v.vendorId,
       vendorName,
@@ -253,8 +259,14 @@
       : ((advDebitRow && advDebitRow.particular) || ledgerNameOf('Advances to Suppliers', 'sg-stla'));
     const advApplied = advance > 0 ? Math.min(advance, paidAmount) : 0;
     const cashPortion = r2(paidAmount - advApplied);
+    // Advance paid by Journal Entry and held in Advances to Suppliers, used on this purchase
+    // ("Use advance" — journal-allocations.js): set off here, Dr Vendor; Cr Advances to Suppliers
+    const jAdv = (!v.isReturn && typeof getPooledJournalAdvanceUsedOn === 'function')
+      ? getPooledJournalAdvanceUsedOn('purchaseVouchers', v.id) : { amount: 0, nos: [] };
+    const jAdvLedgerName = jAdv.amount > 0 ? ledgerNameOf('Advances to Suppliers', 'sg-stla') : '';
+    if (!v.isReturn) v.journalAdvanceSetOff = jAdv.amount;
     // The vendor is debited with everything paid — except an advance already in its ledger
-    const vendorDebit = advInLedger ? cashPortion : paidAmount;
+    const vendorDebit = r2((advInLedger ? cashPortion : paidAmount) + jAdv.amount);
     const docLabel = v.preDocKind ? ({ quotation: 'Purchase Quotation', proforma: 'Purchase Proforma', order: 'Purchase Order', grn: 'Goods Receipt Note' }[v.preDocKind] || 'the Pre Purchase document') : '';
 
     // ── Payment entry: paid to the supplier (none for a cash purchase) ──
@@ -268,6 +280,9 @@
           rows.push({ id: rows.length + 1, type: 'To', particular: p.name, debit: '', credit: p.amount.toFixed(2) });
         });
       }
+      if (jAdv.amount > 0) {
+        rows.push({ id: rows.length + 1, type: 'To', particular: jAdvLedgerName, debit: '', credit: jAdv.amount.toFixed(2) });
+      }
       let narration = `Payment made to supplier ${vendorName} against Purchase No. ${v.invoiceNo}. Status: ${v.paymentStatus}.`;
       if (advInLedger) {
         narration = `Balance payment ₹${fmt(cashPortion)} made to ${vendorName} against Purchase No. ${v.invoiceNo} (advance ₹${fmt(advApplied)} against ${docLabel} already in the ledger).`;
@@ -275,6 +290,11 @@
         narration = `Advance ₹${fmt(advApplied)} adjusted from ${docLabel} and balance payment ₹${fmt(cashPortion)} made to supplier ${vendorName} against Purchase No. ${v.invoiceNo}.`;
       } else if (advApplied > 0) {
         narration = `Advance ₹${fmt(advApplied)} adjusted from ${docLabel} against Purchase No. ${v.invoiceNo} of supplier ${vendorName}.`;
+      } else if (paidAmount <= 0 && jAdv.amount > 0) {
+        narration = `Advance ₹${fmt(jAdv.amount)} paid by Journal Entry ${jAdv.nos.join(', ')} adjusted against Purchase No. ${v.invoiceNo} of supplier ${vendorName}.`;
+      }
+      if (paidAmount > 0 && jAdv.amount > 0) {
+        narration += ` Advance ₹${fmt(jAdv.amount)} paid by Journal Entry ${jAdv.nos.join(', ')} adjusted.`;
       }
       return {
         firstParticular: vendorName,
@@ -315,8 +335,9 @@
   // ── Purchase Reversal ──
   // The mirror of the purchase's entries:
   //  • Reversal entry (PR-…) Dr Vendor with the full value; Cr Purchase Returns (stock items /
-  //      products) or the line's Expense ledger, Cr Input CGST + SGST / IGST, Cr TCS
-  //      Receivable; the round off reversed in Adjustments Account
+  //      products; Raw Material Purchase Returns for raw materials) or the line's Expense
+  //      ledger, Cr Input CGST + SGST / IGST, Cr TCS Receivable; the round off reversed in
+  //      Adjustments Account
   //  • TDS reversal (JV-…) . Dr TDS Payable; Cr Vendor
   //  • Refund (JV-…) ....... Dr Cash / Bank (each Multi Refund account); Cr Vendor
   // A cash purchase is reversed in the reversal entry itself (the vendor is the cash account).
@@ -412,7 +433,7 @@
         firstParticular: vendorName,
         amount: fmt(grossReversed),
         allRows: rows,
-        narration: `Purchase Reversal No. ${v.invoiceNo} posted for supplier ${vendorName}${v.returnAgainstInvoice ? ` (Purchase No. ${v.returnAgainstInvoice})` : ''}.${tcsAmt > 0 ? ` TCS ₹${fmt(tcsAmt)} reversed.` : ''} ${v.notes || ''}`.trim(),
+        narration: `Purchase Reversal No. ${v.invoiceNo} posted for supplier ${vendorName}${v.returnAgainstInvoice ? ` (Purchase No. ${v.returnAgainstInvoice})` : ''}.${tcsAmt > 0 ? ` TCS ₹${fmt(tcsAmt)} reversed.` : ''} ${v.narration || ''}`.trim(),
         jeType: 'purchase_reversal'
       };
     });
@@ -472,19 +493,41 @@
     // Oldest first, so the newest entry ends up on top like a fresh post
     vouchers.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).forEach((v, i) => {
       if (!v.journalEntryId) v.journalEntryId = idBase + i * 3;
-      const res = postPurchaseVoucherToJournal(v, { silent: true });
-      if (res) {
-        // A reversal of a Pre Purchase document with nothing refunded has no entry at all
-        v.journalEntryId = res.purchaseJEId || '';
-        v.tdsJournalEntryId = res.tdsJEId || '';
-        v.tdsVoucherNo = res.tdsJEId ? res.tdsVoucherNo : '';
-        v.paymentJournalEntryId = res.paymentJEId || '';
-        v.paymentVoucherNo = res.paymentJEId ? res.paymentVoucherNo : '';
-        v.advanceRefundJournalEntryId = res.advanceRefundJEId || '';
-        v.advanceRefundVoucherNo = res.advanceRefundJEId ? res.advanceRefundVoucherNo : '';
-      }
+      repostPurchaseInPlace(v);
     });
     window.postedEntries = postedEntries;
+  }
+
+  function repostPurchaseInPlace(v) {
+    const res = postPurchaseVoucherToJournal(v, { silent: true });
+    if (res) {
+      // A reversal of a Pre Purchase document with nothing refunded has no entry at all
+      v.journalEntryId = res.purchaseJEId || '';
+      v.tdsJournalEntryId = res.tdsJEId || '';
+      v.tdsVoucherNo = res.tdsJEId ? res.tdsVoucherNo : '';
+      v.paymentJournalEntryId = res.paymentJEId || '';
+      v.paymentVoucherNo = res.paymentJEId ? res.paymentVoucherNo : '';
+      v.advanceRefundJournalEntryId = res.advanceRefundJEId || '';
+      v.advanceRefundVoucherNo = res.advanceRefundJEId ? res.advanceRefundVoucherNo : '';
+    }
+  }
+
+  // A purchase whose payment entry sets off a journal advance held in Advances to Suppliers
+  // (v.journalAdvanceSetOff) is posted again once that journal changes — edited, deleted —
+  // so the set-off always matches it (run with every refreshAllReports)
+  function syncPurchaseJournalAdvanceSetOffs() {
+    if (typeof postedEntries === 'undefined' || !window.KYA_STORE) return;
+    const used = new Map();
+    postedEntries.forEach(e => (e && e.allRows || []).forEach(row => {
+      if (!row || !row.advanceOf) return;
+      (row.allocations || []).forEach(a => {
+        if (a && a.store === 'purchaseVouchers' && r2(a.amount) > 0) used.set(String(a.docId), r2((used.get(String(a.docId)) || 0) + r2(a.amount)));
+      });
+    }));
+    (window.KYA_STORE.purchaseVouchers || []).forEach(v => {
+      if (!v || v.isDraft || v.isReturn) return;
+      if (Math.abs(r2(used.get(String(v.id)) || 0) - r2(v.journalAdvanceSetOff || 0)) > 0.009) repostPurchaseInPlace(v);
+    });
   }
 
   // The voucher a purchase journal entry belongs to (any of its entries)
@@ -505,5 +548,6 @@
   window.postPurchaseVoucherToJournal = postPurchaseVoucherToJournal;
   window.removePurchaseJournalEntries = removePurchaseJournalEntries;
   window.rebuildPurchaseJournalEntries = rebuildPurchaseJournalEntries;
+  window.syncPurchaseJournalAdvanceSetOffs = syncPurchaseJournalAdvanceSetOffs;
   window.findPurchaseVoucherByEntry = findPurchaseVoucherByEntry;
 })();

@@ -1845,10 +1845,14 @@
         totalDr += dr;
         totalCr += cr;
 
+        // What a party line's money is against (Journal Entry → Received / Paid / Refunded
+        // Against, journal-allocations.js) on a second line
+        const against = (r.allocations || []).filter(a => a && parseFloat(a.amount) > 0)
+          .map(a => `${a.docNo}${a.partyName ? ` (${a.partyName})` : ''} ${fmtNum(parseFloat(a.amount))}`).join(' · ');
         tableBody.push([
           idx + 1,
           r.type || (dr > 0 ? 'By' : 'To'),
-          r.particular || '—',
+          (r.particular || '—') + (against ? `\nAgainst: ${against}` : ''),
           dr ? fmtNum(dr) : '—',
           cr ? fmtNum(cr) : '—'
         ]);

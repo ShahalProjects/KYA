@@ -120,12 +120,18 @@
     const countDocs = key => (store()[key] || []).filter(d => d && isPartyDoc(d, p)).length;
     const newestFirst = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (Number(b.id) || 0) - (Number(a.id) || 0);
     // The ones still open — not completed (invoiced) or cancelled
+    // Their advance: the document's own, plus what Journal Entry received against it
+    // (journal-allocations.js)
     const activePreInvoices = [];
+    let journalAdvance = 0, journalAdvanceDocs = 0;
     PRE_INVOICE_DOCS.forEach(src => (store()[src.store] || []).forEach(d => {
       if (!d || !isPartyDoc(d, p) || (d.status && d.status !== 'Active')) return;
+      const byJournal = typeof getJournalAllocatedTo === 'function' ? getJournalAllocatedTo(src.store, d.id) : 0;
+      journalAdvance += byJournal;
+      if (byJournal > 0 && !(parseFloat(d.advancePaidAmount) > 0)) journalAdvanceDocs++;
       activePreInvoices.push({
         kind: src.kind, type: src.type, id: d.id, no: d[src.noField] || '', date: d.date,
-        total: r2(d.total), advance: r2(d.advancePaidAmount)
+        total: r2(d.total), advance: r2(r2(d.advancePaidAmount) + byJournal)
       });
     }));
     const reversalDocs = docs.filter(v => v.isReturn).map(v => ({
@@ -152,9 +158,11 @@
       unpaid,
       credits,
       refund: sumKinds(['reversal', 'parked']),
-      advance: sumKinds(['advance']),
+      // …and advances received by Journal Entry, held in Advance from Customers
+      advance: r2(sumKinds(['advance', 'jadvance']) + journalAdvance),
       onAccount: sumKinds(['onaccount']),
-      advanceDocs: credits.filter(c => c.kind === 'advance').length,
+      advanceDocs: credits.filter(c => c.kind === 'advance').length + journalAdvanceDocs,
+      journalAdvances: credits.filter(c => c.kind === 'jadvance').length,
       net: getNetBalance(p)
     };
   }
@@ -167,9 +175,9 @@
   }
 
   function totalsOf(rows) {
-    const t = { receivable: 0, overdue: 0, refund: 0, advance: 0, onAccount: 0, net: 0, ageing: AGE_BUCKETS.map(() => 0), advanceDocs: 0 };
+    const t = { receivable: 0, overdue: 0, refund: 0, advance: 0, onAccount: 0, net: 0, ageing: AGE_BUCKETS.map(() => 0), advanceDocs: 0, journalAdvances: 0 };
     rows.forEach(s => {
-      ['receivable', 'overdue', 'refund', 'advance', 'onAccount', 'net', 'advanceDocs'].forEach(k => { t[k] += s[k]; });
+      ['receivable', 'overdue', 'refund', 'advance', 'onAccount', 'net', 'advanceDocs', 'journalAdvances'].forEach(k => { t[k] += s[k]; });
       s.ageing.forEach((v, i) => { t.ageing[i] += v; });
     });
     Object.keys(t).forEach(k => { if (typeof t[k] === 'number') t[k] = r2(t[k]); });
@@ -320,7 +328,10 @@
         ? `<span class="kch-alert">${ICONS.alert} ${money(t.overdue)} overdue</span>`
         : 'Nothing overdue')}
       ${tile('Refund Balance', money(t.refund), 'Owed back to customers')}
-      ${tile('Advance Received', money(t.advance), t.advanceDocs ? `On ${t.advanceDocs} active pre-invoice${t.advanceDocs > 1 ? 's' : ''}` : 'No advances held')}
+      ${tile('Advance Received', money(t.advance), [
+        t.advanceDocs ? `On ${t.advanceDocs} active pre-invoice${t.advanceDocs > 1 ? 's' : ''}` : '',
+        t.journalAdvances ? `${t.journalAdvances} by Journal Entry` : ''
+      ].filter(Boolean).join(' · ') || 'No advances held')}
     </div>`;
 
     // Ageing — a stacked bar with its own legend (the legend doubles as the table view)

@@ -10,7 +10,7 @@
 //    • Supplier Bank ....... the vendor's bank details, with Due Date, TDS deducted,
 //                            Paid and Balance Due. A purchase paid in full (or a cash
 //                            purchase) shows its Payment Details instead.
-//    • Notes / Terms ....... the voucher's Notes / Terms box
+//    • Terms & Conditions .. the voucher's Terms & Conditions box (Narration never prints)
 // ══════════════════════════════════════════════════════════════════
 (function() {
   'use strict';
@@ -114,6 +114,10 @@
     if (advance > 0) lines.push({ label: 'Advance Adjusted', value: num(advance) + (v.advanceVoucherNo ? ` (${v.advanceVoucherNo})` : '') });
     if (paidFrom && (paidNow > 0 || isCash)) lines.push({ label: 'Paid From', value: paidFrom });
     lines.push({ label: 'Amount Paid', value: num(paidAmount) });
+    // The rest paid by Journal Entry against the purchase (journal-allocations.js)
+    const journal = typeof getPurchaseJournalPaid === 'function'
+      ? Math.min(getPurchaseJournalPaid(v), Math.max(0, r2(r2(v.total) - (parseFloat(paidAmount) || 0)))) : 0;
+    if (journal > 0) lines.push({ label: 'Paid by Journal Entry', value: num(journal) });
     return { lines };
   }
 
@@ -196,6 +200,10 @@
 
     const coLines = [];
     if (co.address) coLines.push(esc(co.address).replace(/\n/g, '<br>'));
+    const coDistrict = co.district && String(co.district).toLowerCase() !== String(co.city || '').toLowerCase() ? co.district : '';
+    const coCityPin = [[co.city, coDistrict].filter(Boolean).join(', '), co.pincode].filter(Boolean).join(' - ');
+    if (coCityPin) coLines.push(esc(coCityPin));
+    if (co.state) coLines.push(esc(co.state));
     if (co.gstin) coLines.push(`GSTIN: ${esc(co.gstin)}`);
     const coContact = [co.phone ? 'Phone: ' + esc(co.phone) : '', co.email ? esc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
@@ -270,7 +278,7 @@
 
     const termsHtml = `
       <div style="flex:1 1 auto; min-width:0; padding:6px 8px; box-sizing:border-box;">
-        <div style="font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:5px;">Notes / Terms</div>
+        <div style="font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:5px;">Terms &amp; Conditions</div>
         <div style="font-size:11px; color:#334155; line-height:1.6; white-space:pre-wrap;">${esc(v.notes || '')}</div>
       </div>`;
 
@@ -282,7 +290,7 @@
         </div>`;
     };
     const gstTotalsRows = d.gstLines.map(l => totalsRow(esc(l.label), num(l.amount))).join('');
-    const signatory = (typeof getInvoiceSignatoryHtml === 'function') ? getInvoiceSignatoryHtml(co) : '<div style="flex:1 1 auto; min-height:60px;"></div>';
+    const signatory = (typeof getInvoiceSignatoryBlockHtml === 'function') ? getInvoiceSignatoryBlockHtml(co, companyName) : '';
     const logo = (typeof getCompanyLogoHtml === 'function') ? getCompanyLogoHtml(co) : '';
     const words = (typeof siAmountInWords === 'function') ? siAmountInWords(d.grandTotal) : '';
 
@@ -382,11 +390,7 @@
             <div style="flex:0 0 auto; background:var(--blue-600, #2563eb); border:1px solid #1d4ed8; border-radius:6px; padding:6px 12px; box-sizing:border-box; color:#ffffff; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
               ${totalsRow('Total Amount', num(d.grandTotal), { size: '12px', weight: 700, color: '#ffffff', pad: '1px 0' })}
             </div>
-            <div style="flex:1 1 auto; padding:8px 12px 0; box-sizing:border-box; text-align:center; display:flex; flex-direction:column; justify-content:space-between;">
-              <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${esc(companyName)}</div>
-              ${signatory}
-              <div style="border-top:1px solid #94a3b8; padding-top:5px; font-size:10.5px; color:#475569; font-weight:600;">Authorised Signatory</div>
-            </div>
+            ${signatory}
           </div>
         </div>
 

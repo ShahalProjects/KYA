@@ -3,6 +3,31 @@
   //  (Split from sales.js for maintainability)
   // ══════════════════════════════════════════════════════════════════
 
+  // ── Terms & Conditions / Narration label (voucher, Pre Invoice and Pre Purchase forms) ──
+  // Terms (the document's `notes`) print on the invoice / bill / document; Narration
+  // (`narration`) goes into the books only. Both boxes stay in the form; the label above them
+  // names the one showing, and clicking it switches to the other. `prefix` is the form's id
+  // prefix ('sales', 'purchase', 'quote', 'ppOrder' …); a `data-terms-label` on the label
+  // renames the Terms side (Delivery Challan / GRN: "Transport Notes / Terms").
+  function setVoucherNotesTab(prefix, tab) {
+    const isTerms = tab !== 'narration';
+    const toggle = document.getElementById(prefix + 'NotesToggle');
+    const termsBox = document.getElementById(prefix + 'Notes');
+    const narrationBox = document.getElementById(prefix + 'Narration');
+    if (toggle) {
+      toggle.dataset.notesTab = isTerms ? 'terms' : 'narration';
+      const label = toggle.querySelector('[data-notes-label]');
+      if (label) label.textContent = isTerms ? (toggle.dataset.termsLabel || 'Terms & Conditions') : 'Narration';
+    }
+    if (termsBox) termsBox.style.display = isTerms ? '' : 'none';
+    if (narrationBox) narrationBox.style.display = isTerms ? 'none' : '';
+  }
+
+  document.addEventListener('click', (e) => {
+    const toggle = e.target.closest && e.target.closest('[data-notes-for][data-notes-tab]');
+    if (toggle) setVoucherNotesTab(toggle.dataset.notesFor, toggle.dataset.notesTab === 'narration' ? 'terms' : 'narration');
+  });
+
   // A sales party can be a customer from the customer master or a ledger created under
   // Trade Receivables — both show up in the customer dropdown, so every lookup has to
   // check both. `fallbackName` is the name stored on the voucher, used when the master
@@ -169,7 +194,7 @@
       firstParticular: receiptRows[0].name,
       amount: (typeof fmtNum === 'function') ? fmtNum(amount) : amount.toFixed(2),
       allRows: rows,
-      narration: `Advance received from ${custName} against ${info.docLabel} No. ${info.docNo} (${doc.paymentStatus}).`,
+      narration: `Advance received from ${custName} against ${info.docLabel} No. ${info.docNo} (${doc.paymentStatus}). ${doc.narration || ''}`.trim(),
       jeType: 'advance_receipt',
       customerId: doc.customerId,
       customerName: custName,
@@ -884,13 +909,9 @@
 
     const origInv = getOriginalInvoiceForReturn();
     if (origInv) {
-      let origPaidAmt = 0;
-      if (origInv.paymentStatus === 'Full Payment') {
-        origPaidAmt = origInv.total;
-      } else if (origInv.paymentStatus === 'Partial Payment') {
-        origPaidAmt = origInv.paymentAmount || 0;
-      }
-      
+      // Received on the invoice itself and by Journal Entry against it
+      const origPaidAmt = getSalesInvoiceReceived(origInv);
+
       const otherReturns = (window.KYA_STORE.salesVouchers || []).filter(v => 
         v.isReturn && 
         v.returnAgainstInvoice && 
@@ -1101,6 +1122,30 @@
   }
   window.getSalesJournalReceived = getSalesJournalReceived;
 
+  // What a posted Sales Invoice received in all: its own payment and Journal Entry receipts
+  // against it (journal-allocations.js) — what a reversal of it can pay back
+  function getSalesInvoiceReceived(inv) {
+    if (!inv) return 0;
+    const total = parseFloat(inv.total) || 0;
+    const journal = typeof getInvoiceJournalReceived === 'function' ? getInvoiceJournalReceived(inv) : 0;
+    const stored = parseFloat(inv.paymentAmount) || 0;
+    // With journal receipts, "Full Payment" is the invoice's own payment of the rest
+    const own = inv.paymentStatus === 'Full Payment' ? ((journal > 0 && stored > 0) ? Math.min(stored, total) : total)
+      : (inv.paymentStatus === 'Partial Payment' ? stored : 0);
+    return Math.round(Math.min(total, own + journal) * 100) / 100;
+  }
+  window.getSalesInvoiceReceived = getSalesInvoiceReceived;
+
+  // Refunded by Journal Entry against the posted voucher being edited: a reversal's credit
+  // (rev:) or an advance it holds (park:) — journal-allocations.js. Only the rest can still be
+  // refunded on the voucher.
+  function getSalesJournalRefunded() {
+    const editing = window._editingSalesInvoice;
+    if (!editing || editing.isDraft || !editing.id || typeof getJournalAllocatedTo !== 'function') return 0;
+    return Math.round((getJournalAllocatedTo('customerCredit', `rev:${editing.id}`)
+      + getJournalAllocatedTo('customerCredit', `park:${editing.id}`)) * 100) / 100;
+  }
+
   // The part of the advance this invoice uses — never more than its Grand Total
   function getSalesAdvanceApplied(total) {
     const adv = getSalesLinkedAdvance().amount;
@@ -1195,9 +1240,9 @@
     const origInv = getOriginalInvoiceForReturn();
     if (!origInv || !box) return false;
     const fmt = n => (typeof fmtNum === 'function') ? fmtNum(n) : (parseFloat(n) || 0).toFixed(2);
-    const paid = origInv.paymentStatus === 'Full Payment'
-      ? ((parseFloat(origInv.paymentAmount) || 0) > 0 ? parseFloat(origInv.paymentAmount) : (parseFloat(origInv.total) || 0))
-      : (origInv.paymentStatus === 'Partial Payment' ? (parseFloat(origInv.paymentAmount) || 0) : 0);
+    // Received on the invoice itself and by Journal Entry against it
+    const paid = getSalesInvoiceReceived(origInv);
+    const receivedByJournal = typeof getInvoiceJournalReceived === 'function' ? Math.min(paid, getInvoiceJournalReceived(origInv)) : 0;
     const payAmtEl = document.getElementById('salesPaymentAmount');
     const refundable = payAmtEl ? (parseFloat(payAmtEl.dataset.refundable) || 0) : 0;
     const already = Math.max(0, Math.round((paid - refundable) * 100) / 100);
@@ -1209,10 +1254,14 @@
       box.innerHTML = `${row('Credit to apply to invoices', `₹ ${fmt(getSalesPaymentMax(total))}`, true)}
         <div style="margin-top: 4px; font-weight: 500;">Nothing is paid out — the invoices chosen show this much less due.</div>`;
     } else {
-      const now = Math.min(total, refundable);
+      // Less what Journal Entry already refunded against this reversal (journal-allocations.js)
+      const journal = getSalesJournalRefunded();
+      const now = Math.max(0, Math.min(total - journal, refundable));
       box.innerHTML = paid > 0
         ? `${row(`Received on ${invNo}`, `₹ ${fmt(paid)}`)}
+           ${receivedByJournal > 0 ? row('&nbsp;&nbsp;of which by Journal Entry', `₹ ${fmt(receivedByJournal)}`) : ''}
            ${already > 0 ? row('Already refunded', `₹ ${fmt(already)}`) : ''}
+           ${journal > 0 ? row('Refunded by Journal Entry', `₹ ${fmt(journal)}`) : ''}
            ${row('Refundable on this reversal', `₹ ${fmt(now)}`, true)}
            <div style="margin-top: 4px; font-weight: 500;">Any part not refunded stays as a credit to the customer.</div>${adjustHint}`
         : `<div style="font-weight: 500;">Nothing was received on ${invNo} — the reversal reduces what the customer owes.</div>${adjustHint}`;
@@ -1367,25 +1416,28 @@
       // With an advance, only the balance is left to pay — or, when the advance is more
       // than the invoice, only the excess can be refunded
       const excess = getSalesAdvanceExcess(total);
-      maxVal = excess > 0 ? excess
+      maxVal = excess > 0 ? Math.max(0, Math.round((excess - getSalesJournalRefunded()) * 100) / 100)
         : Math.max(0, Math.round((total - getSalesAdvanceApplied(total) - getSalesJournalReceived()) * 100) / 100);
     }
     if (currentSalesVoucherSubtype === 'Return') {
+      // Refunded by Journal Entry already: only the rest is left on the reversal
+      const journalRefunded = getSalesJournalRefunded();
       // Reversing a pre-invoice: only its advance can be refunded
       const revPre = typeof getSalesReversalPreInvoice === 'function' ? getSalesReversalPreInvoice() : null;
-      if (revPre) return revPre.advance;
+      if (revPre) return Math.max(0, Math.round((revPre.advance - journalRefunded) * 100) / 100);
       // What the invoice still has to refund (set when it is chosen). The input's own max
       // follows this and the current total, so it is not read back here — otherwise a
       // lower total would stick after the quantity goes up again.
       // Applying the credit to unpaid invoices (Invoice Balance) pays nothing
       // out, so it can use the whole reversal
+      const creditLeft = Math.max(0, Math.round((total - journalRefunded) * 100) / 100);
       if (document.getElementById('salesPaymentAccount')?.value === 'credit-adjust' && getOriginalInvoiceForReturn()) {
-        return total;
+        return creditLeft;
       }
       const payAmtEl = document.getElementById('salesPaymentAmount');
       const refundable = payAmtEl ? parseFloat(payAmtEl.dataset.refundable) : NaN;
       if (!isNaN(refundable)) {
-        maxVal = Math.min(total, refundable);
+        maxVal = Math.min(creditLeft, refundable);
       } else if (!getOriginalInvoiceForReturn()) {
         maxVal = 0; // nothing chosen yet, nothing to refund
       }

@@ -93,6 +93,12 @@
       return window.KYA_STORE;
     }
 
+    // Advance received / paid against a saved document by Journal Entry (journal-allocations.js)
+    function journalAdvanceOf(doc) {
+      if (!doc || doc.isDraft || typeof getJournalAllocatedTo !== 'function') return 0;
+      return getJournalAllocatedTo(cfg.storeKey, doc.id);
+    }
+
     // Saved documents plus drafts, newest first
     function getAll() {
       if (typeof cfg.heal === 'function') cfg.heal();
@@ -185,6 +191,9 @@
       if (isReversedBlocked(doc, `${cfg.kind} ${docNo}`)) return;
       if (doc && typeof blockIfCreditUsed === 'function'
           && blockIfCreditUsed([`adv:${cfg.storeKey}:${doc.id}`], `${cfg.kind} ${docNo}`, 'deleted')) return;
+      // One that Journal Entry money is against stays (journal-allocations.js)
+      if (doc && typeof blockIfJournalAgainst === 'function'
+          && blockIfJournalAgainst(journalRefsOf(cfg.storeKey, doc.id), `${cfg.kind} ${docNo}`, 'deleted')) return;
       if (doc && doc.status === 'Completed') {
         showToast(`Completed ${cfg.plural.toLowerCase()} cannot be deleted.`, 'warning');
         return;
@@ -256,7 +265,10 @@
         advancePaidAmount: doc.advancePaidAmount || 0,
         advanceJournalEntryId: doc.advanceJournalEntryId || null,
         advanceVoucherNo: doc.advanceVoucherNo || null,
-        notes: doc.notes ? `${doc.notes}\n[Converted from ${cfg.kind} ${doc[cfg.noField]}]` : `Converted from ${cfg.kind} ${doc[cfg.noField]}`,
+        // The document's terms carry over to print; where it came from, and its own Narration,
+        // go into the Narration
+        notes: doc.notes || '',
+        narration: `Converted from ${cfg.kind} ${doc[cfg.noField]}. ${doc.narration || ''}`.trim(),
         adjustments: doc.adjustments || 0,
         tdsTcsMode: doc.tdsTcsMode || 'None',
         tdsTcsRate: doc.tdsTcsRate || 0,
@@ -419,7 +431,7 @@
               <td style="padding: 12px 14px; font-size: 12px; color: var(--slate-600); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${itemsSummary}</td>
               <td style="padding: 12px 16px; text-align: right; font-weight: 800; color: var(--slate-900); white-space: nowrap;">
                 ₹ ${safeFmtNum(d.total)}
-                ${d.advancePaidAmount ? `<div style="font-size: 11px; color: #047857; font-weight: 600;">Adv: ₹${safeFmtNum(d.advancePaidAmount)}</div>` : ''}
+                ${(parseFloat(d.advancePaidAmount) || 0) + journalAdvanceOf(d) > 0 ? `<div style="font-size: 11px; color: #047857; font-weight: 600;">Adv: ₹${safeFmtNum((parseFloat(d.advancePaidAmount) || 0) + journalAdvanceOf(d))}</div>` : ''}
               </td>
               <td style="padding: 12px 14px; text-align: center; white-space: nowrap;">${statusBadge(d)}</td>
             </tr>`;
@@ -664,6 +676,10 @@
                       <div style="font-size: 11.5px; color: var(--slate-600); margin-top: 4px;">
                         <strong>Advance:</strong> ₹${safeFmtNum(doc.advancePaidAmount || doc.paymentAmount)}
                         ${doc.advanceVoucherNo ? `<span style="font-family: monospace; color: var(--blue-700); font-weight: 700; margin-left: 4px;">[${safeEsc(doc.advanceVoucherNo)}]</span>` : ''}
+                      </div>` : ''}
+                    ${journalAdvanceOf(doc) > 0 ? `
+                      <div style="font-size: 11.5px; color: var(--slate-600); margin-top: 4px;">
+                        <strong>By Journal Entry:</strong> ₹${safeFmtNum(journalAdvanceOf(doc))}
                       </div>` : ''}
                   </div>`}
                   ${doc[P_EXEC] ? `

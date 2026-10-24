@@ -730,6 +730,9 @@
     field('GSTIN', d.co.gstin || '');
     field('PAN', d.co.pan || '');
     field('Address', d.co.address ? String(d.co.address).replace(/\s*\n\s*/g, ', ') : '');
+    field('City', d.co.city || '');
+    field('District', d.co.district || '');
+    field('Pincode', d.co.pincode ? String(d.co.pincode) : '');
     field('State', d.co.state || '');
     field('Phone', d.co.phone ? String(d.co.phone) : '');
     field('Email', d.co.email || '');

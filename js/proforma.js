@@ -31,6 +31,12 @@
     return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // Advance received against a saved proforma by Journal Entry (journal-allocations.js)
+  function proformaJournalAdvance(prof) {
+    if (!prof || prof.isDraft || typeof getJournalAllocatedTo !== 'function') return 0;
+    return getJournalAllocatedTo('proformaInvoices', prof.id);
+  }
+
   function safeParseAmt(val) {
     if (typeof parseSalesAmt === 'function') return parseSalesAmt(val);
     if (!val) return 0;
@@ -169,6 +175,8 @@
     const noEl = document.getElementById('proformaNo');
     const chipEl = document.getElementById('proformaChipDisplay');
     const notesEl = document.getElementById('proformaNotes');
+    const narrationEl = document.getElementById('proformaNarration');
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('proforma', 'terms');
     const supplyTypeEl = document.getElementById('proformaSupplyType');
     const dueEl = document.getElementById('proformaDueDate');
 
@@ -180,11 +188,12 @@
       if (noEl) noEl.value = proformaData.proformaNo || '';
       if (chipEl) chipEl.textContent = proformaData.proformaNo || 'PI-2026-001';
       if (notesEl) notesEl.value = proformaData.notes || '';
+      if (narrationEl) narrationEl.value = proformaData.narration || '';
       if (supplyTypeEl && proformaData.supplyType) supplyTypeEl.value = proformaData.supplyType;
 
       proformaRows = Array.isArray(proformaData.rows) ? JSON.parse(JSON.stringify(proformaData.rows)) : [];
       if (proformaRows.length === 0) {
-        proformaRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+        proformaRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
       }
 
       // Populate customer
@@ -258,9 +267,10 @@
       if (noEl) noEl.value = nextNum;
       if (chipEl) chipEl.textContent = nextNum;
       if (notesEl) notesEl.value = '';
+      if (narrationEl) narrationEl.value = '';
       if (supplyTypeEl) supplyTypeEl.value = 'Intra-State (CGST + SGST)';
 
-      proformaRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+      proformaRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
 
       populateProformaCustomers();
       selectProformaCustomer(''); // a new proforma starts with no customer
@@ -734,7 +744,7 @@
             </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
-            <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
+            <input type="number" class="sales-row-qty je-input" value="${row.qtyBlank ? '' : (row.qty !== undefined ? row.qty : 1)}" placeholder="Qty" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
           </td>
           <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
             <input type="text" class="sales-row-unit je-input" value="${safeEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" />
@@ -787,6 +797,7 @@
             if (typeof window.applyMasterItemToVoucherRow === 'function') {
               window.applyMasterItemToVoucherRow(proformaRows[index], tr, selectedItem);
               updateProformaRowFromDOM(index, tr, 'item');
+              if (typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(proformaRows, index);
             } else {
               proformaRows[index].item = selectedItem.name;
               proformaRows[index].itemType = selectedItem.type;
@@ -824,7 +835,7 @@
   }
 
   function addProformaRow() {
-    proformaRows.push({ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
+    proformaRows.push({ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
     renderProformaRows();
     recalculateProformaTotals();
   }
@@ -845,7 +856,9 @@
     const unitEl = tr.querySelector('.sales-row-unit');
     if (unitEl) row.unit = unitEl.value;
 
-    let qty = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    // An empty Qty means 1
+    const qtyEl = tr.querySelector('.sales-row-qty');
+    let qty = (qtyEl && qtyEl.value.trim() === '') ? 1 : (parseFloat(qtyEl?.value) || 0);
     let rate = Math.round(safeParseAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
     let discount = safeParseAmt(tr.querySelector('.sales-row-discount')?.value || '0');
     row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
@@ -893,6 +906,9 @@
         amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
       }
     }
+
+    if (qtyEl && qtyEl.value.trim() === '') row.qtyBlank = true;
+    else delete row.qtyBlank;
 
     recalculateProformaTotals();
   }
@@ -1114,6 +1130,7 @@
     }
 
     const notes = document.getElementById('proformaNotes')?.value || '';
+    const narration = document.getElementById('proformaNarration')?.value || '';
     const subTotal = calculateProformaSubtotal();
 
     let tdsTcsMode = 'None';
@@ -1182,7 +1199,7 @@
       advanceJournalEntryId: _editingProforma ? _editingProforma.advanceJournalEntryId : null,
       advanceVoucherNo: _editingProforma ? _editingProforma.advanceVoucherNo : null,
       advancePaidAmount: _editingProforma ? _editingProforma.advancePaidAmount : 0,
-      rows: JSON.parse(JSON.stringify(proformaRows)),
+      rows: typeof window.voucherRowsForSave === 'function' ? window.voucherRowsForSave(proformaRows) : JSON.parse(JSON.stringify(proformaRows)),
       subTotal,
       tdsTcsMode,
       tdsTcsRate,
@@ -1190,6 +1207,7 @@
       adjustments,
       total,
       notes,
+      narration,
       document: _proformaDocData ? {
         name: _proformaDocName,
         size: _proformaDocSize,
@@ -1520,6 +1538,8 @@
         if (!tr) return;
         const index = parseInt(tr.dataset.rowIndex);
         updateProformaRowFromDOM(index, tr, 'rate');
+        // More than the stock on hand (or none at all): say so
+        if (e.target.classList.contains('sales-row-qty') && typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(proformaRows, index);
       });
 
       proformaBody.addEventListener('click', (e) => {
@@ -1532,7 +1552,7 @@
               if (proformaRows.length > 1) {
                 proformaRows.splice(index, 1);
               } else {
-                proformaRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+                proformaRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
               }
               renderProformaRows();
               recalculateProformaTotals();
@@ -1808,6 +1828,9 @@
 
     if (prof && typeof blockIfCreditUsed === 'function'
         && blockIfCreditUsed([`adv:proformaInvoices:${prof.id}`], `Proforma ${pNo}`, 'deleted')) return;
+    // One that Journal Entry money is against stays (journal-allocations.js)
+    if (prof && typeof blockIfJournalAgainst === 'function'
+        && blockIfJournalAgainst(journalRefsOf('proformaInvoices', prof.id), `Proforma ${pNo}`, 'deleted')) return;
     if (prof && prof.status === 'Completed') {
       showToast('Completed proforma invoices cannot be deleted.', 'warning');
       return;
@@ -1883,7 +1906,10 @@
       advancePaidAmount: prof.advancePaidAmount || (prof.paymentStatus === 'Full Payment' ? prof.total : (parseFloat(prof.paymentAmount) || 0)),
       advanceJournalEntryId: prof.advanceJournalEntryId || null,
       advanceVoucherNo: prof.advanceVoucherNo || null,
-      notes: prof.notes ? `${prof.notes}\n[Converted from Proforma ${prof.proformaNo}]` : `Converted from Proforma ${prof.proformaNo}`,
+      // The proforma's terms carry over to print; where it came from, and its own Narration,
+      // go into the Narration
+      notes: prof.notes || '',
+      narration: `Converted from Proforma ${prof.proformaNo}. ${prof.narration || ''}`.trim(),
       adjustments: prof.adjustments || 0,
       tdsTcsMode: prof.tdsTcsMode || 'None',
       tdsTcsRate: prof.tdsTcsRate || 0,
@@ -2179,6 +2205,11 @@
                     <div style="font-size: 11.5px; color: var(--slate-600); margin-top: 4px;">
                       <strong>Advance:</strong> ₹${safeFmtNum(prof.advancePaidAmount || prof.paymentAmount)}
                       ${prof.advanceVoucherNo ? `<span style="font-family: monospace; color: var(--blue-700); font-weight: 700; margin-left: 4px;">[${safeEsc(prof.advanceVoucherNo)}]</span>` : ''}
+                    </div>
+                  ` : ''}
+                  ${proformaJournalAdvance(prof) > 0 ? `
+                    <div style="font-size: 11.5px; color: var(--slate-600); margin-top: 4px;">
+                      <strong>By Journal Entry:</strong> ₹${safeFmtNum(proformaJournalAdvance(prof))}
                     </div>
                   ` : ''}
                 </div>
@@ -2487,7 +2518,7 @@
               </td>
               <td style="padding: 12px 16px; text-align: right; font-weight: 800; color: var(--slate-900); white-space: nowrap;">
                 ₹ ${safeFmtNum(p.total)}
-                ${p.advancePaidAmount ? `<div style="font-size: 11px; color: #047857; font-weight: 600;">Adv: ₹${safeFmtNum(p.advancePaidAmount)}</div>` : ''}
+                ${(parseFloat(p.advancePaidAmount) || 0) + proformaJournalAdvance(p) > 0 ? `<div style="font-size: 11px; color: #047857; font-weight: 600;">Adv: ₹${safeFmtNum((parseFloat(p.advancePaidAmount) || 0) + proformaJournalAdvance(p))}</div>` : ''}
               </td>
               <td style="padding: 12px 14px; text-align: center; white-space: nowrap;">
                 ${statusBadge}

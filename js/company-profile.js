@@ -4,88 +4,40 @@
 
     // Load initial data
     let coData = getCompanyDetails();
-    if (!coData.banks) coData.banks = [];
     if (!coData.people) coData.people = { directors: [], keyEmployees: [], auditor: {}, taxConsultant: {} };
     if (!coData.people.directors) coData.people.directors = [];
     if (!coData.people.keyEmployees) coData.people.keyEmployees = [];
     if (!coData.people.auditor) coData.people.auditor = {};
     if (!coData.people.taxConsultant) coData.people.taxConsultant = {};
     if (!coData.documents) coData.documents = [];
-    if (!coData.insuranceAssets) coData.insuranceAssets = { policies: [], assets: [] };
-    if (!coData.insuranceAssets.policies) coData.insuranceAssets.policies = [];
-    if (!coData.insuranceAssets.assets) coData.insuranceAssets.assets = [];
 
-    const escSealText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-    const buildSealSVG = (name, shape) => {
-      const rawName = (name || 'COMPANY NAME').trim();
-      const label = escSealText(rawName.toUpperCase());
-      const ink = '#b91c1c';
-      const labelLen = label.length;
-
-      let fsTop = 15;
-      let letterSpacing = '1.2';
-      if (labelLen > 18) { fsTop = 13; letterSpacing = '0.8'; }
-      if (labelLen > 24) { fsTop = 11; letterSpacing = '0.5'; }
-      if (labelLen > 30) { fsTop = 9.5; letterSpacing = '0.2'; }
-
-      if (shape === 'rectangle') {
-        return `<svg viewBox="0 0 260 160" xmlns="http://www.w3.org/2000/svg">
-          <rect x="6" y="6" width="248" height="148" fill="none" stroke="${ink}" stroke-width="3.5"/>
-          <rect x="13" y="13" width="234" height="134" fill="none" stroke="${ink}" stroke-width="1.2"/>
-          <rect x="20" y="20" width="220" height="120" fill="none" stroke="${ink}" stroke-width="1.5"/>
-          <text x="130" y="66" text-anchor="middle" font-family="'Arial Black', Arial, sans-serif" font-size="${fsTop}" font-weight="900" fill="${ink}">${label}</text>
-          <line x1="46" y1="82" x2="214" y2="82" stroke="${ink}" stroke-width="1.2"/>
-          <text x="130" y="98" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}" letter-spacing="3">★ ★ ★</text>
-          <line x1="46" y1="106" x2="214" y2="106" stroke="${ink}" stroke-width="1.2"/>
-          <text x="130" y="132" text-anchor="middle" font-family="'Arial Black', Arial, sans-serif" font-size="11.5" font-weight="900" fill="${ink}" letter-spacing="1.8">AUTHORISED SIGNATORY</text>
-        </svg>`;
-      }
-
-      // ROUND — top/bottom arc text share the same chord (left↔right through the ring
-      // radius) so both halves stay concentric and upright: sweep=1 draws the upper
-      // semicircle, sweep=0 the lower one, both traversed left-to-right.
-      const cx = 100, cy = 100;
-      const rText = 68;
-      const leftX = cx - rText, rightX = cx + rText;
-      return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-        <defs>
-          <path id="coSealTopArc" d="M ${leftX},${cy} A ${rText},${rText} 0 1 1 ${rightX},${cy}" fill="none"/>
-          <path id="coSealBottomArc" d="M ${leftX},${cy} A ${rText},${rText} 0 1 0 ${rightX},${cy}" fill="none"/>
-        </defs>
-        <circle cx="${cx}" cy="${cy}" r="93" fill="none" stroke="${ink}" stroke-width="3.5"/>
-        <circle cx="${cx}" cy="${cy}" r="87" fill="none" stroke="${ink}" stroke-width="1"/>
-        <circle cx="${cx}" cy="${cy}" r="48" fill="none" stroke="${ink}" stroke-width="1.8"/>
-
-        <text font-family="'Arial Black', Arial, sans-serif" font-size="${fsTop}" font-weight="900" fill="${ink}" letter-spacing="${letterSpacing}">
-          <textPath href="#coSealTopArc" xlink:href="#coSealTopArc" startOffset="50%" text-anchor="middle">${label}</textPath>
-        </text>
-
-        <text x="24" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}">★</text>
-        <text x="176" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}">★</text>
-
-        <text font-family="'Arial Black', Arial, sans-serif" font-size="10.5" font-weight="900" fill="${ink}" letter-spacing="1.8">
-          <textPath href="#coSealBottomArc" xlink:href="#coSealBottomArc" startOffset="50%" text-anchor="middle">AUTHORISED SIGNATORY</textPath>
-        </text>
-
-        <line x1="62" y1="88" x2="138" y2="88" stroke="${ink}" stroke-width="1.2"/>
-        <text x="100" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}" letter-spacing="3">★ ★ ★</text>
-        <line x1="62" y1="112" x2="138" y2="112" stroke="${ink}" stroke-width="1.2"/>
-      </svg>`;
-    };
-
-    if (coData.sealShape === 'square') coData.sealShape = 'rectangle';
-
+    // The seal is drawn by buildInvoiceSealSvg (sales-invoice-print.js), so the
+    // profile preview matches the printed invoice. Seals made before the round-only
+    // format (including old rectangle ones) are redrawn here.
     if (coData.sealImage && typeof coData.sealImage === 'string' && coData.sealImage.startsWith('data:image/svg+xml')) {
       try {
-        const svg = buildSealSVG(coData.sealName || coData.name || coData.displayName || '', coData.sealShape || 'round');
+        const svg = buildInvoiceSealSvg(coData.sealName || coData.name || coData.displayName || '', getInvoiceSealPlace(coData));
         const dataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
         coData.sealImage = dataUrl;
+        delete coData.sealShape;
         saveCompanyDetails(coData);
       } catch (e) {}
     }
 
     const initials = getCompanyInitials(coData.name);
+
+    // District / State search boxes: KYA searchable select, like the Journal Department box
+    const coAddrSelectBox = (key, value) => `
+                      <div class="kya-searchable-select-wrap" id="co${key}SelectWrap" style="position:relative;width:100%;">
+                        <div class="kya-searchable-select-trigger" id="co${key}SelectTrigger" style="display:flex;justify-content:space-between;align-items:center;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:9px;background:#fff;cursor:pointer;font-size:13.5px;color:#334155;height:40px;box-sizing:border-box;">
+                          <span id="co${key}SelectTriggerText" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ohEsc(value || `— Select ${key} —`)}</span>
+                          <svg viewBox="0 0 16 16" fill="none" style="width:10px;height:10px;stroke:var(--slate-500);stroke-width:2;margin-left:6px;flex-shrink:0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <div class="kya-searchable-select-dropdown" id="co${key}SelectDropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--slate-200);border-radius:12px;box-shadow:var(--shadow-lg);z-index:1000;padding:8px;max-height:240px;overflow-y:auto;flex-direction:column;gap:4px;width:100%;box-sizing:border-box;">
+                          <input type="text" id="co${key}SelectSearch" placeholder="Search ${key.toLowerCase()}..." class="je-input" style="padding:8px 12px;font-size:13px;border-radius:6px;border:1.5px solid var(--slate-200);margin-bottom:6px;width:100%;box-sizing:border-box;">
+                          <div id="co${key}SelectOptionsList" style="display:flex;flex-direction:column;gap:2px;"></div>
+                        </div>
+                      </div>`;
 
     // Header layout
     wrap.innerHTML = `
@@ -101,7 +53,7 @@
             </div>
             <div>
               <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px;">Company Profile & Vault</div>
-              <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:2px;">Organize legal entities, compliance documents, bank accounts, and corporate vault</div>
+              <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:2px;">Organize legal entities, compliance documents, and corporate vault</div>
             </div>
           </div>
         </div>
@@ -127,12 +79,6 @@
               </div>
               <span class="oh-tab-text">Tax & Compliance</span>
             </button>
-            <button class="oh-sub-tab" data-subtab="banking">
-              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-              </div>
-              <span class="oh-tab-text">Banking</span>
-            </button>
             <button class="oh-sub-tab" data-subtab="people">
               <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -144,12 +90,6 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
               </div>
               <span class="oh-tab-text">Document Vault</span>
-            </button>
-            <button class="oh-sub-tab" data-subtab="assets">
-              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-              </div>
-              <span class="oh-tab-text">Assets & Insurance</span>
             </button>
           </div>
 
@@ -193,7 +133,29 @@
                   </div>
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Business Address</label>
-                    <textarea id="coAddressInput" placeholder="Street, City, State, PIN" rows="3" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;color:#334155;outline:none;resize:vertical;font-family:Inter,sans-serif;line-height:1.4;">${ohEsc(coData.address||'')}</textarea>
+                    <textarea id="coAddressInput" placeholder="Street Address / Building / Area" rows="3" style="width:100%;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 12px;font-size:13.5px;color:#334155;outline:none;resize:vertical;font-family:Inter,sans-serif;line-height:1.4;">${ohEsc(coData.address||'')}</textarea>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">City</label>
+                      <input id="coCityInput" value="${ohEsc(coData.city||'')}" placeholder="e.g. Kochi" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">District</label>
+                      <input type="hidden" id="coDistrictInput" value="${ohEsc(coData.district||'')}">
+                      ${coAddrSelectBox('District', coData.district)}
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">State</label>
+                      <input type="hidden" id="coStateInput" value="${ohEsc(coData.state||'')}">
+                      ${coAddrSelectBox('State', coData.state)}
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">PIN Code</label>
+                      <input id="coPincodeInput" value="${ohEsc(coData.pincode||'')}" placeholder="e.g. 682001" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                    </div>
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                     <div>
@@ -259,10 +221,6 @@
                       <div style="display:flex;flex-direction:column;gap:8px;">
                         <label style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Company Seal / Stamp</label>
                         <input id="coSealName" value="${ohEsc(coData.sealName || coData.name || coData.displayName || '')}" placeholder="Seal name (e.g. company name)" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box;">
-                        <select id="coSealShape" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 8px;font-size:12px;background:#fff;color:#334155;outline:none;">
-                          <option value="round" ${coData.sealShape !== 'rectangle' ? 'selected' : ''}>Round Seal</option>
-                          <option value="rectangle" ${coData.sealShape === 'rectangle' ? 'selected' : ''}>Rectangle Seal</option>
-                        </select>
                         <div style="display:flex;gap:8px;">
                           <button type="button" id="coGenerateSealBtn" style="flex:1;height:32px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
                             Generate Seal
@@ -359,26 +317,7 @@
               </div>
             </div>
 
-            <!-- TAB 4: BANKING -->
-            <div id="coSubpanel-banking" class="co-subpanel-content" style="display:none;">
-              <div style="display:flex;flex-direction:column;gap:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                  <div style="font-size:12px;color:#64748b;font-weight:500;">Add and manage all company bank accounts. Specify the primary account for payouts.</div>
-                  <button type="button" id="coAddBankBtn" style="height:32px;padding:0 14px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
-                    + Add Bank Account
-                  </button>
-                </div>
-                <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;min-height:100px;overflow-x:auto;">
-                  <div id="coBanksListContainer"></div>
-                </div>
-              </div>
-
-              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
-                <button type="button" class="co-save-section-btn" data-section="banking" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Bank Accounts</button>
-              </div>
-            </div>
-
-            <!-- TAB 5: KEY PEOPLE -->
+            <!-- TAB 4: KEY PEOPLE -->
             <div id="coSubpanel-people" class="co-subpanel-content" style="display:none;">
               <div style="display:flex;flex-direction:column;gap:20px;">
                 <!-- Directors / Partners -->
@@ -431,7 +370,7 @@
               </div>
             </div>
 
-            <!-- TAB 6: DOCUMENT VAULT -->
+            <!-- TAB 5: DOCUMENT VAULT -->
             <div id="coSubpanel-vault" class="co-subpanel-content" style="display:none;">
               <div style="display:flex;flex-direction:column;gap:20px;">
                 <!-- Upload File Box -->
@@ -510,41 +449,6 @@
                     <div id="coDocsListContainer"></div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- TAB 7: ASSETS & INSURANCE -->
-            <div id="coSubpanel-assets" class="co-subpanel-content" style="display:none;">
-              <div style="display:flex;flex-direction:column;gap:20px;">
-                <!-- Insurance Policies -->
-                <div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Insurance Policies</label>
-                    <button type="button" id="coAddPolicyBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
-                      + Add Policy
-                    </button>
-                  </div>
-                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
-                    <div id="coPoliciesListContainer"></div>
-                  </div>
-                </div>
-
-                <!-- Major Assets -->
-                <div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Major Fixed Assets</label>
-                    <button type="button" id="coAddAssetBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
-                      + Add Asset
-                    </button>
-                  </div>
-                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
-                    <div id="coAssetsListContainer"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
-                <button type="button" class="co-save-section-btn" data-section="assets" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Assets & Policies</button>
               </div>
             </div>
 
@@ -658,18 +562,19 @@
     });
 
     const sealNameInp = wrap.querySelector('#coSealName');
-    const sealShapeInp = wrap.querySelector('#coSealShape');
     const sealImageInp = wrap.querySelector('#coSealImage');
     const sealPreview = wrap.querySelector('#coSealPreview');
 
     const removeSealBtn = wrap.querySelector('#coRemoveSealBtn');
     wrap.querySelector('#coGenerateSealBtn').addEventListener('click', () => {
       const name = sealNameInp.value.trim() || (nameInp ? nameInp.value.trim() : '') || 'COMPANY NAME';
-      const shape = sealShapeInp.value;
-      const svg = buildSealSVG(name, shape);
+      // The seal's place is the City box
+      const place = getInvoiceSealPlace({ ...coData, city: wrap.querySelector('#coCityInput').value });
+      const svg = buildInvoiceSealSvg(name, place);
       const dataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
       coData.sealName = name;
-      coData.sealShape = shape;
+      delete coData.sealPlaceCustom;
+      delete coData.sealShape;
       coData.sealImage = dataUrl;
       coData.sealRemoved = false;
       sealImageInp.value = dataUrl;
@@ -692,53 +597,158 @@
     }
 
 
-    // ── DYNAMIC LIST RENDERING ──
+    // ── DISTRICT / STATE SEARCH BOXES ──
+    // Picking a district fills in its state; a picked state limits the district list.
+    const stateDistricts = window.INDIA_STATE_DISTRICTS || {};
+    const districtAliases = window.INDIA_DISTRICT_ALIASES || {};
+    const stateNames = Object.keys(stateDistricts);
+    const districtInp = wrap.querySelector('#coDistrictInput');
+    const stateInp = wrap.querySelector('#coStateInput');
 
-    // 4. Banking List
-    const renderBanks = () => {
-      const cont = wrap.querySelector('#coBanksListContainer');
-      if (coData.banks.length === 0) {
-        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:16px 0;">No bank accounts configured.</div>`;
-        return;
-      }
-      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:700px;">
-        <thead>
-          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
-            <th style="padding:8px;width:150px;">Bank Name</th>
-            <th style="padding:8px;width:160px;">Account Number</th>
-            <th style="padding:8px;width:110px;">IFSC Code</th>
-            <th style="padding:8px;width:120px;">Branch</th>
-            <th style="padding:8px;width:110px;">Type</th>
-            <th style="padding:8px;text-align:center;width:70px;">Primary</th>
-            <th style="padding:8px;text-align:right;width:60px;">Action</th>
-          </tr>
-        </thead>
-        <tbody>`;
-      coData.banks.forEach((b, idx) => {
-        html += `<tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="bankName" value="${ohEsc(b.bankName||'')}" placeholder="e.g. HDFC Bank" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="accNo" value="${ohEsc(b.accNo||'')}" placeholder="Account No" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="ifsc" value="${ohEsc(b.ifsc||'')}" placeholder="IFSC" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;text-transform:uppercase;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="banks" data-index="${idx}" data-field="branch" value="${ohEsc(b.branch||'')}" placeholder="Branch Name" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;">
-            <select data-list="banks" data-index="${idx}" data-field="type" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;background:#fff;">
-              <option value="Current" ${b.type==='Current'?'selected':''}>Current</option>
-              <option value="Savings" ${b.type==='Savings'?'selected':''}>Savings</option>
-              <option value="Overdraft" ${b.type==='Overdraft'?'selected':''}>OD / CC</option>
-            </select>
-          </td>
-          <td style="padding:6px;text-align:center;"><input type="checkbox" data-list="banks" data-index="${idx}" data-field="isPrimary" ${b.isPrimary?'checked':''} style="transform:scale(1.2);cursor:pointer;"></td>
-          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="banks" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-      cont.innerHTML = html;
+    const isListedDistrict = (name) => stateNames.some(s => stateDistricts[s].includes(name));
+
+    const refreshAddrTriggers = () => {
+      wrap.querySelector('#coDistrictSelectTriggerText').textContent = districtInp.value || '— Select District —';
+      wrap.querySelector('#coStateSelectTriggerText').textContent = stateInp.value || '— Select State —';
     };
 
-    wrap.querySelector('#coAddBankBtn').addEventListener('click', () => {
-      coData.banks.push({ bankName: '', accNo: '', ifsc: '', branch: '', type: 'Current', isPrimary: coData.banks.length === 0 });
-      renderBanks();
+    const setCoDistrict = (district, state) => {
+      districtInp.value = district;
+      if (state) stateInp.value = state;
+      refreshAddrTriggers();
+    };
+
+    const setCoState = (state) => {
+      if (state === stateInp.value) return;
+      stateInp.value = state;
+      // A district of another state no longer fits; a typed-in district is kept
+      const d = districtInp.value;
+      if (d && isListedDistrict(d) && !(stateDistricts[state] || []).includes(d)) districtInp.value = '';
+      refreshAddrTriggers();
+    };
+
+    const closeAddrList = (key) => {
+      const dd = wrap.querySelector(`#co${key}SelectDropdown`);
+      if (dd) dd.style.display = 'none';
+    };
+
+    // List row, styled like the Journal Department list; sub is a grey second line
+    const addrListItem = (text, sub, isSelected, onPick) => {
+      const item = document.createElement('div');
+      item.style.cssText = `
+        padding: 8px 12px; font-size: 13px; border-radius: 6px; cursor: pointer;
+        font-weight: ${isSelected ? '700' : '500'};
+        background: ${isSelected ? 'var(--blue-50)' : 'transparent'};
+        color: ${isSelected ? 'var(--blue-700)' : 'var(--slate-700)'};
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        transition: background 0.15s ease;
+      `;
+      item.textContent = text;
+      if (sub) {
+        const subEl = document.createElement('div');
+        subEl.style.cssText = 'font-size: 11px; font-weight: 500; color: var(--slate-400);';
+        subEl.textContent = sub;
+        item.appendChild(subEl);
+      }
+      item.addEventListener('mouseenter', () => { if (!isSelected) item.style.background = 'var(--slate-50)'; });
+      item.addEventListener('mouseleave', () => { if (!isSelected) item.style.background = 'transparent'; });
+      item.addEventListener('click', onPick);
+      return item;
+    };
+
+    const addrEmptyRow = (text) => {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding: 12px 10px; text-align: center; font-size: 13px; font-weight: 600; color: var(--slate-500);';
+      empty.textContent = text;
+      return empty;
+    };
+
+    const renderDistrictList = (filter) => {
+      const list = wrap.querySelector('#coDistrictSelectOptionsList');
+      const q = (filter || '').toLowerCase().trim();
+      const state = stateDistricts[stateInp.value] ? stateInp.value : '';
+      const pool = [];
+      (state ? [state] : stateNames).forEach(s => stateDistricts[s].forEach(d => pool.push({ d, s })));
+      if (!state) pool.sort((a, b) => a.d.localeCompare(b.d));
+      list.innerHTML = '';
+
+      pool.forEach(({ d, s }) => {
+        if (q && !d.toLowerCase().includes(q) && !(districtAliases[s + '|' + d] || '').toLowerCase().includes(q)) return;
+        const isSelected = districtInp.value === d && stateInp.value === s;
+        list.appendChild(addrListItem(d, state ? '' : s, isSelected, () => {
+          setCoDistrict(d, s);
+          closeAddrList('District');
+        }));
+      });
+
+      if (!list.children.length) list.appendChild(addrEmptyRow('No District Found'));
+
+      // A district not in the list can be typed in: sticky footer like the Department box's "Create" footer
+      const raw = (filter || '').trim();
+      if (raw && !pool.some(p => p.d.toLowerCase() === raw.toLowerCase())) {
+        const footer = document.createElement('div');
+        footer.className = 'kya-party-create-footer';
+        footer.style.cssText = 'position: sticky; bottom: -8px; z-index: 5; background: #fff; border-top: 1px solid var(--slate-200); margin: 4px -8px -8px; padding: 8px 10px 10px; border-radius: 0 0 12px 12px;';
+        const label = document.createElement('div');
+        label.style.cssText = 'font-size: 11px; font-weight: 600; color: var(--slate-500); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+        label.textContent = `Use "${raw}" as`;
+        footer.appendChild(label);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'je-drop-create-item';
+        btn.style.cssText = 'width: 100%; justify-content: center; padding: 7px 10px; font-size: 12px;';
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>District</span>';
+        btn.addEventListener('mousedown', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          setCoDistrict(raw, '');
+          closeAddrList('District');
+        });
+        btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+        footer.appendChild(btn);
+        list.appendChild(footer);
+      }
+    };
+
+    const renderStateList = (filter) => {
+      const list = wrap.querySelector('#coStateSelectOptionsList');
+      const q = (filter || '').toLowerCase().trim();
+      list.innerHTML = '';
+      stateNames.forEach(s => {
+        if (q && !s.toLowerCase().includes(q)) return;
+        list.appendChild(addrListItem(s, '', stateInp.value === s, () => {
+          setCoState(s);
+          closeAddrList('State');
+        }));
+      });
+      if (!list.children.length) list.appendChild(addrEmptyRow('No State Found'));
+    };
+
+    ['District', 'State'].forEach(key => {
+      const trigger = wrap.querySelector(`#co${key}SelectTrigger`);
+      const dd = wrap.querySelector(`#co${key}SelectDropdown`);
+      const search = wrap.querySelector(`#co${key}SelectSearch`);
+      const render = key === 'District' ? renderDistrictList : renderStateList;
+      trigger.addEventListener('click', e => {
+        e.stopPropagation();
+        if (dd.style.display === 'flex') { closeAddrList(key); return; }
+        closeAddrList(key === 'District' ? 'State' : 'District');
+        dd.style.display = 'flex';
+        search.value = '';
+        render('');
+        setTimeout(() => search.focus(), 50);
+      });
+      search.addEventListener('input', () => render(search.value));
+      dd.addEventListener('click', e => e.stopPropagation());
     });
+
+    // One outside-click handler, replaced each time the panel is drawn
+    if (window._coAddrOutsideClick) document.removeEventListener('click', window._coAddrOutsideClick);
+    window._coAddrOutsideClick = () => { closeAddrList('District'); closeAddrList('State'); };
+    document.addEventListener('click', window._coAddrOutsideClick);
+
+
+    // ── DYNAMIC LIST RENDERING ──
 
     // 5. Directors List
     const renderDirectors = () => {
@@ -978,88 +988,6 @@
       reader.readAsDataURL(file);
     });
 
-    // 7. Insurance Policies List
-    const renderPolicies = () => {
-      const cont = wrap.querySelector('#coPoliciesListContainer');
-      if (coData.insuranceAssets.policies.length === 0) {
-        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No insurance policies added.</div>`;
-        return;
-      }
-      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
-            <th style="padding:8px;width:150px;">Policy Number</th>
-            <th style="padding:8px;width:150px;">Provider</th>
-            <th style="padding:8px;width:120px;">Expiry Date</th>
-            <th style="padding:8px;">Coverage Type</th>
-            <th style="padding:8px;text-align:right;width:60px;">Action</th>
-          </tr>
-        </thead>
-        <tbody>`;
-      coData.insuranceAssets.policies.forEach((p, idx) => {
-        html += `<tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:6px;"><input data-list="policies" data-index="${idx}" data-field="policyNo" value="${ohEsc(p.policyNo||'')}" placeholder="Policy No" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="policies" data-index="${idx}" data-field="provider" value="${ohEsc(p.provider||'')}" placeholder="e.g. LIC" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input type="date" data-list="policies" data-index="${idx}" data-field="expiry" value="${ohEsc(p.expiry||'')}" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;"></td>
-          <td style="padding:6px;">
-            <select data-list="policies" data-index="${idx}" data-field="type" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;background:#fff;">
-              <option value="Asset" ${p.type==='Asset'?'selected':''}>Key Asset Insurance</option>
-              <option value="Fire" ${p.type==='Fire'?'selected':''}>Fire Insurance</option>
-              <option value="Theft" ${p.type==='Theft'?'selected':''}>Theft & Burglary</option>
-              <option value="Health" ${p.type==='Health'?'selected':''}>Employee Health / Group</option>
-              <option value="Others" ${p.type==='Others'?'selected':''}>Others</option>
-            </select>
-          </td>
-          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="policies" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-      cont.innerHTML = html;
-    };
-
-    wrap.querySelector('#coAddPolicyBtn').addEventListener('click', () => {
-      coData.insuranceAssets.policies.push({ policyNo: '', provider: '', expiry: '', type: 'Asset' });
-      renderPolicies();
-    });
-
-    // 7. Assets List
-    const renderAssets = () => {
-      const cont = wrap.querySelector('#coAssetsListContainer');
-      if (coData.insuranceAssets.assets.length === 0) {
-        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No major fixed assets logged.</div>`;
-        return;
-      }
-      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
-            <th style="padding:8px;">Asset Name</th>
-            <th style="padding:8px;width:120px;">Purchase Date</th>
-            <th style="padding:8px;width:110px;">Cost (₹)</th>
-            <th style="padding:8px;width:180px;">Invoice File</th>
-            <th style="padding:8px;text-align:right;width:60px;">Action</th>
-          </tr>
-        </thead>
-        <tbody>`;
-      coData.insuranceAssets.assets.forEach((a, idx) => {
-        html += `<tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:6px;"><input data-list="assets" data-index="${idx}" data-field="assetName" value="${ohEsc(a.assetName||'')}" placeholder="e.g. MacBook Pro" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input type="date" data-list="assets" data-index="${idx}" data-field="purchaseDate" value="${ohEsc(a.purchaseDate||'')}" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 4px;outline:none;"></td>
-          <td style="padding:6px;"><input type="number" data-list="assets" data-index="${idx}" data-field="purchaseCost" value="${ohEsc(a.purchaseCost||'0')}" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;font-size:11px;color:#64748b;">
-            ${a.purchaseDocName ? `<span style="font-weight:600;color:#0284c7;">${ohEsc(a.purchaseDocName)}</span>` : `<input type="file" class="co-asset-file-uploader" data-index="${idx}" style="width:100%;">`}
-          </td>
-          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="assets" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-      cont.innerHTML = html;
-    };
-
-    wrap.querySelector('#coAddAssetBtn').addEventListener('click', () => {
-      coData.insuranceAssets.assets.push({ assetName: '', purchaseDate: '', purchaseCost: 0, purchaseDoc: '', purchaseDocName: '' });
-      renderAssets();
-    });
-
     // ── DELEGATED LIST EVENT HANDLERS ──
 
     wrap.addEventListener('input', (e) => {
@@ -1070,38 +998,14 @@
         let arr;
         if (list === 'directors') arr = coData.people.directors;
         else if (list === 'keyEmployees') arr = coData.people.keyEmployees;
-        else if (list === 'policies') arr = coData.insuranceAssets.policies;
-        else if (list === 'assets') arr = coData.insuranceAssets.assets;
         else arr = coData[list];
 
         if (arr && arr[index]) {
           if (e.target.type === 'checkbox') {
             arr[index][field] = e.target.checked;
-            if (list === 'banks' && field === 'isPrimary' && e.target.checked) {
-              coData.banks.forEach((b, i) => {
-                if (i !== index) b.isPrimary = false;
-              });
-              renderBanks();
-            }
           } else {
             arr[index][field] = e.target.value;
           }
-        }
-      }
-    });
-
-    wrap.addEventListener('change', (e) => {
-      if (e.target.classList.contains('co-asset-file-uploader')) {
-        const index = parseInt(e.target.dataset.index);
-        const file = e.target.files[0];
-        if (file && !isNaN(index)) {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            coData.insuranceAssets.assets[index].purchaseDoc = evt.target.result;
-            coData.insuranceAssets.assets[index].purchaseDocName = file.name;
-            renderAssets();
-          };
-          reader.readAsDataURL(file);
         }
       }
     });
@@ -1111,10 +1015,7 @@
         const list = e.target.dataset.list;
         const index = parseInt(e.target.dataset.index);
         if (list && !isNaN(index)) {
-          if (list === 'banks') {
-            coData.banks.splice(index, 1);
-            renderBanks();
-          } else if (list === 'directors') {
+          if (list === 'directors') {
             coData.people.directors.splice(index, 1);
             renderDirectors();
           } else if (list === 'keyEmployees') {
@@ -1124,12 +1025,6 @@
             coData.documents.splice(index, 1);
             renderDocumentsList();
             saveCompanyDetails(coData);
-          } else if (list === 'policies') {
-            coData.insuranceAssets.policies.splice(index, 1);
-            renderPolicies();
-          } else if (list === 'assets') {
-            coData.insuranceAssets.assets.splice(index, 1);
-            renderAssets();
           }
         }
       }
@@ -1230,12 +1125,9 @@
     renderGstinStatus();
 
     // ── INITIALIZING LISTS & LOADS ──
-    renderBanks();
     renderDirectors();
     renderEmployees();
     renderDocumentsList();
-    renderPolicies();
-    renderAssets();
 
 
     // ── SECTION SAVE BTN LISTENERS ──
@@ -1257,6 +1149,10 @@
           coData.businessType = wrap.querySelector('#coBusinessType').value;
           coData.incDate = wrap.querySelector('#coIncDate').value;
           coData.address = wrap.querySelector('#coAddressInput').value.trim();
+          coData.city = wrap.querySelector('#coCityInput').value.trim();
+          coData.district = wrap.querySelector('#coDistrictInput').value.trim();
+          coData.state = wrap.querySelector('#coStateInput').value;
+          coData.pincode = wrap.querySelector('#coPincodeInput').value.trim();
           coData.phone = wrap.querySelector('#coPhoneInput').value.trim();
           coData.email = wrap.querySelector('#coEmailInput').value.trim();
           coData.website = wrap.querySelector('#coWebsiteInput').value.trim();
@@ -1264,8 +1160,7 @@
           if (sealVal !== undefined) coData.sealImage = sealVal;
           const sealNameVal = wrap.querySelector('#coSealName')?.value;
           if (sealNameVal !== undefined) coData.sealName = sealNameVal;
-          const sealShapeVal = wrap.querySelector('#coSealShape')?.value;
-          if (sealShapeVal !== undefined) coData.sealShape = sealShapeVal;
+          delete coData.sealPlaceCustom;
           const signVal = wrap.querySelector('#coSignatureImage')?.value;
           if (signVal !== undefined) coData.signatureImage = signVal;
           const iconVal = wrap.querySelector('#coIconImage')?.value;

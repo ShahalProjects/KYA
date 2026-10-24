@@ -1623,14 +1623,19 @@
         totalDr += dr;
         totalCr += cr;
 
+        // What a party line's money is against (Journal Entry → Received / Paid / Refunded
+        // Against, journal-allocations.js) on a second line of the cell
+        const fmtA = n => (parseFloat(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const against = (r.allocations || []).filter(a => a && parseFloat(a.amount) > 0)
+          .map(a => `${a.docNo}${a.partyName ? ` (${a.partyName})` : ''} ${fmtA(a.amount)}`).join(' · ');
         const row = sheet.addRow([
           idx + 1,
           r.type || (dr > 0 ? 'By' : 'To'),
-          r.particular || '',
+          (r.particular || '') + (against ? `\nAgainst: ${against}` : ''),
           dr ? dr : '',
           cr ? cr : ''
         ]);
-        row.height = 20;
+        row.height = against ? 32 : 20;
 
         for (let c = 1; c <= maxCols; c++) {
           const cell = row.getCell(c);
@@ -1643,7 +1648,7 @@
           } else if (c <= 2) {
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
           } else {
-            cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: !!against };
           }
         }
       });

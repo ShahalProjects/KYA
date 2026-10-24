@@ -949,6 +949,48 @@
     syncMasterMsmeSlider(container, inputId);
   }
 
+  // ── Primary Bank Account slider (No | Yes) for Bank Account ledgers ──
+  // Same two-way slider as MSME Status, wired by wireMasterMsmeSlider / syncMasterMsmeSlider,
+  // so its 'no' | 'yes' value also lives in a hidden input.
+  function buildMasterPrimaryBankSliderHtml(inputId) {
+    return `
+      <label class="coa-modal-label" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Primary Bank Account</label>
+      <div class="master-saveas-slider-wrap" data-msme-for="${inputId}" role="radiogroup" aria-label="Primary Bank Account" style="width: 100%; height: 36px; border-radius: 9px; padding: 3px;">
+        <div class="master-saveas-slider-bg ledger-active" data-msme-bg style="top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 7px;"></div>
+        <button type="button" class="master-saveas-btn active" data-msme-val="no" role="radio" aria-checked="true" style="font-size: 12.5px;">No</button>
+        <button type="button" class="master-saveas-btn" data-msme-val="yes" role="radio" aria-checked="false" style="font-size: 12.5px;">Yes</button>
+      </div>
+      <input type="hidden" id="${inputId}" value="no">
+      <div id="${inputId}Hint" style="font-size: 11.5px; color: var(--slate-500); margin-top: 6px; line-height: 1.45;"></div>
+    `;
+  }
+
+  // Sets the slider for one ledger. `locked` keeps it on Yes (the first / only bank account,
+  // or the current primary); otherwise it starts at `value` and the hint names the current primary.
+  function setMasterPrimaryBankSlider(container, inputId, opts) {
+    const inp = container.querySelector('#' + inputId);
+    const hint = container.querySelector('#' + inputId + 'Hint');
+    const slider = container.querySelector(`[data-msme-for="${inputId}"]`);
+    if (!inp) return;
+    inp.disabled = !!opts.locked;
+    if (opts.locked) inp.value = 'yes';
+    else if (opts.value) inp.value = opts.value;
+    if (slider) slider.querySelectorAll('[data-msme-val]').forEach(btn => { btn.style.cursor = opts.locked ? 'default' : 'pointer'; });
+    syncMasterMsmeSlider(container, inputId);
+    if (!hint) return;
+    const primary = typeof getPrimaryBankLedger === 'function' ? getPrimaryBankLedger() : null;
+    const primaryName = primary ? escapeHtml(primary.name) : '';
+    if (opts.locked) {
+      hint.innerHTML = opts.lockReason === 'first'
+        ? 'The first bank account is the primary one. Its details are shown on invoices.'
+        : 'This is the primary bank account; its details are shown on invoices. To change it, set another bank account as primary.';
+    } else if (inp.value === 'yes' && primaryName) {
+      hint.innerHTML = `On saving, this becomes the primary bank account instead of <strong>${primaryName}</strong>.`;
+    } else {
+      hint.innerHTML = `The primary bank account's details are shown on invoices.${primaryName ? ` Current primary: <strong>${primaryName}</strong>.` : ''}`;
+    }
+  }
+
   function ensureCleanCoaTradeParties() {
     if (typeof coaLedgers === 'undefined' || !Array.isArray(coaLedgers)) return;
     const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
@@ -6038,6 +6080,11 @@
             <label class="coa-modal-label" for="masterLedgerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
             <input class="coa-modal-inp" id="masterLedgerBalance" type="number" min="0" step="0.01" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
 
+            <!-- Primary bank account (Bank Account group only): its details are shown on invoices -->
+            <div id="masterLedgerPrimaryBankWrap" style="display: none; margin-top: 16px;">
+              ${buildMasterPrimaryBankSliderHtml('masterLedgerPrimaryBank')}
+            </div>
+
             <!-- MSME status (Trade Payables group only): splits Trade payables in the Schedule III Balance Sheet -->
             <div id="masterLedgerMsmeWrap" style="display: none; margin-top: 16px;">
               ${buildMasterMsmeSliderHtml('masterLedgerMsme', false)}
@@ -6383,6 +6430,8 @@
         addInfoWrap.style.display = isParty ? 'block' : 'none';
         const msmeWrap = contentArea.querySelector('#masterLedgerMsmeWrap');
         if (msmeWrap) msmeWrap.style.display = isPay ? 'block' : 'none';
+        const primaryBankWrap = contentArea.querySelector('#masterLedgerPrimaryBankWrap');
+        if (primaryBankWrap) primaryBankWrap.style.display = isBankAccountGroup(activeGroupSel().value) ? 'block' : 'none';
         if (isParty) {
           applySaveAsModeUi();
         } else {
@@ -6702,6 +6751,14 @@
       const ledgerBalanceInp = contentArea.querySelector('#masterLedgerBalance');
       wireMasterMsmeSlider(contentArea, 'masterLedgerMsme');
 
+      // Primary Bank Account: with no bank account yet, the first one is primary (locked on Yes)
+      const noBankLedgerAtStart = getBankAccountLedgers().length === 0;
+      const primaryBankSliderOpts = { locked: noBankLedgerAtStart, lockReason: 'first' };
+      wireMasterMsmeSlider(contentArea, 'masterLedgerPrimaryBank');
+      setMasterPrimaryBankSlider(contentArea, 'masterLedgerPrimaryBank', primaryBankSliderOpts);
+      const primaryBankInp = contentArea.querySelector('#masterLedgerPrimaryBank');
+      if (primaryBankInp) primaryBankInp.addEventListener('change', () => setMasterPrimaryBankSlider(contentArea, 'masterLedgerPrimaryBank', primaryBankSliderOpts));
+
       // Popup field ids and the value a fresh row starts with
       const LEDGER_ADDL_FIELD_DEFAULTS = {
         masterLedgerContactName: '', masterLedgerAddress: '', masterLedgerCity: '', masterLedgerPincode: '',
@@ -6711,7 +6768,8 @@
         masterLedgerBankAcctBankName: '', masterLedgerBankAcctHolder: '', masterLedgerBankAcctNo: '',
         masterLedgerBankAcctIfsc: '', masterLedgerBankAcctBranch: '',
         masterLedgerSacCode: '', masterLedgerSacDesc: '', masterLedgerSacRate: '', masterLedgerSacGstSel: '18',
-        masterLedgerMsme: 'no'
+        masterLedgerMsme: 'no',
+        masterLedgerPrimaryBank: noBankLedgerAtStart ? 'yes' : 'no'
       };
 
       const newLedgerRowState = () => ({
@@ -6754,6 +6812,7 @@
           if (el) el.value = st.fields[id] !== undefined ? st.fields[id] : LEDGER_ADDL_FIELD_DEFAULTS[id];
         });
         syncMasterMsmeSlider(contentArea, 'masterLedgerMsme');
+        setMasterPrimaryBankSlider(contentArea, 'masterLedgerPrimaryBank', primaryBankSliderOpts);
         setLedgerTriggerText('masterLedgerBankAcctBankName', st.fields.masterLedgerBankAcctBankName, 'Select Bank');
         setLedgerTriggerText('masterLedgerSacCode', st.fields.masterLedgerSacCode, 'Select SAC Code');
         setLedgerTriggerText('masterLedgerSacDesc', st.fields.masterLedgerSacDesc, 'Auto-filled from SAC Code');
@@ -7210,6 +7269,18 @@
           }
 
           const created = rows.map((row, i) => createLedgerRowEntry(row, i));
+
+          // Primary bank account: with none before, the first new bank ledger; otherwise each
+          // bank ledger set to Yes takes over from the previous primary
+          let madePrimaryBank = false;
+          rows.forEach((row, i) => {
+            if (created[i].kind !== 'ledger' || !isBankAccountGroup(row.groupVal)) return;
+            const makePrimary = noBankLedgerAtStart ? !madePrimaryBank : row.fields.masterLedgerPrimaryBank === 'yes';
+            if (makePrimary) {
+              setPrimaryBankLedger(created[i].entity.id);
+              madePrimaryBank = true;
+            }
+          });
 
           if (typeof renderChartPanel === 'function') renderChartPanel();
           if (typeof refreshAllReports === 'function') refreshAllReports();
@@ -11712,6 +11783,10 @@
               <label class="coa-modal-label" for="masterAlterLedgerBalance" style="font-size: 13px; font-weight: 600; color: var(--slate-700); margin-bottom: 6px; display: block;">Opening Balance</label>
               <input class="coa-modal-inp" id="masterAlterLedgerBalance" type="number" min="0" step="0.01" value="${balVal}" placeholder="0.00" style="width: 100%; padding: 10px 14px; font-size: 13.5px; border-radius: 8px; border: 1.5px solid var(--slate-200); box-sizing: border-box;">
             </div>
+            <!-- Primary bank account (Bank Account group only): its details are shown on invoices -->
+            <div id="masterAlterLedgerPrimaryBankWrap" style="display: none; margin-bottom: 16px;">
+              ${buildMasterPrimaryBankSliderHtml('masterAlterLedgerPrimaryBank')}
+            </div>
             <div id="masterAlterLedgerAddlBtnWrap" style="margin-bottom: 16px;">
               <button type="button" class="btn btn-secondary" id="masterAlterLedgerAddlBtn" style="width: 100%; height: 38px; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -11991,6 +12066,24 @@
         const addInfoWrap = contentArea.querySelector('#masterAlterLedgerAdditionalInfoWrap');
         const sacWrap = contentArea.querySelector('#masterAlterLedgerSacWrap');
         const bankAcctWrap = contentArea.querySelector('#masterAlterLedgerBankAcctWrap');
+        const primaryBankWrap = contentArea.querySelector('#masterAlterLedgerPrimaryBankWrap');
+
+        // Primary Bank Account: locked on Yes for the current primary, or when no other bank
+        // account exists; otherwise free, starting at No
+        const otherBankLedgers = getBankAccountLedgers().filter(l => l.id !== currentLedger.id);
+        const isCurrentPrimaryBank = isBankAccountLedger(currentLedger) && String((getPrimaryBankLedger() || {}).id) === String(currentLedger.id);
+        const alterPrimaryBankOpts = {
+          locked: isCurrentPrimaryBank || otherBankLedgers.length === 0,
+          lockReason: isCurrentPrimaryBank ? 'primary' : 'first',
+          value: 'no'
+        };
+        wireMasterMsmeSlider(contentArea, 'masterAlterLedgerPrimaryBank');
+        setMasterPrimaryBankSlider(contentArea, 'masterAlterLedgerPrimaryBank', alterPrimaryBankOpts);
+        const alterPrimaryBankInp = contentArea.querySelector('#masterAlterLedgerPrimaryBank');
+        if (alterPrimaryBankInp) {
+          alterPrimaryBankInp.addEventListener('change', () => setMasterPrimaryBankSlider(contentArea, 'masterAlterLedgerPrimaryBank', { locked: alterPrimaryBankOpts.locked, lockReason: alterPrimaryBankOpts.lockReason }));
+        }
+
         const updateAdditionalInfoVisibility = () => {
           if (!groupSel || !addInfoWrap) return;
           const isParty = isTradePartyGroup(groupSel.value);
@@ -11998,6 +12091,9 @@
 
           if (bankAcctWrap) {
             bankAcctWrap.style.display = isBankAccountGroup(groupSel.value) ? 'block' : 'none';
+          }
+          if (primaryBankWrap) {
+            primaryBankWrap.style.display = isBankAccountGroup(groupSel.value) ? 'block' : 'none';
           }
 
           if (sacWrap) {
@@ -12373,6 +12469,12 @@
                 qrCode: _masterAlterLedgerBankAcctQrData ? _masterAlterLedgerBankAcctQrData.fileData : '',
                 qrCodeFileName: _masterAlterLedgerBankAcctQrData ? _masterAlterLedgerBankAcctQrData.fileName : ''
               };
+              if ((contentArea.querySelector('#masterAlterLedgerPrimaryBank')?.value || 'no') === 'yes') {
+                setPrimaryBankLedger(currentLedger.id);
+              }
+            } else {
+              // Moved out of the bank group: no longer a primary bank (the first remaining one takes over)
+              delete currentLedger.isPrimaryBank;
             }
 
             if (typeof renderChartPanel === 'function') renderChartPanel();

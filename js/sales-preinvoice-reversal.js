@@ -208,10 +208,11 @@
       notes.push('Part of it was already reversed — only what is left is loaded.');
     }
 
-    // What was received on it, less what earlier reversals refunded
-    const paid = inv.paymentStatus === 'Full Payment'
-      ? ((parseFloat(inv.paymentAmount) || 0) > 0 ? parseFloat(inv.paymentAmount) : (parseFloat(inv.total) || 0))
-      : (inv.paymentStatus === 'Partial Payment' ? (parseFloat(inv.paymentAmount) || 0) : 0);
+    // What was received on it (itself and by Journal Entry), less what earlier reversals refunded
+    const paid = typeof getSalesInvoiceReceived === 'function' ? getSalesInvoiceReceived(inv)
+      : (inv.paymentStatus === 'Full Payment'
+        ? ((parseFloat(inv.paymentAmount) || 0) > 0 ? parseFloat(inv.paymentAmount) : (parseFloat(inv.total) || 0))
+        : (inv.paymentStatus === 'Partial Payment' ? (parseFloat(inv.paymentAmount) || 0) : 0));
     const refunded = (S.salesVouchers || []).filter(v =>
       v.isReturn && !v.reversedPreInvoice &&
       String(v.returnAgainstInvoice || '').toLowerCase() === String(inv.invoiceNo || '').toLowerCase() &&
@@ -266,8 +267,12 @@
     if (supplyEl) {
       supplyEl.value = (doc.supplyType && /State|SEZ|Export/i.test(doc.supplyType)) ? doc.supplyType : 'Intra-State (CGST + SGST)';
     }
+    // The reversal's reference goes into the Narration (the books), not the printed Terms
     const notesEl = $('salesNotes');
-    if (notesEl) notesEl.value = `Reversal of ${src.type} ${doc[src.noField] || ''}.`;
+    if (notesEl) notesEl.value = '';
+    const narrationEl = $('salesNarration');
+    if (narrationEl) narrationEl.value = `Reversal of ${src.type} ${doc[src.noField] || ''}.`;
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('sales', 'terms');
     const adjEl = $('salesAdjustments');
     if (adjEl) adjEl.value = doc.adjustments || '';
 
@@ -363,16 +368,22 @@
     });
 
     const payAmtEl = $('salesPaymentAmount');
-    if (sel.advance <= 0) {
+    // Less what Journal Entry already refunded against this reversal (journal-allocations.js)
+    const left = Math.max(0, Math.round((sel.advance - journalRefunded()) * 100) / 100);
+    if (left <= 0) {
       const notPaid = $('salesPaymentStatusNotPaid');
       if (notPaid && !notPaid.classList.contains('active')) notPaid.click();
       lock($('salesPaymentStatusFull'), true);
       lock($('salesPaymentStatusPartial'), true);
       if (payAmtEl) payAmtEl.max = 0;
     } else if (payAmtEl) {
-      payAmtEl.max = sel.advance;
+      payAmtEl.max = left;
     }
     return true;
+  }
+
+  function journalRefunded() {
+    return typeof getSalesJournalRefunded === 'function' ? getSalesJournalRefunded() : 0;
   }
 
   // Hover popup on the Refund Status box: the advance and where an unrefunded part goes.
@@ -383,11 +394,23 @@
     const partyName = (typeof getSalesPartyName === 'function') ? getSalesPartyName($('salesCustomer')?.value) : sel.doc.customerName;
     const row = (label, value, strong) => `<div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 2px;"><span>${label}</span>${strong ? `<strong>${value}</strong>` : `<span>${value}</span>`}</div>`;
     box.dataset.active = '1';
+    // Received against the document by Journal Entry (journal-allocations.js): it sits in the
+    // customer's own ledger, so it isn't refunded here — once the document is cancelled it is
+    // their on-account credit
+    const journalAdv = typeof getJournalAllocatedTo === 'function' ? getJournalAllocatedTo(sel.src.store, sel.doc.id) : 0;
+    const journalAdvNote = journalAdv > 0
+      ? `<div style="margin-top: 4px; font-weight: 500;">₹ ${fmt(journalAdv)} received against ${esc(sel.docNo)} by Journal Entry stays in the customer's ledger as on-account credit — refund it in Journal Entry or use it through Invoice Balance.</div>`
+      : '';
     if (sel.advance > 0) {
       const inLedger = isAdvanceInPartyLedger(sel.doc, partyName || sel.doc.customerName);
+      const journal = journalRefunded();
+      const left = Math.max(0, Math.round((sel.advance - journal) * 100) / 100);
       box.innerHTML = `
         ${row(`Advance received${sel.doc.advanceVoucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${esc(sel.doc.advanceVoucherNo)}]</span>` : ''}`, `₹ ${fmt(sel.advance)}`, true)}
-        <div style="margin-top: 4px; font-weight: 500;">Refund it below; any part not refunded ${inLedger ? "stays in the party's ledger" : 'goes to Refund Payable'}.</div>`;
+        ${journal > 0 ? `${row('Refunded by Journal Entry', `₹ ${fmt(journal)}`)}${row('Refundable on this reversal', `₹ ${fmt(left)}`, true)}` : ''}
+        <div style="margin-top: 4px; font-weight: 500;">${left > 0.005 ? `Refund it below; any part not refunded ${inLedger ? "stays in the party's ledger" : 'goes to Refund Payable'}.` : 'Fully refunded — nothing more to record here.'}</div>${journalAdvNote}`;
+    } else if (journalAdv > 0) {
+      box.innerHTML = `${row('Received by Journal Entry', `₹ ${fmt(journalAdv)}`, true)}${journalAdvNote}`;
     } else {
       box.innerHTML = `<div style="font-weight: 500;">No advance was received against ${esc(sel.docNo)} — nothing to refund.</div>`;
     }
@@ -497,6 +520,7 @@
       date,
       dueDate: $('salesDueDate')?.value || date,
       notes: $('salesNotes')?.value || '',
+      narration: $('salesNarration')?.value || '',
       tdsTcsMode,
       tdsTcsRate: typeof getSalesTdsTcsRate === 'function' ? getSalesTdsTcsRate() : 0,
       tdsTcsAmount,

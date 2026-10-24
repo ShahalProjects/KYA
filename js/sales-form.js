@@ -2618,7 +2618,7 @@
             </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
-            <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
+            <input type="number" class="sales-row-qty je-input" value="${row.qtyBlank ? '' : (row.qty !== undefined ? row.qty : 1)}" placeholder="Qty" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
           </td>
           <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
             <input type="text" class="sales-row-unit je-input" value="${ohEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" ${isLocked ? 'readonly' : ''} />
@@ -2793,6 +2793,17 @@
   }
   window.clearVoucherRowItemLink = clearVoucherRowItemLink;
 
+  // The rows as a saved voucher keeps them: a Qty box left empty is stored as Qty 1, so
+  // posting, stock, prints and exports all read 1. Shared by the Sales and Purchase Vouchers.
+  function voucherRowsForSave(rows) {
+    return JSON.parse(JSON.stringify(rows || [])).map(r => {
+      if (r && r.qtyBlank) r.qty = 1;
+      if (r) delete r.qtyBlank;
+      return r;
+    });
+  }
+  window.voucherRowsForSave = voucherRowsForSave;
+
   // Writes the row's HSN/SAC, unit, rate and tax back into its inputs, without
   // re-rendering the whole table.
   function refreshVoucherRowInputs(row, tr) {
@@ -2867,10 +2878,38 @@
     applyMasterItemToVoucherRow(row, tr, selectedItem, { zeroTax: isSalesZeroTaxSupply() });
     if (tr) updateRowFromDOM(index, tr, 'item');
     recalculateSalesTotals();
+    warnSalesRowStock(index);
   }
 
+  // Sales Voucher: the stock toast for a row (a reversal brings stock back, so none there)
+  function warnSalesRowStock(index) {
+    if (currentSalesVoucherSubtype === 'Return') return;
+    const editing = window._editingSalesInvoice;
+    warnVoucherRowStock(salesRows, index, (editing && !editing.isDraft) ? editing.id : null);
+  }
+  window.warnSalesRowStock = warnSalesRowStock;
+
+  // Sales Voucher and Pre Invoices: KYA's warning toast when the stock item on rows[index] has
+  // no quantity in the Stock Book, or when this document's Qty of it (over all rows) is more
+  // than the stock on hand. excludeVoucherId: a posted invoice being edited (its own sale is
+  // left out of the stock).
+  function warnVoucherRowStock(rows, index, excludeVoucherId) {
+    if (typeof window.getKyaStockForRows !== 'function' || typeof showToast !== 'function') return;
+    const s = window.getKyaStockForRows(rows, index, excludeVoucherId);
+    if (!s) return;
+    const q = n => n.toLocaleString('en-IN', { maximumFractionDigits: 4 });
+    const unit = s.unit ? ' ' + ohEsc(String(s.unit).toUpperCase()) : '';
+    if (s.onHand <= 0) {
+      showToast(`No quantity available for ${ohEsc(s.name)} (stock: ${q(s.onHand)}${unit}).`, 'warning');
+    } else if (s.qty > s.onHand) {
+      showToast(`Only ${q(s.onHand)}${unit} available for ${ohEsc(s.name)}.`, 'warning');
+    }
+  }
+  window.warnVoucherRowStock = warnVoucherRowStock;
+
+  // A new row's Qty box starts empty; an empty Qty means 1 (qtyBlank only keeps the box empty)
   function addSalesRow() {
-    salesRows.push({ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
+    salesRows.push({ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
     renderSalesRows();
     recalculateSalesTotals();
   }
@@ -2905,7 +2944,9 @@
     const unitEl = tr.querySelector('.sales-row-unit');
     if (unitEl) row.unit = unitEl.value;
 
-    let qty      = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    // An empty Qty means 1
+    const qtyEl  = tr.querySelector('.sales-row-qty');
+    let qty      = (qtyEl && qtyEl.value.trim() === '') ? 1 : (parseFloat(qtyEl?.value) || 0);
     let rate     = Math.round(parseSalesAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
     let baseAmt  = Math.round(parseSalesAmt(tr.querySelector('.sales-row-base')?.value || '0') * 100) / 100;
     let discount = parseSalesAmt(tr.querySelector('.sales-row-discount')?.value || '0');
@@ -3006,6 +3047,9 @@
       }
     }
 
+    if (qtyEl && qtyEl.value.trim() === '') row.qtyBlank = true;
+    else delete row.qtyBlank;
+
     recalculateSalesTotals();
   }
 
@@ -3057,7 +3101,7 @@
     
     trs.forEach((tr, index) => {
       if (!salesRows[index]) {
-        salesRows[index] = { item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 };
+        salesRows[index] = { item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 };
       }
       const row = salesRows[index];
       const itemEl = tr.querySelector('.sales-row-item');
@@ -3070,7 +3114,13 @@
       if (unitEl && unitEl.value !== undefined) row.unit = unitEl.value;
 
       const qtyEl = tr.querySelector('.sales-row-qty');
-      if (qtyEl && qtyEl.value !== '') row.qty = parseFloat(qtyEl.value) || 0;
+      if (qtyEl && qtyEl.value.trim() === '') {
+        row.qty = 1;
+        row.qtyBlank = true;
+      } else if (qtyEl) {
+        row.qty = parseFloat(qtyEl.value) || 0;
+        delete row.qtyBlank;
+      }
 
       const rateEl = tr.querySelector('.sales-row-rate');
       if (rateEl && rateEl.value !== '') row.rate = parseSalesAmt(rateEl.value) || 0;
@@ -3496,10 +3546,12 @@
       supplyTypeEl.value = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
     }
 
+    // The reversal's reference goes into the Narration (the books), not the printed Terms
     const notesEl = document.getElementById('salesNotes');
-    if (notesEl) {
-      notesEl.value = `Reversal of Invoice ${inv.invoiceNo}.`;
-    }
+    if (notesEl) notesEl.value = '';
+    const narrationEl = document.getElementById('salesNarration');
+    if (narrationEl) narrationEl.value = `Reversal of Invoice ${inv.invoiceNo}.`;
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('sales', 'terms');
 
     // Refund starts clear; presetSalesReversalRefund (below) fills it in once the rows are in
     document.getElementById('salesPaymentStatusNotPaid')?.click();
@@ -3648,8 +3700,11 @@
     if (dueEl) dueEl.value = today;
     
     const notesEl = document.getElementById('salesNotes');
+    const narrationEl = document.getElementById('salesNarration');
     const adjEl = document.getElementById('salesAdjustments');
     if (notesEl) notesEl.value = '';
+    if (narrationEl) narrationEl.value = '';
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('sales', 'terms');
     if (adjEl) adjEl.value = '';
     
     const noneBtn = document.getElementById('salesTdsTcsNone');
@@ -3778,6 +3833,7 @@
       const salesSupplyType = document.getElementById('salesSupplyType')?.value || 'Intra-State (CGST + SGST)';
       const dueDate = document.getElementById('salesDueDate')?.value || '';
       const notes = document.getElementById('salesNotes')?.value || '';
+      const narration = document.getElementById('salesNarration')?.value || '';
       const adjustments = parseFloat(document.getElementById('salesAdjustments')?.value) || 0;
       const subTotal = typeof calculateSubtotal === 'function' ? calculateSubtotal() : 0;
       const tdsTcsMode = typeof getSalesTdsTcsMode === 'function' ? getSalesTdsTcsMode() : 'None';
@@ -3803,6 +3859,7 @@
         date,
         dueDate,
         notes,
+        narration,
         tdsTcsMode,
         tdsTcsRate,
         tdsTcsAmount,

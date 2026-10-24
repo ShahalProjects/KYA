@@ -871,6 +871,47 @@
         }
         return;
       }
+      // This customer's Advance posted to Advance from Customers by Journal Entry
+      // (journal-allocations.js): the line names the advance account, so it shows from whose it is
+      (entry.allRows || []).forEach(row => {
+        const of = row && row.advanceOf;
+        if (!of || of.side !== 'receivable' || row.type !== 'To') return;
+        if (String(of.id) !== String(customer.id) && String(of.name || '').toLowerCase() !== custNameLower) return;
+        const amt = parseFloat(row.credit) || 0;
+        if (amt <= 0) return;
+        if (dateFrom && entry.date < dateFrom) {
+          preReceived += amt;
+        } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
+          periodReceived += amt;
+          transactions.push({
+            id: entry.id, date: entry.date, voucherNo: entry.voucherNo || 'JE-' + entry.id,
+            particulars: 'Advance Received', debit: 0, credit: amt, isJournal: true
+          });
+        }
+      });
+      // A refund paid out of Refund Payable (or Advance from Customers) by Journal Entry against
+      // this customer's advance held there (journal-allocations.js): the line names that
+      // account, so it shows from what it was refunded — or, with no Cash / Bank, adjusted — against
+      const viaCash = (entry.allRows || []).some(r => (typeof coaLedgers !== 'undefined' ? coaLedgers : []).some(l =>
+        l.type === 'ledger' && l.sgId === 'sg-cce' && (l.name || '').toLowerCase() === (r.particular || '').trim().toLowerCase()));
+      (entry.allRows || []).forEach(row => {
+        if ((row.particular || '').trim().toLowerCase() === custNameLower) return;
+        (row.allocations || []).forEach(a => {
+          if (!a || a.store !== 'customerCredit' || !a.partyName) return;
+          if (String(a.partyId) !== String(customer.id) && String(a.partyName).toLowerCase() !== custNameLower) return;
+          const amt = parseFloat(a.amount) || 0;
+          if (amt <= 0) return;
+          if (dateFrom && entry.date < dateFrom) {
+            preInvoiced += amt;
+          } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
+            periodInvoiced += amt;
+            transactions.push({
+              id: entry.id, date: entry.date, voucherNo: entry.voucherNo || 'JE-' + entry.id,
+              particulars: `${viaCash ? 'Refund Paid' : 'Adjusted'} (${a.docNo})`, debit: amt, credit: 0, isJournal: true
+            });
+          }
+        });
+      });
       // Another party's voucher settled against this customer's ledger (⇄ Adjust with
       // Ledger) — it isn't on this customer's own vouchers, so it shows from the entry
       const contraFromOther = !!entry.ledgerAdjust && (entry.partyName || '').trim().toLowerCase() !== custNameLower;
@@ -1116,6 +1157,47 @@
         }
         return;
       }
+      // This supplier's Advance posted to Advances to Suppliers by Journal Entry
+      // (journal-allocations.js): the line names the advance account, so it shows from whose it is
+      (entry.allRows || []).forEach(row => {
+        const of = row && row.advanceOf;
+        if (!of || of.side !== 'payable' || row.type !== 'By') return;
+        if (String(of.id) !== String(supplier.id) && String(of.name || '').toLowerCase() !== suppNameLower) return;
+        const amt = parseFloat(row.debit) || 0;
+        if (amt <= 0) return;
+        if (dateFrom && entry.date < dateFrom) {
+          prePaid += amt;
+        } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
+          periodPaid += amt;
+          transactions.push({
+            id: entry.id, date: entry.date, voucherNo: entry.voucherNo || 'JE-' + entry.id,
+            particulars: 'Advance Paid', debit: amt, credit: 0, isJournal: true
+          });
+        }
+      });
+      // A refund received into Advances to Suppliers by Journal Entry against this supplier's
+      // advance held there (journal-allocations.js): the line names Advances to Suppliers, so
+      // it shows from what it was received — or, with no Cash / Bank, adjusted — against
+      const viaCash = (entry.allRows || []).some(r => (typeof coaLedgers !== 'undefined' ? coaLedgers : []).some(l =>
+        l.type === 'ledger' && l.sgId === 'sg-cce' && (l.name || '').toLowerCase() === (r.particular || '').trim().toLowerCase()));
+      (entry.allRows || []).forEach(row => {
+        if ((row.particular || '').trim().toLowerCase() === suppNameLower) return;
+        (row.allocations || []).forEach(a => {
+          if (!a || a.store !== 'vendorRefund' || !a.partyName) return;
+          if (String(a.partyId) !== String(supplier.id) && String(a.partyName).toLowerCase() !== suppNameLower) return;
+          const amt = parseFloat(a.amount) || 0;
+          if (amt <= 0) return;
+          if (dateFrom && entry.date < dateFrom) {
+            preBilled += amt;
+          } else if ((!dateFrom || entry.date >= dateFrom) && (!dateTo || entry.date <= dateTo)) {
+            periodBilled += amt;
+            transactions.push({
+              id: entry.id, date: entry.date, voucherNo: entry.voucherNo || 'JE-' + entry.id,
+              particulars: `${viaCash ? 'Refund Received' : 'Adjusted'} (${a.docNo})`, debit: 0, credit: amt, isJournal: true
+            });
+          }
+        });
+      });
       if ((entry.voucherNo || '').startsWith('PV-')) return;
       if (entry.preparedBy === 'Purchase Module' || purchaseJournalEntryIds.has(String(entry.id))) return;
       (entry.allRows || []).forEach(row => {

@@ -28,20 +28,74 @@
     const v = parseFloat(cleanStr);
     return isNaN(v) ? 0 : v;
   }
-  // Every voucher number in use (upper-case): posted and drafted journal entries, and
-  // sales vouchers
-  function getUsedJournalVoucherNos() {
+  // Every journal voucher number ever posted stays used, even after its entry is deleted, so
+  // it is never issued again (like Sales Invoice No.). Kept in KYA_STORE.salesUsedInvoiceNos
+  // .journal; called on every save, so entries posted from Cashline, Sales, Purchase … count too.
+  function registerPostedJournalVoucherNos() {
+    if (typeof postedEntries === 'undefined' || !Array.isArray(postedEntries)) return;
+    window.KYA_STORE = window.KYA_STORE || {};
+    const reg = window.KYA_STORE.salesUsedInvoiceNos = window.KYA_STORE.salesUsedInvoiceNos || {};
+    const list = reg.journal = reg.journal || [];
+    const have = new Set(list);
+    postedEntries.forEach(e => {
+      const no = e && e.voucherNo ? String(e.voucherNo).trim().toLowerCase() : '';
+      if (!no || no === '—' || no === '-' || have.has(no)) return;
+      have.add(no);
+      list.push(no);
+    });
+  }
+  window.registerPostedJournalVoucherNos = registerPostedJournalVoucherNos;
+
+  // Every voucher number in use (upper-case): the register of numbers ever posted, posted and
+  // drafted journal entries, and sales vouchers — leaving out the entry with `exceptId`
+  function getUsedJournalVoucherNos(exceptId) {
     const allEntries = [
       ...(typeof postedEntries !== 'undefined' && Array.isArray(postedEntries) ? postedEntries : []),
       ...(typeof draftedEntries !== 'undefined' && Array.isArray(draftedEntries) ? draftedEntries : []),
       ...((typeof window !== 'undefined' && window.KYA_STORE && Array.isArray(window.KYA_STORE.salesVouchers)) ? window.KYA_STORE.salesVouchers : [])
     ];
-    const used = new Set();
+    const used = new Set((((window.KYA_STORE || {}).salesUsedInvoiceNos || {}).journal || []).map(n => String(n).toUpperCase()));
     allEntries.forEach(e => {
+      if (e && exceptId !== undefined && exceptId !== null && String(e.id) === String(exceptId)) return;
       const vNo = (e && (e.voucherNo || e.invoiceNo)) ? String(e.voucherNo || e.invoiceNo).trim() : '';
       if (vNo) used.add(vNo.toUpperCase());
     });
     return used;
+  }
+
+  // True when the number is taken. A posted entry being edited keeps its own number; a
+  // draft keeps its number only while no other entry has it.
+  function isJournalVoucherNoUsed(voucherNo) {
+    const no = String(voucherNo || '').trim().toUpperCase();
+    if (!no) return false;
+    const ed = window._editingJournalEntry;
+    if (ed && !ed.isDraft) {
+      const own = (typeof postedEntries !== 'undefined' ? postedEntries : []).find(e => String(e.id) === String(ed.id));
+      if (own && String(own.voucherNo || '').trim().toUpperCase() === no) return false;
+    }
+    return getUsedJournalVoucherNos(ed ? ed.id : null).has(no);
+  }
+
+  // Shows or clears the "already used" line under the Journal Voucher No. box
+  function validateJeVoucherNoField() {
+    const inp = document.getElementById('jeVoucherNo');
+    if (!inp) return true;
+    const no = inp.value.trim();
+    const used = isJournalVoucherNoUsed(no);
+    inp.style.borderColor = used ? '#ef4444' : '';
+    // Short line under the box; the full explanation shows when hovering the box
+    const wrap = inp.parentElement;
+    if (wrap) {
+      wrap.classList.toggle('has-invno-error', used);
+      if (used) wrap.setAttribute('data-error-full', `"${no}" is already used. Journal voucher numbers can't be reused, even after deletion.`);
+      else wrap.removeAttribute('data-error-full');
+    }
+    const err = document.getElementById('jeVoucherNoError');
+    if (err) {
+      err.textContent = used ? `"${no}" is already used` : '';
+      err.style.display = used ? 'block' : 'none';
+    }
+    return !used;
   }
 
   // The format set with the pencil on Journal Voucher No. (prefix / starting number / digits);
@@ -143,6 +197,15 @@
     const prevId = jeRows[idx - 1].id;
     focusDebitOfRow(prevId);
   }
+  // The field Tab would have gone to after `el` (the next enabled, focusable control)
+  function focusNextAfter(el) {
+    const all = Array.from(document.querySelectorAll('input, select, textarea, button, [tabindex]'))
+      .filter(x => !x.disabled && x.tabIndex >= 0 && x.offsetParent !== null);
+    const i = all.indexOf(el);
+    const next = i >= 0 ? all[i + 1] : null;
+    if (next) next.focus();
+  }
+
   function focusFirstParticulars() {
     const inp = document.querySelector('#jeEntryBody .je-particulars-input');
     if (inp) inp.focus();
@@ -166,6 +229,7 @@
             const newVn = genVoucherNo(this.value);
             document.getElementById('jeVoucherNo').value = newVn;
             document.getElementById('jeVoucherChipDisplay').textContent = newVn;
+            validateJeVoucherNoField();
           }
         }
       }
@@ -212,6 +276,7 @@
           document.getElementById('jeVoucherNo').value = vn;
           document.getElementById('jeVoucherChipDisplay').textContent = vn;
         }
+        validateJeVoucherNoField();
       }
     });
   });
@@ -565,6 +630,7 @@
     updateJeDocUI(null);
     setupJeDocEventListeners();
     window._editingJournalEntry = null;
+    validateJeVoucherNoField();
   }
 
   function loadJournalEntry(entry, isDraft, returnContext) {
@@ -590,7 +656,9 @@
       updateJeBudgetToggleUI();
     }
     
-    jeRows = JSON.parse(JSON.stringify(entry.allRows || []));
+    // As typed: a customer's / supplier's Advance posted to the advance account goes back into
+    // its party line (journal-allocations.js)
+    jeRows = JSON.parse(JSON.stringify(typeof foldJournalAdvances === 'function' ? foldJournalAdvances(entry.allRows || []) : (entry.allRows || [])));
     jeCounter = 1;
     jeRows.forEach(row => {
       row.id = jeCounter++;
@@ -601,11 +669,19 @@
     updateJeDocUI(entry.uploadedDoc || null);
     setupJeDocEventListeners();
     
-    window._editingJournalEntry = { 
-      id: entry.id, 
+    window._editingJournalEntry = {
+      id: entry.id,
       isDraft: isDraft,
       returnContext: returnContext || window._pendingJournalReturnContext || null
     };
+
+    // A draft whose number has since been used takes the next free one (like Sales drafts)
+    if (isDraft && isJournalVoucherNoUsed(entry.voucherNo)) {
+      const vn = genVoucherNo(entry.date);
+      document.getElementById('jeVoucherNo').value = vn;
+      document.getElementById('jeVoucherChipDisplay').textContent = vn;
+    }
+    validateJeVoucherNoField();
 
     if (jeRows.length > 1 && jeRows[0].lockParticular) {
       setTimeout(() => {
@@ -620,6 +696,7 @@
   // ── Sync voucher chip with input ──────────────────────────────────
   document.getElementById('jeVoucherNo').addEventListener('input', function() {
     document.getElementById('jeVoucherChipDisplay').textContent = this.value || '—';
+    validateJeVoucherNoField();
   });
 
   // ── Add a row ─────────────────────────────────────────────────────
@@ -635,6 +712,7 @@
   function deleteRow(id) {
     if (jeRows.length <= 1) return;  // keep at least 1 row
     jeRows = jeRows.filter(r => r.id !== id);
+    jeRows.forEach(syncJeRowAllocations);  // a split that no longer fits its line goes
     renderRows();
     refreshTotals();
   }
@@ -675,7 +753,7 @@
           // Move any existing amount to the correct bucket
           if (sel.value === 'By') { row.debit = row.credit || row.debit; row.credit = ''; }
           else                    { row.credit = row.debit || row.credit; row.debit  = ''; }
-          syncJeRowAllocations(row);
+          jeRows.forEach(syncJeRowAllocations);
           refreshTotals();
           renderRows();
         });
@@ -801,8 +879,8 @@
                 else                 addRow('By');
               }
             };
-            // A customer receipt / supplier payment: first say what it is against
-            if (typeof getJournalRowAllocParty === 'function' && getJournalRowAllocParty(row)) openJeRowAllocation(row, goOn);
+            // A party's receipt / payment / refund: first say what it is against
+            if (typeof getJournalRowAllocParty === 'function' && getJournalRowAllocParty(row, jeRows)) openJeRowAllocation(row, goOn);
             else goOn();
 
           } else if (e.key === 'Tab') {
@@ -833,6 +911,21 @@
             if (!v || v <= 0) {
               e.preventDefault();
               showToast('Please enter an amount greater than zero.', 'warning');
+            } else if (!e.shiftKey && typeof getJournalRowAllocParty === 'function') {
+              // A party's receipt / payment / refund: as with Enter, first say what it is
+              // against (unless the line already has a split that fits), then go on to the next field
+              const fmt = v.toFixed(2);
+              inpAmt.value = fmt;
+              if (row.type === 'By') { row.debit = fmt; row.credit = ''; }
+              else                   { row.credit = fmt; row.debit = ''; }
+              const list = getJournalRowAllocParty(row, jeRows) ? getJournalRowAllocations(row, jeRows) : null;
+              const fits = list && list.length && Math.abs(list.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0) - v) < 0.01;
+              if (list && !fits) {
+                e.preventDefault();
+                refreshTotals();
+                refreshJeAllocChip(row);
+                openJeRowAllocation(row, () => focusNextAfter(inpAmt));
+              }
             }
           } else if (e.key === 'Backspace' && inpAmt.value === '') {
             // Amount is empty → step back to Particulars of the same row
@@ -871,6 +964,7 @@
             row.particular = '';
             row.debit      = '';
             row.credit     = '';
+            jeRows.forEach(syncJeRowAllocations);
             refreshTotals();
             renderRows();
             focusParticularsOfRow(row.id);
@@ -1437,27 +1531,35 @@
     updateAllParticularsBalanceBadges();
   }
 
-  // ── Received / Paid Against (journal-allocations.js) ──────────────
-  // A customer / Trade Receivables line on To, or a supplier / Trade Payables line on By, says
-  // what its money is against: entering the amount opens the popup, and a chip under the
-  // Particulars shows the split (click it to change it)
+  // ── Received / Paid / Refunded Against (journal-allocations.js) ───
+  // A customer / supplier line (either side), or a Refund Payable (By) / Advances to Suppliers
+  // (To) line, says what its money is against: entering the amount opens the popup, and a chip
+  // under the Particulars shows the split (click it to change it)
   function jeAllocCtx() {
     const ed = window._editingJournalEntry;
     return { excludeJournalEntryId: (ed && !ed.isDraft) ? ed.id : null };
   }
 
-  // Drops a line's split once its party or side no longer matches
+  // Drops a line's split once its party, side or mode no longer matches
   function syncJeRowAllocations(row) {
     if (!row || !row.allocations) return;
-    if (typeof getJournalRowAllocations !== 'function' || !getJournalRowAllocations(row).length) {
+    if (typeof getJournalRowAllocations !== 'function' || !getJournalRowAllocations(row, jeRows).length) {
       delete row.allocations;
       delete row.allocFor;
+      delete row.allocMode;
     }
+  }
+
+  // After a line's account or type changes: every line's split and chip, since whether a
+  // party line reads as a refund or an adjustment depends on the other lines
+  function syncAllJeAllocations() {
+    jeRows.forEach(syncJeRowAllocations);
+    jeRows.forEach(refreshJeAllocChip);
   }
 
   // after(): what Enter on the amount does next, once the popup is closed
   function openJeRowAllocation(row, after) {
-    const party = typeof getJournalRowAllocParty === 'function' ? getJournalRowAllocParty(row) : null;
+    const party = typeof getJournalRowAllocParty === 'function' ? getJournalRowAllocParty(row, jeRows) : null;
     const amount = party ? getJournalRowAmount(row) : 0;
     if (!party || !(amount > 0) || typeof openJournalAllocationModal !== 'function') {
       if (after) after();
@@ -1467,10 +1569,11 @@
       party,
       required: amount,
       rows: getJournalAllocSources(party, jeAllocCtx()),
-      current: getJournalRowAllocations(row),
+      current: getJournalRowAllocations(row, jeRows),
       onSave: list => {
         row.allocations = list;
         row.allocFor = party.name;
+        row.allocMode = party.mode;
         refreshJeAllocChip(row);
         if (after) after();
       },
@@ -1494,7 +1597,7 @@
   }
 
   function fillJeAllocChip(chip, row) {
-    const party = typeof getJournalRowAllocParty === 'function' ? getJournalRowAllocParty(row) : null;
+    const party = typeof getJournalRowAllocParty === 'function' ? getJournalRowAllocParty(row, jeRows) : null;
     const amount = party ? getJournalRowAmount(row) : 0;
     if (!party || !(amount > 0)) {
       chip.style.display = 'none';
@@ -1502,11 +1605,11 @@
       return;
     }
     const esc = s => (typeof ohEsc === 'function' ? ohEsc(s) : String(s));
-    const list = getJournalRowAllocations(row);
+    const list = getJournalRowAllocations(row, jeRows);
     chip.style.display = 'flex';
-    chip.title = `What this ${party.side === 'receivable' ? 'receipt' : 'payment'} is against — click to change`;
+    chip.title = `What this ${party.text.noun} is against — click to change`;
     if (!list.length) {
-      chip.innerHTML = `<span>⇄ Advance — not against a document</span><span style="color: var(--blue-600); flex-shrink: 0;">Choose</span>`;
+      chip.innerHTML = `<span>⇄ ${esc(party.text.chip)}</span><span style="color: var(--blue-600); flex-shrink: 0;">Choose</span>`;
       return;
     }
     const sum = list.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
@@ -1603,8 +1706,7 @@
       function _select(acct) {
         inp.value      = acct.name;
         row.particular = acct.name;
-        syncJeRowAllocations(row);
-        refreshJeAllocChip(row);
+        syncAllJeAllocations();
         updateAllParticularsBalanceBadges();
         const tr = inp.closest('[data-row-id]');
         if (tr) focusDebitOfRow(Number(tr.dataset.rowId));
@@ -1613,8 +1715,7 @@
       inp.addEventListener('focus', () => _jePortal.open(inp, inp.value, _select));
       inp.addEventListener('input', () => {
         row.particular = inp.value;
-        syncJeRowAllocations(row);
-        refreshJeAllocChip(row);
+        syncAllJeAllocations();
         updateAllParticularsBalanceBadges();
         _jePortal.open(inp, inp.value, _select);
       });
@@ -2017,7 +2118,18 @@
     overlay.addEventListener('click', e => { if (e.target === overlay) hideSavePopup(); });
   }
 
+  // Numbers used by any journal entry — including deleted ones — can't be issued again
+  function checkJeVoucherNoBeforePost() {
+    const vn = (document.getElementById('jeVoucherNo')?.value || '').trim();
+    if (!isJournalVoucherNoUsed(vn)) return true;
+    showToast(`Journal Voucher No. "${vn}" is already used (even deleted numbers can't be reused). Please use another number.`, 'danger');
+    validateJeVoucherNoField();
+    document.getElementById('jeVoucherNo')?.focus();
+    return false;
+  }
+
   function showSavePopup() {
+    if (!checkJeVoucherNoBeforePost()) return;
     // Validate before showing
     const chip = document.getElementById('jeBalanceChip');
     if (chip.classList.contains('unbalanced')) {
@@ -2521,8 +2633,18 @@
       }
     });
 
-    // Move matched drafts into postedEntries (preserve newest-first order)
+    // Move matched drafts into postedEntries (preserve newest-first order). What a draft's
+    // customer / supplier lines are against is checked as on the form (journal-allocations.js),
+    // one draft after another, so two drafts can't take the same invoice twice; a draft that
+    // fails stays a draft.
+    const refused = [];
+    const posted = [];
     toPost.forEach(e => {
+      if (Array.isArray(e.allRows) && typeof validateJournalAllocations === 'function') {
+        if (typeof dropStaleJournalAllocations === 'function') dropStaleJournalAllocations(e.allRows);
+        const err = validateJournalAllocations(e.allRows, {});
+        if (err) { refused.push({ e, err }); return; }
+      }
       if (!e.firstParticular && Array.isArray(e.allRows) && e.allRows.length > 0) {
         e.firstParticular = e.allRows[0].particular || '—';
       }
@@ -2531,27 +2653,43 @@
         const amt = parseAmt(firstRow.debit) || parseAmt(firstRow.credit);
         e.amount = fmtNum(amt);
       }
+      // A customer's / supplier's Advance posts to the advance account
+      if (Array.isArray(e.allRows) && typeof routeJournalAdvances === 'function') e.allRows = routeJournalAdvances(e.allRows);
       postedEntries.unshift(e);
+      posted.push(e);
     });
+    const postedIds = new Set(posted.map(e => String(e.id)));
 
     // Remove from drafts & selection
-    draftedEntries = draftedEntries.filter(e => !idsSet.has(String(e.id)));
+    draftedEntries = draftedEntries.filter(e => !postedIds.has(String(e.id)));
     ids.forEach(id => {
+      if (!postedIds.has(String(id))) return;
       if (typeof _dtSelected !== 'undefined') {
         _dtSelected.delete(Number(id));
         _dtSelected.delete(String(id));
       }
     });
 
-    const n = toPost.length;
+    const n = posted.length;
     if (typeof showToast === 'function') {
-      showToast(
-        n === 1
-          ? `Draft "${toPost[0].voucherNo || '—'}" posted successfully!`
-          : `${n} drafts posted successfully!`,
-        'success'
-      );
+      if (refused.length) {
+        const first = refused[0];
+        showToast(
+          `Draft "${first.e.voucherNo || '—'}" was not posted — ${first.err}`
+            + (refused.length > 1 ? ` (${refused.length} drafts were not posted.)` : '')
+            + (n ? ` ${n} other draft${n > 1 ? 's were' : ' was'} posted.` : ''),
+          'error'
+        );
+      } else {
+        showToast(
+          n === 1
+            ? `Draft "${posted[0].voucherNo || '—'}" posted successfully!`
+            : `${n} drafts posted successfully!`,
+          'success'
+        );
+      }
     }
+    if (!n) return false;
 
     if (typeof window.refreshAllAppViews === 'function') {
       window.refreshAllAppViews();
@@ -2979,7 +3117,8 @@
                 <tr>
                   <td style="color:#94a3b8;font-size:12px">${i + 1}</td>
                   <td><span class="${r.type === 'By' ? 'fj-by' : 'fj-to'}">${r.type}</span></td>
-                  <td style="font-weight:500">${r.particular || '—'}</td>
+                  <td style="font-weight:500">${r.particular || '—'}${(typeof describeJournalAllocations === 'function' && Array.isArray(r.allocations) && r.allocations.some(a => a && parseFloat(a.amount) > 0))
+                    ? `<div style="margin-top:2px;font-size:11.5px;font-weight:600;color:#0f766e">⇄ Against: ${typeof ohEsc === 'function' ? ohEsc(describeJournalAllocations(r.allocations)) : describeJournalAllocations(r.allocations)}</div>` : ''}</td>
                   <td style="text-align:right;color:#2563eb;font-weight:600">${parseAmt(r.debit) ? '₹ ' + fmtNum(parseAmt(r.debit)) : '—'}</td>
                   <td style="text-align:right;color:#059669;font-weight:600">${parseAmt(r.credit) ? '₹ ' + fmtNum(parseAmt(r.credit)) : '—'}</td>
                 </tr>`).join('')}
@@ -3080,6 +3219,7 @@
 
   function doPostEntry() {
     if (_savePopupEl) _savePopupEl.style.display = 'none';
+    if (!checkJeVoucherNoBeforePost()) return;
 
     // Capture full entry snapshot before form resets
     const firstRow = jeRows[0] || {};
@@ -3149,6 +3289,9 @@
       }
     }
 
+    // A customer's / supplier's Advance posts to the advance account (journal-allocations.js)
+    if (typeof routeJournalAdvances === 'function') postData.allRows = routeJournalAdvances(postData.allRows);
+
     if (isEditPosted) {
       const idx = postedEntries.findIndex(e => String(e.id) === String(entryId));
       if (idx > -1) {
@@ -3159,6 +3302,7 @@
     } else {
       postedEntries.unshift(postData);
     }
+    registerPostedJournalVoucherNos();
 
     showToast(isEditPosted ? 'Journal entry updated successfully!' : 'Journal entry posted successfully!', 'success');
     if (!isEditPosted && !isEditDraft) {
@@ -3286,6 +3430,14 @@
           }
         });
       } else {
+        // As from the Sales list (sales-records.js): one whose credit paid other documents, or
+        // that Journal Entry money is against, stays
+        const sv = (window.KYA_STORE?.salesVouchers || []).find(v => String(v.id) === String(id) || String(v.journalEntryId) === String(id));
+        if (sv) {
+          const label = `${sv.isReturn ? 'Sales Reversal' : 'Invoice'} ${sv.invoiceNo || ''}`;
+          if (typeof blockIfCreditUsed === 'function' && blockIfCreditUsed([`rev:${sv.id}`, `park:${sv.id}`], label, 'deleted')) return;
+          if (typeof blockIfJournalAgainst === 'function' && blockIfJournalAgainst(journalRefsOf('sales', sv.id), label, 'deleted')) return;
+        }
         showKyaConfirm({
           title: 'Delete this voucher?',
           message: 'Permanently delete this sales voucher?<br>This action cannot be undone.',
@@ -3970,7 +4122,25 @@
           okBg: '#dc2626',
           onConfirm: () => {
             const selectedItems = filtered.filter(item => _vdSelectedKeys.has(`${item.type}_${item.id}_${item.isDraft}`));
+            // A posted voucher whose credit paid other documents, or that Journal Entry money is
+            // against (journal-allocations.js), stays; the rest go
+            const skipped = [];
+            const keepReason = item => {
+              if (item.isDraft) return '';
+              const isSales = item.type === 'Invoice' || item.type === 'Order' || item.type === 'Reversal';
+              const isPurch = item.type === 'Purchase' || item.type === 'Purchase Reversal';
+              if (!isSales && !isPurch) return '';
+              const list = (isSales ? window.KYA_STORE?.salesVouchers : window.KYA_STORE?.purchaseVouchers) || [];
+              const v = list.find(x => String(x.id) === String(item.id) || String(x.journalEntryId) === String(item.id));
+              if (!v) return '';
+              if (isSales && typeof getCreditUsage === 'function'
+                  && (getCreditUsage(`rev:${v.id}`) > 0.009 || getCreditUsage(`park:${v.id}`) > 0.009)) return `${v.invoiceNo} (its credit paid other documents)`;
+              const problem = typeof getJournalDeleteProblem === 'function' ? getJournalDeleteProblem(journalRefsOf(isSales ? 'sales' : 'purchase', v.id)) : '';
+              return problem ? `${v.invoiceNo} (${problem})` : '';
+            };
             selectedItems.forEach(item => {
+              const reason = keepReason(item);
+              if (reason) { skipped.push(reason); return; }
               const id = item.id;
               const type = item.type;
               const isDraft = item.isDraft;
@@ -4023,7 +4193,12 @@
 
             _vdSelectedKeys.clear();
             if (typeof showToast === 'function') {
-              showToast(`${n} ${n === 1 ? 'voucher' : 'vouchers'} deleted successfully.`, 'success');
+              const deleted = n - skipped.length;
+              if (skipped.length) {
+                showToast(`${deleted} ${deleted === 1 ? 'voucher' : 'vouchers'} deleted. Not deleted: ${skipped.join('; ')}.`, 'warning');
+              } else {
+                showToast(`${n} ${n === 1 ? 'voucher' : 'vouchers'} deleted successfully.`, 'success');
+              }
             }
             if (typeof window.refreshAllAppViews === 'function') {
               window.refreshAllAppViews();

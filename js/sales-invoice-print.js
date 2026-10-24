@@ -9,12 +9,11 @@
 //    • Billed To ........... the customer master on the voucher
 //    • Shipped To .......... the voucher's temporary (override) party
 //                            details when present, else the customer
-//    • Bank Details ........ the payment account's bank ledger, else a
-//                            bank ledger from the Chart of Accounts, else
-//                            the primary bank in Company Profile → Banking.
+//    • Bank Details ........ the primary bank account ledger (Master Desk →
+//                            Ledger → Primary Bank Account).
 //                            An invoice paid in full at the sale (or a cash
 //                            sale) shows its Payment Details instead.
-//    • Terms & Conditions .. the voucher's Notes / Terms box
+//    • Terms & Conditions .. the voucher's Terms & Conditions box (Narration never prints)
 //
 //  Intra-State supply splits GST into CGST + SGST; Inter-State / SEZ with
 //  tax shows IGST; zero-rated supplies show no tax columns.
@@ -121,117 +120,142 @@
     return words.join(' ') || raw;
   }
 
+  // The uploaded logo. Without one the header keeps no logo space: the company
+  // name and address start at the left edge.
   function getCompanyLogoHtml(co) {
+    if (!co.iconImage) return '';
     const name = getInvoiceCompanyName(co);
-    if (co.iconImage) {
-      return `<img src="${siEsc(co.iconImage)}" alt="${siEsc(name)}" style="width:82px;height:82px;border-radius:14px;object-fit:contain;flex-shrink:0;" />`;
-    }
-    const initials = (typeof getCompanyInitials === 'function')
-      ? getCompanyInitials(co.name || name)
-      : name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-    const presets = {
-      'blue-green': 'linear-gradient(135deg, #2563eb, #059669)',
-      'indigo-purple': 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-      'rose-red': 'linear-gradient(135deg, #e11d48, #be123c)',
-      'amber-orange': 'linear-gradient(135deg, #f59e0b, #d97706)',
-      'emerald-teal': 'linear-gradient(135deg, #10b981, #047857)',
-      'dark-slate': 'linear-gradient(135deg, #475569, #1e293b)'
-    };
-    const bg = presets[co.iconColor] || presets['blue-green'];
-    return `<div style="width:82px;height:82px;border-radius:14px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;letter-spacing:.5px;flex-shrink:0;">${siEsc(initials)}</div>`;
+    return `<img src="${siEsc(co.iconImage)}" alt="${siEsc(name)}" style="width:82px;height:82px;border-radius:14px;object-fit:contain;flex-shrink:0;" />`;
   }
 
-  function buildInvoiceSealSvg(name, shape) {
+  // Company seal (also drawn by Company Profile & Vault). The registered name runs
+  // round the ring in legible capitals (Companies Act, 2013 s.12(3)(a)), a star
+  // closes the ring at the bottom, and the place of the registered office sits
+  // across the centre between two rules.
+  function buildInvoiceSealSvg(name, place) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const rawName = (name || 'COMPANY NAME').trim();
-    const label = esc(rawName.toUpperCase());
+    const rawName = (name || 'COMPANY NAME').trim().toUpperCase();
+    const rawPlace = String(place || '').trim().toUpperCase();
     const ink = '#b91c1c';
-    const labelLen = label.length;
+    const font = "'Arial Black', Arial, sans-serif";
 
-    let fsTop = 15;
-    let letterSpacing = '1.2';
-    if (labelLen > 18) { fsTop = 13; letterSpacing = '0.8'; }
-    if (labelLen > 24) { fsTop = 11; letterSpacing = '0.5'; }
-    if (labelLen > 30) { fsTop = 9.5; letterSpacing = '0.2'; }
+    // Advance width of the text at font-size 1, measured in the seal's own font.
+    const unitWidth = (text) => {
+      try {
+        const ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = `900 100px ${font}`;
+        return ctx.measureText(text).width / 100;
+      } catch (e) {
+        return text.length * 0.75;
+      }
+    };
 
-    if (shape === 'rectangle') {
-      return `<svg viewBox="0 0 260 160" xmlns="http://www.w3.org/2000/svg">
-        <rect x="6" y="6" width="248" height="148" fill="none" stroke="${ink}" stroke-width="3.5"/>
-        <rect x="13" y="13" width="234" height="134" fill="none" stroke="${ink}" stroke-width="1.2"/>
-        <rect x="20" y="20" width="220" height="120" fill="none" stroke="${ink}" stroke-width="1.5"/>
-        <text x="130" y="66" text-anchor="middle" font-family="'Arial Black', Arial, sans-serif" font-size="${fsTop}" font-weight="900" fill="${ink}">${label}</text>
-        <line x1="46" y1="82" x2="214" y2="82" stroke="${ink}" stroke-width="1.2"/>
-        <text x="130" y="98" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}" letter-spacing="3">★ ★ ★</text>
-        <line x1="46" y1="106" x2="214" y2="106" stroke="${ink}" stroke-width="1.2"/>
-        <text x="130" y="132" text-anchor="middle" font-family="'Arial Black', Arial, sans-serif" font-size="11.5" font-weight="900" fill="${ink}" letter-spacing="1.8">AUTHORISED SIGNATORY</text>
-      </svg>`;
+    // Name ring: radius 66, from 250° over the top to 290°, so the 40° gap at the
+    // bottom holds the star. Font size and spacing are chosen to fill the ring.
+    const cx = 100, cy = 100, rText = 66;
+    const polar = (deg) => {
+      const a = deg * Math.PI / 180;
+      return `${(cx + rText * Math.cos(a)).toFixed(2)},${(cy - rText * Math.sin(a)).toFixed(2)}`;
+    };
+    const ringLen = rText * (320 * Math.PI / 180);
+    const nameFit = ringLen - 12;
+    const nameW = unitWidth(rawName);
+    const fsName = Math.max(8, Math.min(16, nameFit / nameW));
+    const nameSqueezed = nameW * fsName > nameFit;
+    const lsName = nameSqueezed ? 0 : Math.min(fsName * 0.6, (nameFit - nameW * fsName) / rawName.length);
+    // letter-spacing also follows the last letter, so shift by half of it to stay centred.
+    const nameOffset = (ringLen / 2 + lsName / 2).toFixed(2);
+    const nameFitAttr = nameSqueezed ? ` textLength="${nameFit.toFixed(2)}" lengthAdjust="spacingAndGlyphs"` : '';
+
+    // Centre: the place, sized to the inner circle; a star when no place is given.
+    const placeFit = 84;
+    let centre = `<text x="${cx}" y="${cy + 6}" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="900" fill="${ink}">★</text>`;
+    if (rawPlace) {
+      const placeW = unitWidth(rawPlace);
+      const fsPlace = Math.max(7, Math.min(14, placeFit / (placeW + 0.1 * rawPlace.length)));
+      const lsPlace = fsPlace * 0.1;
+      const placeSqueezed = (placeW + 0.1 * rawPlace.length) * fsPlace > placeFit;
+      const placeFitAttr = placeSqueezed ? ` textLength="${placeFit}" lengthAdjust="spacingAndGlyphs"` : ` letter-spacing="${lsPlace.toFixed(2)}"`;
+      const placeX = placeSqueezed ? cx : cx + lsPlace / 2;
+      centre = `<text x="${placeX.toFixed(2)}" y="${(cy + fsPlace * 0.36).toFixed(2)}" text-anchor="middle" font-family="${font}" font-size="${fsPlace.toFixed(2)}" font-weight="900" fill="${ink}"${placeFitAttr}>${esc(rawPlace)}</text>`;
     }
 
-    // ROUND — top/bottom arc text share the same chord (left↔right through the ring
-    // radius) so both halves stay concentric and upright.
-    const cx = 100, cy = 100;
-    const rText = 68;
-    const leftX = cx - rText, rightX = cx + rText;
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
       <defs>
-        <path id="siSealTopWide" d="M ${leftX},${cy} A ${rText},${rText} 0 1 1 ${rightX},${cy}" fill="none"/>
-        <path id="siSealBtmWide" d="M ${leftX},${cy} A ${rText},${rText} 0 1 0 ${rightX},${cy}" fill="none"/>
+        <path id="siSealRing" d="M ${polar(250)} A ${rText},${rText} 0 1 1 ${polar(290)}" fill="none"/>
       </defs>
-      <circle cx="${cx}" cy="${cy}" r="93" fill="none" stroke="${ink}" stroke-width="3.5"/>
-      <circle cx="${cx}" cy="${cy}" r="87" fill="none" stroke="${ink}" stroke-width="1"/>
-      <circle cx="${cx}" cy="${cy}" r="48" fill="none" stroke="${ink}" stroke-width="1.8"/>
+      <circle cx="${cx}" cy="${cy}" r="94" fill="none" stroke="${ink}" stroke-width="3.5"/>
+      <circle cx="${cx}" cy="${cy}" r="89" fill="none" stroke="${ink}" stroke-width="1"/>
+      <circle cx="${cx}" cy="${cy}" r="51" fill="none" stroke="${ink}" stroke-width="1.5"/>
 
-      <text font-family="'Arial Black', Arial, sans-serif" font-size="${fsTop}" font-weight="900" fill="${ink}" letter-spacing="${letterSpacing}">
-        <textPath href="#siSealTopWide" xlink:href="#siSealTopWide" startOffset="50%" text-anchor="middle">${label}</textPath>
+      <text font-family="${font}" font-size="${fsName.toFixed(2)}" font-weight="900" fill="${ink}" letter-spacing="${lsName.toFixed(2)}">
+        <textPath href="#siSealRing" xlink:href="#siSealRing" startOffset="${nameOffset}" text-anchor="middle"${nameFitAttr}>${esc(rawName)}</textPath>
       </text>
 
-      <text x="24" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}">★</text>
-      <text x="176" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}">★</text>
+      <text x="${cx}" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="900" fill="${ink}">★</text>
 
-      <text font-family="'Arial Black', Arial, sans-serif" font-size="10.5" font-weight="900" fill="${ink}" letter-spacing="1.8">
-        <textPath href="#siSealBtmWide" xlink:href="#siSealBtmWide" startOffset="50%" text-anchor="middle">AUTHORISED SIGNATORY</textPath>
-      </text>
-
-      <line x1="62" y1="88" x2="138" y2="88" stroke="${ink}" stroke-width="1.2"/>
-      <text x="100" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="${ink}" letter-spacing="3">★ ★ ★</text>
-      <line x1="62" y1="112" x2="138" y2="112" stroke="${ink}" stroke-width="1.2"/>
+      <line x1="58" y1="86" x2="142" y2="86" stroke="${ink}" stroke-width="1.2"/>
+      ${centre}
+      <line x1="58" y1="114" x2="142" y2="114" stroke="${ink}" stroke-width="1.2"/>
     </svg>`;
+  }
+
+  // Place shown on the seal: the Company Profile City. Profiles saved before the City
+  // box existed fall back to their old seal place, else the city picked out of the
+  // business address ("Street, City, State, PIN").
+  function getInvoiceSealPlace(co) {
+    if (co.city && String(co.city).trim()) return String(co.city).trim();
+    if (co.sealPlace !== undefined && co.sealPlace !== null) return String(co.sealPlace).trim();
+    const stateKey = (p) => p.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const parts = String(co.address || '').split(/[,\n]/)
+      .map(p => p.replace(/\b\d{3}\s?\d{3}\b/g, '').replace(/\bpin(code)?\b\s*[:.]?/gi, '').replace(/^[\s\-–.:]+|[\s\-–.:]+$/g, ''))
+      .filter(p => p && stateKey(p) !== 'india' && !GST_STATE_CODES[stateKey(p)]);
+    return parts.length > 1 ? parts[parts.length - 1] : '';
   }
 
   function getInvoiceCompanySeal(co) {
     if (co.sealRemoved) return '';
-    const shape = co.sealShape === 'square' ? 'rectangle' : (co.sealShape || 'round');
     const name = (co.sealName || co.name || co.displayName || '').trim();
+    const place = getInvoiceSealPlace(co);
     if (co.sealImage) {
       if (typeof co.sealImage === 'string' && co.sealImage.startsWith('data:image/svg+xml')) {
         try {
-          const svg = buildInvoiceSealSvg(name, shape);
+          const svg = buildInvoiceSealSvg(name, place);
           return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
         } catch (e) {}
       }
       return co.sealImage;
     }
     if (!name) return '';
-    const svg = buildInvoiceSealSvg(name, shape);
+    const svg = buildInvoiceSealSvg(name, place);
     return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
   }
 
+  // Signature / seal area: always the same height, with or without a signature or seal.
   function getInvoiceSignatoryHtml(co) {
     const seal = getInvoiceCompanySeal(co);
     const sign = co.signatureImage || '';
 
-    if (!seal && !sign) {
-      return '<div style="flex:1 1 auto; min-height:60px;"></div>';
-    }
-
     return `
-      <div style="flex:1 1 auto; min-height:122px; display:flex; align-items:center; justify-content:center; position:relative; padding:4px 0; box-sizing:border-box;">
+      <div style="flex:0 0 auto; height:122px; display:flex; align-items:center; justify-content:center; position:relative; box-sizing:border-box;">
         ${seal ? `
           <img src="${siEsc(seal)}" alt="Company Seal" style="max-height:120px; max-width:170px; object-fit:contain; opacity:0.9; -webkit-print-color-adjust:exact; print-color-adjust:exact; ${sign ? 'position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); z-index:2; opacity:0.85;' : 'z-index:1;'}" />
         ` : ''}
         ${sign ? `
           <img src="${siEsc(sign)}" alt="Signature" style="max-height:55px; max-width:160px; object-fit:contain; position:relative; z-index:1; -webkit-print-color-adjust:exact; print-color-adjust:exact;" />
         ` : ''}
+      </div>`;
+  }
+
+  // "For <Company>", the signature / seal and "Authorised Signatory" are one block of fixed
+  // size. It sits at the foot of its column and is never split: if it does not fit at the
+  // bottom of a page, the whole block moves to the next page.
+  function getInvoiceSignatoryBlockHtml(co, companyName) {
+    return `
+      <div style="flex:0 0 auto; margin-top:auto; padding:8px 12px 0; box-sizing:border-box; text-align:center; break-inside:avoid; page-break-inside:avoid;">
+        <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${siEsc(companyName)}</div>
+        ${getInvoiceSignatoryHtml(co)}
+        <div style="border-top:1px solid #94a3b8; padding-top:5px; font-size:10.5px; color:#475569; font-weight:600;">Authorised Signatory</div>
       </div>`;
   }
 
@@ -287,52 +311,22 @@
     return { billed, shipped, isTemporary: !!override };
   }
 
-  // Bank account for the payment instructions.
+  // Bank account for the payment instructions: always the primary bank account
+  // (Master Desk → Ledger → Primary Bank Account). Null when it has no bank details.
   function getInvoiceBankDetails(inv) {
-    const ledgers = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
-    const fromLedger = (l) => {
-      if (!l) return null;
-      const info = l.bankAccountInfo || {};
-      const bank = {
-        bankName: info.bankName || l.bankName || '',
-        accountHolder: info.accountHolder || '',
-        accountNo: info.accountNo || l.accountNo || '',
-        ifsc: info.ifscCode || l.ifsc || '',
-        branch: info.branch || l.branch || '',
-        qrCode: info.qrCode || '',
-        ledgerName: l.name || ''
-      };
-      return (bank.bankName || bank.accountNo) ? bank : null;
+    const l = typeof getPrimaryBankLedger === 'function' ? getPrimaryBankLedger() : null;
+    if (!l) return null;
+    const info = l.bankAccountInfo || {};
+    const bank = {
+      bankName: info.bankName || l.bankName || '',
+      accountHolder: info.accountHolder || '',
+      accountNo: info.accountNo || l.accountNo || '',
+      ifsc: info.ifscCode || l.ifsc || '',
+      branch: info.branch || l.branch || '',
+      qrCode: info.qrCode || '',
+      ledgerName: l.name || ''
     };
-
-    // 1. the account this invoice was paid into
-    const payLedger = ledgers.find(l => String(l.id) === String(inv.paymentAccountId));
-    const fromPayment = fromLedger(payLedger);
-    if (fromPayment) return fromPayment;
-
-    // 2. any bank ledger in the Chart of Accounts
-    for (const l of ledgers) {
-      if (l.type !== 'ledger') continue;
-      const b = fromLedger(l);
-      if (b && b.bankName) return b;
-    }
-
-    // 3. the primary bank recorded in Company Profile → Banking
-    const co = getInvoiceCompany();
-    const banks = Array.isArray(co.banks) ? co.banks : [];
-    const primary = banks.find(b => b.isPrimary) || banks[0];
-    if (primary && (primary.bankName || primary.accNo)) {
-      return {
-        bankName: primary.bankName || '',
-        accountHolder: co.name || '',
-        accountNo: primary.accNo || '',
-        ifsc: primary.ifsc || '',
-        branch: primary.branch || '',
-        qrCode: '',
-        ledgerName: primary.type || ''
-      };
-    }
-    return null;
+    return (bank.bankName || bank.accountNo) ? bank : null;
   }
 
   // An invoice paid in full when it was made — Full Payment, or a cash sale (a Cash and
@@ -368,6 +362,9 @@
     if (advance > 0) lines.push({ label: 'Advance Adjusted', value: siNum(advance) + (inv.advanceVoucherNo ? ` (${inv.advanceVoucherNo})` : '') });
     if (paidIn && (receivedNow > 0 || isCashSale)) lines.push({ label: 'Paid In', value: paidIn });
     lines.push({ label: 'Amount Paid', value: siNum(paidAmount) });
+    // The rest received by Journal Entry against the invoice (journal-allocations.js)
+    const journal = getInvoiceSheetJournalReceived(inv, parseFloat(inv.total) || 0, paidAmount);
+    if (journal > 0) lines.push({ label: 'Received by Journal Entry', value: siNum(journal) });
     return { lines };
   }
 
@@ -478,6 +475,10 @@
     // ── Company block ──
     const coLines = [];
     if (co.address) coLines.push(siEsc(co.address).replace(/\n/g, '<br>'));
+    const coDistrict = co.district && String(co.district).toLowerCase() !== String(co.city || '').toLowerCase() ? co.district : '';
+    const coCityPin = [[co.city, coDistrict].filter(Boolean).join(', '), co.pincode].filter(Boolean).join(' - ');
+    if (coCityPin) coLines.push(siEsc(coCityPin));
+    if (co.state) coLines.push(siEsc(co.state));
     if (co.gstin) coLines.push(`GSTIN: ${siEsc(co.gstin)}`);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
@@ -720,8 +721,8 @@
         </table>
 
         <!-- One two-column grid. Every card is only as tall as its own content, the gaps are a
-             uniform 10px, and just the last card in each column absorbs the leftover height so
-             the two columns finish on the same line. -->
+             uniform 10px, and the two columns finish on the same line: on the left the last card
+             absorbs the leftover height, on the right it goes above the signatory block. -->
         <div style="display:flex; gap:10px; margin-top:10px; align-items:stretch;">
           <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px;">
             ${bankHtml}
@@ -741,11 +742,7 @@
             <div style="flex:0 0 auto; background:var(--blue-600, #2563eb); border:1px solid #1d4ed8; border-radius:6px; padding:6px 12px; box-sizing:border-box; color:#ffffff; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
               ${totalsRow('Total Amount', siNum(grandTotal), { size: '12px', weight: 700, color: '#ffffff', pad: '1px 0' })}
             </div>
-            <div style="flex:1 1 auto; padding:8px 12px 0; box-sizing:border-box; text-align:center; display:flex; flex-direction:column; justify-content:space-between;">
-              <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${siEsc(getInvoiceCompanyName(co))}</div>
-              ${getInvoiceSignatoryHtml(co)}
-              <div style="border-top:1px solid #94a3b8; padding-top:5px; font-size:10.5px; color:#475569; font-weight:600;">Authorised Signatory</div>
-            </div>
+            ${getInvoiceSignatoryBlockHtml(co, getInvoiceCompanyName(co))}
           </div>
         </div>
 

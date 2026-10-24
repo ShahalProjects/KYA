@@ -103,8 +103,10 @@
   }
 
   // Refunds vendors owe: Purchase Reversals (and reversed pre-purchase advances) not fully
-  // refunded, and advance above a purchase's value not refunded
+  // refunded, and advance above a purchase's value not refunded — less refunds received by
+  // Journal Entry against them (journal-allocations.js)
   function getVendorRefunds() {
+    const journal = key => typeof getJournalAllocatedTo === 'function' ? getJournalAllocatedTo('vendorRefund', key) : 0;
     const out = [];
     (store().purchaseVouchers || []).forEach(v => {
       if (!v) return;
@@ -112,10 +114,10 @@
       let type = '';
       if (v.isReturn) {
         const value = v.reversedPreDoc ? r2(v.reversedPreDoc.advance) : r2(v.total);
-        amount = r2(value - purchasePaid(v));
+        amount = r2(value - purchasePaid(v) - journal(`prev:${v.id}`));
         type = v.reversedPreDoc ? preReversalType(v.reversedPreDoc.label) : 'Purchase Reversal';
       } else if (v.advanceRefund) {
-        amount = r2((parseFloat(v.advanceRefund.excess) || 0) - (parseFloat(v.advanceRefund.amount) || 0));
+        amount = r2((parseFloat(v.advanceRefund.excess) || 0) - (parseFloat(v.advanceRefund.amount) || 0) - journal(`padv:${v.id}`));
         type = 'Purchase Advance';
       }
       if (amount <= 0.009) return;
@@ -124,6 +126,12 @@
         party: v.vendorName || '', type, amount
       });
     });
+    // An advance paid by Journal Entry against a Pre Purchase document since cancelled
+    if (typeof getVendorRefundItems === 'function') {
+      getVendorRefundItems().filter(x => x.key.indexOf('ppre:') === 0 && x.available > 0.009).forEach(x => {
+        out.push({ dueDate: x.date || '', date: x.date || '', no: x.docNo || '', party: x.vendorName || '', type: 'Purchase Advance', amount: x.available });
+      });
+    }
     return out;
   }
 

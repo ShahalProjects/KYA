@@ -67,6 +67,11 @@
     if (typeof getPreInvoiceAdvanceUsed === 'function' && getPreInvoiceAdvanceUsed(cfg.storeKey, doc.id) > 0.009) {
       return 'its advance paid other documents';
     }
+    // Journal Entry money against it (journal-allocations.js)
+    if (!isDraft && typeof getJournalDeleteProblem === 'function') {
+      const problem = getJournalDeleteProblem(journalRefsOf(cfg.storeKey, doc.id));
+      if (problem) return problem;
+    }
     return '';
   }
 

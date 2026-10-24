@@ -25,6 +25,10 @@
   // { kind, id, advance: { amount, journalEntryId, voucherNo } } — set by Convert to Purchase
   // or the Pre Purchase No. box, or read back from the voucher being edited
   let _purchasePreLink = null;
+  // The supplier's advance paid by Journal Entry chosen to pay this purchase (the ⇄ line in the
+  // payment box): [{ key, entryId, rowId, docNo, amount }]. Moved onto the purchase in those
+  // journal entries once it is posted (journal-allocations.js).
+  let _purchaseAdvanceUse = [];
 
   const MULTI_PAYMENT_VALUE = 'multi-payment';
   const $ = id => document.getElementById(id);
@@ -42,8 +46,9 @@
       .replace(/'/g, '&#39;');
   }
 
+  // The Qty box starts empty; an empty Qty means 1 (qtyBlank only keeps the box empty)
   function newPurchaseRow() {
-    return { item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 };
+    return { item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 };
   }
 
   // Local date — toISOString() is UTC and gives yesterday before 05:30 IST
@@ -200,11 +205,13 @@
   function getPurchaseRefundMax(total) {
     const src = _purchaseReturnSource;
     if (!src) return 0;
-    if (src.type === 'pre') return Math.max(0, r2(src.advance));
+    // Refunded by Journal Entry already: only the rest is left on the reversal
+    const journalRefunded = getPurchaseFormJournalRefunded();
+    if (src.type === 'pre') return Math.max(0, r2(src.advance - journalRefunded));
     const orig = getPurchaseReturnOriginal();
     if (!orig || typeof window.getPurchaseRefundable !== 'function') return 0;
     const refundable = window.getPurchaseRefundable(orig, getPurchaseOwnId());
-    return Math.max(0, Math.min(r2(total), refundable));
+    return Math.max(0, Math.min(r2(total - journalRefunded), refundable));
   }
 
   // Title, the Original Doc box, the number box, the button and the header for the mode
@@ -353,26 +360,44 @@
     const max = getPurchaseRefundMax(total);
     const src = _purchaseReturnSource;
     const row = (label, value, strong) => `<div style="display: flex; justify-content: space-between; gap: 10px; margin-top: 2px;"><span>${label}</span>${strong ? `<strong>${value}</strong>` : `<span>${value}</span>`}</div>`;
+    // Refunded by Journal Entry against this reversal already
+    const journalRefunded = getPurchaseFormJournalRefunded();
+    const journalRow = journalRefunded > 0 ? row('Refunded by Journal Entry', `₹ ${fmt(journalRefunded)}`) : '';
     if (box) {
       if (!src) {
         box.dataset.active = '0';
         box.style.display = 'none';
         box.innerHTML = '';
       } else if (src.type === 'pre') {
+        // Paid by Journal Entry against the document (journal-allocations.js): it sits in the
+        // supplier's own ledger, so it isn't refunded here — once the document is cancelled
+        // the supplier owes it back, and their refund is recorded in Journal Entry
+        const preDoc = (window.PURCHASE_PRE_DOCS || []).find(d => d.key === src.kind);
+        const journalAdv = (preDoc && typeof window.getJournalAllocatedTo === 'function') ? window.getJournalAllocatedTo(preDoc.storeKey, src.id) : 0;
+        const journalAdvNote = journalAdv > 0
+          ? `<div style="margin-top: 4px; font-weight: 500;">₹ ${fmt(journalAdv)} paid against ${ohEsc(src.no)} by Journal Entry stays in the supplier's ledger as an amount they owe you back — record their refund in Journal Entry.</div>`
+          : '';
         box.dataset.active = '1';
         box.innerHTML = src.advance > 0
           ? `${row(`Advance paid${src.advanceVoucherNo ? ` <span style="font-family: monospace; font-weight: 700;">[${ohEsc(src.advanceVoucherNo)}]</span>` : ''}`, `₹ ${fmt(src.advance)}`, true)}
-             <div style="margin-top: 4px; font-weight: 500;">Record the supplier's refund below; any part not refunded stays ${src.inPartyLedger ? "in the supplier's ledger" : 'in Advances to Suppliers'}.</div>`
-          : `<div style="font-weight: 500;">No advance was paid against ${ohEsc(src.no)} — nothing to refund.</div>`;
+             ${journalRow}${journalRow ? row('Refundable on this reversal', `₹ ${fmt(max)}`, true) : ''}
+             <div style="margin-top: 4px; font-weight: 500;">${max > 0.005 ? `Record the supplier's refund below; any part not refunded stays ${src.inPartyLedger ? "in the supplier's ledger" : 'in Advances to Suppliers'}.` : 'Fully refunded — nothing more to record here.'}</div>${journalAdvNote}`
+          : (journalAdv > 0
+            ? `${row('Paid by Journal Entry', `₹ ${fmt(journalAdv)}`, true)}${journalAdvNote}`
+            : `<div style="font-weight: 500;">No advance was paid against ${ohEsc(src.no)} — nothing to refund.</div>`);
       } else {
         const orig = getPurchaseReturnOriginal();
-        const paid = orig ? getPurchasePaidAmount(orig) : 0;
+        // Paid on the purchase itself and by Journal Entry against it
+        const paid = orig ? (typeof window.getPurchaseTotalPaid === 'function' ? window.getPurchaseTotalPaid(orig) : getPurchasePaidAmount(orig)) : 0;
+        const paidByJournal = (orig && typeof window.getPurchaseJournalPaid === 'function') ? Math.min(paid, window.getPurchaseJournalPaid(orig)) : 0;
         const refundable = (orig && typeof window.getPurchaseRefundable === 'function') ? window.getPurchaseRefundable(orig, getPurchaseOwnId()) : 0;
         const already = Math.max(0, r2(paid - refundable));
         box.dataset.active = '1';
         box.innerHTML = paid > 0
           ? `${row(`Paid on ${ohEsc(src.no)}`, `₹ ${fmt(paid)}`)}
+             ${paidByJournal > 0 ? row('&nbsp;&nbsp;of which by Journal Entry', `₹ ${fmt(paidByJournal)}`) : ''}
              ${already > 0 ? row('Already refunded', `₹ ${fmt(already)}`) : ''}
+             ${journalRow}
              ${row('Refundable on this reversal', `₹ ${fmt(max)}`, true)}
              <div style="margin-top: 4px; font-weight: 500;">Any part not refunded stays as an amount the supplier owes you.</div>`
           : `<div style="font-weight: 500;">Nothing was paid on ${ohEsc(src.no)} — the reversal reduces what you owe the supplier.</div>`;
@@ -720,12 +745,108 @@
   // is for what is left after it.
   function getPurchaseFormJournalPaid() {
     if (isPurchaseReturnMode() || typeof window.getPurchaseJournalPaid !== 'function') return 0;
+    return r2(getPurchasePostedJournalPaid() + getPurchaseAdvanceUseTotal());
+  }
+
+  // …of which already in posted journal entries (not the advance chosen on this form)
+  function getPurchasePostedJournalPaid() {
+    if (isPurchaseReturnMode() || typeof window.getPurchaseJournalPaid !== 'function') return 0;
     const ed = _editingPurchaseVoucher;
     return window.getPurchaseJournalPaid({
       id: (ed && !ed.isDraft) ? ed.id : null,
       preDocKind: _purchasePreLink ? _purchasePreLink.kind : null,
       preDocId: _purchasePreLink ? _purchasePreLink.id : null
     });
+  }
+
+  function getPurchaseAdvanceUseTotal() {
+    return r2(_purchaseAdvanceUse.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0));
+  }
+
+  // ── ⇄ line in the payment box: the vendor's advance paid by Journal Entry (not against
+  // anything yet) — choose how much of it pays this purchase. The chip copies Invoice Balance's
+  // summary chip (sales-credit-adjust.js). ──
+  function getPurchaseVendorName() {
+    const party = getPurchaseParty({ vendorId: ($('purchaseVendor') || {}).value || '' });
+    return party ? party.name : '';
+  }
+
+  function refreshPurchaseJournalAdvanceLine() {
+    const box = $('purchasePaymentBox');
+    if (!box) return;
+    let el = $('purchaseJournalAdvanceLine');
+    if (!el) {
+      el = document.createElement('button');
+      el.type = 'button';
+      el.id = 'purchaseJournalAdvanceLine';
+      el.style.cssText = 'display: none; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 5px 9px; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: #0f766e; cursor: pointer; font-family: inherit; box-sizing: border-box; text-align: left;';
+      el.addEventListener('click', openPurchaseJournalAdvancePicker);
+      box.appendChild(el);
+    }
+    const name = getPurchaseVendorName();
+    const advances = (!isPurchaseReturnMode() && name && typeof window.getSupplierJournalAdvances === 'function')
+      ? window.getSupplierJournalAdvances(name) : [];
+    const available = r2(advances.reduce((s, a) => s + a.available, 0));
+    const chosen = _purchaseAdvanceUse.filter(a => a.amount > 0);
+    if (!chosen.length && available <= 0.009) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'flex';
+    el.title = 'Advance paid to this vendor by Journal Entry and not against any document yet';
+    el.innerHTML = chosen.length
+      ? `<span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">⇄ Using advance by Journal Entry: ${chosen.map(a => `${ohEsc(a.docNo)} ₹ ${fmt(a.amount)}`).join(' · ')}</span><span style="color: var(--blue-600); flex-shrink: 0;">Edit</span>`
+      : `<span>⇄ ₹ ${fmt(available)} advance paid by Journal Entry</span><span style="color: var(--blue-600); flex-shrink: 0;">Use</span>`;
+  }
+
+  function openPurchaseJournalAdvancePicker() {
+    const name = getPurchaseVendorName();
+    if (!name || typeof window.openJournalAllocationModal !== 'function') return;
+    const total = getPurchaseGrandTotal();
+    // What this purchase still owes before the advance chosen here
+    const balance = Math.max(0, r2(total - getPurchaseAdvanceApplied(total) - getPurchasePostedJournalPaid()));
+    if (balance <= 0.009 && !_purchaseAdvanceUse.length) {
+      toast('Nothing is left to pay on this purchase.', 'info');
+      return;
+    }
+    const rows = window.getSupplierJournalAdvances(name);
+    window.openJournalAllocationModal({
+      party: { side: 'payable', mode: 'payment', name },
+      required: balance,
+      rows,
+      current: _purchaseAdvanceUse.map(a => ({ key: a.key, amount: a.amount })),
+      upTo: true,
+      title: 'Use Advance',
+      subtitle: `Advance paid to ${ohEsc(name)} by Journal Entry and not against any document yet — choose how much of it pays this purchase. It moves onto this purchase in those entries when the purchase is posted.`,
+      amountLabel: 'Balance of this purchase',
+      empty: 'This vendor has no advance paid by Journal Entry.',
+      onSave: list => {
+        _purchaseAdvanceUse = list.map(a => {
+          const src = rows.find(r => r.key === a.key) || {};
+          return { key: a.key, entryId: src.entryId, rowId: src.rowId, docNo: a.docNo, amount: r2(a.amount) };
+        });
+        recalculatePurchaseTotals();
+      }
+    });
+  }
+
+  // Once the purchase is posted: the advance chosen moves onto it in those journal entries
+  function commitPurchaseAdvanceUse(voucher) {
+    if (!_purchaseAdvanceUse.length || typeof window.moveJournalAdvance !== 'function') return;
+    let short = 0;
+    _purchaseAdvanceUse.forEach(a => {
+      const moved = window.moveJournalAdvance(a.entryId, a.rowId,
+        { store: 'purchaseVouchers', docId: voucher.id, docNo: voucher.invoiceNo, kind: 'bill', kindLabel: 'Purchase' }, a.amount);
+      short = r2(short + (a.amount - moved));
+    });
+    _purchaseAdvanceUse = [];
+    if (short > 0.009) toast(`₹${fmt(short)} of the advance chosen was no longer free in Journal Entry and was not used.`, 'warning');
+  }
+
+  // Refunded by Journal Entry against the posted voucher being edited: a reversal's refund
+  // (prev:) or its advance above the bill (padv:) — journal-allocations.js. Only the rest can
+  // still be refunded on the voucher.
+  function getPurchaseFormJournalRefunded() {
+    const ed = _editingPurchaseVoucher;
+    if (!ed || ed.isDraft || typeof window.getJournalAllocatedTo !== 'function') return 0;
+    return r2(window.getJournalAllocatedTo('vendorRefund', `prev:${ed.id}`) + window.getJournalAllocatedTo('vendorRefund', `padv:${ed.id}`));
   }
 
   // The part of the advance this purchase uses — never more than its Grand Total
@@ -745,7 +866,7 @@
     // A reversal: the refund its Original Doc allows
     if (isPurchaseReturnMode()) return getPurchaseRefundMax(total);
     const excess = getPurchaseAdvanceExcess(total);
-    if (excess > 0) return excess;
+    if (excess > 0) return Math.max(0, r2(excess - getPurchaseFormJournalRefunded()));
     return Math.max(0, r2(total - getPurchaseAdvanceApplied(total) - getPurchaseFormJournalPaid()));
   }
 
@@ -807,6 +928,7 @@
   function updatePurchaseAdvanceInfo(total) {
     const box = $('purchaseAdvanceInfo');
     wirePurchaseAdvanceHover();
+    refreshPurchaseJournalAdvanceLine();
     const t = (typeof total === 'number') ? total : getPurchaseGrandTotal();
     // A reversal shows what its Original Doc allows to be refunded instead
     if (isPurchaseReturnMode()) { updatePurchaseReversalInfo(t); return; }
@@ -1129,7 +1251,7 @@
             </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
-            <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
+            <input type="number" class="sales-row-qty je-input" value="${row.qtyBlank ? '' : (row.qty !== undefined ? row.qty : 1)}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
           </td>
           <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
             <input type="text" class="sales-row-unit je-input" value="${ohEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" />
@@ -1243,7 +1365,9 @@
     const unitEl = tr.querySelector('.sales-row-unit');
     if (unitEl) row.unit = unitEl.value;
 
-    let qty = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    // An empty Qty means 1
+    const qtyEl = tr.querySelector('.sales-row-qty');
+    let qty = (qtyEl && qtyEl.value.trim() === '') ? 1 : (parseFloat(qtyEl?.value) || 0);
     let rate = Math.round(parsePurchaseAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
     let discount = parsePurchaseAmt(tr.querySelector('.sales-row-discount')?.value || '0');
     row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
@@ -1302,6 +1426,9 @@
       }
     }
 
+    if (qtyEl && qtyEl.value.trim() === '') row.qtyBlank = true;
+    else delete row.qtyBlank;
+
     recalculatePurchaseTotals();
   }
 
@@ -1322,7 +1449,13 @@
       if (val('.sales-row-item')) row.item = val('.sales-row-item').value;
       if (val('.sales-row-hsn')) row.hsn = val('.sales-row-hsn').value;
       if (val('.sales-row-unit')) row.unit = val('.sales-row-unit').value;
-      if (val('.sales-row-qty') && val('.sales-row-qty').value !== '') row.qty = parseFloat(val('.sales-row-qty').value) || 0;
+      if (val('.sales-row-qty') && val('.sales-row-qty').value.trim() === '') {
+        row.qty = 1;
+        row.qtyBlank = true;
+      } else if (val('.sales-row-qty')) {
+        row.qty = parseFloat(val('.sales-row-qty').value) || 0;
+        delete row.qtyBlank;
+      }
       if (val('.sales-row-rate') && val('.sales-row-rate').value !== '') row.rate = parsePurchaseAmt(val('.sales-row-rate').value) || 0;
       if (val('.sales-row-discount') && val('.sales-row-discount').value !== '') row.discount = parsePurchaseAmt(val('.sales-row-discount').value) || 0;
       if (val('.sales-row-discount-type')) row.discountType = val('.sales-row-discount-type').value || 'val';
@@ -1602,6 +1735,7 @@
     const keep = (opts && opts.keepEditing && _editingPurchaseVoucher && _editingPurchaseVoucher.isDraft) ? _editingPurchaseVoucher : null;
     _editingPurchaseVoucher = null;
     _purchasePreLink = null;
+    _purchaseAdvanceUse = [];
     // A reversal starts with no Original Doc (the mode — purchase or reversal — is kept)
     _purchaseReturnSource = null;
     if (typeof window.closePurchaseOriginalDocList === 'function') window.closePurchaseOriginalDocList();
@@ -1625,6 +1759,8 @@
     if (isPurchaseReturnMode()) refreshPurchaseReversalNo(true);
 
     if ($('purchaseNotes')) $('purchaseNotes').value = '';
+    if ($('purchaseNarration')) $('purchaseNarration').value = '';
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('purchase', 'terms');
     if ($('purchaseAdjustments')) $('purchaseAdjustments').value = '';
 
     const rateSelect = $('purchaseTdsTcsRateSelect');
@@ -1716,6 +1852,7 @@
       updatePurchaseModeUI();
     }
     window._purchasePartyOverride = v.partyOverride ? JSON.parse(JSON.stringify(v.partyOverride)) : null;
+    _purchaseAdvanceUse = [];
     // Made from a Pre Purchase document: the link, and the advance paid against it
     _purchasePreLink = (v.preDocKind && v.preDocId !== undefined && v.preDocId !== null && v.preDocId !== '') ? {
       kind: v.preDocKind,
@@ -1740,6 +1877,8 @@
     if ($('purchaseVoucherChipDisplay')) $('purchaseVoucherChipDisplay').textContent = (invNoEl && invNoEl.value) || (v.isReturn ? 'REV-XXXX' : 'PUR-XXXX');
 
     if ($('purchaseNotes')) $('purchaseNotes').value = v.notes || '';
+    if ($('purchaseNarration')) $('purchaseNarration').value = v.narration || '';
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('purchase', 'terms');
     const adjEl = $('purchaseAdjustments');
     if (adjEl) adjEl.value = (v.adjustments !== undefined && v.adjustments !== '' && parseFloat(v.adjustments) !== 0) ? v.adjustments : '';
 
@@ -1917,7 +2056,7 @@
       partyOverride: window._purchasePartyOverride ? JSON.parse(JSON.stringify(window._purchasePartyOverride)) : null,
       supplyType: ($('purchaseSupplyType') || {}).value || 'Intra-State (CGST + SGST)',
       executiveId: ($('purchaseExecutive') || {}).value || '',
-      rows: JSON.parse(JSON.stringify(purchaseRows)),
+      rows: typeof window.voucherRowsForSave === 'function' ? window.voucherRowsForSave(purchaseRows) : JSON.parse(JSON.stringify(purchaseRows)),
       subTotal,
       tdsTcsMode: mode,
       tdsTcsRate: getPurchaseTdsTcsRate(),
@@ -1929,6 +2068,7 @@
       paymentAmount: r2(paymentAmount),
       paymentSplits,
       notes: ($('purchaseNotes') || {}).value || '',
+      narration: ($('purchaseNarration') || {}).value || '',
       uploadedDoc: purchaseUploadedDoc || null,
       // The Pre Purchase document it is made from, and the advance paid against it
       preDocKind: _purchasePreLink ? _purchasePreLink.kind : null,
@@ -2148,6 +2288,10 @@
       advanceRefundVoucherNo: existing ? (existing.advanceRefundVoucherNo || '') : ''
     });
 
+    // The vendor's journal advance chosen in the payment box now pays this purchase — first, so
+    // the purchase's payment entry sets off the part held in Advances to Suppliers
+    if (!isReturn) commitPurchaseAdvanceUse(voucher);
+
     // Post to the books (flows to Trial Balance, Ledgers, P&L, Balance Sheet, Voucher Desk)
     const je = (typeof postPurchaseVoucherToJournal === 'function') ? postPurchaseVoucherToJournal(voucher) : null;
     if (je) {
@@ -2245,6 +2389,9 @@
     const v = draft || (S.purchaseVouchers || []).find(x => String(x.id) === String(id));
     if (!v) return;
     const label = v.isReturn ? 'Purchase Reversal' : 'Purchase';
+    // A posted one that Journal Entry money is against stays (journal-allocations.js)
+    if (!draft && typeof window.blockIfJournalAgainst === 'function'
+        && window.blockIfJournalAgainst(window.journalRefsOf('purchase', v.id), `${label} ${v.invoiceNo || ''}`, 'deleted')) return;
     showKyaConfirm({
       title: draft ? 'Delete Draft?' : `Delete Posted ${label}?`,
       message: draft
@@ -2487,6 +2634,9 @@
         refreshPurchaseVendorAlterPencil();
         // A Cash and Cash Equivalents ledger as the vendor: a cash purchase, paid in full there
         applyPurchaseCashVendorLock();
+        // A journal advance chosen belonged to the previous vendor
+        if (_purchaseAdvanceUse.length) { _purchaseAdvanceUse = []; recalculatePurchaseTotals(); }
+        else refreshPurchaseJournalAdvanceLine();
       });
     }
     const vendorAlterBtn = $('btnPurchaseVendorAlter');

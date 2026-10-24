@@ -879,7 +879,11 @@
       const bal = computeTrialBalanceBalances('', to);
       const profit = calculatePnlProfitFromTrialBalances(computeTrialBalanceBalances(from, to));
       const cumulative = calculatePnlProfitFromTrialBalances(bal);
-      return { from, to, enabled: true, bal, profit, prior: cumulative - profit, diff: calculateOpeningDifferenceFromTrial(bal) };
+      // Stock as at To (Inventories); the Master Desk opening stock is brought in like an
+      // opening balance, so it counts in the difference in opening balances
+      const stock = getPnlStockFigures(bal);
+      const diff = calculateOpeningDifferenceFromTrial(bal) + (stock ? stock.open.total : 0);
+      return { from, to, enabled: true, bal, profit, prior: cumulative - profit, diff, stock };
     }
     const p1 = periodCtx(dateFrom, dateTo, true);
     const p2 = periodCtx(prevPeriodFrom, prevPeriodTo, hasPrev);
@@ -945,6 +949,9 @@
     // Profit for the period, retained earnings and any opening-balance difference sit in Reserves and surplus
     addAmt(amt1, 'sg-rs', p1.profit + p1.prior + p1.diff);
     addAmt(amt2, 'sg-rs', p2.profit + p2.prior + p2.diff);
+    // Closing stock from the Stock Book sits in Inventories
+    addAmt(amt1, 'sg-inv', p1.stock ? p1.stock.close.total : 0);
+    addAmt(amt2, 'sg-inv', p2.stock ? p2.stock.close.total : 0);
 
     // ── Trade payables: split by each supplier's MSME status (set in Master Desk) ──
     // Supplier postings land in the Trade Payables ledger (see computeTrialBalanceBalances), so a
@@ -1197,6 +1204,24 @@
 
     const flatItems = items => items.flatMap(it => it.isGroup ? it.children : [it]);
 
+    // Inventories note: closing stock from the Stock Book, classified as Schedule III asks
+    // (raw materials, work-in-progress, finished goods, stock-in-trade) under its mode of valuation
+    function stockNoteItems() {
+      const c1 = p1.stock ? p1.stock.close : null;
+      const c2 = p2.stock ? p2.stock.close : null;
+      if (!c1 && !c2) return [];
+      const v = (c, k) => c ? c[k] : 0;
+      const children = [['rm', 'Raw materials'], ['wip', 'Work-in-progress'], ['fg', 'Finished goods'], ['sit', 'Stock-in-trade']]
+        .map(([k, name]) => ({ name, code: '', amount1: v(c1, k), amount2: v(c2, k) }))
+        .filter(ch => !isNil(ch.amount1, ch.amount2));
+      if (!children.length) return [];
+      const method = (c1 || c2).method === 'fifo' ? 'FIFO' : 'weighted average';
+      return [{
+        name: `Valued at lower of cost and net realisable value (cost on ${method} basis)`, code: '', isGroup: true,
+        amount1: v(c1, 'total'), amount2: v(c2, 'total'), children
+      }];
+    }
+
     const noteDefs = [];
     [...elGroups, ...asGroups].forEach(g => {
       if (g.single) noteDefs.push({ note: g.single.note, title: g.single.label, keys: [g.single.key] });
@@ -1258,6 +1283,8 @@
       } else if (def.ppe) {
         const t = ppe.tables.find(tb => tb.noteNo === def.note);
         items = t.rows.map(r => ({ name: `${r.name} (net block)`, code: r.code || '', isGroup: false, amount1: r.netClose, amount2: r.netPrev }));
+      } else if (def.keys[0] === 'sg-inv') {
+        items = stockNoteItems().concat(ledgerItems(def.keys));
       } else {
         items = ledgerItems(def.keys);
       }
@@ -1921,6 +1948,16 @@
         }
       });
 
+      // Stock, as Schedule III puts it: raw materials in Cost of materials consumed; finished
+      // goods, work-in-progress and stock-in-trade in Changes in inventories (opening − closing)
+      if (nodeId === 'sg-cmc' || nodeId === 'sg-cinv') {
+        const st = getPnlStockFigures(ledgerBalances);
+        if (st) {
+          const others = s => s.fg + s.wip + s.sit;
+          sum += nodeId === 'sg-cmc' ? st.open.rm - st.close.rm : others(st.open) - others(st.close);
+        }
+      }
+
       return sum;
     }
 
@@ -2474,6 +2511,35 @@
       let rowsHtml = '';
       let rowCount = 0;
 
+      // Opening / closing stock lines (Cost of materials consumed, Changes in inventories)
+      const stockLines = getPnlStockNoteItems(sgId, ledgerBalances1, ledgerBalances2);
+      const stockRowsHtml = items => items.map(it => {
+        rowCount++;
+        if (!it.isGroup) {
+          return `
+          <tr>
+            <td style="padding-left: 20px; color: var(--slate-700);">• ${it.name}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(it.amount1)}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(it.amount2)}</td>
+          </tr>
+        `;
+        }
+        return `
+          <tr style="background: #fdfefe; font-weight: 600;">
+            <td style="padding-left: 20px; color: #b45309;">📁 ${it.name}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(it.amount1)}</td>
+            <td class="pnl-sch-amt">${fmtSchAmt(it.amount2)}</td>
+          </tr>
+        ` + it.children.map(ch => `
+            <tr>
+              <td style="padding-left: 38px; color: var(--slate-600);">• ${ch.name}</td>
+              <td class="pnl-sch-amt">${fmtSchAmt(ch.amount1)}</td>
+              <td class="pnl-sch-amt">${fmtSchAmt(ch.amount2)}</td>
+            </tr>
+          `).join('');
+      }).join('');
+      rowsHtml += stockRowsHtml(stockLines.before);
+
       const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
       groupLdgs.forEach(gl => {
         const glBal1 = getPnlNodeBalance(gl.id, 'group-ledger', ledgerBalances1);
@@ -2516,6 +2582,7 @@
         `;
         rowCount++;
       });
+      rowsHtml += stockRowsHtml(stockLines.after);
 
       if (rowCount === 0) {
         rowsHtml = `
@@ -3480,7 +3547,9 @@
     function buildNoteForSubgroup(noteNo, title, sgId) {
       const sgBal1 = getPnlNodeBalance(sgId, 'sg', ledgerBalances1);
       const sgBal2 = getPnlNodeBalance(sgId, 'sg', ledgerBalances2);
-      const items = [];
+      // Opening / closing stock lines (Cost of materials consumed, Changes in inventories)
+      const stockLines = getPnlStockNoteItems(sgId, ledgerBalances1, ledgerBalances2);
+      const items = stockLines.before.slice();
 
       const groupLdgs = coaLedgers.filter(l => l.sgId === sgId && l.type === 'group-ledger');
       groupLdgs.forEach(gl => {
@@ -3504,6 +3573,7 @@
         const bal2 = getPnlNodeBalance(l.id, 'ledger', ledgerBalances2);
         items.push({ name: l.name, code: l.code || '', isGroup: false, amount1: bal1, amount2: bal2 });
       });
+      items.push(...stockLines.after);
 
       return { noteNo, title, total1: sgBal1, total2: sgBal2, items };
     }
@@ -3788,7 +3858,66 @@
       });
     });
 
+    // The period, so the P&L can bring in its opening and closing stock (getPnlStockFigures)
+    Object.defineProperty(balances, '_period', { value: { from: dateFrom || '', to: dateTo || '' } });
     return balances;
+  }
+
+  function rptIsoDayBefore(iso) {
+    const p = (iso || '').split('-').map(Number);
+    const d = new Date(p[0], p[1] - 1, p[2] - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  // Opening and closing stock of the period of a set of balances, by Schedule III class, from
+  // the Stock Book (stock-hub.js: lower of cost and NRV, by its Wt. Avg / FIFO switch).
+  // Opening = stock as at the day before From (the Master Desk opening stock when there is no
+  // From date); closing = stock as at To. null for balances without a period.
+  function getPnlStockFigures(ledgerBalances) {
+    const p = ledgerBalances && ledgerBalances._period;
+    if (!p || typeof getKyaStockValuesAsAt !== 'function') return null;
+    if (!p.stock) {
+      p.stock = {
+        open: getKyaStockValuesAsAt(p.from ? rptIsoDayBefore(p.from) : null),
+        close: getKyaStockValuesAsAt(p.to)
+      };
+    }
+    return p.stock;
+  }
+
+  // Stock lines of the Cost of materials consumed / Changes in inventories notes, as note items:
+  // opening stock first and closing stock as a minus, so the lines add up to the note total.
+  // before: the lines above the note's ledgers; after: the lines below them.
+  function getPnlStockNoteItems(sgId, ledgerBalances1, ledgerBalances2) {
+    const s1 = getPnlStockFigures(ledgerBalances1);
+    const s2 = getPnlStockFigures(ledgerBalances2);
+    const none = { before: [], after: [] };
+    if (!s1 && !s2) return none;
+    const amt = (s, side, keys, sign) => s ? sign * keys.reduce((sum, k) => sum + s[side][k], 0) : 0;
+    const line = (name, side, keys, sign) => ({ name, code: '', isGroup: false, amount1: amt(s1, side, keys, sign), amount2: amt(s2, side, keys, sign) });
+
+    if (sgId === 'sg-cmc') {
+      return {
+        before: [line('Opening stock of raw materials', 'open', ['rm'], 1)],
+        after: [line('Less: Closing stock of raw materials', 'close', ['rm'], -1)]
+      };
+    }
+    if (sgId === 'sg-cinv') {
+      const classes = [['fg', 'Finished goods'], ['wip', 'Work-in-progress'], ['sit', 'Stock-in-trade']];
+      const keys = classes.map(c => c[0]);
+      const group = (name, side, sign) => Object.assign(line(name, side, keys, sign), {
+        isGroup: true,
+        children: classes.map(([k, label]) => line(label, side, [k], sign))
+      });
+      return {
+        before: [
+          group('Inventories at the beginning of the period', 'open', 1),
+          group('Less: Inventories at the end of the period', 'close', -1)
+        ],
+        after: []
+      };
+    }
+    return none;
   }
 
   function renderTrialBalancePanel() {
@@ -3988,6 +4117,8 @@
   }
 
   function refreshAllReports() {
+    // A purchase's set-off of a journal advance follows that journal (purchase-posting.js)
+    if (typeof syncPurchaseJournalAdvanceSetOffs === 'function') syncPurchaseJournalAdvanceSetOffs();
     if (typeof activeTabId !== 'undefined') {
       if (activeTabId === 'posted' && typeof renderPostedPanel === 'function') renderPostedPanel();
       if (activeTabId === 'drafted' && typeof renderDraftedPanel === 'function') renderDraftedPanel();

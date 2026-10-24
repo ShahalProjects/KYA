@@ -112,6 +112,9 @@
     // A reversal / an advance above the invoice value whose credit paid other documents stays
     if (typeof blockIfCreditUsed === 'function'
         && blockIfCreditUsed([`rev:${invoice.id}`, `park:${invoice.id}`], `${isRet ? 'Sales Reversal' : 'Invoice'} ${invoice.invoiceNo}`, 'deleted')) return;
+    // …and so does one that Journal Entry money is against (journal-allocations.js)
+    if (typeof blockIfJournalAgainst === 'function'
+        && blockIfJournalAgainst(journalRefsOf('sales', invoice.id), `${isRet ? 'Sales Reversal' : 'Invoice'} ${invoice.invoiceNo}`, 'deleted')) return;
     
     let titleText = isRet ? 'Delete Reversal?' : 'Delete Invoice?';
     let messageText = isRet 
@@ -265,13 +268,17 @@
     loadSalesInvoice(JSON.parse(JSON.stringify(draft)), true);
     // Not an edit: this flow goes back on its own (below), with the posted preview
     if (window._editingSalesInvoice) delete window._editingSalesInvoice.returnTo;
-    postSalesInvoice();
-    const posted = !(window.KYA_STORE.salesVouchersDrafts || []).some(d => String(d.id) === String(id));
-    if (posted && returnTo && returnTo !== 'sales_voucher' && typeof openTab === 'function') {
-      openTab(returnTo);
-      if (returnTo === 'voucher_desk' && typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
-      if (returnTo === 'sales_drafted') renderSalesDraftedPanel();
-    }
+    const goBack = () => {
+      const posted = !(window.KYA_STORE.salesVouchersDrafts || []).some(d => String(d.id) === String(id));
+      if (posted && returnTo && returnTo !== 'sales_voucher' && typeof openTab === 'function') {
+        openTab(returnTo);
+        if (returnTo === 'voucher_desk' && typeof renderVoucherDeskPanel === 'function') renderVoucherDeskPanel();
+        if (returnTo === 'sales_drafted') renderSalesDraftedPanel();
+      }
+    };
+    // Held by the negative-stock warning: goes back once Post Anyway has posted it
+    postSalesInvoice({ afterStockWarning: goBack });
+    goBack();
   }
   window.postSalesDraft = postSalesDraft;
 

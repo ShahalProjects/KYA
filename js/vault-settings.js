@@ -142,6 +142,8 @@
       if (typeof rebuildSalesJournalEntries === 'function') rebuildSalesJournalEntries();
       // The same for purchases (purchase-posting.js)
       if (typeof rebuildPurchaseJournalEntries === 'function') rebuildPurchaseJournalEntries();
+      // ...and every posted journal voucher number, so deleting an entry never frees it (journal.js)
+      if (typeof registerPostedJournalVoucherNos === 'function') registerPostedJournalVoucherNos();
 
       if (!quiet) {
         showToast('Data restored successfully.', 'success');
@@ -1030,6 +1032,9 @@
 
   async function saveKyaBackup(isAuto = false) {
     try {
+      // Every save runs after a post, so each posted journal voucher number is registered
+      // before its entry can be deleted, wherever it was posted from (journal.js)
+      if (typeof registerPostedJournalVoucherNos === 'function') registerPostedJournalVoucherNos();
       const activePath = getActiveVaultPath();
       const backupData = {
         coaLedgers,

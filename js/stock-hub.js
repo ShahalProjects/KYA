@@ -732,6 +732,13 @@
     };
   }
 
+  // Links a hand-entered Stock Hub receipt / dispatch to its stock item: by SKU, else by name
+  function makeStockMovementMatcher(stockItems) {
+    const bySku = new Map(stockItems.map(it => [String(it.sku).toLowerCase(), it]));
+    const byName = new Map(stockItems.map(it => [String(it.name).toLowerCase().trim(), it]));
+    return m => bySku.get(String(m.sku || '').toLowerCase()) || byName.get(String(m.itemName || '').toLowerCase().trim()) || null;
+  }
+
   // Voucher dates are YYYY-MM-DD (DD-MM-YYYY also read) → { y, m: 1-12, d }, or null
   function voucherDateParts(s) {
     const t = String(s || '').trim();
@@ -766,9 +773,12 @@
   // opening qty and rate, purchases net of returns (also as FIFO layers, oldest first), the
   // weighted average cost, every sale and sales return (date, qty, value without GST) and the
   // latest sale rate (for NRV).
-  function buildStockLedger(stockItems) {
+  // asAtKey (YYYYMMDD, optional): only what happened up to that day, for stock as at a date;
+  // -1 = before every voucher (the Master Desk opening stock).
+  function buildStockLedger(stockItems, asAtKey) {
     const vouchers = stockMovingVouchers();
     const matchRow = makeStockRowMatcher(stockItems);
+    const upToDate = v => asAtKey == null || voucherDateKey(v.date) <= asAtKey;
     // Vouchers in date order, then in the order they were posted
     const seq = v => Number(v.postedAt) || Number(v.id) || 0;
     const byDate = (a, b) => (voucherDateKey(a.date) - voucherDateKey(b.date)) || (seq(a) - seq(b));
@@ -776,7 +786,7 @@
     const ledger = new Map(stockItems.map(it => [it.id, { inQty: 0, inVal: 0, outQty: 0, layers: [], sales: [], nrv: null }]));
 
     // Purchases add stock (and FIFO layers)
-    const purchases = vouchers.purchases.sort(byDate);
+    const purchases = vouchers.purchases.filter(upToDate).sort(byDate);
     purchases.filter(v => !v.isReturn).forEach(v => {
       (v.rows || []).forEach(row => {
         const it = matchRow(row);
@@ -810,7 +820,7 @@
     });
 
     // Sales take stock out, sales returns bring it back; the latest sale sets NRV
-    vouchers.sales.sort(byDate)
+    vouchers.sales.filter(upToDate).sort(byDate)
       .forEach(v => {
         (v.rows || []).forEach(row => {
           const it = matchRow(row);
@@ -825,10 +835,24 @@
         });
       });
 
+    // Hand-entered receipts / dispatches already changed the master qty, so as at a date the
+    // ones dated after it are taken back out
+    const laterAdj = new Map();
+    if (asAtKey != null) {
+      const matchMovement = makeStockMovementMatcher(stockItems);
+      _stockMovements.forEach(m => {
+        if (m.type !== 'inward' && m.type !== 'outward') return;
+        const it = matchMovement(m);
+        if (!it || voucherDateKey(m.date) <= asAtKey) return;
+        const q = (m.type === 'inward' ? 1 : -1) * Math.abs(Number(m.qty) || 0);
+        laterAdj.set(it.id, (laterAdj.get(it.id) || 0) + q);
+      });
+    }
+
     stockItems.forEach(it => {
       const s = ledger.get(it.id);
       // Opening qty and rate from Master Desk (Stock Hub movements already adjust the qty)
-      s.openQty = Math.max(0, it.qty);
+      s.openQty = Math.max(0, it.qty - (laterAdj.get(it.id) || 0));
       s.openRate = Math.max(0, it.cost);
       const allQty = s.openQty + s.inQty;
       s.avgRate = allQty > 0 ? Math.max(0, (s.openQty * s.openRate + s.inVal) / allQty) : s.openRate;
@@ -840,9 +864,10 @@
   // realisable value. Cost is the purchase value after trade discount and without recoverable
   // GST, assigned by weighted average or FIFO. NRV is the item's latest sale rate without GST
   // (costs to sell are not recorded); an item not sold yet is carried at cost.
-  // Returns a Map of stock item id → { qty, value }: closing qty and closing value.
-  function computeStockItemValues(stockItems, method) {
-    const ledger = buildStockLedger(stockItems);
+  // Returns a Map of stock item id → { qty, value }: closing qty and closing value
+  // (as at asAtKey when given, see buildStockLedger).
+  function computeStockItemValues(stockItems, method, asAtKey) {
+    const ledger = buildStockLedger(stockItems, asAtKey);
     const values = new Map();
     stockItems.forEach(it => {
       const s = ledger.get(it.id);
@@ -887,6 +912,120 @@
       }
       return total;
     }, { value: 0, available: 0 });
+  }
+
+  // Schedule III class of a stock item, from its Master Desk "Stock Group *" (following each
+  // group's "Under" up the tree): 'rm' raw materials (Raw Materials, Packaging Materials),
+  // 'wip' work-in-progress, 'fg' finished goods, 'sit' stock-in-trade (Trading Goods, and any
+  // group that is none of these, as its purchases post to Purchases of Stock-in-Trade)
+  function stockScheduleClass(item, groups) {
+    const seen = new Set();
+    let name = String(item.group || '').trim();
+    while (name && !seen.has(name.toLowerCase())) {
+      const key = name.toLowerCase();
+      seen.add(key);
+      if (/raw\s*material|packag|packing/.test(key)) return 'rm';
+      if (/work[\s-]*in[\s-]*progress|\bwip\b/.test(key)) return 'wip';
+      if (/finished/.test(key)) return 'fg';
+      if (/trad/.test(key)) return 'sit';
+      const g = groups.find(x => String(x.id) === name ||
+        [x.name].concat(x.aliases || []).some(n => String(n || '').trim().toLowerCase() === key));
+      name = g ? String(g.parent || '').trim() : '';
+    }
+    return 'sit';
+  }
+
+  function stockGroupsForClass() {
+    return (window._masterStockGroups && Array.isArray(window._masterStockGroups))
+      ? window._masterStockGroups
+      : loadStockHubStorage(KYA_STOCK_GROUPS_KEY, []);
+  }
+
+  // Stock by Schedule III class as at a date, valued as the Stock Book values it (lower of cost
+  // and NRV, by the Wt. Avg / FIFO switch). isoDate: YYYY-MM-DD; '' = after every voucher;
+  // null = the Master Desk opening stock. Used by the Statement of Profit and Loss, the Balance
+  // Sheet (reports.js) and the Cash Flow.
+  function getStockValuesAsAt(isoDate) {
+    const stockItems = getStockItems();
+    const asAtKey = isoDate === null ? -1 : (isoDate ? voucherDateKey(isoDate) : null);
+    const values = computeStockItemValues(stockItems, _stockValMethod, asAtKey);
+    const groups = stockGroupsForClass();
+    const out = { rm: 0, wip: 0, fg: 0, sit: 0, total: 0, method: _stockValMethod };
+    stockItems.forEach(it => {
+      const v = values.get(it.id).value;
+      if (!v) return;
+      out[stockScheduleClass(it, groups)] += v;
+      out.total += v;
+    });
+    return out;
+  }
+
+  // Stock on hand per stock item id: the Stock Book closing qty after every posted voucher
+  // (not floored at zero), with the posted sale being edited (excludeVoucherId) left out
+  function stockOnHandMap(stockItems, matchRow, excludeVoucherId) {
+    const ledger = buildStockLedger(stockItems);
+    const onHand = new Map(stockItems.map(it => {
+      const s = ledger.get(it.id);
+      return [it.id, s.openQty + s.inQty - s.outQty];
+    }));
+    const own = excludeVoucherId != null
+      ? stockMovingVouchers().sales.find(v => String(v.id) === String(excludeVoucherId)) : null;
+    if (own) {
+      (own.rows || []).forEach(row => {
+        const it = matchRow(row);
+        const qty = parseFloat(row.qty) || 0;
+        if (it && qty > 0) onHand.set(it.id, onHand.get(it.id) + (own.isReturn ? -qty : qty));
+      });
+    }
+    return onHand;
+  }
+
+  // The stock item on rows[index] (null if it isn't one): its stock on hand and this
+  // document's qty of it over all rows, for the "no quantity available" toast on the Sales
+  // Voucher and Pre Invoices. Returns { name, unit, onHand, qty }.
+  function getStockForRows(rows, index, excludeVoucherId) {
+    const stockItems = getStockItems();
+    const matchRow = makeStockRowMatcher(stockItems);
+    const it = matchRow(rows && rows[index]);
+    if (!it) return null;
+    const r4 = q => Math.round(q * 10000) / 10000;
+    const onHand = stockOnHandMap(stockItems, matchRow, excludeVoucherId).get(it.id);
+    const qty = rows.reduce((sum, row) => sum + (matchRow(row) === it ? (parseFloat(row.qty) || 0) : 0), 0);
+    return { name: it.name, unit: rows[index].unit || it.uom || '', onHand: r4(onHand), qty: r4(qty) };
+  }
+
+  // The stock items a sale takes below zero, for the Sales Voucher's warning before Post. On
+  // hand as in stockOnHandMap; the same item on several rows is added up.
+  // Returns [{ name, unit, onHand, qty, balance }].
+  function getStockShortfallsForSale(rows, excludeVoucherId) {
+    const stockItems = getStockItems();
+    const matchRow = makeStockRowMatcher(stockItems);
+    const r4 = q => Math.round(q * 10000) / 10000;
+    const onHand = stockOnHandMap(stockItems, matchRow, excludeVoucherId);
+    const selling = new Map();
+    (rows || []).forEach(row => {
+      const it = matchRow(row);
+      const qty = parseFloat(row.qty) || 0;
+      if (!it || qty <= 0) return;
+      const s = selling.get(it.id) || { it, qty: 0, unit: row.unit || it.uom || '' };
+      s.qty += qty;
+      selling.set(it.id, s);
+    });
+    const out = [];
+    selling.forEach(s => {
+      const have = r4(onHand.get(s.it.id));
+      const balance = r4(have - s.qty);
+      if (balance < 0) out.push({ name: s.it.name, unit: s.unit, onHand: have, qty: r4(s.qty), balance });
+    });
+    return out;
+  }
+
+  // Whether a voucher row is a stock item in a raw-material Stock Group (purchase-posting.js
+  // posts those to Raw Material Purchase, under Cost of materials consumed)
+  function isRawMaterialRow(row) {
+    const stockItems = getStockItems();
+    const it = makeStockRowMatcher(stockItems)(row);
+    return !!it && stockScheduleClass(it, stockGroupsForClass()) === 'rm';
   }
 
   // Revenue, expense (cost of goods sold) and profit/loss on stock items for one month (m: 0-11).
@@ -1494,11 +1633,10 @@
 
     // Hand-entered receipts / dispatches already changed the master qty, so they are taken back
     // out of the opening and put in on their own dates
-    const bySku = new Map(stockItems.map(it => [String(it.sku).toLowerCase(), it]));
-    const byName = new Map(stockItems.map(it => [String(it.name).toLowerCase().trim(), it]));
+    const matchMovement = makeStockMovementMatcher(stockItems);
     _stockMovements.forEach(m => {
       if (m.type !== 'inward' && m.type !== 'outward') return;
-      const it = bySku.get(String(m.sku || '').toLowerCase()) || byName.get(String(m.itemName || '').toLowerCase().trim());
+      const it = matchMovement(m);
       if (!it) return;
       const q = (m.type === 'inward' ? 1 : -1) * Math.abs(Number(m.qty) || 0);
       rows.get(it.id).bf -= q;
@@ -2816,5 +2954,9 @@
 
   // Global exports
   window.renderStockHubPanel = renderStockHubPanel;
+  window.getKyaStockValuesAsAt = getStockValuesAsAt;
+  window.isKyaRawMaterialRow = isRawMaterialRow;
+  window.getKyaStockShortfallsForSale = getStockShortfallsForSale;
+  window.getKyaStockForRows = getStockForRows;
 
 })();

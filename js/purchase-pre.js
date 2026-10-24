@@ -90,7 +90,7 @@
       overviewDesc: 'Supplier quotations, price offers and estimates',
       dateField: 'expiryDate', secondLabel: 'Expiry Date', secondDays: 30,
       noLabel: 'Quotation No.', vendorLabel: 'Vendor / Supplier *', supplyLabel: 'Supply Type *', execLabel: 'Purchaser / Executive',
-      notesLabel: 'Notes / Terms', notesPlaceholder: 'Quotation validity, price terms, delivery terms, supplier reference...',
+      notesLabel: 'Terms & Conditions', notesPlaceholder: 'Quotation validity, price terms, delivery terms, supplier reference...',
       advance: false, attachment: false, saveLabel: 'Save Quotation',
       forLabel: 'Quotation From:', previewDateLabel: 'Quotation Date:', preparedLabel: 'Purchaser:',
       emptyText: "Record the quotations your suppliers send to compare prices, then convert the one you accept into a purchase.",
@@ -111,7 +111,7 @@
       overviewDesc: 'Supplier proforma invoices and advance payments',
       dateField: 'expiryDate', secondLabel: 'Valid Until', secondDays: 30,
       noLabel: 'Proforma No.', vendorLabel: 'Vendor / Supplier *', supplyLabel: 'Supply Type *', execLabel: 'Purchaser / Executive',
-      notesLabel: 'Notes / Terms', notesPlaceholder: 'Payment milestones, advance terms, delivery terms...',
+      notesLabel: 'Terms & Conditions', notesPlaceholder: 'Payment milestones, advance terms, delivery terms...',
       advance: true, attachment: true, saveLabel: 'Save Proforma',
       forLabel: 'Proforma From:', previewDateLabel: 'Proforma Date:', preparedLabel: 'Purchaser:',
       emptyText: "Record your suppliers' proforma invoices and the advances paid against them, then convert them into purchases.",
@@ -132,7 +132,7 @@
       overviewDesc: 'Confirmed orders placed with suppliers',
       dateField: 'deliveryDate', secondLabel: 'Delivery Date', secondDays: 30,
       noLabel: 'Order No.', vendorLabel: 'Vendor / Supplier *', supplyLabel: 'Supply Type *', execLabel: 'Purchaser / Executive',
-      notesLabel: 'Notes / Terms', notesPlaceholder: 'Delivery schedule, shipping instructions, supplier quotation reference...',
+      notesLabel: 'Terms & Conditions', notesPlaceholder: 'Delivery schedule, shipping instructions, supplier quotation reference...',
       advance: true, attachment: true, saveLabel: 'Save Purchase Order',
       forLabel: 'Order To:', previewDateLabel: 'Order Date:', preparedLabel: 'Purchaser:',
       emptyText: 'Raise purchase orders to track what is still to be received, what has been billed, and cancellations.',
@@ -258,7 +258,7 @@
       firstParticular: debitName,
       amount: fmt(amount),
       allRows: rows,
-      narration: `Advance paid to ${vendorName} against ${d.kind} No. ${doc.docNo} (${doc.paymentStatus}).`,
+      narration: `Advance paid to ${vendorName} against ${d.kind} No. ${doc.docNo} (${doc.paymentStatus}). ${doc.narration || ''}`.trim(),
       jeType: 'advance_payment',
       vendorId: doc.vendorId,
       vendorName,
@@ -602,8 +602,11 @@
             <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
               ${d.advance ? advanceBoxHtml(d) : ''}
               <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label for="${P}Notes" class="je-narration-label" style="flex-shrink: 0;">${d.notesLabel}</label>
+                <!-- Terms print on the document; Narration goes into the books only. Clicking the
+                     label switches between the two boxes (setVoucherNotesTab, sales-helpers.js). -->
+                <button type="button" id="${P}NotesToggle" data-notes-for="${P}" data-notes-tab="terms" data-terms-label="${esc(d.notesLabel)}" title="Click to switch between ${esc(d.notesLabel)} and Narration" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0 0 8px; flex-shrink: 0; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left;" onmouseover="this.style.color='var(--blue-600)'" onmouseout="this.style.color='var(--slate-400)'"><span data-notes-label>${esc(d.notesLabel)}</span> ⇄</button>
                 <textarea id="${P}Notes" class="je-narration-input" placeholder="${esc(d.notesPlaceholder)}" style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="${P}Narration" class="je-narration-input" placeholder="Narration for the books (not printed)" style="display: none; flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
@@ -1225,8 +1228,10 @@
       if (el('No')) el('No').value = no;
       if (el('ChipDisplay')) el('ChipDisplay').textContent = no || `${d.code}-XXXX`;
       if (el('Notes')) el('Notes').value = (doc && doc.notes) || '';
+      if (el('Narration')) el('Narration').value = (doc && doc.narration) || '';
+      if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab(P, 'terms');
 
-      rows = (doc && Array.isArray(doc.rows) && doc.rows.length) ? JSON.parse(JSON.stringify(doc.rows)) : [newRow()];
+      rows =(doc && Array.isArray(doc.rows) && doc.rows.length) ? JSON.parse(JSON.stringify(doc.rows)) : [newRow()];
 
       // Vendor — selected first, then the saved supply type (which may differ from the
       // vendor's state, e.g. an import)
@@ -1310,6 +1315,7 @@
         adjustments: parseFloat((el('Adjustments') || {}).value) || 0,
         total,
         notes: (el('Notes') || {}).value || '',
+        narration: (el('Narration') || {}).value || '',
         document: file ? { name: file.name, size: file.size, type: file.type, data: file.data } : null,
         advanceJournalEntryId: editing ? (editing.advanceJournalEntryId || null) : null,
         advanceVoucherNo: editing ? (editing.advanceVoucherNo || null) : null,
@@ -1620,7 +1626,10 @@
       tdsTcsAmount: stored.tdsTcsAmount || 0,
       adjustments: stored.adjustments || 0,
       total: stored.total,
-      notes: stored.notes ? `${stored.notes}\n[Converted from ${d.kind} ${stored.docNo}]` : `Converted from ${d.kind} ${stored.docNo}`,
+      // The document's terms carry over to print; where it came from, and its own Narration,
+      // go into the Narration
+      notes: stored.notes || '',
+      narration: `Converted from ${d.kind} ${stored.docNo}. ${stored.narration || ''}`.trim(),
       uploadedDoc: (stored.document && stored.document.data) ? {
         fileName: stored.document.name,
         fileSize: stored.document.size ? `${(stored.document.size / 1024).toFixed(1)} KB` : '',

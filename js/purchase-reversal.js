@@ -71,9 +71,18 @@
   }
 
   // What was paid on the purchase, less what earlier reversals got refunded
+  // What was paid on a purchase in all: its own payment (advance + payment) and Journal Entry
+  // payments against it (journal-allocations.js) — what a reversal of it can get back
+  function getPurchaseTotalPaid(orig) {
+    if (!orig) return 0;
+    const own = typeof getPurchasePaidAmount === 'function' ? getPurchasePaidAmount(orig) : 0;
+    const journal = typeof getPurchaseJournalPaid === 'function' ? getPurchaseJournalPaid(orig) : 0;
+    return r2(Math.min(r2(orig.total), own + journal));
+  }
+
   function getPurchaseRefundable(orig, excludeReturnId) {
     if (!orig) return 0;
-    const paid = typeof getPurchasePaidAmount === 'function' ? getPurchasePaidAmount(orig) : 0;
+    const paid = getPurchaseTotalPaid(orig);
     const refunded = reversalsOf(orig, excludeReturnId)
       .filter(v => v.paymentStatus === 'Full Refund' || v.paymentStatus === 'Partial Refund')
       .reduce((s, v) => s + (parseFloat(v.paymentAmount) || 0), 0);
@@ -167,7 +176,7 @@
       tdsTcsMode: orig.tdsTcsMode || 'None',
       tdsTcsRate: orig.tdsTcsRate || 0,
       adjustments: orig.adjustments || 0,
-      notes: `Reversal of Purchase ${orig.invoiceNo}.`,
+      narration: `Reversal of Purchase ${orig.invoiceNo}.`,
       paymentStatus: 'No Refund',
       // The refund goes back to the account the purchase was paid from
       presetRefund: { accountId: orig.paymentAccountId || '', splits: orig.paymentSplits || [] }
@@ -200,7 +209,7 @@
       tdsTcsRate: doc.tdsTcsRate || 0,
       tdsTcsAmount: doc.tdsTcsAmount || 0,
       adjustments: doc.adjustments || 0,
-      notes: `Reversal of ${d.kind} ${doc.docNo || ''}.`,
+      narration: `Reversal of ${d.kind} ${doc.docNo || ''}.`,
       paymentStatus: 'No Refund',
       // The advance goes back the way it was paid
       presetRefund: { accountId: doc.paymentAccountId || '', splits: doc.paymentSplits || [] }
@@ -381,6 +390,7 @@
 
   window.getPurchaseRemainingRows = getPurchaseRemainingRows;
   window.getPurchaseRefundable = getPurchaseRefundable;
+  window.getPurchaseTotalPaid = getPurchaseTotalPaid;
   window.findPostedPurchaseForReversal = findPostedPurchase;
   window.findPurchasePreDocForReversal = findPreDoc;
   window.getPurchasePreDocAdvance = getPreDocAdvance;

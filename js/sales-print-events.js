@@ -559,6 +559,8 @@
         if (typeof updateRowFromDOM === 'function') {
           updateRowFromDOM(index, tr, 'rate');
         }
+        // More than the stock on hand (or none at all): say so
+        if (e.target.classList.contains('sales-row-qty') && typeof warnSalesRowStock === 'function') warnSalesRowStock(index);
       });
 
       salesItemBodyEl.addEventListener('click', (e) => {
@@ -571,7 +573,7 @@
               if (salesRows.length > 1) {
                 salesRows.splice(index, 1);
               } else {
-                salesRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+                salesRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
               }
               renderSalesRows();
               recalculateSalesTotals();

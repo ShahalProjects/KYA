@@ -101,6 +101,8 @@
     const noEl = document.getElementById('orderNo');
     const chipEl = document.getElementById('orderChipDisplay');
     const notesEl = document.getElementById('orderNotes');
+    const narrationEl = document.getElementById('orderNarration');
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('order', 'terms');
     const supplyTypeEl = document.getElementById('orderSupplyType');
     const dueEl = document.getElementById('orderDueDate');
 
@@ -112,11 +114,12 @@
       if (noEl) noEl.value = orderData.orderNo || '';
       if (chipEl) chipEl.textContent = orderData.orderNo || 'SO-2026-001';
       if (notesEl) notesEl.value = orderData.notes || '';
+      if (narrationEl) narrationEl.value = orderData.narration || '';
       if (supplyTypeEl && orderData.supplyType) supplyTypeEl.value = orderData.supplyType;
 
       orderRows = Array.isArray(orderData.rows) ? JSON.parse(JSON.stringify(orderData.rows)) : [];
       if (orderRows.length === 0) {
-        orderRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+        orderRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
       }
 
       // Populate customer
@@ -177,9 +180,10 @@
       if (noEl) noEl.value = nextNum;
       if (chipEl) chipEl.textContent = nextNum;
       if (notesEl) notesEl.value = '';
+      if (narrationEl) narrationEl.value = '';
       if (supplyTypeEl) supplyTypeEl.value = 'Intra-State (CGST + SGST)';
 
-      orderRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+      orderRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
 
       populateOrderCustomers();
       selectOrderCustomer(''); // a new order starts with no customer
@@ -444,7 +448,7 @@
             </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
-            <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
+            <input type="number" class="sales-row-qty je-input" value="${row.qtyBlank ? '' : (row.qty !== undefined ? row.qty : 1)}" placeholder="Qty" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
           </td>
           <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
             <input type="text" class="sales-row-unit je-input" value="${safeEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" />
@@ -497,6 +501,7 @@
             if (typeof window.applyMasterItemToVoucherRow === 'function') {
               window.applyMasterItemToVoucherRow(orderRows[index], tr, selectedItem);
               updateOrderRowFromDOM(index, tr, 'item');
+              if (typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(orderRows, index);
             } else {
               orderRows[index].item = selectedItem.name;
               orderRows[index].itemType = selectedItem.type;
@@ -534,7 +539,7 @@
   }
 
   function addOrderRow() {
-    orderRows.push({ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
+    orderRows.push({ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
     renderOrderRows();
     recalculateOrderTotals();
   }
@@ -555,7 +560,9 @@
     const unitEl = tr.querySelector('.sales-row-unit');
     if (unitEl) row.unit = unitEl.value;
 
-    let qty = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    // An empty Qty means 1
+    const qtyEl = tr.querySelector('.sales-row-qty');
+    let qty = (qtyEl && qtyEl.value.trim() === '') ? 1 : (parseFloat(qtyEl?.value) || 0);
     let rate = Math.round(safeParseAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
     let discount = safeParseAmt(tr.querySelector('.sales-row-discount')?.value || '0');
     row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
@@ -603,6 +610,9 @@
         amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
       }
     }
+
+    if (qtyEl && qtyEl.value.trim() === '') row.qtyBlank = true;
+    else delete row.qtyBlank;
 
     recalculateOrderTotals();
   }
@@ -815,6 +825,7 @@
     }
 
     const notes = document.getElementById('orderNotes')?.value || '';
+    const narration = document.getElementById('orderNarration')?.value || '';
     const subTotal = calculateOrderSubtotal();
 
     let tdsTcsMode = 'None';
@@ -869,7 +880,7 @@
       advanceJournalEntryId: _editingOrder ? _editingOrder.advanceJournalEntryId : null,
       advanceVoucherNo: _editingOrder ? _editingOrder.advanceVoucherNo : null,
       advancePaidAmount: _editingOrder ? _editingOrder.advancePaidAmount : 0,
-      rows: JSON.parse(JSON.stringify(orderRows)),
+      rows: typeof window.voucherRowsForSave === 'function' ? window.voucherRowsForSave(orderRows) : JSON.parse(JSON.stringify(orderRows)),
       subTotal,
       tdsTcsMode,
       tdsTcsRate,
@@ -877,6 +888,7 @@
       adjustments,
       total,
       notes,
+      narration,
       document: _orderDocData ? {
         name: _orderDocName,
         size: _orderDocSize,
@@ -1129,6 +1141,8 @@
         if (!tr) return;
         const index = parseInt(tr.dataset.rowIndex);
         updateOrderRowFromDOM(index, tr, 'rate');
+        // More than the stock on hand (or none at all): say so
+        if (e.target.classList.contains('sales-row-qty') && typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(orderRows, index);
       });
 
       orderBody.addEventListener('click', (e) => {
@@ -1141,7 +1155,7 @@
               if (orderRows.length > 1) {
                 orderRows.splice(index, 1);
               } else {
-                orderRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+                orderRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
               }
               renderOrderRows();
               recalculateOrderTotals();

@@ -368,6 +368,17 @@
 
       const bankLedger = coaLedgers.find(l => l.id === currentAcc.ledgerId) || { name: currentAcc.name };
 
+      // A statement line's entry rows: money out → By ledger / To bank; money in → By bank / To ledger
+      const clStmtRows = (ledgerName, dbVal, amt) => dbVal > 0 ? [
+        { id: 1, type: 'By', particular: ledgerName, debit: amt.toFixed(2), credit: '' },
+        { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
+      ] : [
+        { id: 1, type: 'By', particular: bankLedger.name, debit: amt.toFixed(2), credit: '' },
+        { id: 2, type: 'To', particular: ledgerName, debit: '', credit: amt.toFixed(2) }
+      ];
+      // What a customer / supplier line was chosen to be against (⇄ chip), kept until it posts
+      const clStmtSplit = key => (window.KYA_STORE.statementAllocMapping || {})[key];
+
       const allUnreconciledRows = statementRows.filter(line => !isRowConfirmed(`${currentAcc.id}_${line.origIdx}`));
       const allConfirmedRows = statementRows.filter(line => isRowConfirmed(`${currentAcc.id}_${line.origIdx}`));
 
@@ -513,6 +524,7 @@
                       ${(attachedDoc && attachedDoc.fileData) ? `<span title="Attachment: ${ohEsc(attachedDoc.fileName)}" style="color: #2563eb; display: inline-flex;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>` : ''}
                     </div>
                     <div style="font-size: 12px; color: #64748b; font-weight: 500; line-height: 1.35;" title="${ohEsc(displayNarration)}">${ohEsc(displayNarration)}</div>
+                    ${(!isPosted && savedLedger && amt > 0 && typeof entryAllocChipHtml === 'function') ? entryAllocChipHtml(clStmtRows(savedLedger.name, dbVal, amt), clStmtSplit(key), `class="cl-confirm-alloc-chip" data-index="${line.origIdx}"`) : ''}
                   </td>
                   <!-- 3. Debit -->
                   <td class="num-val" style="vertical-align: middle; text-align: right; padding: 12px 14px; width: 130px; font-weight: 700; font-size: 13.5px; color: var(--red-600);">
@@ -950,6 +962,7 @@
             delete window.KYA_STORE.statementTypeMapping[k];
             if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[k];
             if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[k];
+            if (window.KYA_STORE.statementAllocMapping) delete window.KYA_STORE.statementAllocMapping[k];
             if (window.KYA_STORE.statementConfirmed) delete window.KYA_STORE.statementConfirmed[k];
           });
 
@@ -969,6 +982,26 @@
       }
 
       function attachConfirmationRowListeners() {
+        // ⇄ chip: what a customer / supplier line is against (kept until the line posts)
+        document.querySelectorAll('.cl-confirm-alloc-chip').forEach(chip => {
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = chip.dataset.index;
+            const line = statementRows.find(r => String(r.origIdx) === String(idx));
+            const key = `${currentAcc.id}_${idx}`;
+            const ledger = allLedgers.find(l => String(l.id) === String(window.KYA_STORE.statementLedgerMapping[key]));
+            if (!line || !ledger || typeof openEntryAllocation !== 'function') return;
+            const dbVal = parseFloat(line.debit) || 0;
+            const amt = dbVal > 0 ? dbVal : (parseFloat(line.credit) || 0);
+            openEntryAllocation(clStmtRows(ledger.name, dbVal, amt), clStmtSplit(key), saved => {
+              window.KYA_STORE.statementAllocMapping = window.KYA_STORE.statementAllocMapping || {};
+              window.KYA_STORE.statementAllocMapping[key] = saved;
+              renderActiveSubtab();
+              if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+            });
+          });
+        });
+
         document.querySelectorAll('.cl-btn-post-single').forEach(btn => {
           btn.addEventListener('click', (e) => {
             const origIdx = Number(e.currentTarget.dataset.index);
@@ -979,6 +1012,7 @@
 
             let postedCount = 0;
             let lastVoucherCode = '';
+            const heldBack = [];
 
             targetIndices.forEach(idx => {
               const line = statementRows.find(r => String(r.origIdx) === String(idx));
@@ -994,6 +1028,10 @@
               const savedLedgerId = window.KYA_STORE.statementLedgerMapping[key];
               const selectedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
               if (!selectedLedger) return;
+
+              const allRows = clStmtRows(selectedLedger.name, dbVal, amt);
+              const splitProblem = (typeof applySavedJournalAllocations === 'function') ? applySavedJournalAllocations(allRows, clStmtSplit(key)) : '';
+              if (splitProblem) { heldBack.push(`${selectedLedger.name} (${formatToDDMMYYYY(line.date)}): ${splitProblem}`); return; }
 
               const voucherCode = (typeof window.getNextJournalVoucherNo === 'function')
                 ? window.getNextJournalVoucherNo(line.date, true)
@@ -1019,17 +1057,14 @@
                 isBudget: savedType === 'budget',
                 narration: savedNarration,
                 uploadedDoc: savedDoc,
-                allRows: dbVal > 0 ? [
-                  { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
-                  { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
-                ] : [
-                  { id: 1, type: 'By', particular: bankLedger.name, debit: amt.toFixed(2), credit: '' },
-                  { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
-                ]
+                allRows
               };
 
+              // A customer's / supplier's Advance posts to the advance account (journal-allocations.js)
+              if (typeof routeJournalAdvances === 'function') newEntry.allRows = routeJournalAdvances(newEntry.allRows);
               if (typeof postedEntries !== 'undefined') postedEntries.push(newEntry);
               window.KYA_STORE.reconciliationState[key] = line.date;
+              if (window.KYA_STORE.statementAllocMapping) delete window.KYA_STORE.statementAllocMapping[key];
               postedCount++;
             });
 
@@ -1037,7 +1072,9 @@
               _clConfirmSelectedIndices.clear();
             }
 
-            if (postedCount > 1) {
+            if (heldBack.length) {
+              showToast(`${postedCount ? `Posted ${postedCount}; ` : ''}${heldBack.length} not posted — ${heldBack[0]}`, 'warning');
+            } else if (postedCount > 1) {
               showToast(`Successfully posted ${postedCount} transactions to books!`, 'success');
             } else if (postedCount === 1) {
               showToast(`Journal Entry ${lastVoucherCode} posted to books!`, 'success');
@@ -1072,6 +1109,7 @@
               delete window.KYA_STORE.statementTypeMapping[key];
               if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[key];
               if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[key];
+              if (window.KYA_STORE.statementAllocMapping) delete window.KYA_STORE.statementAllocMapping[key];
               if (window.KYA_STORE.statementConfirmed) {
                 delete window.KYA_STORE.statementConfirmed[key];
               }
@@ -2813,6 +2851,7 @@
       document.getElementById('clBtnPostSelectedBatch')?.addEventListener('click', () => {
         if (_clConfirmSelectedIndices.size === 0) return;
         let postedCount = 0;
+        const heldBack = [];
         _clConfirmSelectedIndices.forEach(idx => {
           const line = statementRows.find(r => String(r.origIdx) === String(idx));
           if (!line) return;
@@ -2826,6 +2865,10 @@
           const savedLedgerId = window.KYA_STORE.statementLedgerMapping[key];
           const selectedLedger = allLedgers.find(l => String(l.id) === String(savedLedgerId));
           if (!selectedLedger) return;
+
+          const allRows = clStmtRows(selectedLedger.name, dbVal, amt);
+          const splitProblem = (typeof applySavedJournalAllocations === 'function') ? applySavedJournalAllocations(allRows, clStmtSplit(key)) : '';
+          if (splitProblem) { heldBack.push(`${selectedLedger.name} (${formatToDDMMYYYY(line.date)}): ${splitProblem}`); return; }
 
           const voucherCode = (typeof window.getNextJournalVoucherNo === 'function')
             ? window.getNextJournalVoucherNo(line.date, true)
@@ -2849,22 +2892,20 @@
             isBudget: savedType === 'budget',
             narration: savedNarration,
             uploadedDoc: savedDoc,
-            allRows: dbVal > 0 ? [
-              { id: 1, type: 'By', particular: selectedLedger.name, debit: amt.toFixed(2), credit: '' },
-              { id: 2, type: 'To', particular: bankLedger.name, debit: '', credit: amt.toFixed(2) }
-            ] : [
-              { id: 1, type: 'By', particular: bankLedger.name, debit: amt.toFixed(2), credit: '' },
-              { id: 2, type: 'To', particular: selectedLedger.name, debit: '', credit: amt.toFixed(2) }
-            ]
+            allRows
           };
 
+          // A customer's / supplier's Advance posts to the advance account (journal-allocations.js)
+          if (typeof routeJournalAdvances === 'function') newEntry.allRows = routeJournalAdvances(newEntry.allRows);
           if (typeof postedEntries !== 'undefined') postedEntries.push(newEntry);
           window.KYA_STORE.reconciliationState[key] = line.date;
+          if (window.KYA_STORE.statementAllocMapping) delete window.KYA_STORE.statementAllocMapping[key];
           postedCount++;
         });
 
         _clConfirmSelectedIndices.clear();
-        showToast(`Successfully posted ${postedCount} transaction(s) to books!`, 'success');
+        if (heldBack.length) showToast(`${postedCount ? `Posted ${postedCount}; ` : ''}${heldBack.length} not posted — ${heldBack[0]}`, 'warning');
+        else showToast(`Successfully posted ${postedCount} transaction(s) to books!`, 'success');
         renderActiveSubtab();
         if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
       });
@@ -2883,6 +2924,7 @@
           delete window.KYA_STORE.statementTypeMapping[key];
           if (window.KYA_STORE.statementNarrationMapping) delete window.KYA_STORE.statementNarrationMapping[key];
           if (window.KYA_STORE.statementDocMapping) delete window.KYA_STORE.statementDocMapping[key];
+          if (window.KYA_STORE.statementAllocMapping) delete window.KYA_STORE.statementAllocMapping[key];
           if (window.KYA_STORE.statementConfirmed) delete window.KYA_STORE.statementConfirmed[key];
           revertedCount++;
         });
@@ -4241,18 +4283,26 @@
         );
       }
 
-      if (typeof postedEntries !== 'undefined') {
-        postedEntries.push(newEntry);
-      }
-      if (typeof jvCounter !== 'undefined') {
-        jvCounter++;
-      }
+      const post = () => {
+        // A customer's / supplier's Advance posts to the advance account (journal-allocations.js)
+        if (typeof routeJournalAdvances === 'function') newEntry.allRows = routeJournalAdvances(newEntry.allRows);
+        if (typeof postedEntries !== 'undefined') {
+          postedEntries.push(newEntry);
+        }
+        if (typeof jvCounter !== 'undefined') {
+          jvCounter++;
+        }
 
-      showToast(`Entry posted successfully. Voucher: ${voucherNo}`, 'success');
+        showToast(`Entry posted successfully. Voucher: ${voucherNo}`, 'success');
 
-      renderActiveSubtab();
-      if (typeof refreshAllReports === 'function') refreshAllReports();
-      if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+        renderActiveSubtab();
+        if (typeof refreshAllReports === 'function') refreshAllReports();
+        if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
+      };
+
+      // A customer / supplier (or Refund Payable / Advances to Suppliers) account: ask what it is against first
+      if (typeof askJournalAllocationsThen === 'function') askJournalAllocationsThen(newEntry.allRows, post);
+      else post();
     };
 
     const showEditEntryBeforePostModal = (entryData) => {

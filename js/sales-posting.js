@@ -68,7 +68,10 @@
     
     const notesEl = document.getElementById('salesNotes');
     if (notesEl) notesEl.value = inv.notes || '';
-    
+    const narrationEl = document.getElementById('salesNarration');
+    if (narrationEl) narrationEl.value = inv.narration || '';
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('sales', 'terms');
+
     const adjEl = document.getElementById('salesAdjustments');
     if (adjEl) adjEl.value = inv.adjustments || '';
     
@@ -305,6 +308,7 @@
     const date = document.getElementById('salesDate').value;
     const dueDate = document.getElementById('salesDueDate').value;
     const notes = document.getElementById('salesNotes').value;
+    const narration = document.getElementById('salesNarration')?.value || '';
     const adjustments = parseFloat(document.getElementById('salesAdjustments').value) || 0;
 
     let tdsTcsMode = 'None';
@@ -387,6 +391,7 @@
       date,
       dueDate,
       notes,
+      narration,
       tdsTcsMode,
       tdsTcsRate,
       tdsTcsAmount,
@@ -397,7 +402,7 @@
       paymentAccountId,
       paymentAmount,
       paymentSplits: (typeof getSalesMultiPaymentSplits === 'function') ? getSalesMultiPaymentSplits() : [],
-      rows: JSON.parse(JSON.stringify(salesRows)),
+      rows: voucherRowsForSave(salesRows),
       partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
       convertedFromQuotationId: window._pendingConvertQuotationId || null,
@@ -446,7 +451,10 @@
     }
   }
 
-  function postSalesInvoice() {
+  // opts.stockConfirmed: Post Anyway was chosen on the negative-stock warning;
+  // opts.afterStockWarning: run once Post Anyway has posted (see postSalesDraft)
+  function postSalesInvoice(opts) {
+    const postOpts = opts || {};
     if (typeof syncSalesRowsFromDOM === 'function') {
       syncSalesRowsFromDOM();
     }
@@ -489,6 +497,7 @@
     }
     
     // Filter out completely blank rows if at least one non-empty row exists
+    const formRows = salesRows;
     if (Array.isArray(salesRows) && salesRows.length > 1) {
       const nonEmpty = salesRows.filter(r => (r.item && r.item.trim()) || (r.rate && r.rate > 0) || (r.amount && r.amount > 0) || (r.baseAmount && r.baseAmount > 0));
       if (nonEmpty.length > 0) {
@@ -500,7 +509,7 @@
       showToast('Please add at least one line item.', 'warning');
       return;
     }
-    
+
     if (currentSalesType === 'Product') {
       for (let i = 0; i < salesRows.length; i++) {
         const r = salesRows[i];
@@ -564,6 +573,7 @@
     }
     const dueDate = document.getElementById('salesDueDate').value;
     const notes = document.getElementById('salesNotes').value;
+    const narration = document.getElementById('salesNarration')?.value || '';
     const adjustments = parseFloat(document.getElementById('salesAdjustments').value) || 0;
     
     let tdsTcsMode = 'None';
@@ -626,13 +636,10 @@
         if (currentSalesVoucherSubtype === 'Return' && paymentAccountId !== 'credit-adjust') {
           const origInv = getOriginalInvoiceForReturn();
           if (origInv) {
-            let origPaidAmt = 0;
-            if (origInv.paymentStatus === 'Full Payment') {
-              origPaidAmt = origInv.total;
-            } else if (origInv.paymentStatus === 'Partial Payment') {
-              origPaidAmt = origInv.paymentAmount || 0;
-            }
-            if (paymentAmount > origPaidAmt) {
+            // Received on the invoice itself and by Journal Entry against it
+            const origPaidAmt = typeof getSalesInvoiceReceived === 'function' ? getSalesInvoiceReceived(origInv)
+              : (origInv.paymentStatus === 'Full Payment' ? origInv.total : (origInv.paymentStatus === 'Partial Payment' ? (origInv.paymentAmount || 0) : 0));
+            if (paymentAmount > origPaidAmt + 0.009) {
               showToast(`Refund Amount cannot exceed the original invoice paid amount of ₹${fmtNum(origPaidAmt)}.`, 'warning');
               return;
             }
@@ -680,6 +687,21 @@
         }
       }
     }
+    // A sale that takes a stock item below zero is warned about first; Post Anyway posts it
+    if (currentSalesVoucherSubtype !== 'Return' && !postOpts.stockConfirmed &&
+        typeof window.getKyaStockShortfallsForSale === 'function' && typeof showKyaConfirm === 'function') {
+      const editingPostedId = (window._editingSalesInvoice && !window._editingSalesInvoice.isDraft) ? window._editingSalesInvoice.id : null;
+      const shortfalls = window.getKyaStockShortfallsForSale(salesRows, editingPostedId);
+      if (shortfalls.length) {
+        // The form still shows any blank rows, so keep them until it is posted
+        salesRows = formRows;
+        showSalesNegativeStockConfirm(shortfalls, () => {
+          postSalesInvoice(Object.assign({}, postOpts, { stockConfirmed: true }));
+          if (typeof postOpts.afterStockWarning === 'function') postOpts.afterStockWarning();
+        });
+        return;
+      }
+    }
     // Refund of the excess advance is kept apart from the invoice's own payment: the
     // invoice is fully paid by the advance, and the excess is refunded and/or parked
     // Invoice Balance: the credits used (payment) or invoices paid (refund)
@@ -719,6 +741,7 @@
       date,
       dueDate,
       notes,
+      narration,
       tdsTcsMode,
       tdsTcsRate,
       tdsTcsAmount,
@@ -742,7 +765,7 @@
                              (existingPostedInv && existingPostedInv.advanceJournalEntryId) || null,
       advanceVoucherNo: (window._pendingConvertProformaAdvance && window._pendingConvertProformaAdvance.voucherNo) ||
                         (existingPostedInv && existingPostedInv.advanceVoucherNo) || null,
-      rows: JSON.parse(JSON.stringify(salesRows)),
+      rows: voucherRowsForSave(salesRows),
       partyOverride: window._salesPartyOverride ? JSON.parse(JSON.stringify(window._salesPartyOverride)) : null,
       uploadedDoc: window._salesUploadedDoc || null,
       journalEntryId: existingJournalEntryId || '',
@@ -888,6 +911,27 @@
     } else {
       showInvoicePostedModal(invoiceNo, _subtypeSnapshot);
     }
+  }
+
+  // ── Negative stock warning before Post (KYA's confirm popup) ──
+  // items: [{ name, unit, onHand, qty, balance }] from getKyaStockShortfallsForSale
+  function showSalesNegativeStockConfirm(items, onConfirm) {
+    const esc = s => (typeof ohEsc === 'function' ? ohEsc(s) : String(s));
+    const q = n => (Math.round(n * 10000) / 10000).toLocaleString('en-IN', { maximumFractionDigits: 4 });
+    const lines = items.map(s => {
+      const u = s.unit ? ' ' + esc(String(s.unit).toUpperCase()) : '';
+      return `<strong>${esc(s.name)}</strong>: in stock ${q(s.onHand)}${u}, this sale ${q(s.qty)}${u} → ${q(s.balance)}${u}`;
+    });
+    showKyaConfirm({
+      title: 'Stock Going Negative',
+      message: `These items will go below zero stock:<br>${lines.join('<br>')}<br>Post anyway?`,
+      confirmLabel: 'Post Anyway',
+      okBg: '#dc2626',
+      iconBg: '#fee2e2',
+      iconColor: '#dc2626',
+      iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      onConfirm
+    });
   }
 
   // ── Invoice Posted Success Modal (fallback when the preview isn't loaded) ──
@@ -1507,7 +1551,7 @@
         // The full invoice value, before the customer's TDS (as the tax invoice shows it)
         amount:          fmtNum(grossReceivable),
         allRows:         invoiceJERows,
-        narration:       `${cashSale ? `Cash sale — Sales Invoice No. ${invoice.invoiceNo} received in full in ${customerName}.` : `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.`}${execText} ${invoice.notes || ''}`.trim(),
+        narration:       `${cashSale ? `Cash sale — Sales Invoice No. ${invoice.invoiceNo} received in full in ${customerName}.` : `Sales Invoice No. ${invoice.invoiceNo} posted for customer ${customerName}.`}${execText} ${invoice.narration || ''}`.trim(),
         jeType:          'invoice',
       };
       if (typeof postedEntries !== 'undefined') {
@@ -1733,7 +1777,7 @@
       firstParticular: (journalRows[0] && journalRows[0].particular) || customerName,
       amount:          fmtNum((parseFloat(invoice.total) || 0) + retTdsAmt),
       allRows:         journalRows,
-      narration:       `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText}${reversalNote}${typeof usesCreditAdjust === 'function' && usesCreditAdjust(invoice.paymentAccountId, invoice.paymentSplits) && typeof describeApplications === 'function' ? ` Credit applied to ${describeApplications(invoice.creditApplications)}.` : ''} ${invoice.notes || ''}`.trim(),
+      narration:       `Sales Reversal No. ${invoice.invoiceNo} posted for customer ${customerName}.${execText}${reversalNote}${typeof usesCreditAdjust === 'function' && usesCreditAdjust(invoice.paymentAccountId, invoice.paymentSplits) && typeof describeApplications === 'function' ? ` Credit applied to ${describeApplications(invoice.creditApplications)}.` : ''} ${invoice.narration || ''}`.trim(),
       jeType:          'reversal',
       customerName,
       partyName:       customerName,

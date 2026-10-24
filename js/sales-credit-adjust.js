@@ -114,6 +114,8 @@
         (d.creditAdjustments || []).forEach(a => { if (a && a.key === key) used += parseFloat(a.amount) || 0; });
       });
     });
+    // Refunded by Journal Entry (journal-allocations.js)
+    if (typeof getJournalAllocatedTo === 'function') used += getJournalAllocatedTo('customerCredit', key, ctx);
     return r2(used);
   }
 
@@ -127,6 +129,10 @@
       if (d && usesCreditAdjust(d.paymentAccountId, d.paymentSplits) && !(d.status === 'Cancelled' && !d.reversedBy)
           && (d.creditAdjustments || []).some(a => a && a.key === key)) names.push(d[src.noField]);
     }));
+    // Journal Entry refunds of it
+    ((typeof postedEntries !== 'undefined' && Array.isArray(postedEntries)) ? postedEntries : []).forEach(e => {
+      if (e && (e.allRows || []).some(r => (r.allocations || []).some(a => a && a.store === 'customerCredit' && a.docId === key))) names.push(e.voucherNo);
+    });
     return names.filter(Boolean);
   }
 
@@ -219,9 +225,15 @@
     const p = partyOf(customerId);
     const ob = p ? (parseFloat(p.openingBalance) || 0) : 0;
     if (ob < 0) cr += -ob; // a credit opening balance is money held for the customer
-    // Journal receipts put against invoices / open pre-invoices are not free (journal-allocations.js)
+    // …and a debit one is still owed by them: receipts settle it before any credit is free
+    // (with or without being put against it in Journal Entry)
+    if (ob > 0) dr += ob;
+    // Journal receipts put against invoices / open pre-invoices are not free, and journal
+    // refunds of a credit note / held advance use that credit, not this balance
+    // (journal-allocations.js)
     const committed = typeof getCustomerJournalCommitted === 'function' ? getCustomerJournalCommitted(customerId, partyName) : 0;
-    return Math.max(0, r2(cr - dr - committed));
+    const refundedCredits = typeof getCustomerJournalRefundCredits === 'function' ? getCustomerJournalRefundCredits(customerId, partyName) : 0;
+    return Math.max(0, r2(cr - (dr - refundedCredits) - committed));
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -291,6 +303,14 @@
         });
       });
     });
+
+    // Advances received by Journal Entry and held in Advance from Customers (journal-allocations.js)
+    if (typeof getCustomerPooledJournalAdvances === 'function') {
+      getCustomerPooledJournalAdvances(customerId, partyName, ctx).forEach(x => add({
+        key: x.key, kind: 'jadvance', kindLabel: 'Advance (Journal Entry)',
+        docNo: x.docNo, date: x.date, note: '', ledgerName: x.ledgerName, credit: x.amount
+      }));
+    }
 
     add({
       key: `onacct:${customerId || partyName}`, kind: 'onaccount', kindLabel: 'On-account balance',

@@ -112,13 +112,21 @@
         );
       }
 
-      postedEntries.push(newEntry);
-      showToast(`Entry saved successfully. Voucher: ${voucherNo}`, 'success');
-      
-      close();
-      renderActiveSubtab();
-      refreshAllReports();
-      triggerAutoBackup();
+      const post = () => {
+        // A customer's / supplier's Advance posts to the advance account (journal-allocations.js)
+        if (typeof routeJournalAdvances === 'function') newEntry.allRows = routeJournalAdvances(newEntry.allRows);
+        postedEntries.push(newEntry);
+        showToast(`Entry saved successfully. Voucher: ${voucherNo}`, 'success');
+
+        close();
+        renderActiveSubtab();
+        refreshAllReports();
+        triggerAutoBackup();
+      };
+
+      // A customer / supplier (or Refund Payable / Advances to Suppliers) account: ask what it is against first
+      if (typeof askJournalAllocationsThen === 'function') askJournalAllocationsThen(newEntry.allRows, post);
+      else post();
     });
   }
 
@@ -152,6 +160,13 @@
       return d.toISOString().split('T')[0];
     }
 
+    // Change in the Stock Book's stock over the period (the P&L's opening and closing stock)
+    function getStockValueChange() {
+      if (typeof getKyaStockValuesAsAt !== 'function') return 0;
+      const opening = getKyaStockValuesAsAt(fromVal ? getDayBefore(fromVal) : null).total;
+      return getKyaStockValuesAsAt(toVal || '').total - opening;
+    }
+
     // ── 1. OPERATING ACTIVITIES ──
     const netProfit = calculatePnlProfitForPeriod(fromVal, toVal);
     
@@ -162,7 +177,7 @@
     const operatingProfitBeforeWC = netProfit + depreciation + financeCosts;
 
     // Working Capital adjustments
-    const inventoriesChange = getSubgroupBalDiff('sg-inv');     // Increase in Asset = Outflow (-)
+    const inventoriesChange = getSubgroupBalDiff('sg-inv') + getStockValueChange(); // Increase in Asset = Outflow (-)
     const receivablesChange = getSubgroupBalDiff('sg-tr');       // Increase in Asset = Outflow (-)
     const stLoansAdvancesChange = getSubgroupBalDiff('sg-stla'); // Increase in Asset = Outflow (-)
     const otherCurrentAssetsChange = getSubgroupBalDiff('sg-oca'); // Increase in Asset = Outflow (-)

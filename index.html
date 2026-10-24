@@ -733,10 +733,11 @@
             <div class="je-field">
               <label for="jeVoucherNo">Journal Voucher No.</label>
               <div class="kya-docno-wrap" style="position: relative; width: 100%;">
-                <input type="text" id="jeVoucherNo" class="je-input" placeholder="e.g. JV-2024-001" aria-label="Journal voucher number" style="padding-right: 38px;" />
+                <input type="text" id="jeVoucherNo" class="je-input" placeholder="e.g. JV-2024-001" aria-label="Journal voucher number" aria-describedby="jeVoucherNoError" style="padding-right: 38px;" />
                 <button type="button" id="jeVoucherNoFormatBtn" class="sales-invno-edit-btn" title="Set journal voucher number prefix" aria-label="Set journal voucher number prefix">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                 </button>
+                <div id="jeVoucherNoError" role="alert" class="sales-invno-error" style="display: none;"></div>
               </div>
             </div>
             <input type="hidden" id="jeFiscalYear" value="2024-25" />
@@ -2661,8 +2662,11 @@
               </div>
               
               <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label for="salesNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <!-- Terms & Conditions print on the invoice; Narration goes into the books only.
+                     Clicking the label switches between the two boxes. -->
+                <button type="button" id="salesNotesToggle" data-notes-for="sales" data-notes-tab="terms" title="Click to switch between Terms &amp; Conditions and Narration" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0 0 8px; flex-shrink: 0; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left;" onmouseover="this.style.color='var(--blue-600)'" onmouseout="this.style.color='var(--slate-400)'"><span data-notes-label>Terms &amp; Conditions</span> ⇄</button>
                 <textarea id="salesNotes" class="je-narration-input" placeholder="Payment terms, bank details, delivery terms..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="salesNarration" class="je-narration-input" placeholder="Narration for the books (not printed on the invoice)" style="display: none; flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
@@ -3234,8 +3238,11 @@
             <!-- Left side Notes / Terms -->
             <div class="sales-totals-left" style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
               <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label for="quoteNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <!-- Terms & Conditions print on the quotation; Narration goes into the books only.
+                     Clicking the label switches between the two boxes. -->
+                <button type="button" id="quoteNotesToggle" data-notes-for="quote" data-notes-tab="terms" title="Click to switch between Terms &amp; Conditions and Narration" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0 0 8px; flex-shrink: 0; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left;" onmouseover="this.style.color='var(--blue-600)'" onmouseout="this.style.color='var(--slate-400)'"><span data-notes-label>Terms &amp; Conditions</span> ⇄</button>
                 <textarea id="quoteNotes" class="je-narration-input" placeholder="Quotation validity terms, payment milestones, delivery terms..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="quoteNarration" class="je-narration-input" placeholder="Narration for the books (not printed)" style="display: none; flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
@@ -3597,8 +3604,11 @@
               </div>
 
               <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label for="proformaNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <!-- Terms & Conditions print on the proforma; Narration goes into the books only.
+                     Clicking the label switches between the two boxes. -->
+                <button type="button" id="proformaNotesToggle" data-notes-for="proforma" data-notes-tab="terms" title="Click to switch between Terms &amp; Conditions and Narration" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0 0 8px; flex-shrink: 0; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left;" onmouseover="this.style.color='var(--blue-600)'" onmouseout="this.style.color='var(--slate-400)'"><span data-notes-label>Terms &amp; Conditions</span> ⇄</button>
                 <textarea id="proformaNotes" class="je-narration-input" placeholder="Payment terms, advance payment details, delivery schedule, bank account info..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="proformaNarration" class="je-narration-input" placeholder="Narration for the books (not printed)" style="display: none; flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
@@ -4048,8 +4058,11 @@
               </div>
 
               <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label for="orderNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <!-- Terms & Conditions print on the sales order; Narration goes into the books only.
+                     Clicking the label switches between the two boxes. -->
+                <button type="button" id="orderNotesToggle" data-notes-for="order" data-notes-tab="terms" title="Click to switch between Terms &amp; Conditions and Narration" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0 0 8px; flex-shrink: 0; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left;" onmouseover="this.style.color='var(--blue-600)'" onmouseout="this.style.color='var(--slate-400)'"><span data-notes-label>Terms &amp; Conditions</span> ⇄</button>
                 <textarea id="orderNotes" class="je-narration-input" placeholder="Order fulfillment terms, delivery schedule, shipping instructions, customer PO reference..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="orderNarration" class="je-narration-input" placeholder="Narration for the books (not printed)" style="display: none; flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
@@ -4401,8 +4414,11 @@
               </div>
 
               <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label for="challanNotes" class="je-narration-label" style="flex-shrink: 0;">Transport Notes / Terms</label>
+                <!-- Transport Notes / Terms print on the challan; Narration goes into the books only.
+                     Clicking the label switches between the two boxes. -->
+                <button type="button" id="challanNotesToggle" data-notes-for="challan" data-notes-tab="terms" data-terms-label="Transport Notes / Terms" title="Click to switch between Transport Notes / Terms and Narration" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0 0 8px; flex-shrink: 0; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left;" onmouseover="this.style.color='var(--blue-600)'" onmouseout="this.style.color='var(--slate-400)'"><span data-notes-label>Transport Notes / Terms</span> ⇄</button>
                 <textarea id="challanNotes" class="je-narration-input" placeholder="Vehicle number, transporter name, LR / E-Way bill number, dispatch terms, delivery instructions..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="challanNarration" class="je-narration-input" placeholder="Narration for the books (not printed)" style="display: none; flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
@@ -4811,8 +4827,11 @@
               </div>
 
               <div class="je-narration-wrap sales-notes-wrap" style="padding: 0; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label for="purchaseNotes" class="je-narration-label" style="flex-shrink: 0;">Notes / Terms</label>
+                <!-- Terms & Conditions print on the bill; Narration goes into the books only.
+                     Clicking the label switches between the two boxes. -->
+                <button type="button" id="purchaseNotesToggle" data-notes-for="purchase" data-notes-tab="terms" title="Click to switch between Terms &amp; Conditions and Narration" style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin: 0 0 8px; flex-shrink: 0; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left;" onmouseover="this.style.color='var(--blue-600)'" onmouseout="this.style.color='var(--slate-400)'"><span data-notes-label>Terms &amp; Conditions</span> ⇄</button>
                 <textarea id="purchaseNotes" class="je-narration-input" placeholder="Payment terms, vendor terms, delivery terms..." style="flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="purchaseNarration" class="je-narration-input" placeholder="Narration for the books (not printed on the bill)" style="display: none; flex: 1; min-height: 90px; height: 100%; box-sizing: border-box; resize: vertical;"></textarea>
               </div>
             </div>
 
@@ -5001,59 +5020,60 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-<script src="js/exportPdf.js?v=20261021_tb1"></script>
-<script src="js/exportExcel.js?v=20261021_tb1"></script>
-<script src="js/app-shell.js?v=20261021_pt2"></script>
+<script src="js/exportPdf.js?v=20261023_ja6"></script>
+<script src="js/exportExcel.js?v=20261023_ja6"></script>
+<script src="js/app-shell.js?v=20261023_pb1"></script>
 <script src="js/hsn-codes.js"></script>
 <script src="js/sac-codes.js"></script>
-<script src="js/master-desk.js?v=20261021_je3"></script>
-<script src="js/journal.js?v=20261022_ja1"></script>
+<script src="js/india-districts.js?v=20261024_addr2"></script>
+<script src="js/master-desk.js?v=20261023_pb1"></script>
+<script src="js/journal.js?v=20261023_jvn1"></script>
 <script src="js/coa.js?v=20261012_p1"></script>
-<script src="js/reports.js?v=20261021_tb2"></script>
-<script src="js/stock-hub.js?v=20261019_6"></script>
+<script src="js/reports.js?v=20261023_st1"></script>
+<script src="js/stock-hub.js?v=20261024_qty2"></script>
 <script src="js/reports-hub.js?v=20261013_pr1"></script>
 <script src="js/onehub-shell.js?v=20261021_ko2"></script>
 <script src="js/onehub-budget.js?v=20261021_ko1"></script>
 <script src="js/onehub-reminders-core.js?v=20261021_ko2"></script>
 <script src="js/onehub-reminders-view.js?v=20261021_ko4"></script>
 <script src="js/track-recorder.js?v=20261022_pt8"></script>
-<script src="js/pay-tracker.js?v=20261022_ja1"></script>
+<script src="js/pay-tracker.js?v=20261023_ja5"></script>
 <script src="js/vault-core.js"></script>
-<script src="js/ledgers.js?v=20261013_pr1"></script>
-<script src="js/vault-settings.js?v=20261021_ko1"></script>
+<script src="js/ledgers.js?v=20261023_ja10"></script>
+<script src="js/vault-settings.js?v=20261023_jvn1"></script>
 <script src="js/kya-datepicker.js?v=20261019_1"></script>
-<script src="js/sales-form.js?v=20261021_je1"></script>
-<script src="js/sales-posting.js?v=20261011_v6"></script>
-<script src="js/sales-helpers.js?v=20261022_ja1"></script>
-<script src="js/sales-credit-adjust.js?v=20261022_ja1"></script>
-<script src="js/journal-allocations.js?v=20261022_ja2"></script>
-<script src="js/sales-customers.js?v=20261008_11"></script>
+<script src="js/sales-form.js?v=20261024_qty2"></script>
+<script src="js/sales-posting.js?v=20261024_qty1"></script>
+<script src="js/sales-helpers.js?v=20261023_nt3"></script>
+<script src="js/sales-credit-adjust.js?v=20261023_ja10"></script>
+<script src="js/journal-allocations.js?v=20261023_ja11"></script>
+<script src="js/sales-customers.js?v=20261023_ja10"></script>
 <script src="js/doc-numbering.js?v=20261013_pr1"></script>
-<script src="js/sales-records.js?v=20261008_v1"></script>
-<script src="js/sales-print-events.js?v=20261011_v2"></script>
-<script src="js/sales-invoice-print.js?v=20261022_ja2"></script>
-<script src="js/sales-invoice-export.js?v=20261022_ja2"></script>
-<script src="js/quotation.js?v=20261011_v4"></script>
-<script src="js/proforma.js?v=20261011_v3"></script>
-<script src="js/preinvoice-bulk.js?v=20261013_pp1"></script>
-<script src="js/preinvoice-list.js?v=20261013_pr1"></script>
-<script src="js/sales-order.js?v=20261008_a1"></script>
-<script src="js/delivery-challan.js?v=20261008_a1"></script>
+<script src="js/sales-records.js?v=20261024_qty1"></script>
+<script src="js/sales-print-events.js?v=20261024_qty2"></script>
+<script src="js/sales-invoice-print.js?v=20261024_seal5"></script>
+<script src="js/sales-invoice-export.js?v=20261024_addr2"></script>
+<script src="js/quotation.js?v=20261024_qty3"></script>
+<script src="js/proforma.js?v=20261024_qty3"></script>
+<script src="js/preinvoice-bulk.js?v=20261023_ja5"></script>
+<script src="js/preinvoice-list.js?v=20261023_nt3"></script>
+<script src="js/sales-order.js?v=20261024_qty3"></script>
+<script src="js/delivery-challan.js?v=20261024_qty3"></script>
 <script src="js/sales-preinvoice-picker.js?v=20261008_d1"></script>
-<script src="js/sales-preinvoice-reversal.js?v=20261011_v3"></script>
-<script src="js/purchase-posting.js?v=20261013_pr1"></script>
-<script src="js/purchase-print.js?v=20261022_ja2"></script>
-<script src="js/purchase-form.js?v=20261022_ja1"></script>
-<script src="js/purchase-pre.js?v=20261013_pr1"></script>
+<script src="js/sales-preinvoice-reversal.js?v=20261023_nt1"></script>
+<script src="js/purchase-posting.js?v=20261023_nt1"></script>
+<script src="js/purchase-print.js?v=20261024_addr2"></script>
+<script src="js/purchase-form.js?v=20261024_qty1"></script>
+<script src="js/purchase-pre.js?v=20261023_nt3"></script>
 <script src="js/purchase-pre-picker.js?v=20261013_pr1"></script>
-<script src="js/purchase-reversal.js?v=20261013_pr1"></script>
-<script src="js/company-profile.js?v=20260912_2"></script>
+<script src="js/purchase-reversal.js?v=20261023_nt1"></script>
+<script src="js/company-profile.js?v=20261024_seal5"></script>
 <script src="js/cashline-core.js?v=20261021_je1"></script>
 <script src="js/cashline-accounts.js?v=20260827_1"></script>
 <script src="js/cashline-statement-import.js?v=20260827_1"></script>
 <script src="js/cashline-reconciliation.js?v=20260723_2"></script>
-<script src="js/cashline-cashbook.js?v=20260827_5"></script>
-<script src="js/cashline-fastentry-cashflow.js?v=20260723_2"></script>
+<script src="js/cashline-cashbook.js?v=20261023_ja10"></script>
+<script src="js/cashline-fastentry-cashflow.js?v=20261023_st1"></script>
 
 </body>
 </html>

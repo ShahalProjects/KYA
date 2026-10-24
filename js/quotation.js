@@ -159,6 +159,8 @@
     const noEl = document.getElementById('quoteNo');
     const chipEl = document.getElementById('quoteChipDisplay');
     const notesEl = document.getElementById('quoteNotes');
+    const narrationEl = document.getElementById('quoteNarration');
+    if (typeof setVoucherNotesTab === 'function') setVoucherNotesTab('quote', 'terms');
     const supplyTypeEl = document.getElementById('quoteSupplyType');
 
     if (quoteData) {
@@ -168,11 +170,12 @@
       if (noEl) noEl.value = quoteData.quoteNo || '';
       if (chipEl) chipEl.textContent = quoteData.quoteNo || 'QT-2026-001';
       if (notesEl) notesEl.value = quoteData.notes || '';
+      if (narrationEl) narrationEl.value = quoteData.narration || '';
       if (supplyTypeEl && quoteData.supplyType) supplyTypeEl.value = quoteData.supplyType;
 
       quoteRows = Array.isArray(quoteData.rows) ? JSON.parse(JSON.stringify(quoteData.rows)) : [];
       if (quoteRows.length === 0) {
-        quoteRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+        quoteRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
       }
 
       // Populate customer
@@ -229,9 +232,10 @@
       if (noEl) noEl.value = nextNum;
       if (chipEl) chipEl.textContent = nextNum;
       if (notesEl) notesEl.value = '';
+      if (narrationEl) narrationEl.value = '';
       if (supplyTypeEl) supplyTypeEl.value = 'Intra-State (CGST + SGST)';
 
-      quoteRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+      quoteRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
 
       populateQuoteCustomers();
       selectQuoteCustomer(''); // a new quotation starts with no customer
@@ -427,7 +431,7 @@
             </div>
           </td>
           <td class="sales-cell-qty" style="width: 65px; padding: 4px 6px;">
-            <input type="number" class="sales-row-qty je-input" value="${row.qty !== undefined ? row.qty : 1}" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
+            <input type="number" class="sales-row-qty je-input" value="${row.qtyBlank ? '' : (row.qty !== undefined ? row.qty : 1)}" placeholder="Qty" min="0" style="border: none; background: transparent; box-shadow: none; text-align: right; padding: 0; font-weight: 600; font-size: 13px; color: var(--slate-800); outline: none; width: 100%;" />
           </td>
           <td class="sales-cell-unit" style="width: 65px; padding: 4px 6px; text-align: center;">
             <input type="text" class="sales-row-unit je-input" value="${safeEsc(row.unit || '')}" placeholder="Unit" style="border: none; background: transparent; box-shadow: none; text-align: center; padding: 0; font-weight: 600; text-transform: uppercase; font-size: 12px; color: var(--slate-700); outline: none; width: 100%;" />
@@ -480,6 +484,7 @@
             if (typeof window.applyMasterItemToVoucherRow === 'function') {
               window.applyMasterItemToVoucherRow(quoteRows[index], tr, selectedItem);
               updateQuoteRowFromDOM(index, tr, 'item');
+              if (typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(quoteRows, index);
             } else {
               quoteRows[index].item = selectedItem.name;
               quoteRows[index].itemType = selectedItem.type;
@@ -517,7 +522,7 @@
   }
 
   function addQuoteRow() {
-    quoteRows.push({ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
+    quoteRows.push({ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 });
     renderQuoteRows();
     recalculateQuoteTotals();
   }
@@ -538,7 +543,9 @@
     const unitEl = tr.querySelector('.sales-row-unit');
     if (unitEl) row.unit = unitEl.value;
 
-    let qty = parseFloat(tr.querySelector('.sales-row-qty')?.value) || 0;
+    // An empty Qty means 1
+    const qtyEl = tr.querySelector('.sales-row-qty');
+    let qty = (qtyEl && qtyEl.value.trim() === '') ? 1 : (parseFloat(qtyEl?.value) || 0);
     let rate = Math.round(safeParseAmt(tr.querySelector('.sales-row-rate')?.value || '0') * 100) / 100;
     let discount = safeParseAmt(tr.querySelector('.sales-row-discount')?.value || '0');
     row.discountType = tr.querySelector('.sales-row-discount-type')?.value || 'val';
@@ -586,6 +593,9 @@
         amtInput.value = row.amount === 0 ? '' : row.amount.toFixed(2);
       }
     }
+
+    if (qtyEl && qtyEl.value.trim() === '') row.qtyBlank = true;
+    else delete row.qtyBlank;
 
     recalculateQuoteTotals();
   }
@@ -794,6 +804,7 @@
     }
 
     const notes = document.getElementById('quoteNotes')?.value || '';
+    const narration = document.getElementById('quoteNarration')?.value || '';
     const subTotal = calculateQuoteSubtotal();
 
     let tdsTcsMode = 'None';
@@ -835,7 +846,7 @@
       supplyType,
       salesExecutiveId,
       salesExecutiveName,
-      rows: JSON.parse(JSON.stringify(quoteRows)),
+      rows: typeof window.voucherRowsForSave === 'function' ? window.voucherRowsForSave(quoteRows) : JSON.parse(JSON.stringify(quoteRows)),
       subTotal,
       tdsTcsMode,
       tdsTcsRate,
@@ -843,6 +854,7 @@
       adjustments,
       total,
       notes,
+      narration,
       document: _quoteDocData ? {
         name: _quoteDocName,
         size: _quoteDocSize,
@@ -1055,6 +1067,8 @@
         if (!tr) return;
         const index = parseInt(tr.dataset.rowIndex);
         updateQuoteRowFromDOM(index, tr, 'rate');
+        // More than the stock on hand (or none at all): say so
+        if (e.target.classList.contains('sales-row-qty') && typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(quoteRows, index);
       });
 
       quoteBody.addEventListener('click', (e) => {
@@ -1067,7 +1081,7 @@
               if (quoteRows.length > 1) {
                 quoteRows.splice(index, 1);
               } else {
-                quoteRows = [{ item: '', hsn: '', qty: 1, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
+                quoteRows = [{ item: '', hsn: '', qty: 1, qtyBlank: true, unit: '', rate: 0, discount: 0, discountType: 'val', tax: 18, amount: 0 }];
               }
               renderQuoteRows();
               recalculateQuoteTotals();
@@ -1383,7 +1397,10 @@
       paymentStatus: 'Not Paid',
       paymentAccountId: '',
       paymentAmount: '',
-      notes: quote.notes ? `${quote.notes}\n[Converted from Quotation ${quote.quoteNo}]` : `Converted from Quotation ${quote.quoteNo}`,
+      // The quotation's terms carry over to print; where it came from, and its own Narration,
+      // go into the Narration
+      notes: quote.notes || '',
+      narration: `Converted from Quotation ${quote.quoteNo}. ${quote.narration || ''}`.trim(),
       adjustments: quote.adjustments || 0,
       tdsTcsMode: quote.tdsTcsMode || 'None',
       tdsTcsRate: quote.tdsTcsRate || 0,
