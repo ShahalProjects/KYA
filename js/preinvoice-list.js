@@ -55,6 +55,8 @@
    *   openForm(doc, openedFrom),         // the module's form opener
    *   exportLabels: { pdf, excel },
    *   api: { openList, closeList, view, markCompleted }  // window names this list answers to
+   *   sheetKind                          // Sales only: the preview is the Tax Invoice-style sheet
+   *                                      // of sales-predoc-print.js ('salesOrder', 'deliveryChallan')
    *
    *   Optional — a Pre Purchase list (purchase-pre.js) sets these; Sales leaves them out:
    *   party: { idField, nameField, type, noun, execField }  // default customerId / customerName / 'Customer'
@@ -265,9 +267,9 @@
         advancePaidAmount: doc.advancePaidAmount || 0,
         advanceJournalEntryId: doc.advanceJournalEntryId || null,
         advanceVoucherNo: doc.advanceVoucherNo || null,
-        // The document's terms carry over to print; where it came from, and its own Narration,
-        // go into the Narration
-        notes: doc.notes || '',
+        // The invoice has its own Terms & Conditions — the document's don't come across; where it
+        // came from, and its own Narration, go into the Narration
+        notes: '',
         narration: `Converted from ${cfg.kind} ${doc[cfg.noField]}. ${doc.narration || ''}`.trim(),
         adjustments: doc.adjustments || 0,
         tdsTcsMode: doc.tdsTcsMode || 'None',
@@ -542,6 +544,47 @@
     function view(id) {
       const doc = getAll().find(d => String(d.id) === String(id));
       if (!doc) { showToast(`${cfg.kind} not found.`, 'error'); return; }
+      const docNo = doc[cfg.noField] || cfg.noFallback;
+      const noHtml = `<strong>${safeEsc(docNo)}</strong>`;
+      // Convert / Mark Completed / Mark Cancelled are confirmed first
+      const confirmOpts = {
+        convert: {
+          title: `${cfg.convertLabel || 'Convert to Sale'}?`,
+          message: `Convert ${cfg.noun} ${noHtml} to ${cfg.convertTarget || 'a Sales Invoice'}?<br>It will be marked Completed once the ${cfg.convertTarget ? 'purchase' : 'invoice'} is posted.`,
+          confirmLabel: cfg.convertLabel || 'Convert to Sale',
+          okBg: '#2563eb',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14h8M13 11l3 3-3 3"/></svg>'
+        },
+        complete: {
+          title: 'Mark as Completed?',
+          message: `Mark ${cfg.noun} ${noHtml} as Completed?<br>Completed ${cfg.plural.toLowerCase()} cannot be reopened.`,
+          confirmLabel: 'Mark Completed',
+          okBg: '#2563eb',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+        },
+        cancel: {
+          title: 'Mark as Cancelled?',
+          message: `Mark ${cfg.noun} ${noHtml} as Cancelled?<br>Its advance entry is removed; you can reopen it later if needed.`,
+          confirmLabel: 'Mark Cancelled',
+          okBg: '#dc2626',
+          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+        }
+      };
+
+      // A Sales document is laid out like the Sales Tax Invoice, with its Print / PDF / Excel
+      // (sales-predoc-print.js); a Pre Purchase document keeps the preview below
+      if (cfg.sheetKind && typeof window.viewSalesPreDoc === 'function') {
+        const confirmThen = (close, act, fn) => showKyaConfirm(Object.assign({}, confirmOpts[act], { onConfirm: () => { close(); fn(); } }));
+        window.viewSalesPreDoc(cfg.sheetKind, doc, {
+          edit: close => { close(); edit(doc.id); },
+          delete: close => { close(); remove(doc.id); },
+          reopen: close => { close(); setStatus(doc.id, 'Active'); },
+          convert: close => confirmThen(close, 'convert', () => convertToInvoice(doc.id)),
+          complete: close => confirmThen(close, 'complete', () => setStatus(doc.id, 'Completed')),
+          cancel: close => confirmThen(close, 'cancel', () => setStatus(doc.id, 'Cancelled'))
+        });
+        return;
+      }
 
       const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
       const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(doc[P_ID], P_TYPE) : null) ||
@@ -552,7 +595,6 @@
       const cityPin = [customer.city, customer.pincode].filter(Boolean).join(' - ');
       const stateCountry = [customer.state, customer.country || 'India'].filter(Boolean).join(', ');
       const partyPhone = customer.phone || customer.mobile || '';
-      const docNo = doc[cfg.noField] || cfg.noFallback;
 
       const rowsHtml = (Array.isArray(doc.rows) ? doc.rows : []).map((r, i) => {
         const qty = parseFloat(r.qty) || 1;
@@ -750,7 +792,6 @@
       overlay.focus();
 
       const exportMenu = overlay.querySelector('[data-role="export-menu"]');
-      const noHtml = `<strong>${safeEsc(docNo)}</strong>`;
       // The exporters read the party from customerId / customerName
       const exportDoc = { ...doc, proformaNo: docNo, customerId: doc[P_ID], customerName: doc[P_NAME] };
       const confirmThen = (opts, fn) => showKyaConfirm(Object.assign({}, opts, { onConfirm: () => { overlay.remove(); fn(); } }));
@@ -771,27 +812,9 @@
         edit: () => { overlay.remove(); edit(doc.id); },
         delete: () => { overlay.remove(); remove(doc.id); },
         reopen: () => { overlay.remove(); setStatus(doc.id, 'Active'); },
-        convert: () => confirmThen({
-          title: `${cfg.convertLabel || 'Convert to Sale'}?`,
-          message: `Convert ${cfg.noun} ${noHtml} to ${cfg.convertTarget || 'a Sales Invoice'}?<br>It will be marked Completed once the ${cfg.convertTarget ? 'purchase' : 'invoice'} is posted.`,
-          confirmLabel: cfg.convertLabel || 'Convert to Sale',
-          okBg: '#2563eb',
-          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14h8M13 11l3 3-3 3"/></svg>'
-        }, () => convertToInvoice(doc.id)),
-        complete: () => confirmThen({
-          title: 'Mark as Completed?',
-          message: `Mark ${cfg.noun} ${noHtml} as Completed?<br>Completed ${cfg.plural.toLowerCase()} cannot be reopened.`,
-          confirmLabel: 'Mark Completed',
-          okBg: '#2563eb',
-          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
-        }, () => setStatus(doc.id, 'Completed')),
-        cancel: () => confirmThen({
-          title: 'Mark as Cancelled?',
-          message: `Mark ${cfg.noun} ${noHtml} as Cancelled?<br>Its advance entry is removed; you can reopen it later if needed.`,
-          confirmLabel: 'Mark Cancelled',
-          okBg: '#dc2626',
-          iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
-        }, () => setStatus(doc.id, 'Cancelled'))
+        convert: () => confirmThen(confirmOpts.convert, () => convertToInvoice(doc.id)),
+        complete: () => confirmThen(confirmOpts.complete, () => setStatus(doc.id, 'Completed')),
+        cancel: () => confirmThen(confirmOpts.cancel, () => setStatus(doc.id, 'Cancelled'))
       };
 
       overlay.addEventListener('click', e => {

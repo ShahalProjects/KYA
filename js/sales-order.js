@@ -41,6 +41,7 @@
     noField: 'orderNo',
     noFallback: 'SO-XXXX',
     ids: { prefix: 'order', listCard: 'salesOrderListCard', contentArea: 'orderListFullContentArea' },
+    sheetKind: 'salesOrder',
     secondDate: { label: 'Delivery Date', get: d => d.deliveryDate || d.dueDate || '' },
     previewDateLabel: 'Order Date:',
     supplyLabel: 'Supply Type:',
@@ -204,6 +205,8 @@
     renderOrderRows();
     recalculateOrderTotals();
     if (typeof validateDocNoField === 'function') validateDocNoField('salesOrder'); // clear an old "already used" line
+    // Pre Invoice No. box: what this order was made from (sales-predoc-convert.js)
+    if (typeof refreshSalesPreDocPicker === 'function') refreshSalesPreDocPicker('salesOrder', orderData || null);
   }
 
   // Next free number from the sales order number format (prefix / start / digits — the
@@ -880,6 +883,10 @@
       advanceJournalEntryId: _editingOrder ? _editingOrder.advanceJournalEntryId : null,
       advanceVoucherNo: _editingOrder ? _editingOrder.advanceVoucherNo : null,
       advancePaidAmount: _editingOrder ? _editingOrder.advancePaidAmount : 0,
+      // Made by converting another pre-sales document, and the advance receipt it carries
+      // (sales-predoc-convert.js)
+      convertedFrom: _editingOrder ? (_editingOrder.convertedFrom || null) : null,
+      advanceCarriedFrom: _editingOrder ? (_editingOrder.advanceCarriedFrom || null) : null,
       rows: typeof window.voucherRowsForSave === 'function' ? window.voucherRowsForSave(orderRows) : JSON.parse(JSON.stringify(orderRows)),
       subTotal,
       tdsTcsMode,
@@ -930,6 +937,10 @@
     // A number already used can't be issued again (the order being edited keeps its own)
     if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('salesOrder', data.orderNo, data.id)) return;
 
+    // Converted from another document: the advance receipt it carries becomes this order's
+    // (sales-predoc-convert.js)
+    if (!isDraft && typeof takeOverConvertedAdvance === 'function' && !takeOverConvertedAdvance(data)) return;
+
     window.KYA_STORE.salesOrders = window.KYA_STORE.salesOrders || [];
     window.KYA_STORE.salesOrdersDrafts = window.KYA_STORE.salesOrdersDrafts || [];
 
@@ -973,13 +984,25 @@
       window.KYA_STORE.salesOrdersDrafts = window.KYA_STORE.salesOrdersDrafts.filter(d => d.id !== data.id);
       // Saved: the number is used for good, even if the order is deleted later
       if (typeof registerDocNo === 'function') registerDocNo('salesOrder', data.orderNo);
+      // The document it was converted from is now Completed
+      if (typeof completeConvertedSource === 'function') completeConvertedSource(data);
 
       showToast(`Sales Order ${data.orderNo} saved successfully!`, 'success');
     }
 
     if (typeof refreshAllReports === 'function') refreshAllReports();
     if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-    closeSalesOrderForm();
+
+    // Editing an existing order: return to where it was opened from (a converted one is new)
+    if (_editingOrder && !_editingOrder.isConversion) {
+      closeSalesOrderForm();
+      return;
+    }
+
+    // New order: stay on the form and start a fresh blank one with the next number
+    initSalesOrderForm(null);
+    const formCard = document.getElementById('salesOrderFormCard');
+    if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── Setup Event Listeners ──
@@ -1324,6 +1347,7 @@
   // ── Global Exports ──
   window.openSalesOrderForm = openSalesOrderForm;
   window.viewSalesOrderPreview = id => _orderList.view(id); // e.g. from Sales → Customers
+  window.editSalesOrderItem = id => _orderList.edit(id); // e.g. Edit on its advance entry
   window.closeSalesOrderForm = closeSalesOrderForm;
   window.initSalesOrderForm = initSalesOrderForm;
   window.renderOrderRows = renderOrderRows;

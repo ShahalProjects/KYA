@@ -2555,6 +2555,10 @@
       }
     }
 
+    // A Proforma / Sales Order / Delivery Challan advance: the document opens on its form
+    // in Pre Invoice (sales-helpers.js)
+    if (typeof window.editPreInvoiceAdvanceEntry === 'function' && window.editPreInvoiceAdvanceEntry(entry)) return;
+
     const currentTab = (typeof activeTabId !== 'undefined' && activeTabId) ? activeTabId : 'chart';
     const returnContext = {
       tabId: currentTab,
@@ -2682,6 +2686,9 @@
         ? window.findPurchaseVoucherByEntry(entry.id) : null;
       if (sv && typeof window.loadSalesInvoice === 'function') window.loadSalesInvoice(sv, false);
       else if (pv && typeof window.loadPurchaseVoucher === 'function') window.loadPurchaseVoucher(pv, false);
+      // A Proforma / Sales Order / Delivery Challan advance: the document opens on its form
+      // in Pre Invoice (sales-helpers.js)
+      else if (entry && typeof window.editPreInvoiceAdvanceEntry === 'function' && window.editPreInvoiceAdvanceEntry(entry)) return;
       else if (entry) loadJournalEntry(entry, false, returnContext);
     }
   };

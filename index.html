@@ -3484,6 +3484,21 @@
                 </button>
               </div>
             </div>
+            <!-- Pre Invoice No.: load an active Quotation / Sales Order into this proforma (sales-predoc-convert.js) -->
+            <div class="je-field" id="proformaPreInvoiceField">
+              <label for="proformaPreInvoiceSelectTrigger">Pre Invoice No.</label>
+              <div class="kya-searchable-select-wrap" id="proformaPreInvoiceSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="proformaPreInvoiceSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-500); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04);">
+                  <span id="proformaPreInvoiceSelectTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">&mdash; Select &mdash;</span>
+                  <button type="button" class="kya-preinv-clear-btn" id="proformaPreInvoiceClearBtn" title="Remove Pre Invoice" aria-label="Remove Pre Invoice" style="display: none;"><svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px;"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px; flex-shrink: 0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="proformaPreInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: 340px; max-width: 90vw; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 300px; overflow-y: auto; flex-direction: column; gap: 4px; box-sizing: border-box;">
+                  <input type="text" id="proformaPreInvoiceSelectSearch" placeholder="Search no., customer, item..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; height: auto; box-sizing: border-box;" />
+                  <div id="proformaPreInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
             <div class="je-field">
               <label for="proformaNo">Proforma No. *</label>
               <div id="proformaNoInputWrap" class="kya-docno-wrap" style="position: relative; width: 100%;">
@@ -3938,6 +3953,21 @@
                 </button>
               </div>
             </div>
+            <!-- Pre Invoice No.: load an active Quotation / Proforma Invoice into this order (sales-predoc-convert.js) -->
+            <div class="je-field" id="orderPreInvoiceField">
+              <label for="orderPreInvoiceSelectTrigger">Pre Invoice No.</label>
+              <div class="kya-searchable-select-wrap" id="orderPreInvoiceSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="orderPreInvoiceSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-500); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04);">
+                  <span id="orderPreInvoiceSelectTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">&mdash; Select &mdash;</span>
+                  <button type="button" class="kya-preinv-clear-btn" id="orderPreInvoiceClearBtn" title="Remove Pre Invoice" aria-label="Remove Pre Invoice" style="display: none;"><svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px;"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px; flex-shrink: 0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="orderPreInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: 340px; max-width: 90vw; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 300px; overflow-y: auto; flex-direction: column; gap: 4px; box-sizing: border-box;">
+                  <input type="text" id="orderPreInvoiceSelectSearch" placeholder="Search no., customer, item..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; height: auto; box-sizing: border-box;" />
+                  <div id="orderPreInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
+              </div>
+            </div>
             <div class="je-field">
               <label for="orderNo">Order No. *</label>
               <div id="orderNoInputWrap" class="kya-docno-wrap" style="position: relative; width: 100%;">
@@ -4291,6 +4321,21 @@
                 <button type="button" class="kya-dp-icon" tabindex="-1" aria-label="Open calendar" title="Open calendar">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                 </button>
+              </div>
+            </div>
+            <!-- Pre Invoice No.: load an active Quotation / Proforma Invoice / Sales Order into this challan (sales-predoc-convert.js) -->
+            <div class="je-field" id="challanPreInvoiceField">
+              <label for="challanPreInvoiceSelectTrigger">Pre Invoice No.</label>
+              <div class="kya-searchable-select-wrap" id="challanPreInvoiceSelectWrap" style="position: relative; width: 100%;">
+                <div class="kya-searchable-select-trigger" id="challanPreInvoiceSelectTrigger" tabindex="0" role="button" aria-haspopup="listbox" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-500); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04);">
+                  <span id="challanPreInvoiceSelectTriggerText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">&mdash; Select &mdash;</span>
+                  <button type="button" class="kya-preinv-clear-btn" id="challanPreInvoiceClearBtn" title="Remove Pre Invoice" aria-label="Remove Pre Invoice" style="display: none;"><svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px;"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px; flex-shrink: 0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="kya-searchable-select-dropdown" id="challanPreInvoiceSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: 340px; max-width: 90vw; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 300px; overflow-y: auto; flex-direction: column; gap: 4px; box-sizing: border-box;">
+                  <input type="text" id="challanPreInvoiceSelectSearch" placeholder="Search no., customer, item..." class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; height: auto; box-sizing: border-box;" />
+                  <div id="challanPreInvoiceSelectOptionsList" style="display: flex; flex-direction: column; gap: 2px;"></div>
+                </div>
               </div>
             </div>
             <div class="je-field">
@@ -5039,12 +5084,12 @@
 <script src="js/track-recorder.js?v=20261022_pt8"></script>
 <script src="js/pay-tracker.js?v=20261023_ja5"></script>
 <script src="js/vault-core.js"></script>
-<script src="js/ledgers.js?v=20261023_ja10"></script>
+<script src="js/ledgers.js?v=20261028_adv1"></script>
 <script src="js/vault-settings.js?v=20261023_jvn1"></script>
 <script src="js/kya-datepicker.js?v=20261019_1"></script>
 <script src="js/sales-form.js?v=20261024_qty2"></script>
 <script src="js/sales-posting.js?v=20261024_qty1"></script>
-<script src="js/sales-helpers.js?v=20261023_nt3"></script>
+<script src="js/sales-helpers.js?v=20261028_cv1"></script>
 <script src="js/sales-credit-adjust.js?v=20261023_ja10"></script>
 <script src="js/journal-allocations.js?v=20261023_ja11"></script>
 <script src="js/sales-customers.js?v=20261023_ja10"></script>
@@ -5053,12 +5098,14 @@
 <script src="js/sales-print-events.js?v=20261024_qty2"></script>
 <script src="js/sales-invoice-print.js?v=20261024_seal5"></script>
 <script src="js/sales-invoice-export.js?v=20261024_addr2"></script>
-<script src="js/quotation.js?v=20261024_qty3"></script>
-<script src="js/proforma.js?v=20261024_qty3"></script>
+<script src="js/sales-predoc-print.js?v=20261028_cv1"></script>
+<script src="js/sales-predoc-convert.js?v=20261028_tc1"></script>
+<script src="js/quotation.js?v=20261028_tc1"></script>
+<script src="js/proforma.js?v=20261028_tc1"></script>
 <script src="js/preinvoice-bulk.js?v=20261023_ja5"></script>
-<script src="js/preinvoice-list.js?v=20261023_nt3"></script>
-<script src="js/sales-order.js?v=20261024_qty3"></script>
-<script src="js/delivery-challan.js?v=20261024_qty3"></script>
+<script src="js/preinvoice-list.js?v=20261028_tc1"></script>
+<script src="js/sales-order.js?v=20261028_pk1"></script>
+<script src="js/delivery-challan.js?v=20261028_pk1"></script>
 <script src="js/sales-preinvoice-picker.js?v=20261008_d1"></script>
 <script src="js/sales-preinvoice-reversal.js?v=20261023_nt1"></script>
 <script src="js/purchase-posting.js?v=20261023_nt1"></script>

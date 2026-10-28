@@ -298,6 +298,8 @@
     renderProformaRows();
     recalculateProformaTotals();
     if (typeof validateDocNoField === 'function') validateDocNoField('proforma'); // clear an old "already used" line
+    // Pre Invoice No. box: what this proforma was made from (sales-predoc-convert.js)
+    if (typeof refreshSalesPreDocPicker === 'function') refreshSalesPreDocPicker('proforma', proformaData || null);
   }
 
   // Next free number from the proforma number format (prefix / start / digits — the
@@ -1199,6 +1201,10 @@
       advanceJournalEntryId: _editingProforma ? _editingProforma.advanceJournalEntryId : null,
       advanceVoucherNo: _editingProforma ? _editingProforma.advanceVoucherNo : null,
       advancePaidAmount: _editingProforma ? _editingProforma.advancePaidAmount : 0,
+      // Made by converting another pre-sales document, and the advance receipt it carries
+      // (sales-predoc-convert.js)
+      convertedFrom: _editingProforma ? (_editingProforma.convertedFrom || null) : null,
+      advanceCarriedFrom: _editingProforma ? (_editingProforma.advanceCarriedFrom || null) : null,
       rows: typeof window.voucherRowsForSave === 'function' ? window.voucherRowsForSave(proformaRows) : JSON.parse(JSON.stringify(proformaRows)),
       subTotal,
       tdsTcsMode,
@@ -1278,6 +1284,10 @@
     // A number already used can't be issued again (the proforma being edited keeps its own)
     if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('proforma', data.proformaNo, data.id)) return;
 
+    // Converted from another document: the advance receipt it carries becomes this proforma's
+    // (sales-predoc-convert.js)
+    if (!isDraft && typeof takeOverConvertedAdvance === 'function' && !takeOverConvertedAdvance(data)) return;
+
     window.KYA_STORE.proformaInvoices = window.KYA_STORE.proformaInvoices || [];
     window.KYA_STORE.proformaInvoicesDrafts = window.KYA_STORE.proformaInvoicesDrafts || [];
 
@@ -1322,6 +1332,8 @@
       window.KYA_STORE.proformaInvoicesDrafts = window.KYA_STORE.proformaInvoicesDrafts.filter(d => d.id !== data.id);
       // Saved: the number is used for good, even if the proforma is deleted later
       if (typeof registerDocNo === 'function') registerDocNo('proforma', data.proformaNo);
+      // The document it was converted from is now Completed
+      if (typeof completeConvertedSource === 'function') completeConvertedSource(data);
 
       showToast(`Proforma Invoice ${data.proformaNo} saved successfully!`, 'success');
     }
@@ -1329,6 +1341,15 @@
     if (typeof refreshAllReports === 'function') refreshAllReports();
     if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
     const proformaFormCard = document.getElementById('salesProformaFormCard');
+
+    // New proforma (a converted one too): stay on the form and start a fresh blank one with
+    // the next number
+    if (!_editingProforma || _editingProforma.isConversion) {
+      initProformaForm(null);
+      if (proformaFormCard) proformaFormCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
     if (proformaFormCard) proformaFormCard.style.display = 'none';
     _editingProforma = null;
     openProformaList('all');
@@ -1906,9 +1927,9 @@
       advancePaidAmount: prof.advancePaidAmount || (prof.paymentStatus === 'Full Payment' ? prof.total : (parseFloat(prof.paymentAmount) || 0)),
       advanceJournalEntryId: prof.advanceJournalEntryId || null,
       advanceVoucherNo: prof.advanceVoucherNo || null,
-      // The proforma's terms carry over to print; where it came from, and its own Narration,
-      // go into the Narration
-      notes: prof.notes || '',
+      // The invoice has its own Terms & Conditions — the proforma's don't come across; where it
+      // came from, and its own Narration, go into the Narration
+      notes: '',
       narration: `Converted from Proforma ${prof.proformaNo}. ${prof.narration || ''}`.trim(),
       adjustments: prof.adjustments || 0,
       tdsTcsMode: prof.tdsTcsMode || 'None',
@@ -1997,403 +2018,54 @@
       return;
     }
 
-    const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
-    const coName = activeCo.name || 'KYA Accounting';
-    const coAddress = activeCo.address || '';
-    const coGstin = activeCo.gstin || '';
-    const coPhone = activeCo.phone || '';
-
-    const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(prof.customerId, 'Customer') : null) ||
-                     (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == prof.customerId) : null) ||
-                     { name: prof.customerName || 'Customer' };
-    // With the customer details changed for this document only (Customer Details card)
-    const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, prof.partyOverride) : masterCustomer;
-    const partyName = customer.name || prof.customerName || 'Customer';
-    const partyContact = customer.contactName || '';
-    const partyAddr = customer.address || '';
-    const cityPin = [customer.city, customer.pincode].filter(Boolean).join(' - ');
-    const stateCountry = [customer.state, customer.country || 'India'].filter(Boolean).join(', ');
-    const partyGstin = customer.gstin || '';
-    const partyPhone = customer.phone || customer.mobile || '';
-
-    const rows = Array.isArray(prof.rows) ? prof.rows : [];
-    const rowsHtml = rows.map((r, i) => {
-      const qty = parseFloat(r.qty) || 1;
-      const rate = parseFloat(r.rate) || 0;
-      const base = qty * rate;
-      const disc = parseFloat(r.discount) || 0;
-      const discAmt = r.discountType === 'pct' ? (base * (disc / 100)) : disc;
-      const taxRate = parseFloat(r.tax) || 0;
-      const taxAmt = (base - discAmt) * (taxRate / 100);
-      const totalAmt = (base - discAmt) + taxAmt;
-      const discStr = disc > 0 ? (r.discountType === 'pct' ? `${disc}% (₹${safeFmtNum(discAmt)})` : `₹${safeFmtNum(disc)}`) : '—';
-
-      return `
-        <tr style="border-bottom: 1px solid var(--slate-100);">
-          <td style="padding: 10px; font-weight: 500; color: #94a3b8; font-size: 12px;">${i + 1}</td>
-          <td style="padding: 10px; font-weight: 600; color: var(--slate-800);">${safeEsc(r.item || 'Item')}</td>
-          <td style="padding: 10px; font-family: monospace; font-size: 12px; color: var(--slate-600);">${safeEsc(r.hsn || '—')}</td>
-          <td style="padding: 10px; text-align: right;">${qty} ${r.unit ? safeEsc(r.unit) : ''}</td>
-          <td style="padding: 10px; text-align: right;">₹ ${safeFmtNum(rate)}</td>
-          <td style="padding: 10px; text-align: right; color: var(--slate-600);">${discStr}</td>
-          <td style="padding: 10px; text-align: right; color: var(--slate-600);">${taxRate}%</td>
-          <td style="padding: 10px; text-align: right; font-weight: 700; color: var(--blue-700);">₹ ${safeFmtNum(totalAmt)}</td>
-        </tr>
-      `;
-    }).join('');
-
-    let statusBadge = '';
-    if (prof.status === 'Completed') {
-      statusBadge = '<span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:12px; padding:4px 10px; font-weight:700;">Completed</span>';
-    } else if (prof.status === 'Cancelled') {
-      statusBadge = '<span class="badge" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; font-size:12px; padding:4px 10px; font-weight:700;">Cancelled</span>';
-    } else if (prof.status === 'Draft' || prof.isDraft) {
-      statusBadge = '<span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-size:12px; padding:4px 10px; font-weight:700;">Draft</span>';
-    } else {
-      statusBadge = '<span class="badge" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:12px; padding:4px 10px; font-weight:700;">Active</span>';
-    }
-
-    let payStatusBadge = '';
-    if (prof.paymentStatus === 'Full Payment') {
-      payStatusBadge = '<span class="badge" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:11px; padding:2px 8px; font-weight:700;">Full Payment</span>';
-    } else if (prof.paymentStatus === 'Partial Payment') {
-      payStatusBadge = '<span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:11px; padding:2px 8px; font-weight:700;">Partial Payment</span>';
-    } else {
-      payStatusBadge = '<span class="badge" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-size:11px; padding:2px 8px; font-weight:700;">Not Paid</span>';
-    }
-
-    const isAct = prof.status === 'Active' || !prof.status;
-    const isDrf = prof.status === 'Draft' || prof.isDraft;
-
-    const actBtnStyle = 'padding: 8px 16px;';
-    let statusActionsHtml = '';
-    if (isAct || isDrf) {
-      statusActionsHtml = `
-        <button type="button" id="btnPreviewToInvoice" class="btn btn-secondary" style="${actBtnStyle}">Convert to Sale</button>
-        <button type="button" id="btnPreviewComplete" class="btn btn-secondary" style="${actBtnStyle}">Mark Completed</button>
-        <button type="button" id="btnPreviewCancel" class="btn btn-secondary" style="${actBtnStyle}">Mark Cancelled</button>
-      `;
-    } else if (prof.status === 'Cancelled') {
-      // Only cancelled proformas can be reopened; completed ones are final
-      statusActionsHtml = `
-        <button type="button" id="btnPreviewReopen" class="btn btn-secondary" style="${actBtnStyle}">Reopen</button>
-      `;
-    }
-
-    const overlay = document.createElement('div');
-    overlay.className = 'inv-modal-overlay';
-    overlay.id = 'proformaPrintOverlay';
-    overlay.setAttribute('tabindex', '-1');
-
-    overlay.innerHTML = `
-      <div class="inv-modal-card">
-        <div class="inv-modal-hdr" style="background: linear-gradient(90deg, #1d4ed8, #2563eb); flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">
-              <path d="M5 2h10a1 1 0 011 1v14l-3-2-3 2-3-2-3 2V3a1 1 0 011-1z"/>
-              <path d="M8 7h4M8 11h4"/>
-            </svg>
-            <div>
-              <span style="font-weight: 700; font-size: 16px;">Proforma Invoice Preview</span>
-              <span style="margin-left: 8px; font-family: monospace; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 6px; font-size: 13px;">${safeEsc(prof.proformaNo || 'PI-XXXX')}</span>
-            </div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
-            <!-- Export Dropdown (PDF & Excel) -->
-            <div class="rpt-more-wrap" style="position: relative;">
-              <button class="btn btn-secondary" id="btnExportProformaAction" type="button" style="background: rgba(255,255,255,0.18); color: #fff; border: 1.5px solid rgba(255,255,255,0.35); font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; height: 36px; transition: all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>Export</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
-              <div id="proformaExportDropdown" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1.5px solid var(--slate-200); border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1); z-index: 10006; min-width: 145px; overflow: hidden; padding: 4px 0;">
-                <button type="button" id="btnProformaExportPdf" class="rpt-menu-item" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='none'">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                  </svg>
-                  <span>PDF</span>
-                </button>
-                <button type="button" id="btnProformaExportExcel" class="rpt-menu-item" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; text-align: left; border-top: 1px solid var(--slate-100); transition: background 0.15s;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='none'">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="8" y1="13" x2="16" y2="17"></line>
-                    <line x1="16" y1="13" x2="8" y2="17"></line>
-                  </svg>
-                  <span>Excel</span>
-                </button>
-              </div>
-            </div>
-            <!-- Edit / Delete (same icons as the Quotation preview); completed proformas are locked -->
-            ${prof.status === 'Completed' ? '' : `
-            <button type="button" id="btnPreviewEditProforma" title="Edit Proforma Invoice" aria-label="Edit Proforma Invoice" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-            </button>
-            <button type="button" id="btnPreviewDeleteProforma" title="Delete Proforma Invoice" aria-label="Delete Proforma Invoice" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>`}
-            <button id="btnCloseProformaModal" style="background: rgba(255,255,255,0.18); border: none; color: #fff; font-size: 18px; cursor: pointer; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; line-height: 1; transition: all 0.15s;" type="button" title="Close Preview" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">✕</button>
-          </div>
-        </div>
-
-        <!-- Action Bar: status actions aligned to the left side (hidden when none apply) -->
-        ${statusActionsHtml ? `
-        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap;">
-          ${statusActionsHtml}
-        </div>` : ''}
-
-        <div class="inv-modal-body">
-          <div class="inv-paper">
-            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--slate-100); padding-bottom: 24px; margin-bottom: 24px;">
-              <div>
-                <h1 style="font-size: 24px; font-weight: 800; color: #1e3a8a; margin: 0 0 6px 0; letter-spacing: -0.02em;">${safeEsc(coName)}</h1>
-                <div style="font-size: 13px; color: var(--slate-500); line-height: 1.4;">
-                  ${safeEsc(coAddress)}<br>
-                  ${coGstin ? `GSTIN: <strong style="color: var(--slate-700);">${safeEsc(coGstin)}</strong><br>` : ''}
-                  ${coPhone ? `Phone: ${safeEsc(coPhone)}` : ''}
-                </div>
-              </div>
-              <div style="text-align: right;">
-                <div style="font-size: 22px; font-weight: 800; color: var(--slate-800); text-transform: uppercase; letter-spacing: 0.05em;">Proforma Invoice</div>
-                <div style="font-size: 15px; font-family: monospace; font-weight: 700; color: #1d4ed8; margin-top: 4px;"># ${safeEsc(prof.proformaNo || 'PI-XXXX')}</div>
-                <div style="margin-top: 10px;">${statusBadge}</div>
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-bottom: 28px; background: var(--slate-50); padding: 18px 20px; border-radius: 12px; border: 1px solid var(--slate-100);">
-              <div>
-                <h3 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.08em; margin-bottom: 8px; font-weight: 700;">Proforma For:</h3>
-                <div style="font-size: 16px; font-weight: 800; color: var(--slate-900);">${safeEsc(partyName)}</div>
-                ${partyContact ? `<div style="font-size: 12.5px; color: var(--slate-600); margin-top: 2px;">Attn: ${safeEsc(partyContact)}</div>` : ''}
-                ${partyAddr ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 4px;">${safeEsc(partyAddr)}</div>` : ''}
-                ${(cityPin || stateCountry) ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px;">${safeEsc([cityPin, stateCountry].filter(Boolean).join(', '))}</div>` : ''}
-                ${partyGstin ? `<div style="font-size: 12px; color: var(--slate-700); margin-top: 4px;">GSTIN: <strong style="font-family: monospace; color: #047857;">${safeEsc(partyGstin)}</strong></div>` : ''}
-                ${partyPhone ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px;">Phone: ${safeEsc(partyPhone)}</div>` : ''}
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 13px;">
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Proforma Date:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${prof.date || '—'}</div>
-                </div>
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Due Date:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${prof.dueDate || prof.expiryDate || '—'}</div>
-                </div>
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Supply Type:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${safeEsc(prof.supplyType || 'Intra-State')}</div>
-                </div>
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Payment Terms:</div>
-                  <div style="margin-top: 4px;">${payStatusBadge}</div>
-                  ${(prof.paymentStatus !== 'Not Paid' && (prof.advancePaidAmount || prof.paymentAmount)) ? `
-                    <div style="font-size: 11.5px; color: var(--slate-600); margin-top: 4px;">
-                      <strong>Advance:</strong> ₹${safeFmtNum(prof.advancePaidAmount || prof.paymentAmount)}
-                      ${prof.advanceVoucherNo ? `<span style="font-family: monospace; color: var(--blue-700); font-weight: 700; margin-left: 4px;">[${safeEsc(prof.advanceVoucherNo)}]</span>` : ''}
-                    </div>
-                  ` : ''}
-                  ${proformaJournalAdvance(prof) > 0 ? `
-                    <div style="font-size: 11.5px; color: var(--slate-600); margin-top: 4px;">
-                      <strong>By Journal Entry:</strong> ₹${safeFmtNum(proformaJournalAdvance(prof))}
-                    </div>
-                  ` : ''}
-                </div>
-                ${prof.salesExecutiveName ? `
-                <div style="grid-column: 1 / -1;">
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Prepared By:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${safeEsc(prof.salesExecutiveName)}</div>
-                </div>
-                ` : ''}
-              </div>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px;">
-              <thead>
-                <tr style="border-bottom: 2px solid var(--slate-200); background: var(--slate-50);">
-                  <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500); width: 36px;">#</th>
-                  <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500);">Description</th>
-                  <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500); width: 80px;">HSN/SAC</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 70px;">Qty</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 100px;">Rate</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 80px;">Discount</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 70px;">Tax</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 130px;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHtml}
-              </tbody>
-            </table>
-
-            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; margin-top: 20px;">
-              <div>
-                <h4 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin-bottom: 6px; font-weight: 700;">Payment & Terms:</h4>
-                <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap;">${safeEsc(prof.notes) || 'Payment is requested as per agreed terms before delivery. Thank you for your business!'}</div>
-                ${prof.paymentStatus !== 'Not Paid' && prof.paymentAccountName ? `
-                  <div style="margin-top: 10px; font-size: 12.5px; color: var(--slate-700); background: #f8fafc; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <strong>Advance Account:</strong> ${safeEsc(prof.paymentAccountName)}
-                    ${prof.paymentAmount ? ` &bull; <strong>Advance Amount:</strong> ₹ ${safeFmtNum(prof.paymentAmount)}` : ''}
-                  </div>
-                ` : ''}
-                ${prof.document && prof.document.data ? `
-                  <div style="margin-top: 12px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                    <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">📎 ${safeEsc(prof.document.name)}</span>
-                    <a href="${prof.document.data}" download="${safeEsc(prof.document.name)}" style="font-size: 11px; font-weight: 700; color: #2563eb; text-decoration: none;">Download</a>
-                  </div>
-                ` : ''}
-              </div>
-              <div>
-                <div style="background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 12px; padding: 16px 20px;">
-                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-bottom: 6px;">
-                    <span>Subtotal</span>
-                    <span style="font-weight: 600;">₹ ${safeFmtNum(prof.subTotal)}</span>
-                  </div>
-                  ${prof.tdsTcsMode && prof.tdsTcsMode !== 'None' ? `
-                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-bottom: 6px;">
-                      <span>${prof.tdsTcsMode} (${prof.tdsTcsRate || 0}%)</span>
-                      <span style="font-weight: 600;">${prof.tdsTcsMode === 'TDS' ? '-' : '+'} ₹ ${safeFmtNum(prof.tdsTcsAmount)}</span>
-                    </div>
-                  ` : ''}
-                  ${prof.adjustments ? `
-                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-bottom: 6px;">
-                      <span>Adjustments / Round-off</span>
-                      <span style="font-weight: 600;">₹ ${safeFmtNum(prof.adjustments)}</span>
-                    </div>
-                  ` : ''}
-                  <div style="display: flex; justify-content: space-between; font-size: 17px; font-weight: 800; color: var(--blue-800); border-top: 1.5px solid var(--slate-200); padding-top: 10px; margin-top: 6px;">
-                    <span>Grand Total</span>
-                    <span>₹ ${safeFmtNum(prof.total)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style="margin-top: 50px; border-top: 1px solid var(--slate-100); padding-top: 16px; text-align: center; font-size: 11.5px; color: var(--slate-400);">
-              This is a provisional commercial proforma invoice. Generated by KYA Accounting Suite.
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-    overlay.focus();
-
-    overlay.querySelector('#btnCloseProformaModal')?.addEventListener('click', () => overlay.remove());
-
-    // Wire Export Dropdown (PDF & Excel)
-    const expBtn = overlay.querySelector('#btnExportProformaAction');
-    const expDropdown = overlay.querySelector('#proformaExportDropdown');
-    const expPdfBtn = overlay.querySelector('#btnProformaExportPdf');
-    const expExcelBtn = overlay.querySelector('#btnProformaExportExcel');
-
-    if (expBtn && expDropdown) {
-      expBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = expDropdown.style.display === 'block';
-        expDropdown.style.display = isOpen ? 'none' : 'block';
-      });
-    }
-
-    if (expPdfBtn) {
-      expPdfBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (expDropdown) expDropdown.style.display = 'none';
-        if (typeof window.exportProformaToPDF === 'function') {
-          await window.exportProformaToPDF(prof);
-        } else {
-          window.print();
-        }
-      });
-    }
-
-    if (expExcelBtn) {
-      expExcelBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (expDropdown) expDropdown.style.display = 'none';
-        if (typeof window.exportProformaToExcel === 'function') {
-          await window.exportProformaToExcel(prof);
-        } else if (typeof window.exportProformaToCsvFallback === 'function') {
-          window.exportProformaToCsvFallback(prof);
-        }
-      });
-    }
-
-    overlay.querySelector('#btnPreviewEditProforma')?.addEventListener('click', () => {
-      overlay.remove();
-      editProformaItem(prof.id);
-    });
+    // Laid out like the Sales Tax Invoice, with its Print / PDF / Excel (sales-predoc-print.js)
     const pNoHtml = `<strong>${safeEsc(prof.proformaNo || 'this proforma invoice')}</strong>`;
-    overlay.querySelector('#btnPreviewToInvoice')?.addEventListener('click', () => {
-      showKyaConfirm({
+    viewSalesPreDoc('proforma', prof, {
+      edit: close => {
+        close();
+        editProformaItem(prof.id);
+      },
+      delete: close => {
+        close();
+        deleteProformaItem(prof.id);
+      },
+      convert: close => showKyaConfirm({
         title: 'Convert to Sale?',
         message: `Convert proforma invoice ${pNoHtml} to a Sales Invoice?<br>It will be marked Completed once the invoice is posted.`,
         confirmLabel: 'Convert to Sale',
         okBg: '#2563eb',
         iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14h8M13 11l3 3-3 3"/></svg>',
         onConfirm: () => {
-          overlay.remove();
+          close();
           convertProformaToInvoice(prof.id);
         }
-      });
-    });
-    overlay.querySelector('#btnPreviewComplete')?.addEventListener('click', () => {
-      showKyaConfirm({
+      }),
+      complete: close => showKyaConfirm({
         title: 'Mark as Completed?',
         message: `Mark proforma invoice ${pNoHtml} as Completed?<br>Completed proforma invoices cannot be reopened.`,
         confirmLabel: 'Mark Completed',
         okBg: '#2563eb',
         iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
         onConfirm: () => {
-          overlay.remove();
+          close();
           setProformaStatus(prof.id, 'Completed');
         }
-      });
-    });
-    overlay.querySelector('#btnPreviewCancel')?.addEventListener('click', () => {
-      showKyaConfirm({
+      }),
+      cancel: close => showKyaConfirm({
         title: 'Mark as Cancelled?',
         message: `Mark proforma invoice ${pNoHtml} as Cancelled?<br>Its advance entry is removed; you can reopen it later if needed.`,
         confirmLabel: 'Mark Cancelled',
         okBg: '#dc2626',
         iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
         onConfirm: () => {
-          overlay.remove();
+          close();
           setProformaStatus(prof.id, 'Cancelled');
         }
-      });
-    });
-    overlay.querySelector('#btnPreviewReopen')?.addEventListener('click', () => {
-      overlay.remove();
-      setProformaStatus(prof.id, 'Active');
-    });
-    overlay.querySelector('#btnPreviewDeleteProforma')?.addEventListener('click', () => {
-      overlay.remove();
-      deleteProformaItem(prof.id);
-    });
-    overlay.addEventListener('click', e => {
-      if (expDropdown && !expDropdown.contains(e.target) && expBtn && !expBtn.contains(e.target)) {
-        expDropdown.style.display = 'none';
+      }),
+      reopen: close => {
+        close();
+        setProformaStatus(prof.id, 'Active');
       }
-      if (e.target === overlay) overlay.remove();
-    });
-    overlay.addEventListener('keydown', e => {
-      if (e.key === 'Escape') overlay.remove();
     });
   }
 

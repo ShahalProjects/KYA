@@ -41,6 +41,7 @@
     noField: 'challanNo',
     noFallback: 'DC-XXXX',
     ids: { prefix: 'challan', listCard: 'salesDeliveryChallanListCard', contentArea: 'challanListFullContentArea' },
+    sheetKind: 'deliveryChallan',
     secondDate: { label: 'Dispatch Date', get: d => d.dispatchDate || d.dueDate || '' },
     previewDateLabel: 'Challan Date:',
     supplyLabel: 'Challan Purpose:',
@@ -204,6 +205,8 @@
     renderChallanRows();
     recalculateChallanTotals();
     if (typeof validateDocNoField === 'function') validateDocNoField('deliveryChallan'); // clear an old "already used" line
+    // Pre Invoice No. box: what this challan was made from (sales-predoc-convert.js)
+    if (typeof refreshSalesPreDocPicker === 'function') refreshSalesPreDocPicker('deliveryChallan', challanData || null);
   }
 
   // Next free number from the delivery challan number format (prefix / start / digits — the
@@ -865,6 +868,10 @@
       advanceJournalEntryId: _editingChallan ? _editingChallan.advanceJournalEntryId : null,
       advanceVoucherNo: _editingChallan ? _editingChallan.advanceVoucherNo : null,
       advancePaidAmount: _editingChallan ? _editingChallan.advancePaidAmount : 0,
+      // Made by converting another pre-sales document, and the advance receipt it carries
+      // (sales-predoc-convert.js)
+      convertedFrom: _editingChallan ? (_editingChallan.convertedFrom || null) : null,
+      advanceCarriedFrom: _editingChallan ? (_editingChallan.advanceCarriedFrom || null) : null,
       rows: typeof window.voucherRowsForSave === 'function' ? window.voucherRowsForSave(challanRows) : JSON.parse(JSON.stringify(challanRows)),
       subTotal,
       tdsTcsMode,
@@ -915,6 +922,10 @@
     // A number already used can't be issued again (the challan being edited keeps its own)
     if (typeof checkDocNoBeforeSave === 'function' && !checkDocNoBeforeSave('deliveryChallan', data.challanNo, data.id)) return;
 
+    // Converted from another document: the advance receipt it carries becomes this challan's
+    // (sales-predoc-convert.js)
+    if (!isDraft && typeof takeOverConvertedAdvance === 'function' && !takeOverConvertedAdvance(data)) return;
+
     window.KYA_STORE.deliveryChallans = window.KYA_STORE.deliveryChallans || [];
     window.KYA_STORE.deliveryChallansDrafts = window.KYA_STORE.deliveryChallansDrafts || [];
 
@@ -958,13 +969,25 @@
       window.KYA_STORE.deliveryChallansDrafts = window.KYA_STORE.deliveryChallansDrafts.filter(d => d.id !== data.id);
       // Saved: the number is used for good, even if the challan is deleted later
       if (typeof registerDocNo === 'function') registerDocNo('deliveryChallan', data.challanNo);
+      // The document it was converted from is now Completed
+      if (typeof completeConvertedSource === 'function') completeConvertedSource(data);
 
       showToast(`Delivery Challan ${data.challanNo} saved successfully!`, 'success');
     }
 
     if (typeof refreshAllReports === 'function') refreshAllReports();
     if (typeof triggerAutoBackup === 'function') triggerAutoBackup();
-    closeDeliveryChallanForm();
+
+    // Editing an existing challan: return to where it was opened from (a converted one is new)
+    if (_editingChallan && !_editingChallan.isConversion) {
+      closeDeliveryChallanForm();
+      return;
+    }
+
+    // New challan: stay on the form and start a fresh blank one with the next number
+    initDeliveryChallanForm(null);
+    const formCard = document.getElementById('salesDeliveryChallanFormCard');
+    if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── Setup Event Listeners ──
@@ -1307,6 +1330,7 @@
   // ── Global Exports ──
   window.openDeliveryChallanForm = openDeliveryChallanForm;
   window.viewDeliveryChallanPreview = id => _challanList.view(id); // e.g. from Sales → Customers
+  window.editDeliveryChallanItem = id => _challanList.edit(id); // e.g. Edit on its advance entry
   window.closeDeliveryChallanForm = closeDeliveryChallanForm;
   window.initDeliveryChallanForm = initDeliveryChallanForm;
   window.renderChallanRows = renderChallanRows;

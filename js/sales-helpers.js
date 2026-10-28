@@ -169,11 +169,16 @@
     if (typeof postedEntries === 'undefined' || !(amount > 0) || !receiptRows.length) return;
 
     const custName = doc.customerName || 'Customer';
+    // An advance carried over from the document it was first received against
+    // (sales-predoc-convert.js) is the same receipt: it keeps that date and names that document
+    const carried = (doc.advanceCarriedFrom && doc.advanceJournalEntryId
+      && String(doc.advanceCarriedFrom.journalEntryId) === String(doc.advanceJournalEntryId)) ? doc.advanceCarriedFrom : null;
+    const receivedOn = (carried && carried.date) || doc.date;
     let voucherNo = doc.advanceVoucherNo;
     if (!voucherNo || !String(voucherNo).startsWith('JV-')) {
       voucherNo = (typeof getNextJournalVoucherNo === 'function')
-        ? getNextJournalVoucherNo(doc.date)
-        : `JV-${(doc.date ? new Date(doc.date) : new Date()).getFullYear()}-001`;
+        ? getNextJournalVoucherNo(receivedOn)
+        : `JV-${(receivedOn ? new Date(receivedOn) : new Date()).getFullYear()}-001`;
     }
     const entryId = doc.advanceJournalEntryId || Date.now();
 
@@ -186,7 +191,7 @@
 
     const entry = Object.assign({
       id: entryId,
-      date: doc.date,
+      date: receivedOn,
       voucherNo,
       preparedBy: info.preparedBy,
       departmentId: '',
@@ -194,7 +199,9 @@
       firstParticular: receiptRows[0].name,
       amount: (typeof fmtNum === 'function') ? fmtNum(amount) : amount.toFixed(2),
       allRows: rows,
-      narration: `Advance received from ${custName} against ${info.docLabel} No. ${info.docNo} (${doc.paymentStatus}). ${doc.narration || ''}`.trim(),
+      narration: (carried
+        ? `Advance received from ${custName} against ${carried.label} No. ${carried.no}, carried to ${info.docLabel} No. ${info.docNo} (${doc.paymentStatus}). ${doc.narration || ''}`
+        : `Advance received from ${custName} against ${info.docLabel} No. ${info.docNo} (${doc.paymentStatus}). ${doc.narration || ''}`).trim(),
       jeType: 'advance_receipt',
       customerId: doc.customerId,
       customerName: custName,
@@ -226,6 +233,47 @@
     doc.advanceVoucherNo = null;
     doc.advancePaidAmount = 0;
   }
+
+  // The Proforma / Sales Order / Delivery Challan an advance entry was posted for (its link
+  // field, or the document's advanceJournalEntryId): { doc, edit }, or null for any other entry
+  const PRE_INVOICE_ADVANCE_DOCS = [
+    { store: 'proformaInvoices', link: 'proformaId', edit: 'editProformaItem' },
+    { store: 'salesOrders', link: 'salesOrderId', edit: 'editSalesOrderItem' },
+    { store: 'deliveryChallans', link: 'deliveryChallanId', edit: 'editDeliveryChallanItem' }
+  ];
+  function findPreInvoiceByAdvanceEntry(entry) {
+    if (!entry || entry.jeType !== 'advance_receipt') return null;
+    const S = window.KYA_STORE || {};
+    // The entry names the document holding it now: a converted document shares its receipt with
+    // the one it came from (sales-predoc-convert.js)
+    for (const k of PRE_INVOICE_ADVANCE_DOCS) {
+      const linkId = entry[k.link];
+      if (linkId === undefined || linkId === null) continue;
+      const doc = (S[k.store] || []).find(d => d && String(d.id) === String(linkId));
+      if (doc) return { doc, edit: k.edit };
+    }
+    for (const k of PRE_INVOICE_ADVANCE_DOCS) {
+      const doc = (S[k.store] || []).find(d => d && d.advanceJournalEntryId && String(d.advanceJournalEntryId) === String(entry.id));
+      if (doc) return { doc, edit: k.edit };
+    }
+    return null;
+  }
+
+  // Edit on a pre-invoice advance entry (the journal popup, ledger statements): the document
+  // opens on its own form in Sales Voucher → Pre Invoice instead of the entry in Journal Entry.
+  // Returns false for any other entry.
+  function editPreInvoiceAdvanceEntry(entry) {
+    const found = findPreInvoiceByAdvanceEntry(entry);
+    const editFn = found ? window[found.edit] : null;
+    if (typeof editFn !== 'function') return false;
+    if (typeof openTab === 'function') openTab('sales_voucher');
+    currentSalesVoucherSubtype = 'PreInvoice';
+    window._editingSalesInvoice = null;
+    if (typeof updateVoucherSubtypeUI === 'function') updateVoucherSubtypeUI();
+    editFn(found.doc.id);
+    return true;
+  }
+  window.editPreInvoiceAdvanceEntry = editPreInvoiceAdvanceEntry;
 
   // Cash/Bank debit rows for a saved document's advance entry: one per account, scaled to
   // `amount` when split by Multi Payment (rounding lands on the last row)

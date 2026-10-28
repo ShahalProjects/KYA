@@ -1397,9 +1397,9 @@
       paymentStatus: 'Not Paid',
       paymentAccountId: '',
       paymentAmount: '',
-      // The quotation's terms carry over to print; where it came from, and its own Narration,
-      // go into the Narration
-      notes: quote.notes || '',
+      // The invoice has its own Terms & Conditions — the quotation's don't come across; where it
+      // came from, and its own Narration, go into the Narration
+      notes: '',
       narration: `Converted from Quotation ${quote.quoteNo}. ${quote.narration || ''}`.trim(),
       adjustments: quote.adjustments || 0,
       tdsTcsMode: quote.tdsTcsMode || 'None',
@@ -1486,365 +1486,54 @@
       return;
     }
 
-    const activeCo = (typeof getActiveCompany === 'function' ? getActiveCompany() : null) || {};
-    const coName = activeCo.name || 'KYA Accounting';
-    const coAddress = activeCo.address || '';
-    const coGstin = activeCo.gstin || '';
-    const coPhone = activeCo.phone || '';
-
-    const masterCustomer = (typeof findPartyById === 'function' ? findPartyById(quote.customerId, 'Customer') : null) ||
-                     (typeof coaLedgers !== 'undefined' ? coaLedgers.find(l => l.id == quote.customerId) : null) ||
-                     { name: quote.customerName || 'Customer' };
-    // With the customer details changed for this document only (Customer Details card)
-    const customer = typeof mergePartyOverride === 'function' ? mergePartyOverride(masterCustomer, quote.partyOverride) : masterCustomer;
-    const partyName = customer.name || quote.customerName || 'Customer';
-    const partyContact = customer.contactName || '';
-    const partyAddr = customer.address || '';
-    const cityPin = [customer.city, customer.pincode].filter(Boolean).join(' - ');
-    const stateCountry = [customer.state, customer.country || 'India'].filter(Boolean).join(', ');
-    const partyGstin = customer.gstin || '';
-    const partyPhone = customer.phone || customer.mobile || '';
-
-    const rows = Array.isArray(quote.rows) ? quote.rows : [];
-    const rowsHtml = rows.map((r, i) => {
-      const qty = parseFloat(r.qty) || 1;
-      const rate = parseFloat(r.rate) || 0;
-      const base = qty * rate;
-      const disc = parseFloat(r.discount) || 0;
-      const discAmt = r.discountType === 'pct' ? (base * (disc / 100)) : disc;
-      const taxRate = parseFloat(r.tax) || 0;
-      const taxAmt = (base - discAmt) * (taxRate / 100);
-      const totalAmt = (base - discAmt) + taxAmt;
-      const discStr = disc > 0 ? (r.discountType === 'pct' ? `${disc}% (₹${safeFmtNum(discAmt)})` : `₹${safeFmtNum(disc)}`) : '—';
-
-      return `
-        <tr style="border-bottom: 1px solid var(--slate-100);">
-          <td style="padding: 10px; font-weight: 500; color: #94a3b8; font-size: 12px;">${i + 1}</td>
-          <td style="padding: 10px; font-weight: 600; color: var(--slate-800);">${safeEsc(r.item || 'Item')}</td>
-          <td style="padding: 10px; font-family: monospace; font-size: 12px; color: var(--slate-600);">${safeEsc(r.hsn || '—')}</td>
-          <td style="padding: 10px; text-align: right;">${qty} ${r.unit ? safeEsc(r.unit) : ''}</td>
-          <td style="padding: 10px; text-align: right;">₹ ${safeFmtNum(rate)}</td>
-          <td style="padding: 10px; text-align: right; color: var(--slate-600);">${discStr}</td>
-          <td style="padding: 10px; text-align: right; color: var(--slate-600);">${taxRate}%</td>
-          <td style="padding: 10px; text-align: right; font-weight: 700; color: var(--blue-700);">₹ ${safeFmtNum(totalAmt)}</td>
-        </tr>
-      `;
-    }).join('');
-
-    let statusBadge = '';
-    if (quote.status === 'Completed') {
-      statusBadge = '<span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:12px; padding:4px 10px; font-weight:700;">Completed</span>';
-    } else if (quote.status === 'Cancelled') {
-      statusBadge = '<span class="badge" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; font-size:12px; padding:4px 10px; font-weight:700;">Cancelled</span>';
-    } else if (quote.status === 'Draft' || quote.isDraft) {
-      statusBadge = '<span class="badge" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-size:12px; padding:4px 10px; font-weight:700;">Draft</span>';
-    } else {
-      statusBadge = '<span class="badge" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:12px; padding:4px 10px; font-weight:700;">Active</span>';
-    }
-
-    const isAct = quote.status === 'Active' || !quote.status;
-    const isDrf = quote.status === 'Draft' || quote.isDraft;
-
-    const actBtnStyle = 'padding: 8px 16px;';
-    let statusActionsHtml = '';
-    if (isAct || isDrf) {
-      statusActionsHtml = `
-        <button type="button" id="btnPreviewToInvoice" class="btn btn-secondary" style="${actBtnStyle}">Convert to Sale</button>
-        <button type="button" id="btnPreviewComplete" class="btn btn-secondary" style="${actBtnStyle}">Mark Completed</button>
-        <button type="button" id="btnPreviewCancel" class="btn btn-secondary" style="${actBtnStyle}">Mark Cancelled</button>
-      `;
-    } else if (quote.status === 'Cancelled') {
-      // Only cancelled quotations can be reopened; completed ones are final
-      statusActionsHtml = `
-        <button type="button" id="btnPreviewReopen" class="btn btn-secondary" style="${actBtnStyle}">Reopen</button>
-      `;
-    }
-
-    const overlay = document.createElement('div');
-    overlay.className = 'inv-modal-overlay';
-    overlay.id = 'quotationPrintOverlay';
-    overlay.setAttribute('tabindex', '-1');
-
-    overlay.innerHTML = `
-      <div class="inv-modal-card">
-        <div class="inv-modal-hdr" style="background: linear-gradient(90deg, #1d4ed8, #2563eb); flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">
-              <path d="M4 4h12v12H4z"/>
-              <path d="M7 8h6M7 12h4"/>
-            </svg>
-            <div>
-              <span style="font-weight: 700; font-size: 16px;">Quotation Preview</span>
-              <span style="margin-left: 8px; font-family: monospace; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 6px; font-size: 13px;">${safeEsc(quote.quoteNo || 'QT-XXXX')}</span>
-            </div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
-            <!-- Export Dropdown (PDF & Excel) -->
-            <div class="rpt-more-wrap" style="position: relative;">
-              <button class="btn btn-secondary" id="btnExportQuoteAction" type="button" style="background: rgba(255,255,255,0.18); color: #fff; border: 1.5px solid rgba(255,255,255,0.35); font-weight: 700; padding: 7px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-size: 13px; height: 36px; transition: all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>Export</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
-              <div id="quoteExportDropdown" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1.5px solid var(--slate-200); border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1); z-index: 10006; min-width: 145px; overflow: hidden; padding: 4px 0;">
-                <button type="button" id="btnQuoteExportPdf" class="rpt-menu-item" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='none'">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                  </svg>
-                  <span>PDF</span>
-                </button>
-                <button type="button" id="btnQuoteExportExcel" class="rpt-menu-item" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: none; background: none; font-size: 13px; font-weight: 600; color: var(--slate-700); cursor: pointer; text-align: left; border-top: 1px solid var(--slate-100); transition: background 0.15s;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='none'">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="8" y1="13" x2="16" y2="17"></line>
-                    <line x1="16" y1="13" x2="8" y2="17"></line>
-                  </svg>
-                  <span>Excel</span>
-                </button>
-              </div>
-            </div>
-            <!-- Edit / Delete (same icons as Voucher Desk journal voucher); completed quotations are locked -->
-            ${quote.status === 'Completed' ? '' : `
-            <button type="button" id="btnPreviewEditQuote" title="Edit Quotation" aria-label="Edit Quotation" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-            </button>
-            <button type="button" id="btnPreviewDeleteQuote" title="Delete Quotation" aria-label="Delete Quotation" style="background: rgba(255,255,255,0.15); border: none; border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>`}
-            <button id="btnCloseQuoteModal" style="background: rgba(255,255,255,0.18); border: none; color: #fff; font-size: 18px; cursor: pointer; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; line-height: 1; transition: all 0.15s;" type="button" title="Close Preview" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">✕</button>
-          </div>
-        </div>
-
-        <!-- Action Bar: status actions aligned to the left side (hidden when none apply) -->
-        ${statusActionsHtml ? `
-        <div class="quote-preview-action-bar no-print" style="background: #f8fafc; border-bottom: 1.5px solid var(--slate-200); padding: 12px 28px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; flex-wrap: wrap;">
-          ${statusActionsHtml}
-        </div>` : ''}
-
-        <div class="inv-modal-body">
-          <div class="inv-paper">
-            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--slate-100); padding-bottom: 24px; margin-bottom: 24px;">
-              <div>
-                <div style="font-size: 22px; font-weight: 800; color: var(--blue-800);">${safeEsc(coName)}</div>
-                ${coAddress ? `<div style="font-size: 12.5px; color: var(--slate-500); margin-top: 4px;">${safeEsc(coAddress)}</div>` : ''}
-                ${coGstin ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px;">GSTIN: <strong>${safeEsc(coGstin)}</strong></div>` : ''}
-                ${coPhone ? `<div style="font-size: 12px; color: var(--slate-600);">Phone: ${safeEsc(coPhone)}</div>` : ''}
-              </div>
-              <div style="text-align: right;">
-                <h1 style="font-size: 28px; font-weight: 900; color: var(--slate-800); margin: 0; text-transform: uppercase;">Quotation</h1>
-                <div style="font-size: 15px; font-weight: 800; color: var(--blue-700); margin-top: 4px; font-family: monospace;">${safeEsc(quote.quoteNo)}</div>
-                <div style="margin-top: 6px;">${statusBadge}</div>
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; border-bottom: 2px solid var(--slate-100); padding-bottom: 24px; margin-bottom: 24px;">
-              <div>
-                <h3 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.08em; margin-bottom: 8px; font-weight: 700;">Quotation For:</h3>
-                <div style="font-size: 16px; font-weight: 800; color: var(--slate-900);">${safeEsc(partyName)}</div>
-                ${partyContact ? `<div style="font-size: 12.5px; color: var(--slate-600); margin-top: 2px;">Attn: ${safeEsc(partyContact)}</div>` : ''}
-                ${partyAddr ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 4px;">${safeEsc(partyAddr)}</div>` : ''}
-                ${(cityPin || stateCountry) ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px;">${safeEsc([cityPin, stateCountry].filter(Boolean).join(', '))}</div>` : ''}
-                ${partyGstin ? `<div style="font-size: 12px; color: var(--slate-700); margin-top: 4px;">GSTIN: <strong style="font-family: monospace; color: #047857;">${safeEsc(partyGstin)}</strong></div>` : ''}
-                ${partyPhone ? `<div style="font-size: 12px; color: var(--slate-600); margin-top: 2px;">Phone: ${safeEsc(partyPhone)}</div>` : ''}
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 13px;">
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Quotation Date:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${quote.date || '—'}</div>
-                </div>
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Valid Until:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${quote.expiryDate || '—'}</div>
-                </div>
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Supply Type:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${safeEsc(quote.supplyType || 'Intra-State')}</div>
-                </div>
-                ${quote.salesExecutiveName ? `
-                <div>
-                  <div style="color: var(--slate-400); font-weight: 600; font-size: 11px; text-transform: uppercase;">Prepared By:</div>
-                  <div style="font-weight: 700; color: var(--slate-800); margin-top: 2px;">${safeEsc(quote.salesExecutiveName)}</div>
-                </div>
-                ` : ''}
-              </div>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px;">
-              <thead>
-                <tr style="border-bottom: 2px solid var(--slate-200); background: var(--slate-50);">
-                  <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500); width: 36px;">#</th>
-                  <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500);">Description</th>
-                  <th style="padding: 10px; text-align: left; font-weight: 700; color: var(--slate-500); width: 80px;">HSN/SAC</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 70px;">Qty</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 100px;">Rate</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 80px;">Discount</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 70px;">Tax</th>
-                  <th style="padding: 10px; text-align: right; font-weight: 700; color: var(--slate-500); width: 130px;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHtml}
-              </tbody>
-            </table>
-
-            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; margin-top: 20px;">
-              <div>
-                <h4 style="font-size: 11px; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.05em; margin-bottom: 6px; font-weight: 700;">Terms & Notes:</h4>
-                <div style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; white-space: pre-wrap;">${safeEsc(quote.notes) || 'Thank you for your interest! Prices are valid until the specified expiry date.'}</div>
-                ${quote.document && quote.document.data ? `
-                  <div style="margin-top: 12px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                    <span style="font-size: 12px; font-weight: 600; color: var(--slate-700);">📎 ${safeEsc(quote.document.name)}</span>
-                    <a href="${quote.document.data}" download="${safeEsc(quote.document.name)}" style="font-size: 11px; font-weight: 700; color: #2563eb; text-decoration: none;">Download</a>
-                  </div>
-                ` : ''}
-              </div>
-              <div>
-                <div style="background: var(--slate-50); border: 1px solid var(--slate-100); border-radius: 12px; padding: 16px 20px;">
-                  <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-bottom: 6px;">
-                    <span>Subtotal</span>
-                    <span style="font-weight: 600;">₹ ${safeFmtNum(quote.subTotal)}</span>
-                  </div>
-                  ${quote.adjustments ? `
-                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-600); margin-bottom: 6px;">
-                      <span>Adjustments / Round-off</span>
-                      <span style="font-weight: 600;">₹ ${safeFmtNum(quote.adjustments)}</span>
-                    </div>
-                  ` : ''}
-                  <div style="display: flex; justify-content: space-between; font-size: 17px; font-weight: 800; color: var(--blue-800); border-top: 1.5px solid var(--slate-200); padding-top: 10px; margin-top: 6px;">
-                    <span>Grand Total</span>
-                    <span>₹ ${safeFmtNum(quote.total)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style="margin-top: 50px; border-top: 1px solid var(--slate-100); padding-top: 16px; text-align: center; font-size: 11.5px; color: var(--slate-400);">
-              This is an official price estimate / quotation. Generated by KYA Accounting Suite.
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-    overlay.focus();
-
-    overlay.querySelector('#btnCloseQuoteModal')?.addEventListener('click', () => overlay.remove());
-
-    // Wire Export Dropdown (PDF & Excel)
-    const expBtn = overlay.querySelector('#btnExportQuoteAction');
-    const expDropdown = overlay.querySelector('#quoteExportDropdown');
-    const expPdfBtn = overlay.querySelector('#btnQuoteExportPdf');
-    const expExcelBtn = overlay.querySelector('#btnQuoteExportExcel');
-
-    if (expBtn && expDropdown) {
-      expBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = expDropdown.style.display === 'block';
-        expDropdown.style.display = isOpen ? 'none' : 'block';
-      });
-    }
-
-    if (expPdfBtn) {
-      expPdfBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (expDropdown) expDropdown.style.display = 'none';
-        if (typeof window.exportQuotationToPDF === 'function') {
-          await window.exportQuotationToPDF(quote);
-        } else {
-          window.print();
-        }
-      });
-    }
-
-    if (expExcelBtn) {
-      expExcelBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (expDropdown) expDropdown.style.display = 'none';
-        if (typeof window.exportQuotationToExcel === 'function') {
-          await window.exportQuotationToExcel(quote);
-        } else if (typeof window.exportQuotationToCsvFallback === 'function') {
-          window.exportQuotationToCsvFallback(quote);
-        }
-      });
-    }
-
-    overlay.querySelector('#btnPreviewEditQuote')?.addEventListener('click', () => {
-      overlay.remove();
-      editQuotationItem(quote.id);
-    });
+    // Laid out like the Sales Tax Invoice, with its Print / PDF / Excel (sales-predoc-print.js)
     const qNoHtml = `<strong>${safeEsc(quote.quoteNo || 'this quotation')}</strong>`;
-    overlay.querySelector('#btnPreviewToInvoice')?.addEventListener('click', () => {
-      showKyaConfirm({
+    viewSalesPreDoc('quotation', quote, {
+      edit: close => {
+        close();
+        editQuotationItem(quote.id);
+      },
+      delete: close => {
+        close();
+        deleteQuotationItem(quote.id);
+      },
+      convert: close => showKyaConfirm({
         title: 'Convert to Sale?',
         message: `Convert quotation ${qNoHtml} to a Sales Invoice?<br>It will be marked Completed once the invoice is posted.`,
         confirmLabel: 'Convert to Sale',
         okBg: '#2563eb',
         iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14h8M13 11l3 3-3 3"/></svg>',
         onConfirm: () => {
-          overlay.remove();
+          close();
           convertQuotationToInvoice(quote.id);
         }
-      });
-    });
-    overlay.querySelector('#btnPreviewComplete')?.addEventListener('click', () => {
-      showKyaConfirm({
+      }),
+      complete: close => showKyaConfirm({
         title: 'Mark as Completed?',
         message: `Mark quotation ${qNoHtml} as Completed?<br>Completed quotations cannot be reopened.`,
         confirmLabel: 'Mark Completed',
         okBg: '#2563eb',
         iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
         onConfirm: () => {
-          overlay.remove();
+          close();
           setQuotationStatus(quote.id, 'Completed');
         }
-      });
-    });
-    overlay.querySelector('#btnPreviewCancel')?.addEventListener('click', () => {
-      showKyaConfirm({
+      }),
+      cancel: close => showKyaConfirm({
         title: 'Mark as Cancelled?',
         message: `Mark quotation ${qNoHtml} as Cancelled?<br>You can reopen it later if needed.`,
         confirmLabel: 'Mark Cancelled',
         okBg: '#dc2626',
         iconSvg: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
         onConfirm: () => {
-          overlay.remove();
+          close();
           setQuotationStatus(quote.id, 'Cancelled');
         }
-      });
-    });
-    overlay.querySelector('#btnPreviewReopen')?.addEventListener('click', () => {
-      overlay.remove();
-      setQuotationStatus(quote.id, 'Active');
-    });
-    overlay.querySelector('#btnPreviewDeleteQuote')?.addEventListener('click', () => {
-      overlay.remove();
-      deleteQuotationItem(quote.id);
-    });
-    overlay.addEventListener('click', e => {
-      if (expDropdown && !expDropdown.contains(e.target) && expBtn && !expBtn.contains(e.target)) {
-        expDropdown.style.display = 'none';
+      }),
+      reopen: close => {
+        close();
+        setQuotationStatus(quote.id, 'Active');
       }
-      if (e.target === overlay) overlay.remove();
-    });
-    overlay.addEventListener('keydown', e => {
-      if (e.key === 'Escape') overlay.remove();
     });
   }
 
