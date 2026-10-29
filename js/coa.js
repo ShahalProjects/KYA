@@ -1434,13 +1434,30 @@
       card.innerHTML = getPartyHoverPreviewHtml(party, partyType);
     }
 
+    placePartyHoverCard(card, targetElement, isEditable ? 385 : 325, isEditable ? 520 : 260);
+  }
+
+  // The same card beside `targetElement` with other content — e.g. what a Supply Type means
+  // as per law, in the voucher lists (sales-select-boxes.js). It hides like the preview card.
+  function positionAndShowKyaInfoHoverCard(targetElement, html) {
+    if (!targetElement) return;
+    cancelHidePartyHoverCard();
+    _kyaPartyCardIsEditable = false;
+    const card = getOrCreatePartyHoverCard();
+    card.innerHTML = html;
+    placePartyHoverCard(card, targetElement, 325, 260);
+  }
+  window.positionAndShowKyaInfoHoverCard = positionAndShowKyaInfoHoverCard;
+
+  // Shows the card beside the target, kept inside the screen
+  function placePartyHoverCard(card, targetElement, fallbackWidth, fallbackHeight) {
     card.style.display = 'block';
     card.style.visibility = 'hidden';
 
     // Measure card dimensions accurately
     const cardRect = card.getBoundingClientRect();
-    const cardWidth = cardRect.width || (isEditable ? 385 : 325);
-    const cardHeight = cardRect.height || (isEditable ? 520 : 260);
+    const cardWidth = cardRect.width || fallbackWidth;
+    const cardHeight = cardRect.height || fallbackHeight;
 
     const targetRect = targetElement.getBoundingClientRect();
     const vw = window.innerWidth;

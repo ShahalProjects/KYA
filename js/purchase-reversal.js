@@ -186,7 +186,9 @@
   function buildFromPreDoc(d, doc) {
     const party = typeof window.findPrePurchaseVendor === 'function' ? window.findPrePurchaseVendor(doc.vendorId) : null;
     const vendorName = (party && party.name) || doc.vendorName || '';
-    const supplyTypes = ['Intra-State (CGST + SGST)', 'Inter-State (IGST)', 'Import (Customs / Zero-Rated)', 'SEZ With Tax', 'SEZ Without Tax', 'Deemed Export'];
+    const supplyTypes = ['Intra-State (CGST + SGST)', 'Inter-State (IGST)', 'Import (Customs / Zero-Rated)', 'SEZ With Tax', 'SEZ Without Tax', 'Deemed Export (CGST + SGST)', 'Deemed Export (IGST)'];
+    // A document saved as 'Deemed Export' (before the two choices) is the CGST + SGST one
+    const docSupply = typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(doc.supplyType) : doc.supplyType;
     return {
       id: Date.now(),
       isReturn: true,
@@ -202,7 +204,7 @@
       vendorId: doc.vendorId,
       vendorName: doc.vendorName,
       partyOverride: doc.partyOverride ? JSON.parse(JSON.stringify(doc.partyOverride)) : null,
-      supplyType: supplyTypes.includes(doc.supplyType) ? doc.supplyType : 'Intra-State (CGST + SGST)',
+      supplyType: supplyTypes.includes(docSupply) ? docSupply : 'Intra-State (CGST + SGST)',
       executiveId: doc.executiveId || '',
       rows: Array.isArray(doc.rows) ? JSON.parse(JSON.stringify(doc.rows)) : [],
       tdsTcsMode: doc.tdsTcsMode || 'None',

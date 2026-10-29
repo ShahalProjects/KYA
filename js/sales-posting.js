@@ -128,7 +128,9 @@
     }
     populateSalesExecutives(inv.salesExecutiveId);
     const supplyTypeEl = document.getElementById('salesSupplyType');
-    if (supplyTypeEl) supplyTypeEl.value = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
+    // An invoice saved as 'Deemed Export' opens as Deemed Export (CGST + SGST)
+    const savedSupply = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
+    if (supplyTypeEl) supplyTypeEl.value = typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(savedSupply) : savedSupply;
     
     const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     const fullBtn = document.getElementById('salesPaymentStatusFull');
@@ -1416,7 +1418,7 @@
       });
       if (totalGst > 0) {
         const supplyType = invoice.salesSupplyType || 'Intra-State (CGST + SGST)';
-        if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
+        if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export (CGST + SGST)' || supplyType === 'Deemed Export') {
           const cgstAmt = totalGst / 2;
           const sgstAmt = totalGst / 2;
           const cgstLedgerId = getOrCreateSystemLedger('Output CGST', 'sg-ocl');
@@ -1425,7 +1427,7 @@
           const sgstLedgerId = getOrCreateSystemLedger('Output SGST', 'sg-ocl');
           const sgstName = (coaLedgers.find(l => l.id == sgstLedgerId) || { name: 'Output SGST' }).name;
           journalRows.push({ id: journalRows.length + 1, type: 'By', particular: sgstName, debit: sgstAmt.toFixed(2), credit: '' });
-        } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
+        } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax' || supplyType === 'Deemed Export (IGST)') {
           const igstLedgerId = getOrCreateSystemLedger('Output IGST', 'sg-ocl');
           const igstName = (coaLedgers.find(l => l.id == igstLedgerId) || { name: 'Output IGST' }).name;
           journalRows.push({ id: journalRows.length + 1, type: 'By', particular: igstName, debit: totalGst.toFixed(2), credit: '' });
@@ -1506,7 +1508,7 @@
       });
       if (totalGst > 0) {
         const supplyType = invoice.salesSupplyType || 'Intra-State (CGST + SGST)';
-        if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
+        if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export (CGST + SGST)' || supplyType === 'Deemed Export') {
           const cgstAmt = totalGst / 2;
           const sgstAmt = totalGst / 2;
           const cgstLedgerId = getOrCreateSystemLedger('Output CGST', 'sg-ocl');
@@ -1515,7 +1517,7 @@
           const sgstLedgerId = getOrCreateSystemLedger('Output SGST', 'sg-ocl');
           const sgstName = (coaLedgers.find(l => l.id == sgstLedgerId) || { name: 'Output SGST' }).name;
           invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: sgstName, debit: '', credit: sgstAmt.toFixed(2) });
-        } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
+        } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax' || supplyType === 'Deemed Export (IGST)') {
           const igstLedgerId = getOrCreateSystemLedger('Output IGST', 'sg-ocl');
           const igstName = (coaLedgers.find(l => l.id == igstLedgerId) || { name: 'Output IGST' }).name;
           invoiceJERows.push({ id: invoiceJERows.length + 1, type: 'To', particular: igstName, debit: '', credit: totalGst.toFixed(2) });

@@ -48,10 +48,11 @@
   }
 
   // GST split by supply type — the same rules the Sales Invoice and the GST reports use
+  // ('Deemed Export' alone: saved before the CGST + SGST / IGST choices, always CGST + SGST)
   function getPurchaseTaxMode(supplyType) {
     const t = supplyType || 'Intra-State (CGST + SGST)';
-    if (t === 'Intra-State (CGST + SGST)' || t === 'Deemed Export') return 'split';
-    if (t === 'Inter-State (IGST)' || t === 'SEZ With Tax') return 'igst';
+    if (t === 'Intra-State (CGST + SGST)' || t === 'Deemed Export (CGST + SGST)' || t === 'Deemed Export') return 'split';
+    if (t === 'Inter-State (IGST)' || t === 'SEZ With Tax' || t === 'Deemed Export (IGST)') return 'igst';
     return 'none';
   }
 

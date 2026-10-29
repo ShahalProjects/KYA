@@ -94,7 +94,7 @@
     for (const pct in taxSummary) {
       const taxable = taxSummary[pct].taxable;
       const taxAmt = taxSummary[pct].taxAmt;
-      if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export') {
+      if (supplyType === 'Intra-State (CGST + SGST)' || supplyType === 'Deemed Export (CGST + SGST)' || supplyType === 'Deemed Export') {
         const halfPct = parseFloat(pct) / 2;
         const halfAmt = taxAmt / 2;
         taxDetailsHtml += `
@@ -107,7 +107,7 @@
             <span>₹ ${fmtNum(halfAmt)}</span>
           </div>
         `;
-      } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax') {
+      } else if (supplyType === 'Inter-State (IGST)' || supplyType === 'SEZ With Tax' || supplyType === 'Deemed Export (IGST)') {
         taxDetailsHtml += `
           <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--slate-500); margin-top: 4px;">
             <span>IGST @ ${pct}% (on ₹ ${fmtNum(taxable)})</span>

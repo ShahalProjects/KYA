@@ -41,9 +41,10 @@
   };
 
   // The Supply Type box of the Quotation, Proforma and Sales Order. A Delivery Challan's box
-  // holds its purpose (Job Work, Supply on Approval …) instead.
+  // holds its purpose (Job Work, Supply on Approval …) instead. ('Deemed Export' alone: a
+  // document saved before the CGST + SGST / IGST choices.)
   const GST_SUPPLY_TYPES = ['Intra-State (CGST + SGST)', 'Inter-State (IGST)', 'Export (Zero-Rated / LUT)',
-    'SEZ With Tax', 'SEZ Without Tax', 'Deemed Export'];
+    'SEZ With Tax', 'SEZ Without Tax', 'Deemed Export (CGST + SGST)', 'Deemed Export (IGST)', 'Deemed Export'];
 
   // Status beside the number, in the shape of the Tax Invoice's Draft chip
   const STATUS_CHIP_STYLE = {

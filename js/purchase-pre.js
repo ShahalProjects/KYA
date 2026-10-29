@@ -69,7 +69,9 @@
   // ══════════════════════════════════════════════════════════════════
   //  THE FOUR DOCUMENTS
   // ══════════════════════════════════════════════════════════════════
-  const PURCHASE_SUPPLY_TYPES = ['Intra-State (CGST + SGST)', 'Inter-State (IGST)', 'Import (Customs / Zero-Rated)', 'SEZ With Tax', 'SEZ Without Tax', 'Deemed Export'];
+  const PURCHASE_SUPPLY_TYPES = ['Intra-State (CGST + SGST)', 'Inter-State (IGST)', 'Import (Customs / Zero-Rated)', 'SEZ With Tax', 'SEZ Without Tax', 'Deemed Export (CGST + SGST)', 'Deemed Export (IGST)'];
+  // A document saved as 'Deemed Export' (before the two choices) opens as the CGST + SGST one
+  const normSupply = t => (typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(t) : t);
   // A Goods Receipt Note records why the goods came in, as a Delivery Challan records why they go out
   const GRN_PURPOSES = ['Goods Received for Purchase', 'Received on Approval', 'Job Work / Processing Return', 'Stock / Location Transfer', 'Received for Exhibition / Demo', 'Others'];
 
@@ -548,7 +550,7 @@
               <div class="kya-searchable-select-wrap" id="${P}VendorSelectWrap" style="position: relative; width: 100%;">
                 <div class="kya-searchable-select-trigger" id="${P}VendorSelectTrigger" style="display: flex; justify-content: space-between; align-items: center; padding: 0 14px; border: 1.5px solid var(--slate-300); border-radius: 9px; background: var(--white, #fff); cursor: pointer; font-family: var(--font-main); font-size: 14px; font-weight: 500; color: var(--slate-900); height: 42px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color var(--duration), box-shadow var(--duration);">
                   <span id="${P}VendorSelectTriggerText">&mdash; Select Vendor &mdash;</span>
-                  <svg viewBox="0 0 16 16" fill="none" style="width: 10px; height: 10px; stroke: var(--slate-500); stroke-width: 2; margin-left: 6px;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span style="font-size: 10px; color: var(--slate-400); flex-shrink: 0; margin-left: 6px;">▼</span>
                 </div>
                 <button type="button" id="${P}VendorAlterBtn" class="kya-alter-pencil kya-alter-pencil-field" title="Alter this vendor in Master Desk" aria-label="Alter this vendor in Master Desk" hidden>${ICON_PENCIL(13)}</button>
                 <div class="kya-searchable-select-dropdown" id="${P}VendorSelectDropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 240px; overflow-y: auto; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;">
@@ -835,7 +837,10 @@
       const sel = el('Executive');
       if (!sel) return;
       sel.innerHTML = '<option value="">&mdash; Select Executive &mdash;</option>';
-      (typeof ohEmployees !== 'undefined' && Array.isArray(ohEmployees) ? ohEmployees : []).forEach(e => {
+      // Employees set as Purchaser / Executive (Master Desk → Employee), GRN included
+      const emps = typeof getKyaExecutiveEmployees === 'function' ? getKyaExecutiveEmployees('purchase', selectedId)
+        : (typeof ohEmployees !== 'undefined' && Array.isArray(ohEmployees) ? ohEmployees : []);
+      emps.forEach(e => {
         const opt = document.createElement('option');
         opt.value = e.id;
         opt.textContent = `${e.name} (${e.code || 'EMP'})`;
@@ -892,11 +897,7 @@
           </td>
           <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
             <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${zeroTax ? 'disabled' : ''}>
-              <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
-              <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
-              <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
-              <option value="18" ${row.tax === 18 || row.tax === undefined ? 'selected' : ''}>18%</option>
-              <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+              ${typeof kyaGstRateOptionsHtml === 'function' ? kyaGstRateOptionsHtml(row.tax) : `<option value="${row.tax === undefined ? 18 : row.tax}" selected>${row.tax === undefined ? 18 : row.tax}%</option>`}
             </select>
           </td>
           <td class="sales-cell-amt" style="width: 110px; padding: 4px 6px;">
@@ -1248,7 +1249,7 @@
       const supplyEl = el('SupplyType');
       if (supplyEl) {
         const fallback = d.isGrn ? GRN_PURPOSES[0] : 'Intra-State (CGST + SGST)';
-        const wanted = (doc && doc.supplyType) || fallback;
+        const wanted = normSupply(doc && doc.supplyType) || fallback;
         supplyEl.value = Array.from(supplyEl.options).some(o => o.value === wanted) ? wanted : fallback;
       }
       populateExecutives(doc && doc.executiveId);
@@ -1605,8 +1606,8 @@
     const advance = isDraft ? 0 : r2(stored.advancePaidAmount);
     const party = findVendor(stored.vendorId);
     const today = todayIso();
-    const supplyType = PURCHASE_SUPPLY_TYPES.includes(stored.supplyType)
-      ? stored.supplyType
+    const supplyType = PURCHASE_SUPPLY_TYPES.includes(normSupply(stored.supplyType))
+      ? normSupply(stored.supplyType)
       : (supplyTypeForVendor(party) || 'Intra-State (CGST + SGST)');
     const keepExec = (opts && opts.keepExecutive) || '';
     const v = {

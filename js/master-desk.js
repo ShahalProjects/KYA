@@ -991,6 +991,20 @@
     }
   }
 
+  // ── GST / Tax Rate box of Stock Items and Service ledgers: today's rates as per law
+  // (gst-rates.js). An item already at a rate no longer in force (e.g. 12% from before GST
+  // 2.0) keeps it, marked with the date it ended. ──
+  function masterGstRateOptionsHtml(selected) {
+    const label = (r) => {
+      const info = typeof kyaGstRateInfo === 'function' ? kyaGstRateInfo(r) : null;
+      const ended = !!(info && info.until && typeof kyaIsGstRateInForce === 'function' && !kyaIsGstRateInForce(r));
+      return (r === 0 ? '0% (Nil / Exempt)' : `${r}% GST`) + (ended ? ` (until ${info.until.split('-').reverse().join('-')})` : '');
+    };
+    if (typeof kyaGstRateOptionsHtml === 'function') return kyaGstRateOptionsHtml(selected, { today: true, label });
+    const sel = (selected === undefined || selected === null || selected === '') ? 18 : Number(selected);
+    return [0, 5, 12, 18, 28].map(r => `<option value="${r}"${r === sel ? ' selected' : ''}>${label(r)}</option>`).join('');
+  }
+
   function ensureCleanCoaTradeParties() {
     if (typeof coaLedgers === 'undefined' || !Array.isArray(coaLedgers)) return;
     const customers = typeof getKyaCustomers === 'function' ? getKyaCustomers() : [];
@@ -6338,11 +6352,7 @@
               <div>
                 <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">GST / Tax Rate (%)</label>
                 <select id="masterLedgerSacGstSel" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                  <option value="0">0% (Nil / Exempt)</option>
-                  <option value="5">5% GST</option>
-                  <option value="12">12% GST</option>
-                  <option value="18" selected>18% GST</option>
-                  <option value="28">28% GST</option>
+                  ${masterGstRateOptionsHtml(18)}
                 </select>
               </div>
             </div>
@@ -7027,6 +7037,12 @@
         if (ctx.purpose === 'voucherItem') {
           goTo(ctx.returnTab || 'sales_voucher');
           if (typeof window.onVoucherItemCreated === 'function') window.onVoucherItemCreated(entity, 'Service');
+          return true;
+        }
+        // A Cash / Bank account created from a voucher's Payment Account list (sales-select-boxes.js)
+        if (ctx.purpose === 'paymentAccount') {
+          goTo(ctx.returnTab || 'sales_voucher');
+          if (typeof window.onPaymentAccountCreated === 'function') window.onPaymentAccountCreated(entity);
           return true;
         }
         if (ctx.returnTab === 'sales_voucher') {
@@ -9297,11 +9313,7 @@
                 <div>
                   <label style="${siSmallLabelStyle}">GST / Tax Rate (%)</label>
                   <select id="masterStockItemGstSel" style="${siSmallInpStyle}">
-                    <option value="0">0% (Nil / Exempt)</option>
-                    <option value="5">5% GST</option>
-                    <option value="12">12% GST</option>
-                    <option value="18" selected>18% GST</option>
-                    <option value="28">28% GST</option>
+                    ${masterGstRateOptionsHtml(18)}
                   </select>
                 </div>
               </div>
@@ -12030,11 +12042,7 @@
                 <div>
                   <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">GST / Tax Rate (%)</label>
                   <select id="masterAlterLedgerSacGstSel" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                    <option value="0" ${(currentLedger.sacInfo?.gstRate === 0) ? 'selected' : ''}>0% (Nil / Exempt)</option>
-                    <option value="5" ${(currentLedger.sacInfo?.gstRate === 5) ? 'selected' : ''}>5% GST</option>
-                    <option value="12" ${(currentLedger.sacInfo?.gstRate === 12) ? 'selected' : ''}>12% GST</option>
-                    <option value="18" ${(!currentLedger.sacInfo || currentLedger.sacInfo.gstRate === 18) ? 'selected' : ''}>18% GST</option>
-                    <option value="28" ${(currentLedger.sacInfo?.gstRate === 28) ? 'selected' : ''}>28% GST</option>
+                    ${masterGstRateOptionsHtml(currentLedger.sacInfo ? currentLedger.sacInfo.gstRate : 18)}
                   </select>
                 </div>
               </div>
@@ -13946,11 +13954,7 @@
                 <div>
                   <label style="font-size: 11.5px; font-weight: 600; color: var(--slate-600); margin-bottom: 4px; display: block;">GST / Tax Rate (%)</label>
                   <select id="masterAlterStockItemGstSel" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: 1.5px solid var(--slate-200); box-sizing: border-box; outline: none; background: #fff;">
-                    <option value="0" ${currentItem.gst === 0 ? 'selected' : ''}>0% (Nil / Exempt)</option>
-                    <option value="5" ${currentItem.gst === 5 ? 'selected' : ''}>5% GST</option>
-                    <option value="12" ${currentItem.gst === 12 ? 'selected' : ''}>12% GST</option>
-                    <option value="18" ${currentItem.gst === 18 ? 'selected' : ''}>18% GST</option>
-                    <option value="28" ${currentItem.gst === 28 ? 'selected' : ''}>28% GST</option>
+                    ${masterGstRateOptionsHtml(currentItem.gst !== undefined && currentItem.gst !== null ? currentItem.gst : 0)}
                   </select>
                 </div>
               </div>
@@ -14869,8 +14873,69 @@
   function getMasterTeamEmps() {
     return (typeof ohEmployees !== 'undefined' && Array.isArray(ohEmployees)) ? ohEmployees : [];
   }
-  // KeepOne's auto code: EMP-001, EMP-002... (the number is the employee's id)
-  function masterTeamEmpCode(n) { return 'EMP-' + String(n).padStart(3, '0'); }
+  // ── Employee Code, numbered like the Sales Invoice No.: the next free code from the number
+  // format (✎ in the box opens the Number Format popup shared with the invoice: prefix,
+  // starting number, digits; KeepOne's EMP-001 by default), typed over when wanted. Like
+  // invoice numbers, a saved code stays used even after its employee is deleted.
+  const MASTER_EMP_CODE_KIND = 'employee';
+
+  function masterTeamEmpCodeSettings() {
+    if (typeof getSalesNumberingSettings === 'function') return getSalesNumberingSettings(MASTER_EMP_CODE_KIND);
+    return { prefix: 'EMP-', start: 1, digits: 3 };
+  }
+
+  function masterTeamFormatEmpCode(s, n) {
+    return s.prefix + String(n).padStart(s.digits, '0');
+  }
+
+  // Every code in use: the register of codes ever saved plus the employees on file
+  function getMasterTeamUsedEmpCodes() {
+    const reg = ((window.KYA_STORE || {}).salesUsedInvoiceNos || {})[MASTER_EMP_CODE_KIND] || [];
+    const used = new Set(reg.map(c => String(c).trim().toLowerCase()));
+    getMasterTeamEmps().forEach(e => {
+      const c = String(e.code || '').trim().toLowerCase();
+      if (c) used.add(c);
+    });
+    return used;
+  }
+
+  // True when the code is taken. The employee being altered may keep their own code.
+  function isMasterTeamEmpCodeUsed(code, ownId) {
+    const c = String(code || '').trim().toLowerCase();
+    if (!c) return false;
+    const own = (ownId !== null && ownId !== undefined) ? getMasterTeamEmps().find(e => String(e.id) === String(ownId)) : null;
+    if (own && String(own.code || '').trim().toLowerCase() === c) return false;
+    return getMasterTeamUsedEmpCodes().has(c);
+  }
+
+  // The next free code; `alsoUsed` holds the codes other rows of the form already have
+  function getNextMasterTeamEmpCode(alsoUsed) {
+    const s = masterTeamEmpCodeSettings();
+    const used = getMasterTeamUsedEmpCodes();
+    (alsoUsed || []).forEach(c => {
+      const v = String(c || '').trim().toLowerCase();
+      if (v) used.add(v);
+    });
+    let n = s.start;
+    while (used.has(masterTeamFormatEmpCode(s, n).toLowerCase())) n++;
+    return masterTeamFormatEmpCode(s, n);
+  }
+
+  // Called once an employee is saved or deleted: their code is used for good
+  function registerMasterTeamEmpCode(code) {
+    if (code && typeof registerUsedSalesInvoiceNo === 'function') registerUsedSalesInvoiceNo(MASTER_EMP_CODE_KIND, code);
+  }
+
+  // Employees for the voucher Executive boxes. 'sales': Sales Executive = Yes (Sales Voucher,
+  // Quotation, Proforma, Sales Order, Delivery Challan); 'purchase': Purchaser / Executive = Yes
+  // (Purchase Voucher, Pre Purchase incl. GRN). Employees saved before the Yes / No existed count
+  // as Yes, and the one a document already names (selectedId) always stays in the list.
+  function getKyaExecutiveEmployees(role, selectedId) {
+    const flag = role === 'purchase' ? 'isPurchaser' : 'isSalesExecutive';
+    const hasSel = selectedId !== null && selectedId !== undefined && selectedId !== '';
+    return getMasterTeamEmps().filter(e => e[flag] !== false || (hasSel && String(e.id) === String(selectedId)));
+  }
+  window.getKyaExecutiveEmployees = getKyaExecutiveEmployees;
 
   // After a save or delete: back up
   function afterMasterTeamChange() {
@@ -14907,6 +14972,11 @@
     return getMasterTeamDepts().map(d =>
       `<option value="${d.id}" ${String(d.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
   }
+  // An employee's Department choices: "General" (no department — not every company has
+  // departments), then every department
+  function masterTeamEmpDeptOptionsHtml(selectedId) {
+    return '<option value="">General</option>' + masterTeamDeptOptionsHtml(selectedId);
+  }
 
   // Count of records in the form (1, 2, 3...) in the Back bar's right corner
   function renderMasterTeamCount(count, title) {
@@ -14936,52 +15006,116 @@
     btn.addEventListener('click', onClick);
   }
 
-  // Employee Code: an Auto | Manual slider (the same slider as Stock Group's Yes / No) over
-  // the code box. The hidden PREFIXCodeMode input holds the mode.
-  function buildMasterTeamCodeHtml(prefix, mode, code) {
-    const isAuto = mode !== 'Manual';
+  // Employee Code box, like the Sales Invoice No.: the code (typed over when wanted) with ✎
+  // inside for the number format, and the "already used" line under it
+  function buildMasterTeamCodeHtml(prefix, code) {
+    const s = masterTeamEmpCodeSettings();
     return `
       <label class="coa-modal-label" for="${prefix}Code" style="${MASTER_TEAM_LABEL_STYLE}">Employee Code *</label>
-      <input type="hidden" id="${prefix}CodeMode" value="${isAuto ? 'Auto' : 'Manual'}">
-      <div class="je-tx-slider-wrap" role="radiogroup" aria-label="Employee Code">
-        <div class="je-tx-slider-bg ${isAuto ? 'non-budget-active' : 'budget-active'}" id="${prefix}CodeModeBg"></div>
-        <button type="button" class="je-tx-slider-btn ${isAuto ? 'active' : ''}" id="${prefix}CodeAutoBtn" role="radio" aria-checked="${isAuto}">Auto</button>
-        <button type="button" class="je-tx-slider-btn ${isAuto ? '' : 'active'}" id="${prefix}CodeManualBtn" role="radio" aria-checked="${!isAuto}">Manual</button>
-      </div>
-      <input class="coa-modal-inp" id="${prefix}Code" value="${escapeHtml(code || '')}" placeholder="Employee code" style="${MASTER_TEAM_INPUT_STYLE} margin-top: 10px;">`;
+      <div class="kya-docno-wrap" style="position: relative; width: 100%;">
+        <input class="coa-modal-inp" id="${prefix}Code" value="${escapeHtml(code || '')}" placeholder="${escapeHtml(masterTeamFormatEmpCode(s, s.start))}" aria-describedby="${prefix}CodeError" style="${MASTER_TEAM_INPUT_STYLE} padding-right: 40px;">
+        <button type="button" id="${prefix}CodeFormatBtn" class="sales-invno-edit-btn" style="top: 50%; transform: translateY(-50%);" title="Set employee code prefix" aria-label="Set employee code prefix">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        </button>
+        <div id="${prefix}CodeError" role="alert" class="sales-invno-error" style="display: none;"></div>
+      </div>`;
   }
 
-  // Keeps the slider and the code box in step with the mode: Auto shows autoCode() read-only
-  // (as KeepOne does), Manual lets you type your own. Returns { apply } to re-sync from code.
-  function wireMasterTeamCode(contentArea, prefix, autoCode) {
-    const modeInp = contentArea.querySelector('#' + prefix + 'CodeMode');
-    const bg = contentArea.querySelector('#' + prefix + 'CodeModeBg');
-    const autoBtn = contentArea.querySelector('#' + prefix + 'CodeAutoBtn');
-    const manualBtn = contentArea.querySelector('#' + prefix + 'CodeManualBtn');
-    const codeInp = contentArea.querySelector('#' + prefix + 'Code');
+  // Shows or clears the "already used" line under the Employee Code box. opts.ownId: the
+  // employee being altered (keeps their own code); opts.isTaken(code): the form's own check
+  // (another row of the form holding the same code).
+  function validateMasterTeamCodeField(contentArea, prefix, opts) {
+    const inp = contentArea.querySelector('#' + prefix + 'Code');
+    if (!inp) return true;
+    const code = inp.value.trim();
+    const used = isMasterTeamEmpCodeUsed(code, opts.ownId) ||
+      (!!code && typeof opts.isTaken === 'function' && opts.isTaken(code));
+    inp.style.borderColor = used ? '#ef4444' : 'var(--slate-200)';
+    // Short line under the box; the full explanation shows when hovering the box
+    const wrap = inp.parentElement;
+    if (wrap) {
+      wrap.classList.toggle('has-invno-error', used);
+      if (used) wrap.setAttribute('data-error-full', `"${code}" is already used. Employee codes can't be reused, even after deletion.`);
+      else wrap.removeAttribute('data-error-full');
+    }
+    const err = contentArea.querySelector('#' + prefix + 'CodeError');
+    if (err) {
+      err.textContent = used ? `"${code}" is already used` : '';
+      err.style.display = used ? 'block' : 'none';
+    }
+    return !used;
+  }
+
+  // Wires the Employee Code box: the "already used" check while typing, and ✎ → the Number
+  // Format popup (the invoice's). opts.onFormatSaved re-numbers the form after a new format.
+  // Returns { validate }.
+  function wireMasterTeamCode(contentArea, prefix, opts) {
+    const inp = contentArea.querySelector('#' + prefix + 'Code');
+    const btn = contentArea.querySelector('#' + prefix + 'CodeFormatBtn');
+    const validate = () => validateMasterTeamCodeField(contentArea, prefix, opts);
+    if (inp) inp.addEventListener('input', validate);
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (typeof openKyaNumberingModal !== 'function') return;
+        openKyaNumberingModal({
+          kind: MASTER_EMP_CODE_KIND,
+          noun: 'Employee Code',
+          subtitle: 'New employee codes are numbered from this prefix. Codes already used are skipped automatically.',
+          previewLabel: 'Next employee code',
+          getUsed: getMasterTeamUsedEmpCodes,
+          onSaved: () => {
+            if (inp) {
+              const s = masterTeamEmpCodeSettings();
+              inp.placeholder = masterTeamFormatEmpCode(s, s.start);
+            }
+            if (typeof opts.onFormatSaved === 'function') opts.onFormatSaved();
+            validate();
+          }
+        });
+      });
+    }
+    validate();
+    return { validate };
+  }
+
+  // Yes / No slider (the same slider as Stock Group's "Should quantities of items be added?")
+  // over a hidden input holding 'Yes' | 'No'
+  function buildMasterTeamYesNoHtml(id, label, value) {
+    const isYes = value === 'Yes';
+    return `
+      <label class="coa-modal-label" style="${MASTER_TEAM_LABEL_STYLE} margin-top: 16px;">${label}</label>
+      <input type="hidden" id="${id}" value="${isYes ? 'Yes' : 'No'}">
+      <div class="je-tx-slider-wrap" role="radiogroup" aria-label="${label}">
+        <div class="je-tx-slider-bg ${isYes ? 'non-budget-active' : 'budget-active'}" id="${id}Bg"></div>
+        <button type="button" class="je-tx-slider-btn ${isYes ? 'active' : ''}" id="${id}YesBtn" role="radio" aria-checked="${isYes}">Yes</button>
+        <button type="button" class="je-tx-slider-btn ${isYes ? '' : 'active'}" id="${id}NoBtn" role="radio" aria-checked="${!isYes}">No</button>
+      </div>`;
+  }
+
+  // Keeps the slider in step with its hidden input. Returns { apply } to re-sync after the
+  // value is set from code (a row switch).
+  function wireMasterTeamYesNo(contentArea, id) {
+    const inp = contentArea.querySelector('#' + id);
+    const bg = contentArea.querySelector('#' + id + 'Bg');
+    const yesBtn = contentArea.querySelector('#' + id + 'YesBtn');
+    const noBtn = contentArea.querySelector('#' + id + 'NoBtn');
     const apply = () => {
-      const isAuto = !modeInp || modeInp.value !== 'Manual';
-      if (bg) bg.className = 'je-tx-slider-bg ' + (isAuto ? 'non-budget-active' : 'budget-active');
-      if (autoBtn) { autoBtn.classList.toggle('active', isAuto); autoBtn.setAttribute('aria-checked', String(isAuto)); }
-      if (manualBtn) { manualBtn.classList.toggle('active', !isAuto); manualBtn.setAttribute('aria-checked', String(!isAuto)); }
-      if (codeInp) {
-        if (isAuto) codeInp.value = autoCode();
-        codeInp.readOnly = isAuto;
-        codeInp.style.background = isAuto ? 'var(--slate-50)' : '#ffffff';
-        codeInp.style.color = isAuto ? 'var(--slate-400)' : 'var(--slate-800)';
-      }
+      const isYes = !!inp && inp.value === 'Yes';
+      if (bg) bg.className = 'je-tx-slider-bg ' + (isYes ? 'non-budget-active' : 'budget-active');
+      if (yesBtn) { yesBtn.classList.toggle('active', isYes); yesBtn.setAttribute('aria-checked', String(isYes)); }
+      if (noBtn) { noBtn.classList.toggle('active', !isYes); noBtn.setAttribute('aria-checked', String(!isYes)); }
     };
-    [[autoBtn, 'Auto'], [manualBtn, 'Manual']].forEach(([btn, val]) => {
+    [[yesBtn, 'Yes'], [noBtn, 'No']].forEach(([btn, val]) => {
       if (!btn) return;
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (modeInp) modeInp.value = val;
+        if (inp) inp.value = val;
         apply();
-        if (val === 'Manual' && codeInp) { codeInp.focus(); codeInp.select(); }
       });
     });
-    // Multi Alter puts a parked mode back by value: follow it
-    if (modeInp) modeInp.addEventListener('change', apply);
+    // Multi Alter puts a parked value back by value: follow it
+    if (inp) inp.addEventListener('change', apply);
     apply();
     return { apply };
   }
@@ -15296,22 +15430,35 @@
     }
   }
 
-  // ── Create Employee: "Name + Department" rows, with Employee Code and Designation in the
-  // side box and the rest in the Additional Details popup — like Create Stock Item ──
+  // ── Create Employee: "Name + Department" rows, with Employee Code, Designation and the
+  // Sales Executive / Purchaser Yes / No in the side box and the rest in the Additional
+  // Details popup — like Create Stock Item ──
   function renderMasterEmployeeCreate(contentArea) {
     let extraRowKeys = [];
     let rowSeq = 0;
     let activeIdx = 0;
     // The side box and popup always show the active row; other rows' values are parked here
     const rowState = {};
+    // Opened from a sales form's Sales Executive box: every row starts as a Sales Executive
+    const forSalesExecutive = !!(_masterDeskReturnContext && _masterDeskReturnContext.purpose === 'salesExecutive');
     const FIELD_DEFAULTS = {
-      masterEmployeeCodeMode: 'Auto', masterEmployeeCode: '', masterEmployeeDesignation: '',
+      masterEmployeeCode: '', masterEmployeeDesignation: '',
+      masterEmployeeSalesExec: forSalesExecutive ? 'Yes' : 'No', masterEmployeePurchaser: 'No',
       masterEmployeeJoining: '', masterEmployeeSalary: '', masterEmployeePhone: '',
       masterEmployeeEmail: '', masterEmployeePan: '', masterEmployeeAddress: ''
     };
-    const newRowState = () => Object.assign({}, FIELD_DEFAULTS);
-    const deptOpts = masterTeamDeptOptionsHtml('');
-    const hasDepts = getMasterTeamDepts().length > 0;
+    // A row's code: the box on screen for the active row, the parked value for the others
+    const codeInput = () => contentArea.querySelector('#masterEmployeeCode');
+    const rowCode = (idx) => {
+      const inp = idx === activeIdx ? codeInput() : null;
+      if (inp) return inp.value;
+      return rowState[idx] ? rowState[idx].masterEmployeeCode : '';
+    };
+    const otherRowCodes = (idx) => [0, ...extraRowKeys].filter(k => k !== idx).map(rowCode);
+    // A new row takes the next free code — one no other row of the form has
+    const newRowState = (idx) => Object.assign({}, FIELD_DEFAULTS, { masterEmployeeCode: getNextMasterTeamEmpCode(otherRowCodes(idx)) });
+    const deptOpts = masterTeamEmpDeptOptionsHtml('');
+    rowState[0] = newRowState(0);
 
     const buildRowHtml = (idx) => {
       const sfx = idx ? String(idx) : '';
@@ -15325,8 +15472,8 @@
             <input class="coa-modal-inp" id="masterEmployeeName${sfx}" placeholder="Enter Name" style="${MASTER_TEAM_INPUT_STYLE}">
           </div>
           <div>
-            <label class="coa-modal-label" for="masterEmployeeDeptSel${sfx}" style="${MASTER_TEAM_LABEL_STYLE}">Department *</label>
-            ${buildMasterTeamSelectHtml('masterEmployeeDeptSel' + sfx, deptOpts, 'Select Department', 'Search department...')}
+            <label class="coa-modal-label" for="masterEmployeeDeptSel${sfx}" style="${MASTER_TEAM_LABEL_STYLE}">Department</label>
+            ${buildMasterTeamSelectHtml('masterEmployeeDeptSel' + sfx, deptOpts, 'General', 'Search department...')}
           </div>
           <div>
             <label style="font-size: 13px; margin-bottom: 6px; display: block; visibility: hidden; user-select: none;">&nbsp;</label>
@@ -15350,20 +15497,21 @@
             <button type="button" id="masterEmployeeAddRowBtn" title="Add another employee" style="${MASTER_TEAM_ADD_BTN_STYLE}">＋ Add Another Employee</button>
           </div>
 
-          ${hasDepts ? '' : '<div style="font-size: 12px; font-weight: 600; color: #d97706; margin: -6px 0 16px 0;">⚠ No departments yet. Create one first.</div>'}
-
           <div style="display: flex; gap: 12px; align-items: center;">
             <button class="btn btn-primary" id="masterEmployeeSaveBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Create Employee</button>
             <button class="btn btn-secondary" id="masterEmployeeCancelBtn" style="height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
           </div>
         </div>
 
-        <!-- Second box: Employee Code, Designation, then Additional Details -->
+        <!-- Second box: Employee Code, Designation, Sales Executive, Purchaser / Executive, then Additional Details -->
         <div class="coa-modal-card" id="masterEmployeeSidePanel" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
-          ${buildMasterTeamCodeHtml('masterEmployee', 'Auto', '')}
+          ${buildMasterTeamCodeHtml('masterEmployee', rowState[0].masterEmployeeCode)}
 
           <label class="coa-modal-label" for="masterEmployeeDesignation" style="${MASTER_TEAM_LABEL_STYLE} margin-top: 16px;">Designation</label>
           <input class="coa-modal-inp" id="masterEmployeeDesignation" placeholder="e.g. Manager, Engineer…" style="${MASTER_TEAM_INPUT_STYLE}">
+
+          ${buildMasterTeamYesNoHtml('masterEmployeeSalesExec', 'Sales Executive', FIELD_DEFAULTS.masterEmployeeSalesExec)}
+          ${buildMasterTeamYesNoHtml('masterEmployeePurchaser', 'Purchaser / Executive', FIELD_DEFAULTS.masterEmployeePurchaser)}
 
           ${buildMasterTeamAddlBtnHtml('masterEmployee')}
         </div>
@@ -15377,13 +15525,28 @@
     const nameInput = (idx) => contentArea.querySelector('#masterEmployeeName' + (idx ? idx : ''));
     const deptSel = (idx) => contentArea.querySelector('#masterEmployeeDeptSel' + (idx ? idx : ''));
     const deptControls = {};
-    const firstDeptSel = deptSel(0);
-    if (firstDeptSel) firstDeptSel.selectedIndex = -1; // "Select Department" until one is picked
-    deptControls[0] = initSearchableSelectHelper(contentArea, 'masterEmployeeDeptSel', 'Select Department');
+    // Department starts on General (no department) until one is picked
+    deptControls[0] = initSearchableSelectHelper(contentArea, 'masterEmployeeDeptSel', 'General');
 
-    // Auto code for the row on screen: the next codes in row order (EMP-00n, EMP-00n+1...)
-    const rowPos = (idx) => Math.max(0, [0, ...extraRowKeys].indexOf(idx));
-    const codeCtl = wireMasterTeamCode(contentArea, 'masterEmployee', () => masterTeamEmpCode(_ohEmpCtr + rowPos(activeIdx || 0)));
+    // Employee Code, like the Sales Invoice No.: flagged when another row of the form has it
+    // too, and a new number format re-numbers every row in order (as a new invoice is)
+    const codeCtl = wireMasterTeamCode(contentArea, 'masterEmployee', {
+      ownId: null,
+      isTaken: (code) => otherRowCodes(activeIdx).some(c => String(c || '').trim().toLowerCase() === code.toLowerCase()),
+      onFormatSaved: () => {
+        captureActiveRow();
+        const taken = [];
+        [0, ...extraRowKeys].forEach(k => {
+          const st = rowState[k] || (rowState[k] = Object.assign({}, FIELD_DEFAULTS));
+          st.masterEmployeeCode = getNextMasterTeamEmpCode(taken);
+          taken.push(st.masterEmployeeCode);
+        });
+        const inp = codeInput();
+        if (inp && rowState[activeIdx]) inp.value = rowState[activeIdx].masterEmployeeCode;
+      }
+    });
+    const salesExecCtl = wireMasterTeamYesNo(contentArea, 'masterEmployeeSalesExec');
+    const purchaserCtl = wireMasterTeamYesNo(contentArea, 'masterEmployeePurchaser');
 
     wireAlterAddlPopup(contentArea, 'masterEmployee', {
       subtitle: () => {
@@ -15394,7 +15557,7 @@
 
     const captureActiveRow = () => {
       if (activeIdx === null) return;
-      const st = rowState[activeIdx] || newRowState();
+      const st = rowState[activeIdx] || Object.assign({}, FIELD_DEFAULTS);
       Object.keys(FIELD_DEFAULTS).forEach(id => {
         const el = contentArea.querySelector('#' + id);
         if (el) st[id] = el.value;
@@ -15402,13 +15565,15 @@
       rowState[activeIdx] = st;
     };
     const loadRow = (idx) => {
-      const st = rowState[idx] || newRowState();
+      const st = rowState[idx] || newRowState(idx);
       rowState[idx] = st;
       Object.keys(FIELD_DEFAULTS).forEach(id => {
         const el = contentArea.querySelector('#' + id);
         if (el) el.value = st[id] !== undefined ? st[id] : FIELD_DEFAULTS[id];
       });
-      codeCtl.apply();
+      salesExecCtl.apply();
+      purchaserCtl.apply();
+      codeCtl.validate();
     };
     const setActiveRow = (idx) => {
       if (idx === activeIdx) return;
@@ -15455,7 +15620,7 @@
           const prevInp = nameInput(prevIdx);
           if (prevInp) prevInp.focus();
         } else {
-          codeCtl.apply(); // rows below moved up, so the auto code on screen may change
+          codeCtl.validate(); // the removed row may have had the code on screen too
         }
         refreshAddRowBtn();
       });
@@ -15469,12 +15634,9 @@
       const prevDeptSel = deptSel(prevIdx);
       extraContainer.insertAdjacentHTML('beforeend', buildRowHtml(idx));
       const newDeptSel = deptSel(idx);
-      if (newDeptSel) {
-        if (prevDeptSel && prevDeptSel.value) newDeptSel.value = prevDeptSel.value;
-        else newDeptSel.selectedIndex = -1;
-      }
-      deptControls[idx] = initSearchableSelectHelper(contentArea, 'masterEmployeeDeptSel' + idx, 'Select Department');
-      rowState[idx] = newRowState();
+      if (newDeptSel) newDeptSel.value = prevDeptSel ? prevDeptSel.value : '';
+      deptControls[idx] = initSearchableSelectHelper(contentArea, 'masterEmployeeDeptSel' + idx, 'General');
+      rowState[idx] = newRowState(idx);
       wireRowInputs(idx);
       wireRowRemoveBtn(idx);
       extraRowKeys.push(idx);
@@ -15500,11 +15662,8 @@
           const nextName = nameInput(nextIdx);
           const nextDept = deptSel(nextIdx);
           if (nameInp0) nameInp0.value = nextName ? nextName.value : '';
-          if (deptSel0) {
-            if (nextDept && nextDept.value) deptSel0.value = nextDept.value;
-            else deptSel0.selectedIndex = -1;
-          }
-          rowState[0] = rowState[nextIdx] || newRowState();
+          if (deptSel0) deptSel0.value = nextDept ? nextDept.value : '';
+          rowState[0] = rowState[nextIdx] || newRowState(0);
           delete rowState[nextIdx];
           delete deptControls[nextIdx];
           const nextRowEl = extraContainer.querySelector('.master-employee-row[data-row-index="' + nextIdx + '"]');
@@ -15512,8 +15671,8 @@
           extraRowKeys = extraRowKeys.slice(1);
         } else {
           if (nameInp0) nameInp0.value = '';
-          if (deptSel0) deptSel0.selectedIndex = -1;
-          rowState[0] = newRowState();
+          if (deptSel0) deptSel0.value = '';
+          rowState[0] = newRowState(0);
         }
         if (deptControls[0] && typeof deptControls[0].refresh === 'function') deptControls[0].refresh();
         activeIdx = null;
@@ -15523,7 +15682,6 @@
       });
     }
 
-    rowState[0] = newRowState();
     wireRowInputs(0);
     refreshAddRowBtn();
 
@@ -15531,14 +15689,13 @@
     if (saveBtn) {
       saveBtn.addEventListener('click', () => {
         captureActiveRow();
-        const existingCodes = new Set(getMasterTeamEmps().map(e => String(e.code || '').trim().toLowerCase()));
         const formCodes = new Set();
         const rows = [];
         let nextId = _ohEmpCtr;
         for (const idx of [0, ...extraRowKeys]) {
           const inp = nameInput(idx);
           const name = inp ? inp.value.trim() : '';
-          const st = rowState[idx] || newRowState();
+          const st = rowState[idx] || newRowState(idx);
           if (!name) {
             // A row left empty below the first is just unfilled — it's skipped, not an error
             if (idx !== 0) continue;
@@ -15546,24 +15703,24 @@
             if (inp) inp.focus();
             return;
           }
+          // No department picked = General
           const ds = deptSel(idx);
           const deptId = ds && ds.value ? Number(ds.value) : null;
-          if (!deptId) {
-            masterTeamNotify(`Please select a Department for "${name}".`, 'warning');
-            return;
-          }
-          // KeepOne's auto code uses the employee's own id: EMP-00<id>
           const id = nextId++;
-          const code = st.masterEmployeeCodeMode === 'Manual' ? String(st.masterEmployeeCode || '').trim() : masterTeamEmpCode(id);
+          const code = String(st.masterEmployeeCode || '').trim();
           if (!code) {
             masterTeamNotify(`Please enter an Employee Code for "${name}".`, 'warning');
             setActiveRow(idx);
             return;
           }
+          // Codes used by any employee — including deleted ones — can't be given again
           const codeLower = code.toLowerCase();
-          if (existingCodes.has(codeLower) || formCodes.has(codeLower)) {
-            masterTeamNotify(`Employee code "${code}" is already in use.`, 'error');
+          if (isMasterTeamEmpCodeUsed(code, null) || formCodes.has(codeLower)) {
+            masterTeamNotify(`Employee Code "${code}" is already used (even deleted codes can't be reused). Please use another code.`, 'danger');
             setActiveRow(idx);
+            codeCtl.validate();
+            const codeInp = codeInput();
+            if (codeInp) codeInp.focus();
             return;
           }
           formCodes.add(codeLower);
@@ -15572,6 +15729,8 @@
             id: id, code: code, name: name,
             designation: String(st.masterEmployeeDesignation || '').trim(),
             deptId: deptId,
+            isSalesExecutive: st.masterEmployeeSalesExec === 'Yes',
+            isPurchaser: st.masterEmployeePurchaser === 'Yes',
             joiningDate: st.masterEmployeeJoining || '',
             salary: salary !== '' ? Number(salary) : null,
             pan: String(st.masterEmployeePan || '').trim().toUpperCase(),
@@ -15582,18 +15741,38 @@
         }
 
         const emps = getMasterTeamEmps();
-        rows.forEach(row => emps.push(row));
+        rows.forEach(row => {
+          emps.push(row);
+          registerMasterTeamEmpCode(row.code);
+        });
         _ohEmpCtr = nextId;
         afterMasterTeamChange();
 
         if (rows.length > 1) masterTeamNotify(`${rows.length} employees added successfully.`, 'success');
         else masterTeamNotify(`Employee "${rows[0].name}" added successfully.`, 'success');
+
+        // Opened from a sales form's Sales Executive box: back to that form as it was, with the
+        // (first) new Sales Executive picked
+        const ctx = _masterDeskReturnContext;
+        if (ctx && ctx.purpose === 'salesExecutive') {
+          _masterDeskReturnContext = null;
+          const target = ctx.returnTab || 'sales_voucher';
+          if (typeof closeTab === 'function') closeTab('master_desk', null, target);
+          if (typeof openTab === 'function') openTab(target);
+          if (typeof window.onSalesExecutiveCreated === 'function') window.onSalesExecutiveCreated(rows);
+          return;
+        }
         updateMasterDeskContent();
       });
     }
 
     const cancelBtn = contentArea.querySelector('#masterEmployeeCancelBtn');
-    if (cancelBtn) cancelBtn.addEventListener('click', () => updateMasterDeskContent());
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        if (cancelMasterDeskReturn()) return;
+        updateMasterDeskContent();
+      });
+    }
   }
 
   // ── Alter Department: pick it (Name) and its Head on the left, rename it on the right ──
@@ -15737,7 +15916,8 @@
   }
 
   // ── Alter Employee: pick them (Name) and their Department on the left; Name, Employee
-  // Code, Designation and Additional Details on the right, like the Create form ──
+  // Code, Designation, Sales Executive / Purchaser and Additional Details on the right, like
+  // the Create form ──
   function renderMasterEmployeeAlter(contentArea) {
     const emps = getMasterTeamEmps();
     if (emps.length === 0) {
@@ -15767,8 +15947,8 @@
             </div>
             <div>
               <div class="coa-modal-fg" style="margin-bottom: 16px;">
-                <label class="coa-modal-label" for="masterAlterEmployeeDeptSel" style="${MASTER_TEAM_LABEL_STYLE}">Department *</label>
-                ${buildMasterTeamSelectHtml('masterAlterEmployeeDeptSel', masterTeamDeptOptionsHtml(emp.deptId), curDept ? curDept.name : 'Select Department', 'Search department...')}
+                <label class="coa-modal-label" for="masterAlterEmployeeDeptSel" style="${MASTER_TEAM_LABEL_STYLE}">Department</label>
+                ${buildMasterTeamSelectHtml('masterAlterEmployeeDeptSel', masterTeamEmpDeptOptionsHtml(emp.deptId), curDept ? curDept.name : 'General', 'Search department...')}
               </div>
             </div>
           </div>
@@ -15789,17 +15969,20 @@
           </div>
         </div>
 
-        <!-- Second box: Name (to rename), Employee Code, Designation, then Additional Details -->
+        <!-- Second box: Name (to rename), Employee Code, Designation, Sales Executive, Purchaser / Executive, then Additional Details -->
         <div class="coa-modal-card" style="box-shadow: none; border: 1.5px solid var(--slate-200); border-radius: 12px; padding: 24px; background: var(--slate-50); margin: 0;">
           <div class="coa-modal-fg" style="margin-bottom: 16px;">
             <label class="coa-modal-label" for="masterAlterEmployeeName" style="${MASTER_TEAM_LABEL_STYLE}">Name *</label>
             <input class="coa-modal-inp" id="masterAlterEmployeeName" value="${escapeHtml(emp.name || '')}" placeholder="Enter Name" style="${MASTER_TEAM_INPUT_STYLE}">
           </div>
 
-          ${buildMasterTeamCodeHtml('masterAlterEmployee', 'Auto', emp.code || '')}
+          ${buildMasterTeamCodeHtml('masterAlterEmployee', emp.code || '')}
 
           <label class="coa-modal-label" for="masterAlterEmployeeDesignation" style="${MASTER_TEAM_LABEL_STYLE} margin-top: 16px;">Designation</label>
           <input class="coa-modal-inp" id="masterAlterEmployeeDesignation" value="${escapeHtml(emp.designation || '')}" placeholder="e.g. Manager, Engineer…" style="${MASTER_TEAM_INPUT_STYLE}">
+
+          ${buildMasterTeamYesNoHtml('masterAlterEmployeeSalesExec', 'Sales Executive', emp.isSalesExecutive !== false ? 'Yes' : 'No')}
+          ${buildMasterTeamYesNoHtml('masterAlterEmployeePurchaser', 'Purchaser / Executive', emp.isPurchaser !== false ? 'Yes' : 'No')}
 
           ${buildMasterTeamAddlBtnHtml('masterAlterEmployee')}
         </div>
@@ -15817,10 +16000,13 @@
       });
     }
     const deptSelEl = contentArea.querySelector('#masterAlterEmployeeDeptSel');
-    if (deptSelEl && !curDept) deptSelEl.selectedIndex = -1;
-    initSearchableSelectHelper(contentArea, 'masterAlterEmployeeDeptSel', 'Select Department');
-    // Auto keeps the employee's current code, as in KeepOne
-    wireMasterTeamCode(contentArea, 'masterAlterEmployee', () => emp.code || '');
+    // No department = General
+    initSearchableSelectHelper(contentArea, 'masterAlterEmployeeDeptSel', 'General');
+    // The employee keeps their own code; a new number format leaves it as it is (as a posted
+    // invoice keeps its number)
+    const codeCtl = wireMasterTeamCode(contentArea, 'masterAlterEmployee', { ownId: emp.id });
+    wireMasterTeamYesNo(contentArea, 'masterAlterEmployeeSalesExec');
+    wireMasterTeamYesNo(contentArea, 'masterAlterEmployeePurchaser');
     wireAlterAddlPopup(contentArea, 'masterAlterEmployee', {
       subtitle: () => {
         const nm = contentArea.querySelector('#masterAlterEmployeeName');
@@ -15842,18 +16028,18 @@
         if (nameInp) nameInp.focus();
         return;
       }
+      // No department picked = General
       const deptId = deptSelEl && deptSelEl.value ? Number(deptSelEl.value) : null;
-      if (!deptId) {
-        masterTeamNotify(`Please select a Department for "${name}".`, 'warning');
-        return;
-      }
       const code = val('masterAlterEmployeeCode');
       if (!code) {
         masterTeamNotify(`Please enter an Employee Code for "${name}".`, 'warning');
         return;
       }
-      if (getMasterTeamEmps().some(e => e.id !== emp.id && String(e.code || '').trim().toLowerCase() === code.toLowerCase())) {
-        masterTeamNotify(`Employee code "${code}" is already in use.`, 'error');
+      // Codes used by any employee — including deleted ones — can't be given again
+      if (isMasterTeamEmpCodeUsed(code, emp.id)) {
+        masterTeamNotify(`Employee Code "${code}" is already used (even deleted codes can't be reused). Please use another code.`, 'danger');
+        codeCtl.validate();
+        contentArea.querySelector('#masterAlterEmployeeCode')?.focus();
         return;
       }
 
@@ -15867,10 +16053,15 @@
       }
 
       const salary = val('masterAlterEmployeeSalary');
+      // A changed code leaves the old one used, as a renumbered invoice does
+      registerMasterTeamEmpCode(emp.code);
+      registerMasterTeamEmpCode(code);
       emp.code = code;
       emp.name = name;
       emp.designation = val('masterAlterEmployeeDesignation');
       emp.deptId = deptId;
+      emp.isSalesExecutive = val('masterAlterEmployeeSalesExec') === 'Yes';
+      emp.isPurchaser = val('masterAlterEmployeePurchaser') === 'Yes';
       emp.joiningDate = val('masterAlterEmployeeJoining');
       emp.salary = salary !== '' ? Number(salary) : null;
       emp.pan = val('masterAlterEmployeePan').toUpperCase();
@@ -15893,6 +16084,8 @@
       setSelectedId: (id) => { _masterAlterSelectedEmployeeId = id; },
       apply: applyAlterCurrent
     });
+    // Multi Alter may have put back a code typed earlier: check it
+    codeCtl.validate();
 
     const delBtn = contentArea.querySelector('#masterAlterEmployeeDelBtn');
     if (delBtn) {
@@ -15903,6 +16096,8 @@
           if (idx >= 0) {
             // KeepOne's rule: a deleted employee stops being head of any department
             getMasterTeamDepts().forEach(d => { if (d.headEmpId === emp.id) d.headEmpId = null; });
+            // Their code stays used, like a deleted invoice's number
+            registerMasterTeamEmpCode(emp.code);
             list.splice(idx, 1);
             afterMasterTeamChange();
             masterTeamNotify(`Employee "${emp.name}" deleted.`, 'info');
@@ -16577,6 +16772,36 @@
     }, 60);
   }
 
+  // Opens Create Employee from a sales form's Sales Executive box (sales-select-boxes.js): every
+  // row starts with Sales Executive = Yes, and Create Employee goes back to that form.
+  function openMasterDeskCreateEmployee(options = {}) {
+    _masterDeskReturnContext = Object.assign({ purpose: 'salesExecutive', returnTab: 'sales_voucher' }, options);
+
+    if (typeof openTab === 'function') openTab('master_desk');
+    else if (typeof window.openTab === 'function') window.openTab('master_desk');
+    else window.location.hash = '#master_desk';
+
+    const wrap = document.getElementById('panel-master-desk');
+    if (wrap && (!_masterDeskInitialized || !wrap.children.length)) {
+      initMasterDesk(wrap);
+      _masterDeskInitialized = true;
+    }
+
+    setMasterDeskSubtype('Create');
+    setMasterDeskTab('employee');
+
+    setTimeout(() => {
+      const nameInp = document.getElementById('masterEmployeeName');
+      if (!nameInp) return;
+      if (options.initialName) {
+        nameInp.value = options.initialName;
+        nameInp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      nameInp.focus();
+      if (options.initialName) nameInp.select();
+    }, 60);
+  }
+
   function cancelMasterDeskReturn() {
     if (_masterDeskReturnContext) {
       const ctx = _masterDeskReturnContext;
@@ -16619,6 +16844,14 @@
         if (typeof window.onDepartmentCreationCancelledForJournal === 'function') {
           window.onDepartmentCreationCancelledForJournal(ctx.initialName);
         }
+      } else if (ctx.purpose === 'salesExecutive') {
+        if (typeof window.onSalesExecutiveCreationCancelled === 'function') {
+          window.onSalesExecutiveCreationCancelled(ctx.initialName);
+        }
+      } else if (ctx.purpose === 'paymentAccount') {
+        if (typeof window.onPaymentAccountCreationCancelled === 'function') {
+          window.onPaymentAccountCreationCancelled(ctx.initialName);
+        }
       } else if (targetTab === 'sales_voucher') {
         if (typeof window.onPartyCreationCancelledForSales === 'function') {
           window.onPartyCreationCancelledForSales(ctx.initialName);
@@ -16657,6 +16890,7 @@
   window.openMasterDeskCreateStockItem = openMasterDeskCreateStockItem;
   window.openMasterDeskCreateUnit = openMasterDeskCreateUnit;
   window.openMasterDeskCreateDepartment = openMasterDeskCreateDepartment;
+  window.openMasterDeskCreateEmployee = openMasterDeskCreateEmployee;
   window.openMasterDeskAlter = openMasterDeskAlter;
   window.handleMasterDeskClosed = handleMasterDeskClosed;
   window.checkAndRestorePendingJournalState = checkAndRestorePendingJournalState;

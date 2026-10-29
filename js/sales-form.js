@@ -1424,10 +1424,13 @@
   function getSalesNumberingSettings(kind) {
     const year = new Date().getFullYear();
     // 'reversal': the prefix put in front of the Original Doc number (REV-INV-2026-001);
-    // 'purchaseReversal' likewise for a Purchase Reversal (REV-PUR-2026-001)
+    // 'purchaseReversal' likewise for a Purchase Reversal (REV-PUR-2026-001);
+    // 'employee': Master Desk → Employee Code, KeepOne's EMP-001 (no year)
     const defaults = (kind === 'reversal' || kind === 'purchaseReversal')
       ? { prefix: 'REV-', start: 1, digits: 3 }
-      : { prefix: `${SALES_NUMBER_DEFAULT_CODES[kind] || 'INV'}-${year}-`, start: 1, digits: 3 };
+      : kind === 'employee'
+        ? { prefix: 'EMP-', start: 1, digits: 3 }
+        : { prefix: `${SALES_NUMBER_DEFAULT_CODES[kind] || 'INV'}-${year}-`, start: 1, digits: 3 };
     const saved = ((window.KYA_STORE || {}).salesNumbering || {})[kind];
     if (!saved) return defaults;
     return {
@@ -1817,8 +1820,10 @@
     if (!execSelect) return;
     
     execSelect.innerHTML = '<option value="">&mdash; Select Sales Executive &mdash;</option>';
-    
-    ohEmployees.forEach(e => {
+
+    // Employees set as Sales Executive (Master Desk → Employee)
+    const execs = typeof getKyaExecutiveEmployees === 'function' ? getKyaExecutiveEmployees('sales', selectedId) : ohEmployees;
+    execs.forEach(e => {
       const opt = document.createElement('option');
       opt.value = e.id;
       opt.textContent = `${e.name} (${e.code})`;
@@ -2637,11 +2642,7 @@
           </td>
           <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
             <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${isZeroTax ? 'disabled' : ''}>
-              <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
-              <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
-              <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
-              <option value="18" ${row.tax === 18 || row.tax === undefined ? 'selected' : ''}>18%</option>
-              <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+              ${typeof kyaGstRateOptionsHtml === 'function' ? kyaGstRateOptionsHtml(row.tax) : `<option value="${row.tax === undefined ? 18 : row.tax}" selected>${row.tax === undefined ? 18 : row.tax}%</option>`}
             </select>
           </td>
           <td class="sales-cell-amt" style="width: 110px; padding: 4px 6px;">
@@ -3543,7 +3544,9 @@
 
     const supplyTypeEl = document.getElementById('salesSupplyType');
     if (supplyTypeEl) {
-      supplyTypeEl.value = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
+      // An invoice saved as 'Deemed Export' opens as Deemed Export (CGST + SGST)
+      const supply = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
+      supplyTypeEl.value = typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(supply) : supply;
     }
 
     // The reversal's reference goes into the Narration (the books), not the printed Terms

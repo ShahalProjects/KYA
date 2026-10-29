@@ -413,11 +413,20 @@
     });
   }
 
+  // A Deemed Export is taxed like any other supply: CGST + SGST within the State, IGST to
+  // another State. 'Deemed Export' alone is a document saved before the two choices — it was
+  // always CGST + SGST.
   function getInvoiceTaxMode(inv) {
     const supply = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
-    if (supply === 'Intra-State (CGST + SGST)' || supply === 'Deemed Export') return 'split';
-    if (supply === 'Inter-State (IGST)' || supply === 'SEZ With Tax') return 'igst';
+    if (supply === 'Intra-State (CGST + SGST)' || supply === 'Deemed Export (CGST + SGST)' || supply === 'Deemed Export') return 'split';
+    if (supply === 'Inter-State (IGST)' || supply === 'SEZ With Tax' || supply === 'Deemed Export (IGST)') return 'igst';
     return 'none';
+  }
+
+  // A Supply Type as the forms list it: a document saved as 'Deemed Export' opens as
+  // Deemed Export (CGST + SGST), the tax it was posted with (Sales and Purchase forms)
+  function normalizeKyaSupplyType(supplyType) {
+    return supplyType === 'Deemed Export' ? 'Deemed Export (CGST + SGST)' : supplyType;
   }
 
   // ── The printable sheet ──────────────────────────────────────────
@@ -1067,6 +1076,7 @@
   window.renderSalesTaxInvoiceHTML = renderSalesTaxInvoiceHTML;
   window.viewSalesTaxInvoice = viewSalesTaxInvoice;
   window.getInvoiceCompany = getInvoiceCompany;
+  window.normalizeKyaSupplyType = normalizeKyaSupplyType;
   window.getInvoiceBankDetails = getInvoiceBankDetails;
   window.siAmountInWords = siAmountInWords;
   window.getSalesInvoiceExportData = getSalesInvoiceExportData;

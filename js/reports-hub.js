@@ -854,15 +854,17 @@
   // Split GST into IGST / CGST / SGST by supply type — same rules the sales voucher posting uses
   const DEFAULT_SUPPLY_TYPE = 'Intra-State (CGST + SGST)';
 
+  // A Deemed Export is CGST + SGST within the State and IGST to another; 'Deemed Export' alone
+  // was saved before the two choices and was always CGST + SGST
   function isIntraStateSupply(supplyType) {
     const t = supplyType || DEFAULT_SUPPLY_TYPE;
-    return t === DEFAULT_SUPPLY_TYPE || t === 'Deemed Export';
+    return t === DEFAULT_SUPPLY_TYPE || t === 'Deemed Export (CGST + SGST)' || t === 'Deemed Export';
   }
 
   function gstSplit(gst, supplyType) {
     const t = supplyType || DEFAULT_SUPPLY_TYPE;
     if (isIntraStateSupply(t)) return { igst: 0, cgst: gst / 2, sgst: gst / 2 };
-    if (t === 'Inter-State (IGST)' || t === 'SEZ With Tax') return { igst: gst, cgst: 0, sgst: 0 };
+    if (t === 'Inter-State (IGST)' || t === 'SEZ With Tax' || t === 'Deemed Export (IGST)') return { igst: gst, cgst: 0, sgst: 0 };
     return { igst: 0, cgst: 0, sgst: 0 }; // Export (Zero-Rated / LUT), SEZ Without Tax
   }
 
@@ -2009,7 +2011,7 @@
   function g2bInvoiceType(supplyType) {
     if (supplyType === 'SEZ With Tax') return 'SEZ supplies with payment of tax';
     if (supplyType === 'SEZ Without Tax') return 'SEZ supplies without payment of tax';
-    if (supplyType === 'Deemed Export') return 'Deemed Exp';
+    if (supplyType === 'Deemed Export (CGST + SGST)' || supplyType === 'Deemed Export (IGST)' || supplyType === 'Deemed Export') return 'Deemed Exp';
     return 'Regular';
   }
 

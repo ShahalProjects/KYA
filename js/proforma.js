@@ -189,7 +189,8 @@
       if (chipEl) chipEl.textContent = proformaData.proformaNo || 'PI-2026-001';
       if (notesEl) notesEl.value = proformaData.notes || '';
       if (narrationEl) narrationEl.value = proformaData.narration || '';
-      if (supplyTypeEl && proformaData.supplyType) supplyTypeEl.value = proformaData.supplyType;
+      // A proforma saved as 'Deemed Export' opens as Deemed Export (CGST + SGST)
+      if (supplyTypeEl && proformaData.supplyType) supplyTypeEl.value = typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(proformaData.supplyType) : proformaData.supplyType;
 
       proformaRows = Array.isArray(proformaData.rows) ? JSON.parse(JSON.stringify(proformaData.rows)) : [];
       if (proformaRows.length === 0) {
@@ -704,7 +705,9 @@
     execEl.innerHTML = '<option value="">&mdash; Select Sales Executive &mdash;</option>';
 
     if (typeof ohEmployees !== 'undefined' && Array.isArray(ohEmployees) && ohEmployees.length > 0) {
-      ohEmployees.forEach(e => {
+      // Employees set as Sales Executive (Master Desk → Employee)
+      const execs = typeof getKyaExecutiveEmployees === 'function' ? getKyaExecutiveEmployees('sales', selectedId) : ohEmployees;
+      execs.forEach(e => {
         const opt = document.createElement('option');
         opt.value = e.id;
         opt.textContent = `${e.name} (${e.code || ''})`;
@@ -765,11 +768,7 @@
           </td>
           <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
             <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;">
-              <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
-              <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
-              <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
-              <option value="18" ${row.tax === 18 || row.tax === undefined ? 'selected' : ''}>18%</option>
-              <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+              ${typeof kyaGstRateOptionsHtml === 'function' ? kyaGstRateOptionsHtml(row.tax) : `<option value="${row.tax === undefined ? 18 : row.tax}" selected>${row.tax === undefined ? 18 : row.tax}%</option>`}
             </select>
           </td>
           <td class="sales-cell-amt" style="width: 110px; padding: 4px 6px;">
@@ -2316,6 +2315,8 @@
   window.openProformaList = openProformaList;
   window.closeProformaList = closeProformaList;
   window.initProformaForm = initProformaForm;
+  // The Sales Executive box (sales-select-boxes.js) refreshes its list with it
+  window.populateProformaExecutives = populateProformaExecutives;
   window.renderProformaRows = renderProformaRows;
   window.addProformaRow = addProformaRow;
   window.recalculateProformaTotals = recalculateProformaTotals;

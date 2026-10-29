@@ -265,7 +265,9 @@
     if (execEl) execEl.value = doc.salesExecutiveId || '';
     const supplyEl = $('salesSupplyType');
     if (supplyEl) {
-      supplyEl.value = (doc.supplyType && /State|SEZ|Export/i.test(doc.supplyType)) ? doc.supplyType : 'Intra-State (CGST + SGST)';
+      // A document saved as 'Deemed Export' opens as Deemed Export (CGST + SGST)
+      const supply = (doc.supplyType && /State|SEZ|Export/i.test(doc.supplyType)) ? doc.supplyType : 'Intra-State (CGST + SGST)';
+      supplyEl.value = typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(supply) : supply;
     }
     // The reversal's reference goes into the Narration (the books), not the printed Terms
     const notesEl = $('salesNotes');

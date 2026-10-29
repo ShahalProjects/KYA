@@ -698,7 +698,9 @@
 
     execSelect.innerHTML = '<option value="">&mdash; Select Executive &mdash;</option>';
 
-    const emps = typeof ohEmployees !== 'undefined' ? ohEmployees : [];
+    // Employees set as Purchaser / Executive (Master Desk → Employee)
+    const emps = typeof getKyaExecutiveEmployees === 'function' ? getKyaExecutiveEmployees('purchase', selectedId)
+      : (typeof ohEmployees !== 'undefined' ? ohEmployees : []);
     emps.forEach(e => {
       const opt = document.createElement('option');
       opt.value = e.id;
@@ -1270,11 +1272,7 @@
           </td>
           <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
             <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${isZeroTax ? 'disabled' : ''}>
-              <option value="0" ${row.tax === 0 ? 'selected' : ''}>0%</option>
-              <option value="5" ${row.tax === 5 ? 'selected' : ''}>5%</option>
-              <option value="12" ${row.tax === 12 ? 'selected' : ''}>12%</option>
-              <option value="18" ${row.tax === 18 || row.tax === undefined ? 'selected' : ''}>18%</option>
-              <option value="28" ${row.tax === 28 ? 'selected' : ''}>28%</option>
+              ${typeof kyaGstRateOptionsHtml === 'function' ? kyaGstRateOptionsHtml(row.tax) : `<option value="${row.tax === undefined ? 18 : row.tax}" selected>${row.tax === undefined ? 18 : row.tax}%</option>`}
             </select>
           </td>
           <td class="sales-cell-amt" style="width: 110px; padding: 4px 6px;">
@@ -1891,7 +1889,9 @@
       if (match) populatePurchaseVendors(match.value);
     }
     populatePurchaseExecutives(v.executiveId);
-    if ($('purchaseSupplyType')) $('purchaseSupplyType').value = v.supplyType || 'Intra-State (CGST + SGST)';
+    // A purchase saved as 'Deemed Export' opens as Deemed Export (CGST + SGST)
+    const savedSupply = v.supplyType || 'Intra-State (CGST + SGST)';
+    if ($('purchaseSupplyType')) $('purchaseSupplyType').value = typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(savedSupply) : savedSupply;
 
     purchaseRows = (Array.isArray(v.rows) && v.rows.length) ? v.rows : [newPurchaseRow()];
     // A reversal of a purchase: each line may cover what is still left of its purchase line
