@@ -151,6 +151,8 @@
       ${section(ICON_LAW, 'As per law', info.law, false)}
       ${section(ICON_EXAMPLE, 'Example', info.example, false)}`;
   }
+  // The same card for Company Profile's GST Registration Type (company-profile.js)
+  window.kyaLawCardHtml = lawCardHtml;
 
   function supplyTypeCardHtml(type) {
     const info = SUPPLY_TYPE_INFO[type];
@@ -312,7 +314,8 @@
 
     let shown = 0;
     Array.from(sel.options).forEach(opt => {
-      if (!opt.value) return;
+      // A hidden option is off the list (an SEZ's CGST + SGST supply types, gst-registration.js)
+      if (!opt.value || opt.hidden) return;
       const text = opt.textContent.trim();
       if (q && !text.toLowerCase().includes(q)) return;
       const item = listItem(text, sel.value === opt.value);

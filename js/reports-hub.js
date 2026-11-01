@@ -8,6 +8,7 @@
 
   let _activeReportsTab = 'overview';   // overview | gst | tds | tcs
   let _gstCycle = 'monthly';            // monthly | quarterly
+  let _gstCycleCompany = null;          // the company's GSTR-1 Filing Period the cycle last followed
   let _gstFyStart = null;               // start year of the selected financial year (Apr–Mar)
   let _gstPeriodIdx = null;             // index into the year's months / quarters
   let _gstView = 'dashboard';           // dashboard | gstr1 | gstr1-b2b | gstr1-b2b-docs | gstr1-b2b-invoice | gstr2b | gstr2b-docs | gstr2b-invoice | gstr3b
@@ -1030,8 +1031,22 @@
     `;
   }
 
+  // The cycle starts on the company's GSTR-1 Filing Period (Company Profile & Vault → GST
+  // Registration, gst-registration.js) and follows it when that changes; the slider below only
+  // changes the view
+  function syncGstCycleWithCompany() {
+    const period = typeof kyaCompanyGstReg === 'function' ? kyaCompanyGstReg().period : 'monthly';
+    if (period === _gstCycleCompany) return;
+    _gstCycleCompany = period;
+    if (period === _gstCycle) return;
+    // Keep the same part of the year: month → its quarter, quarter → its first month
+    if (_gstPeriodIdx !== null) _gstPeriodIdx = period === 'quarterly' ? Math.floor(_gstPeriodIdx / 3) : _gstPeriodIdx * 3;
+    _gstCycle = period;
+  }
+
   // Resolve the Cycle / Year / Period selection, filling in defaults
   function getGstSelection() {
+    syncGstCycleWithCompany();
     const fyStarts = getAvailableFyStarts();
     if (_gstFyStart === null || !fyStarts.includes(_gstFyStart)) {
       _gstFyStart = fyStarts[0];
@@ -1069,6 +1084,7 @@
 
   // Monthly / Quarterly slider in the Reports title card (same look as Master Desk's Create / Alter)
   function renderGstCycleSlider() {
+    syncGstCycleWithCompany();
     const pill = (value, label) => {
       const isActive = _gstCycle === value;
       return `
@@ -1420,11 +1436,12 @@
     return String(s || '').replace(/\b[a-z]/g, ch => ch.toUpperCase());
   }
 
-  // Place of supply as "32-Kerala" — same source as the printed invoice: customer's state, else the company's
+  // Place of supply as "32-Kerala" — same source as the printed invoice: customer's state, else the
+  // company's State of registration (gst-registration.js)
   function placeOfSupplyOf(party) {
     const co = typeof getInvoiceCompany === 'function' ? (getInvoiceCompany() || {}) : {};
     const fromParty = !!(party && (party.state || party.country));
-    const state = fromParty ? (party.state || '') : (co.state || '');
+    const state = fromParty ? (party.state || '') : (typeof kyaCompanyGstState === 'function' ? kyaCompanyGstState(co) : (co.state || ''));
     const country = fromParty ? (party.country || '') : '';
     const gstin = fromParty ? (party && party.gstin) : co.gstin;
     let code = typeof getGstStateCode === 'function' ? getGstStateCode(state, country, gstin) : '';

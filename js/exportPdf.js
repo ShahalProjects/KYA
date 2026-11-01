@@ -2730,17 +2730,16 @@
       doc.setLineWidth(0.5);
       doc.line(14, 32, pageWidth - 14, 32);
 
-      const tableHeaders = [['Sl No', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']];
+      const tableHeaders = [['Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']];
       const tableBody = [];
       let totalAmt = 0;
 
-      items.forEach((item, idx) => {
+      items.forEach(item => {
         const cleanAmt = typeof item.amount === 'string' ? parseFloat(item.amount.replace(/,/g, '')) : Number(item.amount);
         const val = isNaN(cleanAmt) ? 0 : cleanAmt;
         totalAmt += val;
 
         tableBody.push([
-          { content: String(idx + 1), styles: { halign: 'center' } },
           item.date || '—',
           item.voucherNo || '—',
           item.type || 'Journal Entry',
@@ -2752,7 +2751,7 @@
 
       // Total Row
       tableBody.push([
-        { content: 'TOTAL AMOUNT', colSpan: 5, styles: { halign: 'left', fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [30, 58, 138] } },
+        { content: 'TOTAL AMOUNT', colSpan: 4, styles: { halign: 'left', fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [30, 58, 138] } },
         { content: typeof fmtNum === 'function' ? fmtNum(totalAmt) : totalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 }), styles: { halign: 'right', fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [30, 58, 138] } },
         { content: `${items.length} vouchers`, styles: { halign: 'center', fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [100, 116, 139] } }
       ]);
@@ -2765,18 +2764,17 @@
         styles: { font: 'helvetica', fontSize: 8.5, cellPadding: { top: 2.2, bottom: 2.2, left: 2.5, right: 2.5 }, textColor: [51, 65, 85], lineColor: [241, 245, 249], lineWidth: 0.2 },
         headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
         columnStyles: {
-          0: { cellWidth: 16, halign: 'center' },
-          1: { cellWidth: 24, halign: 'left' },
-          2: { cellWidth: 32, halign: 'left', fontStyle: 'bold' },
-          3: { cellWidth: 30, halign: 'left' },
-          4: { cellWidth: 'auto', halign: 'left' },
-          5: { cellWidth: 36, halign: 'right' },
-          6: { cellWidth: 24, halign: 'center' }
+          0: { cellWidth: 24, halign: 'left' },
+          1: { cellWidth: 32, halign: 'left', fontStyle: 'bold' },
+          2: { cellWidth: 30, halign: 'left' },
+          3: { cellWidth: 'auto', halign: 'left' },
+          4: { cellWidth: 36, halign: 'right' },
+          5: { cellWidth: 24, halign: 'center' }
         },
         didParseCell: function (hookData) {
           if (hookData.section === 'head') {
-            if (hookData.column.index === 0 || hookData.column.index === 6) hookData.cell.styles.halign = 'center';
-            if (hookData.column.index === 5) hookData.cell.styles.halign = 'right';
+            if (hookData.column.index === 5) hookData.cell.styles.halign = 'center';
+            if (hookData.column.index === 4) hookData.cell.styles.halign = 'right';
           }
         },
         didDrawPage: function () {

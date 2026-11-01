@@ -98,8 +98,8 @@
     return co;
   }
 
-  // The invoice prints the trading name only: the display name when one is set,
-  // otherwise the legal name with its entity suffix (Pvt Ltd, LLP, Inc …) dropped.
+  // The trading name (the exports' company name and Trading Name): the display name when one
+  // is set, otherwise the legal name with its entity suffix (Pvt Ltd, LLP, Inc …) dropped.
   const COMPANY_NAME_SUFFIXES = [
     'pvt', 'private', 'ltd', 'limited', 'llp', 'llc', 'plc', 'inc', 'incorporated',
     'corp', 'corporation', 'co', 'company', 'gmbh', 'sa', 'bv', 'nv', 'pte', 'sdn', 'bhd'
@@ -118,6 +118,12 @@
       else break;
     }
     return words.join(' ') || raw;
+  }
+
+  // The name the documents print at the top and on the "For <Company>" line: the Company / Firm
+  // Name exactly as entered in Company Profile & Vault (the trading name while it is empty).
+  function getInvoiceFirmName(co) {
+    return (co.name || '').trim() || getInvoiceCompanyName(co);
   }
 
   // The uploaded logo. Without one the header keeps no logo space: the company
@@ -248,11 +254,11 @@
   }
 
   // "For <Company>", the signature / seal and "Authorised Signatory" are one block of fixed
-  // size. It sits at the foot of its column and is never split: if it does not fit at the
+  // size. It sits right under the Total Amount and is never split: if it does not fit at the
   // bottom of a page, the whole block moves to the next page.
   function getInvoiceSignatoryBlockHtml(co, companyName) {
     return `
-      <div style="flex:0 0 auto; margin-top:auto; padding:8px 12px 0; box-sizing:border-box; text-align:center; break-inside:avoid; page-break-inside:avoid;">
+      <div style="flex:0 0 auto; padding:8px 12px 0; box-sizing:border-box; text-align:center; break-inside:avoid; page-break-inside:avoid;">
         <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${siEsc(companyName)}</div>
         ${getInvoiceSignatoryHtml(co)}
         <div style="border-top:1px solid #94a3b8; padding-top:5px; font-size:10.5px; color:#475569; font-weight:600;">Authorised Signatory</div>
@@ -429,6 +435,20 @@
     return supplyType === 'Deemed Export' ? 'Deemed Export (CGST + SGST)' : supplyType;
   }
 
+  // Tax Invoice, Bill of Supply (composition) or a plain Invoice (unregistered), as per the GST
+  // registration the invoice was made under (gst-registration.js); a return is a Credit Note
+  function getSalesInvoiceTitle(inv) {
+    if (typeof kyaSalesInvoiceTitle !== 'function') return inv.isReturn ? 'Credit Note' : 'Tax Invoice';
+    return kyaSalesInvoiceTitle(kyaDocGstReg(inv), !!inv.isReturn);
+  }
+
+  // The State for GST of an invoice: the State of the GSTIN it was issued with, else the
+  // company's State of registration (gst-registration.js)
+  function getInvoiceCompanyState(co, inv) {
+    if (typeof kyaDocGstState === 'function') return kyaDocGstState(inv, co);
+    return typeof kyaCompanyGstState === 'function' ? kyaCompanyGstState(co) : (co.state || '');
+  }
+
   // ── The printable sheet ──────────────────────────────────────────
   // A saved draft, not posted: shown, printed and exported with a DRAFT mark
   function isSalesInvoiceDraft(inv) {
@@ -446,7 +466,8 @@
     const taxMode = getInvoiceTaxMode(inv);
     const isReturn = !!inv.isReturn;
     const isDraft = isSalesInvoiceDraft(inv);
-    const docTitle = isReturn ? 'Credit Note' : 'Tax Invoice';
+    const docTitle = getSalesInvoiceTitle(inv);
+    const gstRules = typeof kyaGstRegRules === 'function' ? kyaGstRegRules(kyaDocGstReg(inv)) : { registered: true, composition: false };
 
     const subTotal = rows.reduce((s, r) => s + r.taxable, 0);
     const grossTotal = rows.reduce((s, r) => s + r.gross, 0);
@@ -476,19 +497,20 @@
     };
 
     const posFromParty = !!(parties.billed.state || parties.billed.country);
-    const posState = posFromParty ? (parties.billed.state || '') : (co.state || '');
+    const posState = posFromParty ? (parties.billed.state || '') : getInvoiceCompanyState(co, inv);
     const posCountry = posFromParty ? (parties.billed.country || '') : '';
     const posCode = posState ? getGstStateCode(posState, posCountry, posFromParty ? parties.billed.gstin : co.gstin) : '';
     const placeOfSupply = [posCode ? posCode + ' - ' + posState : posState, posCountry].filter(Boolean).join(', ');
 
-    // ── Company block ──
+    // ── Company block ── (no GSTIN when not registered)
     const coLines = [];
     if (co.address) coLines.push(siEsc(co.address).replace(/\n/g, '<br>'));
     const coDistrict = co.district && String(co.district).toLowerCase() !== String(co.city || '').toLowerCase() ? co.district : '';
     const coCityPin = [[co.city, coDistrict].filter(Boolean).join(', '), co.pincode].filter(Boolean).join(' - ');
     if (coCityPin) coLines.push(siEsc(coCityPin));
     if (co.state) coLines.push(siEsc(co.state));
-    if (co.gstin) coLines.push(`GSTIN: ${siEsc(co.gstin)}`);
+    const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(inv, co) : co.gstin;
+    if (docGstin && gstRules.registered) coLines.push(`GSTIN: ${siEsc(docGstin)}`);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(siEsc(co.website));
@@ -612,9 +634,10 @@
         </div>
       </div>`;
 
-    // Terms always print too — an invoice without notes still shows the column.
+    // Terms always print too — an invoice without notes still shows the heading. As one block
+    // (flow-root) they sit beside the signatory when it reaches their row, else across the full row.
     const termsHtml = `
-      <div style="flex:1 1 auto; min-width:0; padding:6px 8px; box-sizing:border-box;">
+      <div style="display:flow-root; margin-top:10px; padding:6px 8px; box-sizing:border-box;">
         <div style="font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:5px;">Terms &amp; Conditions</div>
         <div style="font-size:11px; color:#334155; line-height:1.6; white-space:pre-wrap;">${siEsc(inv.notes || '')}</div>
       </div>`;
@@ -687,12 +710,13 @@
           <div style="display:flex; gap:12px; align-items:flex-start; min-width:0;">
             ${getCompanyLogoHtml(co)}
             <div style="min-width:0;">
-              <div style="font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-.2px;">${siEsc(getInvoiceCompanyName(co))}</div>
+              <div style="font-size:19px; font-weight:800; color:#1d4ed8; letter-spacing:-.2px;">${siEsc(getInvoiceFirmName(co))}</div>
               <div style="font-size:${FS.body}; color:#475569; margin-top:5px; line-height:1.55;">${coLines.join('<br>')}</div>
             </div>
           </div>
           <div style="text-align:right; flex-shrink:0;">
             <div style="font-size:22px; font-weight:900; text-transform:uppercase; letter-spacing:.04em; color:#1d4ed8;">${docTitle}</div>
+            ${gstRules.composition && !isReturn ? `<div style="font-size:${FS.note}; color:#64748b; font-weight:600; margin-top:2px;">${siEsc(window.KYA_COMPOSITION_DECLARATION || '')}</div>` : ''}
             <div style="font-size:${FS.note}; color:#64748b; font-weight:600; margin-top:2px;">${isReturn ? 'Against Invoice ' + siEsc(inv.returnAgainstInvoice || '') : (isDraft ? 'Draft — not posted' : 'Original for Recipient')}</div>
             <div style="margin-top:8px; font-size:${FS.body}; color:#0f172a; line-height:1.7;">
               <div><span style="color:#64748b; font-weight:600;">Invoice No.:</span> <strong>${siEsc(inv.invoiceNo)}</strong></div>
@@ -729,19 +753,11 @@
           </tbody>
         </table>
 
-        <!-- One two-column grid. Every card is only as tall as its own content, the gaps are a
-             uniform 10px, and the two columns finish on the same line: on the left the last card
-             absorbs the leftover height, on the right it goes above the signatory block. -->
-        <div style="display:flex; gap:10px; margin-top:10px; align-items:stretch;">
-          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px;">
-            ${bankHtml}
-            <div style="flex:0 0 auto; padding:7px 12px; background:#f8fafc; border-left:3.5px solid var(--blue-600, #2563eb); border-radius:0 6px 6px 0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
-              <div style="color:#2563eb; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
-              <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${siEsc(siAmountInWords(grandTotal))}</div>
-            </div>
-            ${termsHtml}
-          </div>
-          <div style="width:290px; flex-shrink:0; display:flex; flex-direction:column; gap:10px;">
+        <!-- Two columns, 10px apart, every card only as tall as its own content. On the right
+             (floated) the totals, the Total Amount and the signatory right under it; on the left
+             the bank and amount-in-words cards, then the terms (see termsHtml). -->
+        <div style="display:flow-root; margin-top:10px;">
+          <div style="float:right; width:290px; margin-left:10px; display:flex; flex-direction:column; gap:10px;">
             <div style="flex:0 0 auto; padding:4px 12px; box-sizing:border-box;">
               ${totalsRow('Taxable Value', siNum(subTotal))}
               ${gstTotalsRows ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${gstTotalsRows}` : ''}
@@ -751,8 +767,16 @@
             <div style="flex:0 0 auto; background:var(--blue-600, #2563eb); border:1px solid #1d4ed8; border-radius:6px; padding:6px 12px; box-sizing:border-box; color:#ffffff; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
               ${totalsRow('Total Amount', siNum(grandTotal), { size: '12px', weight: 700, color: '#ffffff', pad: '1px 0' })}
             </div>
-            ${getInvoiceSignatoryBlockHtml(co, getInvoiceCompanyName(co))}
+            ${getInvoiceSignatoryBlockHtml(co, getInvoiceFirmName(co))}
           </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${bankHtml}
+            <div style="flex:0 0 auto; padding:7px 12px; background:#f8fafc; border-left:3.5px solid var(--blue-600, #2563eb); border-radius:0 6px 6px 0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+              <div style="color:#2563eb; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
+              <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${siEsc(siAmountInWords(grandTotal))}</div>
+            </div>
+          </div>
+          ${termsHtml}
         </div>
 
         <!-- Thank you -->
@@ -793,7 +817,7 @@
     const payStatus = journalReceived > 0 ? getJournalSettledStatus(netTotal, paidAmount, journalReceived) : (inv.paymentStatus || '');
 
     const posFromParty = !!(parties.billed.state || parties.billed.country);
-    const posState = posFromParty ? (parties.billed.state || '') : (co.state || '');
+    const posState = posFromParty ? (parties.billed.state || '') : getInvoiceCompanyState(co, inv);
     const posCountry = posFromParty ? (parties.billed.country || '') : '';
     const posCode = posState ? getGstStateCode(posState, posCountry, posFromParty ? parties.billed.gstin : co.gstin) : '';
     const placeOfSupply = [posCode ? posCode + ' - ' + posState : posState, posCountry].filter(Boolean).join(', ');
@@ -825,7 +849,7 @@
 
     // A draft's exports say so in their title (and file name)
     const isDraft = isSalesInvoiceDraft(inv);
-    const docTitle = (isDraft ? 'Draft ' : '') + (isReturn ? 'Credit Note' : 'Tax Invoice');
+    const docTitle = (isDraft ? 'Draft ' : '') + getSalesInvoiceTitle(inv);
     return {
       inv, co, parties, bank, paymentDetails, rows, taxMode, isReturn, docTitle,
       companyName: getInvoiceCompanyName(co),
@@ -884,7 +908,7 @@
       <div class="inv-modal-card" style="padding:0; max-width:${compact ? '640px' : '900px'}; width:94%;${compact ? ' overflow:hidden;' : ''}">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1.5px solid var(--slate-100); background:var(--slate-50); border-radius:20px 20px 0 0;">
           <div style="font-weight:700; color:var(--slate-800); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span>${inv.isReturn ? 'Credit Note' : 'Tax Invoice'} &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${siEsc(inv.invoiceNo || 'Draft')}</span></span>
+            <span>${getSalesInvoiceTitle(inv)} &nbsp;·&nbsp; <span style="font-family:monospace; color:var(--blue-700);">${siEsc(inv.invoiceNo || 'Draft')}</span></span>
             ${isDraft && !compact ? '<span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">Draft</span>' : ''}          </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
             ${!compact ? `

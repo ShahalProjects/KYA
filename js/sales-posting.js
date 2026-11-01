@@ -131,7 +131,9 @@
     // An invoice saved as 'Deemed Export' opens as Deemed Export (CGST + SGST)
     const savedSupply = inv.salesSupplyType || 'Intra-State (CGST + SGST)';
     if (supplyTypeEl) supplyTypeEl.value = typeof normalizeKyaSupplyType === 'function' ? normalizeKyaSupplyType(savedSupply) : savedSupply;
-    
+    // Made by an SEZ unit / developer: inter-State choices only (gst-registration.js)
+    if (typeof kyaApplyGstSupplyTypes === 'function' && typeof salesDocGstReg === 'function') kyaApplyGstSupplyTypes(supplyTypeEl, salesDocGstReg());
+
     const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     const fullBtn = document.getElementById('salesPaymentStatusFull');
     const partBtn = document.getElementById('salesPaymentStatusPartial');
@@ -421,6 +423,8 @@
       // Invoice Balance (kept for when the draft is posted)
       creditAdjustments: (draftUsesCredit && currentSalesVoucherSubtype !== 'Return' && !draftAdvanceRefund && typeof getSalesAdjust === 'function' && getSalesAdjust()) ? getSalesAdjust().get() : [],
       creditApplications: (draftUsesCredit && currentSalesVoucherSubtype === 'Return' && typeof getSalesAdjust === 'function' && getSalesAdjust()) ? getSalesAdjust().get() : [],
+      // The GST registration it is made under (gst-registration.js)
+      gstReg: typeof salesDocGstReg === 'function' ? salesDocGstReg() : null,
       updatedAt: Date.now()
     };
     window.KYA_STORE.salesVouchersDrafts = window.KYA_STORE.salesVouchersDrafts || [];
@@ -778,6 +782,8 @@
       advanceRefund,
       advanceRefundJournalEntryId: existingPostedInv ? (existingPostedInv.advanceRefundJournalEntryId || '') : '',
       advanceRefundVoucherNo: existingPostedInv ? (existingPostedInv.advanceRefundVoucherNo || '') : '',
+      // The GST registration it is made under (gst-registration.js)
+      gstReg: typeof salesDocGstReg === 'function' ? salesDocGstReg() : null,
       postedAt: isEditPosted ? (existingPostedInv?.postedAt || Date.now()) : Date.now()
     };
 

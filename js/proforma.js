@@ -295,6 +295,9 @@
       updateProformaDocUI(null);
     }
 
+    // An SEZ unit / developer: inter-State choices only (gst-registration.js)
+    if (typeof kyaApplyGstSupplyTypes === 'function') kyaApplyGstSupplyTypes(supplyTypeEl, proformaGstReg());
+
     updateProformaDueDateHelper();
     renderProformaRows();
     recalculateProformaTotals();
@@ -692,8 +695,22 @@
     if (typeof refreshPreInvoiceCustomerAlterPencil === 'function') refreshPreInvoiceCustomerAlterPencil('proforma');
   }
 
+  // The GST registration this proforma is made under (gst-registration.js): a stored one keeps
+  // its own, a new one (or a conversion) takes the company's
+  function proformaGstReg() {
+    return typeof kyaGstRegFor === 'function' ? kyaGstRegFor(_editingProforma && !_editingProforma.isConversion ? _editingProforma : null) : null;
+  }
+
+  // Unregistered or composition: no GST (Section 32 / Section 10(4), CGST Act)
+  function proformaGstAllowed() {
+    return typeof kyaGstRegRules !== 'function' || kyaGstRegRules(proformaGstReg()).chargesGst;
+  }
+
   function isProformaInterstate(partyState) {
-    if (!partyState) return false;
+    // An SEZ unit / developer supplies inter-State only, a composition dealer intra-State only
+    const gstRules = typeof kyaGstRegRules === 'function' ? kyaGstRegRules(proformaGstReg()) : null;
+    if (gstRules && gstRules.sez) return true;
+    if (!partyState || (gstRules && gstRules.composition)) return false;
     const companyProfile = (typeof getKyaCompanyProfile === 'function') ? getKyaCompanyProfile() : {};
     const companyState = companyProfile.state || 'Kerala';
     return partyState.trim().toLowerCase() !== companyState.trim().toLowerCase();
@@ -732,8 +749,17 @@
     if (!body) return;
 
     body.innerHTML = '';
+    const gstLocked = !proformaGstAllowed();
 
     proformaRows.forEach((row, index) => {
+      // No GST to charge: Tax 0%, locked (as the Sales form's zero-rated supplies)
+      if (gstLocked && parseFloat(row.tax)) {
+        row.tax = 0;
+        const base = (row.qty || 1) * (row.rate || 0);
+        const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+        row.amount = Math.max(0, base - discAmt);
+      }
+
       const trHtml = `
         <tr class="sales-row" data-row-index="${index}">
           <td class="sales-cell-item" style="padding: 4px 8px;">
@@ -767,7 +793,7 @@
             </div>
           </td>
           <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
-            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;">
+            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${gstLocked ? 'disabled' : ''}>
               ${typeof kyaGstRateOptionsHtml === 'function' ? kyaGstRateOptionsHtml(row.tax) : `<option value="${row.tax === undefined ? 18 : row.tax}" selected>${row.tax === undefined ? 18 : row.tax}%</option>`}
             </select>
           </td>
@@ -796,7 +822,7 @@
           _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
             if (typeof window.applyMasterItemToVoucherRow === 'function') {
-              window.applyMasterItemToVoucherRow(proformaRows[index], tr, selectedItem);
+              window.applyMasterItemToVoucherRow(proformaRows[index], tr, selectedItem, { zeroTax: gstLocked });
               updateProformaRowFromDOM(index, tr, 'item');
               if (typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(proformaRows, index);
             } else {
@@ -1220,6 +1246,8 @@
         data: _proformaDocData
       } : (_editingProforma ? _editingProforma.document : null),
       createdAt: _editingProforma ? _editingProforma.createdAt : Date.now(),
+      // The GST registration it is made under (gst-registration.js)
+      gstReg: proformaGstReg(),
       status: 'Active'
     };
   }
@@ -2317,6 +2345,15 @@
   window.initProformaForm = initProformaForm;
   // The Sales Executive box (sales-select-boxes.js) refreshes its list with it
   window.populateProformaExecutives = populateProformaExecutives;
+  // The GST registration was changed (Company Profile & Vault): a new proforma takes it at once;
+  // a stored one keeps its own
+  document.addEventListener('kya:gst-registration-changed', () => {
+    if (_editingProforma && !_editingProforma.isConversion) return;
+    if (typeof kyaApplyGstSupplyTypes === 'function') kyaApplyGstSupplyTypes(document.getElementById('proformaSupplyType'), proformaGstReg());
+    renderProformaRows();
+    recalculateProformaTotals();
+  });
+
   window.renderProformaRows = renderProformaRows;
   window.addProformaRow = addProformaRow;
   window.recalculateProformaTotals = recalculateProformaTotals;

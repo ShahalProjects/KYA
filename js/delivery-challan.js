@@ -415,14 +415,34 @@
     }
   }
 
+  // The GST registration this challan is made under (gst-registration.js): a stored one keeps
+  // its own, a new one (or a conversion) takes the company's
+  function challanGstReg() {
+    return typeof kyaGstRegFor === 'function' ? kyaGstRegFor(_editingChallan && !_editingChallan.isConversion ? _editingChallan : null) : null;
+  }
+
+  // Unregistered or composition: no GST (Section 32 / Section 10(4), CGST Act)
+  function challanGstAllowed() {
+    return typeof kyaGstRegRules !== 'function' || kyaGstRegRules(challanGstReg()).chargesGst;
+  }
+
   // ── Render Line Item Rows ──
   function renderChallanRows() {
     const body = document.getElementById('challanItemBody');
     if (!body) return;
 
     body.innerHTML = '';
+    const gstLocked = !challanGstAllowed();
 
     challanRows.forEach((row, index) => {
+      // No GST to charge: Tax 0%, locked (as the Sales form's zero-rated supplies)
+      if (gstLocked && parseFloat(row.tax)) {
+        row.tax = 0;
+        const base = (row.qty || 1) * (row.rate || 0);
+        const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+        row.amount = Math.max(0, base - discAmt);
+      }
+
       const trHtml = `
         <tr class="sales-row" data-row-index="${index}">
           <td class="sales-cell-item" style="padding: 4px 8px;">
@@ -456,7 +476,7 @@
             </div>
           </td>
           <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
-            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;">
+            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${gstLocked ? 'disabled' : ''}>
               ${typeof kyaGstRateOptionsHtml === 'function' ? kyaGstRateOptionsHtml(row.tax) : `<option value="${row.tax === undefined ? 18 : row.tax}" selected>${row.tax === undefined ? 18 : row.tax}%</option>`}
             </select>
           </td>
@@ -485,7 +505,7 @@
           _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
             if (typeof window.applyMasterItemToVoucherRow === 'function') {
-              window.applyMasterItemToVoucherRow(challanRows[index], tr, selectedItem);
+              window.applyMasterItemToVoucherRow(challanRows[index], tr, selectedItem, { zeroTax: gstLocked });
               updateChallanRowFromDOM(index, tr, 'item');
               if (typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(challanRows, index);
             } else {
@@ -886,6 +906,8 @@
         data: _challanDocData
       } : null,
       createdAt: _editingChallan ? _editingChallan.createdAt : Date.now(),
+      // The GST registration it is made under (gst-registration.js)
+      gstReg: challanGstReg(),
       status: 'Active'
     };
   }
@@ -1333,6 +1355,14 @@
   window.initDeliveryChallanForm = initDeliveryChallanForm;
   // The Dispatched By / Executive box (sales-select-boxes.js) refreshes its list with it
   window.populateChallanExecutives = populateChallanExecutives;
+  // The GST registration was changed (Company Profile & Vault): a new challan takes it at once; a
+  // stored one keeps its own
+  document.addEventListener('kya:gst-registration-changed', () => {
+    if (_editingChallan && !_editingChallan.isConversion) return;
+    renderChallanRows();
+    recalculateChallanTotals();
+  });
+
   window.renderChallanRows = renderChallanRows;
   window.addChallanRow = addChallanRow;
   window.recalculateChallanTotals = recalculateChallanTotals;

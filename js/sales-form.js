@@ -1835,8 +1835,7 @@
   }
 
   function handleSupplyTypeChange() {
-    const supplyType = document.getElementById('salesSupplyType').value;
-    const isZeroTax = supplyType === 'Export (Zero-Rated / LUT)' || supplyType === 'SEZ Without Tax';
+    const isZeroTax = isSalesZeroTaxSupply();
     
     salesRows.forEach(row => {
       if (isZeroTax) {
@@ -2597,9 +2596,8 @@
     body.innerHTML = '';
     const isLocked = isSalesReturnInvoiceSelected();
     
-    const supplyTypeEl = document.getElementById('salesSupplyType');
-    const isZeroTax = supplyTypeEl && (supplyTypeEl.value === 'Export (Zero-Rated / LUT)' || supplyTypeEl.value === 'SEZ Without Tax');
-    
+    const isZeroTax = isSalesZeroTaxSupply();
+
     salesRows.forEach((row, index) => {
       if (isZeroTax) {
         row.tax = 0;
@@ -2867,9 +2865,35 @@
   }
   window.attachVoucherRowCodePicker = attachVoucherRowCodePicker;
 
+  // The GST registration this invoice is made under (gst-registration.js): a stored invoice
+  // keeps its own, a reversal follows the invoice it reverses, a new invoice takes the company's
+  function salesDocGstReg() {
+    if (typeof kyaGstRegFor !== 'function') return null;
+    const S = window.KYA_STORE || {};
+    const ctx = window._editingSalesInvoice;
+    const stored = ctx ? ((ctx.isDraft ? S.salesVouchersDrafts : S.salesVouchers) || []).find(v => String(v.id) === String(ctx.id)) : null;
+    const original = !stored && typeof getOriginalInvoiceForReturn === 'function' ? getOriginalInvoiceForReturn() : null;
+    return kyaGstRegFor(stored || original || null);
+  }
+  window.salesDocGstReg = salesDocGstReg;
+
+  // Unregistered or composition: no GST on the sale (Section 32 / Section 10(4), CGST Act)
+  function salesGstAllowed() {
+    return typeof kyaGstRegRules !== 'function' || kyaGstRegRules(salesDocGstReg()).chargesGst;
+  }
+
+  // The GST registration was changed (Company Profile & Vault): a new invoice takes it at once;
+  // a stored one and a reversal keep their own
+  document.addEventListener('kya:gst-registration-changed', () => {
+    if (window._editingSalesInvoice || currentSalesVoucherSubtype === 'Return') return;
+    if (typeof kyaApplyGstSupplyTypes === 'function') kyaApplyGstSupplyTypes(document.getElementById('salesSupplyType'), salesDocGstReg());
+    renderSalesRows();
+    recalculateSalesTotals();
+  });
+
   function isSalesZeroTaxSupply() {
     const supplyTypeEl = document.getElementById('salesSupplyType');
-    return !!supplyTypeEl && (supplyTypeEl.value === 'Export (Zero-Rated / LUT)' || supplyTypeEl.value === 'SEZ Without Tax');
+    return (!!supplyTypeEl && (supplyTypeEl.value === 'Export (Zero-Rated / LUT)' || supplyTypeEl.value === 'SEZ Without Tax')) || !salesGstAllowed();
   }
 
   function applySalesMasterItemToRow(index, tr, selectedItem) {
@@ -3729,6 +3753,8 @@
     if (execEl) execEl.value = '';
     const supplyTypeEl = document.getElementById('salesSupplyType');
     if (supplyTypeEl) supplyTypeEl.value = 'Intra-State (CGST + SGST)';
+    // An SEZ unit / developer: inter-State choices only (gst-registration.js)
+    if (typeof kyaApplyGstSupplyTypes === 'function') kyaApplyGstSupplyTypes(supplyTypeEl, salesDocGstReg());
     const notPaidBtn = document.getElementById('salesPaymentStatusNotPaid');
     // A disabled button ignores .click() (a cash sale locks Not Paid); the lock state is applied again below
     if (notPaidBtn) { notPaidBtn.disabled = false; notPaidBtn.click(); }

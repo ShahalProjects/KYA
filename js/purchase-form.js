@@ -1806,6 +1806,15 @@
     return null;
   }
 
+  // The GST registration this purchase is made under (gst-registration.js): a stored voucher keeps
+  // its own, a reversal follows the purchase it reverses, a new purchase takes the company's
+  function purchaseDocGstReg(isReturn, src) {
+    if (typeof kyaGstRegFor !== 'function') return null;
+    const stored = _editingPurchaseVoucher ? findStoredPurchase(_editingPurchaseVoucher.id) : null;
+    const original = !stored && isReturn && src && src.type === 'purchase' ? findStoredPurchase(src.id) : null;
+    return kyaGstRegFor((stored && stored.v) || (original && original.v) || null);
+  }
+
   // Opens a stored purchase (posted or draft) on the form. Takes the voucher or its id.
   function loadPurchaseVoucher(vOrId, isDraft = false) {
     // The screen it is opened from (see returnFromPurchaseEdit)
@@ -2070,6 +2079,8 @@
       notes: ($('purchaseNotes') || {}).value || '',
       narration: ($('purchaseNarration') || {}).value || '',
       uploadedDoc: purchaseUploadedDoc || null,
+      // The GST registration it is made under (gst-registration.js)
+      gstReg: purchaseDocGstReg(isReturn, src),
       // The Pre Purchase document it is made from, and the advance paid against it
       preDocKind: _purchasePreLink ? _purchasePreLink.kind : null,
       preDocId: _purchasePreLink ? _purchasePreLink.id : null,

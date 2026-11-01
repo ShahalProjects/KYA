@@ -86,14 +86,20 @@
     const rows = getInvoiceLineRows(sd);
     const isDraft = isDraftDoc(sd);
 
+    // The GST registration the document was made under (gst-registration.js), and the company's
+    // State of registration
+    const gstRules = typeof kyaGstRegRules === 'function' ? kyaGstRegRules(kyaDocGstReg(sd)) : { registered: true, sez: false };
+    const companyState = typeof kyaDocGstState === 'function' ? kyaDocGstState(sd, co) : (co.state || '');
+
     // A Delivery Challan's box is its purpose: the tax then follows the consignee's state,
-    // compared with the company's as the Quotation / Sales Order forms do (Kerala when unset)
+    // compared with the company's as the Quotation / Sales Order forms do (Kerala when unset);
+    // an SEZ unit / developer supplies inter-State only
     const isGstSupply = GST_SUPPLY_TYPES.indexOf(sd.supplyType) > -1;
     const stateKey = s => String(s || '').trim().toLowerCase();
     const partyState = stateKey(parties.billed.state);
     const taxMode = isGstSupply
       ? getInvoiceTaxMode({ salesSupplyType: sd.supplyType })
-      : ((partyState && partyState !== (stateKey(co.state) || 'kerala')) ? 'igst' : 'split');
+      : ((gstRules.sez || (partyState && partyState !== (stateKey(companyState) || 'kerala'))) ? 'igst' : 'split');
     const purpose = (!isGstSupply && sd.supplyType) ? String(sd.supplyType) : '';
 
     const subTotal = rows.reduce((s, r) => s + r.taxable, 0);
@@ -143,7 +149,7 @@
     }
 
     const posFromParty = !!(parties.billed.state || parties.billed.country);
-    const posState = posFromParty ? (parties.billed.state || '') : (co.state || '');
+    const posState = posFromParty ? (parties.billed.state || '') : companyState;
     const posCountry = posFromParty ? (parties.billed.country || '') : '';
     const posCode = posState ? getGstStateCode(posState, posCountry, posFromParty ? parties.billed.gstin : co.gstin) : '';
     const placeOfSupply = [posCode ? posCode + ' - ' + posState : posState, posCountry].filter(Boolean).join(', ');
@@ -166,7 +172,7 @@
     });
 
     return {
-      kind, co, parties, rows, isDraft, taxMode, purpose,
+      kind, co, parties, rows, isDraft, taxMode, purpose, gstRules,
       bank: getInvoiceBankDetails(sd) || { bankName: '', accountHolder: '', accountNo: '', ifsc: '', branch: '', qrCode: '' },
       subTotal, grossTotal, totalTax, totalDiscount, adjustments, tdsTcsAmount, netTotal, grandTotal,
       advance, journal, balanceDue, isFullyPaid, payLines, paymentDetails, placeOfSupply, gstLines,
@@ -179,19 +185,20 @@
     const d = computePreDocSheet(sd);
     const co = d.co;
     const docTitle = d.kind.title;
-    const companyName = getInvoiceCompanyName(co);
+    const companyName = getInvoiceFirmName(co);
 
     // One type scale shared by the company, Billed/Shipped To, bank and terms blocks
     const FS = { label: '10.5px', body: '12.5px', name: '15px', note: '11.5px' };
 
-    // ── Company block ──
+    // ── Company block ── (no GSTIN when not registered)
     const coLines = [];
     if (co.address) coLines.push(siEsc(co.address).replace(/\n/g, '<br>'));
     const coDistrict = co.district && String(co.district).toLowerCase() !== String(co.city || '').toLowerCase() ? co.district : '';
     const coCityPin = [[co.city, coDistrict].filter(Boolean).join(', '), co.pincode].filter(Boolean).join(' - ');
     if (coCityPin) coLines.push(siEsc(coCityPin));
     if (co.state) coLines.push(siEsc(co.state));
-    if (co.gstin) coLines.push(`GSTIN: ${siEsc(co.gstin)}`);
+    const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(sd, co) : co.gstin;
+    if (docGstin && d.gstRules.registered) coLines.push(`GSTIN: ${siEsc(docGstin)}`);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(siEsc(co.website));
@@ -275,9 +282,10 @@
         </div>
       </div>`;
 
-    // Terms always print too — a document without notes still shows the column
+    // Terms always print too — a document without notes still shows the heading. As one block
+    // (flow-root) they sit beside the signatory when it reaches their row, else across the full row
     const termsHtml = `
-      <div style="flex:1 1 auto; min-width:0; padding:6px 8px; box-sizing:border-box;">
+      <div style="display:flow-root; margin-top:10px; padding:6px 8px; box-sizing:border-box;">
         <div style="font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:5px;">Terms &amp; Conditions</div>
         <div style="font-size:11px; color:#334155; line-height:1.6; white-space:pre-wrap;">${siEsc(sd.notes || '')}</div>
       </div>`;
@@ -328,7 +336,7 @@
           <div style="display:flex; gap:12px; align-items:flex-start; min-width:0;">
             ${getCompanyLogoHtml(co)}
             <div style="min-width:0;">
-              <div style="font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-.2px;">${siEsc(companyName)}</div>
+              <div style="font-size:19px; font-weight:800; color:#1d4ed8; letter-spacing:-.2px;">${siEsc(companyName)}</div>
               <div style="font-size:${FS.body}; color:#475569; margin-top:5px; line-height:1.55;">${coLines.join('<br>')}</div>
             </div>
           </div>
@@ -372,17 +380,9 @@
           </tbody>
         </table>
 
-        <!-- One two-column grid, as on the Tax Invoice -->
-        <div style="display:flex; gap:10px; margin-top:10px; align-items:stretch;">
-          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px;">
-            ${bankHtml}
-            <div style="flex:0 0 auto; padding:7px 12px; background:#f8fafc; border-left:3.5px solid var(--blue-600, #2563eb); border-radius:0 6px 6px 0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
-              <div style="color:#2563eb; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
-              <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${siEsc(siAmountInWords(d.grandTotal))}</div>
-            </div>
-            ${termsHtml}
-          </div>
-          <div style="width:290px; flex-shrink:0; display:flex; flex-direction:column; gap:10px;">
+        <!-- Two columns, as on the Tax Invoice: the signatory right under the Total Amount -->
+        <div style="display:flow-root; margin-top:10px;">
+          <div style="float:right; width:290px; margin-left:10px; display:flex; flex-direction:column; gap:10px;">
             <div style="flex:0 0 auto; padding:4px 12px; box-sizing:border-box;">
               ${totalsRow('Taxable Value', siNum(d.subTotal))}
               ${gstTotalsRows ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${gstTotalsRows}` : ''}
@@ -394,6 +394,14 @@
             </div>
             ${getInvoiceSignatoryBlockHtml(co, companyName)}
           </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${bankHtml}
+            <div style="flex:0 0 auto; padding:7px 12px; background:#f8fafc; border-left:3.5px solid var(--blue-600, #2563eb); border-radius:0 6px 6px 0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+              <div style="color:#2563eb; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
+              <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${siEsc(siAmountInWords(d.grandTotal))}</div>
+            </div>
+          </div>
+          ${termsHtml}
         </div>
 
         <!-- Thank you -->

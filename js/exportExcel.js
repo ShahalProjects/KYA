@@ -2428,16 +2428,15 @@
         views: [{ state: 'frozen', ySplit: 5, showGridLines: true }]
       });
 
-      const maxCols = 7;
-      const lastColLetter = 'G';
+      const maxCols = 6;
+      const lastColLetter = 'F';
 
-      sheet.getColumn(1).width = 10;
-      sheet.getColumn(2).width = 14;
+      sheet.getColumn(1).width = 14;
+      sheet.getColumn(2).width = 20;
       sheet.getColumn(3).width = 20;
-      sheet.getColumn(4).width = 20;
-      sheet.getColumn(5).width = 38;
-      sheet.getColumn(6).width = 20;
-      sheet.getColumn(7).width = 14;
+      sheet.getColumn(4).width = 38;
+      sheet.getColumn(5).width = 20;
+      sheet.getColumn(6).width = 14;
 
       const compName = (data.companyName || 'KYA Accounting').toUpperCase();
 
@@ -2465,20 +2464,20 @@
       }
       filterStr += `Status: ${data.filterStatus || 'All'} • Type: ${data.filterType || 'All'} • Total Vouchers: ${items.length}`;
       const genStr = `Generated on: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
-      const r3 = sheet.addRow([filterStr, '', '', '', '', '', genStr]);
+      const r3 = sheet.addRow([filterStr, '', '', '', genStr]);
       r3.height = 18;
-      sheet.mergeCells('A3:E3');
-      sheet.mergeCells(`F3:${lastColLetter}3`);
+      sheet.mergeCells('A3:D3');
+      sheet.mergeCells(`E3:${lastColLetter}3`);
       r3.getCell(1).font = { name: 'Calibri', size: 9.5, color: { argb: 'FF64748B' } };
-      r3.getCell(6).font = { name: 'Calibri', size: 9.5, color: { argb: 'FF64748B' } };
-      r3.getCell(6).alignment = { vertical: 'middle', horizontal: 'right' };
+      r3.getCell(5).font = { name: 'Calibri', size: 9.5, color: { argb: 'FF64748B' } };
+      r3.getCell(5).alignment = { vertical: 'middle', horizontal: 'right' };
 
       // Row 4: Spacer
       const r4 = sheet.addRow([]);
       r4.height = 6;
 
       // Row 5: Header Row
-      const r5 = sheet.addRow(['Sl No', 'Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']);
+      const r5 = sheet.addRow(['Date', 'Voucher No.', 'Type', 'Particulars', 'Amount (INR)', 'Status']);
       r5.height = 24;
       for (let c = 1; c <= maxCols; c++) {
         const cell = r5.getCell(c);
@@ -2487,19 +2486,18 @@
         cell.border = { top: thinBorder, bottom: mediumBorder, left: thinBorder, right: thinBorder };
         cell.alignment = {
           vertical: 'middle',
-          horizontal: (c === 1 || c === 7 ? 'center' : (c === 6 ? 'right' : 'left')),
-          indent: (c === 3 || c === 4 || c === 5 ? 1 : 0)
+          horizontal: (c === 6 ? 'center' : (c === 5 ? 'right' : 'left')),
+          indent: (c === 2 || c === 3 || c === 4 ? 1 : 0)
         };
       }
 
       let totalAmt = 0;
-      items.forEach((item, idx) => {
+      items.forEach(item => {
         const cleanAmt = typeof item.amount === 'string' ? parseFloat(item.amount.replace(/,/g, '')) : Number(item.amount);
         const val = isNaN(cleanAmt) ? 0 : cleanAmt;
         totalAmt += val;
 
         const row = sheet.addRow([
-          idx + 1,
           item.date || '—',
           item.voucherNo || '—',
           item.type || 'Journal Entry',
@@ -2514,13 +2512,13 @@
           cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF334155' } };
           cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
 
-          if (c === 6) {
+          if (c === 5) {
             cell.numFmt = numFormat;
             cell.alignment = { vertical: 'middle', horizontal: 'right' };
             cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1E3A8A' } };
-          } else if (c === 1 || c === 7) {
+          } else if (c === 6) {
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-          } else if (c === 2) {
+          } else if (c === 1) {
             cell.alignment = { vertical: 'middle', horizontal: 'left' };
           } else {
             cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
@@ -2529,18 +2527,18 @@
       });
 
       // Total Row
-      const rTot = sheet.addRow(['TOTAL AMOUNT', '', '', '', '', totalAmt, `${items.length} vouchers`]);
+      const rTot = sheet.addRow(['TOTAL AMOUNT', '', '', '', totalAmt, `${items.length} vouchers`]);
       rTot.height = 22;
-      sheet.mergeCells(`A${rTot.number}:E${rTot.number}`);
+      sheet.mergeCells(`A${rTot.number}:D${rTot.number}`);
       for (let c = 1; c <= maxCols; c++) {
         const cell = rTot.getCell(c);
         cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E3A8A' } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
         cell.border = { top: mediumBorder, bottom: doubleBorder, left: thinBorder, right: thinBorder };
-        if (c === 6) {
+        if (c === 5) {
           cell.numFmt = numFormat;
           cell.alignment = { vertical: 'middle', horizontal: 'right' };
-        } else if (c === 7) {
+        } else if (c === 6) {
           cell.alignment = { vertical: 'middle', horizontal: 'center' };
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF64748B' } };
         } else {

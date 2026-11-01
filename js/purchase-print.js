@@ -148,11 +148,13 @@
     const isFullyPaid = balanceDue <= 0.005;
     const payStatus = journalPaid > 0 ? getJournalSettledStatus(netTotal, paidAmount, journalPaid) : (v.paymentStatus || '');
 
-    // Place of Supply of an inward supply: the buyer's (this company's) state
-    const posState = co.state || parties.billed.state || '';
-    const posCountry = co.state ? (co.country || '') : (parties.billed.country || '');
+    // Place of Supply of an inward supply: the buyer's (this company's) State of registration
+    // (gst-registration.js)
+    const coState = typeof kyaDocGstState === 'function' ? kyaDocGstState(v, co) : (co.state || '');
+    const posState = coState || parties.billed.state || '';
+    const posCountry = coState ? (co.country || '') : (parties.billed.country || '');
     const posCode = posState && typeof getGstStateCode === 'function'
-      ? getGstStateCode(posState, posCountry, co.state ? co.gstin : parties.billed.gstin) : '';
+      ? getGstStateCode(posState, posCountry, coState ? co.gstin : parties.billed.gstin) : '';
     const placeOfSupply = [posCode ? posCode + ' - ' + posState : posState, posCountry].filter(Boolean).join(', ');
 
     const gstByRate = {};
@@ -184,8 +186,11 @@
       ifsc: vendorBank.ifsc, branch: vendorBank.branch, qrCode: ''
     };
 
+    // The GST registration the purchase was made under (gst-registration.js)
+    const gstRules = typeof kyaGstRegRules === 'function' ? kyaGstRegRules(kyaDocGstReg(v)) : { registered: true };
+
     return {
-      co, parties, rows, taxMode, isDraft, bank,
+      co, parties, rows, taxMode, isDraft, bank, gstRules,
       subTotal, grossTotal, totalTax, totalDiscount, adjustments, tdsTcsAmount, tdsAmount,
       netTotal, grandTotal, paidAmount, balanceDue, isFullyPaid, placeOfSupply, gstLines, payLines, journalPaid,
       paymentDetails: getPurchasePaymentDetails(v, paidAmount || netTotal)
@@ -195,7 +200,7 @@
   function renderPurchaseVoucherHTML(v) {
     const d = computePurchaseSheet(v);
     const co = d.co;
-    const companyName = (typeof getInvoiceCompanyName === 'function') ? getInvoiceCompanyName(co) : (co.name || 'Your Company');
+    const companyName = (typeof getInvoiceFirmName === 'function') ? getInvoiceFirmName(co) : (co.name || 'Your Company');
     const FS = { label: '10.5px', body: '12.5px', name: '15px', note: '11.5px' };
 
     const coLines = [];
@@ -204,7 +209,8 @@
     const coCityPin = [[co.city, coDistrict].filter(Boolean).join(', '), co.pincode].filter(Boolean).join(' - ');
     if (coCityPin) coLines.push(esc(coCityPin));
     if (co.state) coLines.push(esc(co.state));
-    if (co.gstin) coLines.push(`GSTIN: ${esc(co.gstin)}`);
+    const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(v, co) : co.gstin;
+    if (docGstin && d.gstRules.registered) coLines.push(`GSTIN: ${esc(docGstin)}`);
     const coContact = [co.phone ? 'Phone: ' + esc(co.phone) : '', co.email ? esc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(esc(co.website));
@@ -276,8 +282,9 @@
         </div>
       </div>`;
 
+    // As on the Tax Invoice: beside the signatory when it reaches their row, else the full row
     const termsHtml = `
-      <div style="flex:1 1 auto; min-width:0; padding:6px 8px; box-sizing:border-box;">
+      <div style="display:flow-root; margin-top:10px; padding:6px 8px; box-sizing:border-box;">
         <div style="font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#94a3b8; margin-bottom:5px;">Terms &amp; Conditions</div>
         <div style="font-size:11px; color:#334155; line-height:1.6; white-space:pre-wrap;">${esc(v.notes || '')}</div>
       </div>`;
@@ -328,7 +335,7 @@
           <div style="display:flex; gap:12px; align-items:flex-start; min-width:0;">
             ${logo}
             <div style="min-width:0;">
-              <div style="font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-.2px;">${esc(companyName)}</div>
+              <div style="font-size:19px; font-weight:800; color:#1d4ed8; letter-spacing:-.2px;">${esc(companyName)}</div>
               <div style="font-size:${FS.body}; color:#475569; margin-top:5px; line-height:1.55;">${coLines.join('<br>')}</div>
             </div>
           </div>
@@ -371,16 +378,8 @@
           </tbody>
         </table>
 
-        <div style="display:flex; gap:10px; margin-top:10px; align-items:stretch;">
-          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px;">
-            ${bankHtml}
-            <div style="flex:0 0 auto; padding:7px 12px; background:#f8fafc; border-left:3.5px solid var(--blue-600, #2563eb); border-radius:0 6px 6px 0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
-              <div style="color:#2563eb; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
-              <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${esc(words)}</div>
-            </div>
-            ${termsHtml}
-          </div>
-          <div style="width:290px; flex-shrink:0; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flow-root; margin-top:10px;">
+          <div style="float:right; width:290px; margin-left:10px; display:flex; flex-direction:column; gap:10px;">
             <div style="flex:0 0 auto; padding:4px 12px; box-sizing:border-box;">
               ${totalsRow('Taxable Value', num(d.subTotal))}
               ${gstTotalsRows ? `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #94a3b8;"></div>${gstTotalsRows}` : ''}
@@ -392,6 +391,14 @@
             </div>
             ${signatory}
           </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${bankHtml}
+            <div style="flex:0 0 auto; padding:7px 12px; background:#f8fafc; border-left:3.5px solid var(--blue-600, #2563eb); border-radius:0 6px 6px 0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+              <div style="color:#2563eb; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:${FS.label};">Amount in Words</div>
+              <div style="font-size:${FS.body}; color:#0f172a; font-weight:700; margin-top:2px; line-height:1.4;">${esc(words)}</div>
+            </div>
+          </div>
+          ${termsHtml}
         </div>
 
         <div style="text-align:center; margin-top:18px; padding-top:12px; border-top:1px solid #94a3b8;">

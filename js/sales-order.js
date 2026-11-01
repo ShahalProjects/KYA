@@ -202,6 +202,9 @@
       updateOrderDocUI(null);
     }
 
+    // An SEZ unit / developer: inter-State choices only (gst-registration.js)
+    if (typeof kyaApplyGstSupplyTypes === 'function') kyaApplyGstSupplyTypes(supplyTypeEl, orderGstReg());
+
     updateOrderDueDateHelper();
     renderOrderRows();
     recalculateOrderTotals();
@@ -397,8 +400,22 @@
     if (typeof refreshPreInvoiceCustomerAlterPencil === 'function') refreshPreInvoiceCustomerAlterPencil('order');
   }
 
+  // The GST registration this order is made under (gst-registration.js): a stored one keeps its
+  // own, a new one (or a conversion) takes the company's
+  function orderGstReg() {
+    return typeof kyaGstRegFor === 'function' ? kyaGstRegFor(_editingOrder && !_editingOrder.isConversion ? _editingOrder : null) : null;
+  }
+
+  // Unregistered or composition: no GST (Section 32 / Section 10(4), CGST Act)
+  function orderGstAllowed() {
+    return typeof kyaGstRegRules !== 'function' || kyaGstRegRules(orderGstReg()).chargesGst;
+  }
+
   function isOrderInterstate(partyState) {
-    if (!partyState) return false;
+    // An SEZ unit / developer supplies inter-State only, a composition dealer intra-State only
+    const gstRules = typeof kyaGstRegRules === 'function' ? kyaGstRegRules(orderGstReg()) : null;
+    if (gstRules && gstRules.sez) return true;
+    if (!partyState || (gstRules && gstRules.composition)) return false;
     const companyProfile = (typeof getKyaCompanyProfile === 'function') ? getKyaCompanyProfile() : {};
     const companyState = companyProfile.state || 'Kerala';
     return partyState.trim().toLowerCase() !== companyState.trim().toLowerCase();
@@ -437,8 +454,17 @@
     if (!body) return;
 
     body.innerHTML = '';
+    const gstLocked = !orderGstAllowed();
 
     orderRows.forEach((row, index) => {
+      // No GST to charge: Tax 0%, locked (as the Sales form's zero-rated supplies)
+      if (gstLocked && parseFloat(row.tax)) {
+        row.tax = 0;
+        const base = (row.qty || 1) * (row.rate || 0);
+        const discAmt = row.discountType === 'pct' ? (base * (row.discount / 100)) : row.discount;
+        row.amount = Math.max(0, base - discAmt);
+      }
+
       const trHtml = `
         <tr class="sales-row" data-row-index="${index}">
           <td class="sales-cell-item" style="padding: 4px 8px;">
@@ -472,7 +498,7 @@
             </div>
           </td>
           <td class="sales-cell-tax" style="width: 75px; padding: 4px 6px;">
-            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;">
+            <select class="sales-row-tax je-input" style="border: none; background: transparent; box-shadow: none; text-align: right; text-align-last: right; padding-right: 2px; font-weight: 600; font-size: 12.5px; color: var(--slate-800); width: 100%; outline: none; cursor: pointer;" ${gstLocked ? 'disabled' : ''}>
               ${typeof kyaGstRateOptionsHtml === 'function' ? kyaGstRateOptionsHtml(row.tax) : `<option value="${row.tax === undefined ? 18 : row.tax}" selected>${row.tax === undefined ? 18 : row.tax}%</option>`}
             </select>
           </td>
@@ -501,7 +527,7 @@
           _salesItemPortal.open(itemInp, itemInp.value, (selectedItem) => {
             itemInp.value = selectedItem.name;
             if (typeof window.applyMasterItemToVoucherRow === 'function') {
-              window.applyMasterItemToVoucherRow(orderRows[index], tr, selectedItem);
+              window.applyMasterItemToVoucherRow(orderRows[index], tr, selectedItem, { zeroTax: gstLocked });
               updateOrderRowFromDOM(index, tr, 'item');
               if (typeof window.warnVoucherRowStock === 'function') window.warnVoucherRowStock(orderRows, index);
             } else {
@@ -902,6 +928,8 @@
         data: _orderDocData
       } : null,
       createdAt: _editingOrder ? _editingOrder.createdAt : Date.now(),
+      // The GST registration it is made under (gst-registration.js)
+      gstReg: orderGstReg(),
       status: 'Active'
     };
   }
@@ -1351,6 +1379,15 @@
   window.initSalesOrderForm = initSalesOrderForm;
   // The Sales Executive box (sales-select-boxes.js) refreshes its list with it
   window.populateOrderExecutives = populateOrderExecutives;
+  // The GST registration was changed (Company Profile & Vault): a new order takes it at once; a
+  // stored one keeps its own
+  document.addEventListener('kya:gst-registration-changed', () => {
+    if (_editingOrder && !_editingOrder.isConversion) return;
+    if (typeof kyaApplyGstSupplyTypes === 'function') kyaApplyGstSupplyTypes(document.getElementById('orderSupplyType'), orderGstReg());
+    renderOrderRows();
+    recalculateOrderTotals();
+  });
+
   window.renderOrderRows = renderOrderRows;
   window.addOrderRow = addOrderRow;
   window.recalculateOrderTotals = recalculateOrderTotals;

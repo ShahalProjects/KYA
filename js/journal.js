@@ -3845,8 +3845,9 @@
     if (elPurch) elPurch.textContent = totalPurchase;
     if (elDrafts) elDrafts.textContent = totalDrafts;
 
+    // Oldest date first, down to today: the latest voucher is last
     dateFilteredList.sort((a, b) => {
-      const dComp = (b.date || '').localeCompare(a.date || '');
+      const dComp = (a.date || '').localeCompare(b.date || '');
       if (dComp !== 0) return dComp;
       const vComp = (a.voucherNo || '').localeCompare(b.voucherNo || '', undefined, { numeric: true, sensitivity: 'base' });
       if (vComp !== 0) return vComp;
@@ -3980,7 +3981,6 @@
                     <input type="checkbox" class="pt-cb" id="vdSelAll" ${allChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; accent-color: #2563eb;">
                   </th>
                 ` : ''}
-                <th style="width: 60px; text-align: center;">Sl No</th>
                 <th>Date</th>
                 <th>Voucher No.</th>
                 <th>Type</th>
@@ -3990,7 +3990,7 @@
               </tr>
             </thead>
             <tbody>
-              ${filtered.map((e, index) => {
+              ${filtered.map(e => {
                 const itemKey = `${e.type}_${e.id}_${e.isDraft}`;
                 const isSelected = _vdSelectedKeys.has(itemKey);
 
@@ -4018,7 +4018,6 @@
                         <input type="checkbox" class="pt-cb vd-rcb" data-key="${itemKey}" ${isSelected ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; accent-color: #2563eb;">
                       </td>
                     ` : ''}
-                    <td style="color:#94a3b8; font-size:12px; font-weight:600; text-align:center;">${index + 1}</td>
                     <td style="white-space:nowrap;">${e.date || '—'}</td>
                     <td><span style="font-family: monospace; font-weight: 700; color: var(--slate-700);">${e.voucherNo || '—'}</span></td>
                     <td>${typeBadge}</td>
@@ -4451,8 +4450,9 @@
       }
     });
 
+    // As on screen: oldest date first, the latest voucher last
     list.sort((a, b) => {
-      const dComp = (b.date || '').localeCompare(a.date || '');
+      const dComp = (a.date || '').localeCompare(b.date || '');
       if (dComp !== 0) return dComp;
       const vComp = (a.voucherNo || '').localeCompare(b.voucherNo || '', undefined, { numeric: true, sensitivity: 'base' });
       if (vComp !== 0) return vComp;

@@ -5,7 +5,8 @@
 //        Raw Material Purchase for raw materials) or the line's own Expense ledger, Dr Input
 //        CGST + SGST / Input IGST, Dr TCS Receivable (TCS the supplier collected), round off
 //        to Adjustments Account;
-//        Cr Vendor with the full bill value
+//        Cr Vendor with the full bill value. With no input tax credit (an unregistered or
+//        composition buyer) the GST stays in the Purchase / Expense lines.
 //    • TDS entry (JV-…) ..... Dr Vendor; Cr TDS Payable — the TDS deducted from the bill
 //    • Payment entry (JV-…) . Dr Vendor; Cr Cash / Bank (or each Multi Payment account).
 //        A purchase made from a Pre Purchase document (purchase-pre.js) sets off the advance
@@ -82,15 +83,24 @@
     return !!party && party.type === 'ledger' && party.sgId === 'sg-cce';
   }
 
+  // An unregistered or composition buyer takes no input tax credit (Sections 16 and 10(4), CGST
+  // Act): the GST is part of the cost. Follows the registration the purchase was made under
+  // (gst-registration.js); one saved before that existed took the credit.
+  function purchaseClaimsItc(v) {
+    return typeof kyaGstRegRules !== 'function' || kyaGstRegRules(kyaDocGstReg(v)).claimsItc;
+  }
+
   // The debit lines: each line's own Expense ledger, or Purchase for stock items / products —
   // Raw Material Purchase (Cost of materials consumed) for an item in a raw-material Stock Group.
   // On a reversal they are the credit lines: the Expense ledger, or Purchase Returns / Raw
-  // Material Purchase Returns.
+  // Material Purchase Returns. Without input tax credit a line carries its GST too.
   function getPurchaseDebitLines(v) {
     const ledgers = (typeof coaLedgers !== 'undefined' ? coaLedgers : []);
     const lines = [];
+    const itc = purchaseClaimsItc(v);
     (v.rows || []).forEach(r => {
-      const amt = getPurchaseLineFigures(r).taxable;
+      const f = getPurchaseLineFigures(r);
+      const amt = itc ? f.taxable : f.total;
       if (amt <= 0) return;
       const own = r.expenseLedgerId
         ? ledgers.find(l => l.type !== 'group-ledger' && String(l.id) === String(r.expenseLedgerId))
@@ -182,7 +192,7 @@
     getPurchaseDebitLines(v).forEach(line => add('By', line.name, line.amount));
 
     const gst = r2((v.rows || []).reduce((s, r) => s + getPurchaseLineFigures(r).taxAmt, 0));
-    if (gst > 0) {
+    if (gst > 0 && purchaseClaimsItc(v)) {
       const mode = getPurchaseTaxMode(v.supplyType);
       if (mode === 'split') {
         const cgst = r2(gst / 2);
@@ -419,7 +429,7 @@
       if (adjAmt < 0) add('By', ledgerNameOf('Adjustments Account', 'sg-oe'), -adjAmt);
       getPurchaseDebitLines(v).forEach(line => add('To', line.name, line.amount));
       const gst = r2((v.rows || []).reduce((s, r) => s + getPurchaseLineFigures(r).taxAmt, 0));
-      if (gst > 0) {
+      if (gst > 0 && purchaseClaimsItc(v)) {
         if (getPurchaseTaxMode(v.supplyType) === 'split') {
           const cgst = r2(gst / 2);
           add('To', ledgerNameOf('Input CGST', 'sg-oca'), cgst);

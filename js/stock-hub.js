@@ -753,6 +753,13 @@
     return (parseFloat(row.amount) || 0) / (1 + (parseFloat(row.tax) || 0) / 100);
   }
 
+  // A purchase line's cost: without its GST when the input tax credit was taken, with it when
+  // the buyer takes none (unregistered / composition, gst-registration.js)
+  function purchaseRowCost(v, row) {
+    const itc = typeof kyaGstRegRules !== 'function' || kyaGstRegRules(kyaDocGstReg(v)).claimsItc;
+    return itc ? rowTaxableValue(row) : (parseFloat(row.amount) || 0);
+  }
+
   // Voucher date as a sortable number (YYYYMMDD); 0 when it can't be read
   function voucherDateKey(s) {
     const p = voucherDateParts(s);
@@ -793,7 +800,7 @@
         const qty = parseFloat(row.qty) || 0;
         if (!it || qty <= 0) return;
         const s = ledger.get(it.id);
-        const val = rowTaxableValue(row);
+        const val = purchaseRowCost(v, row);
         s.inQty += qty;
         s.inVal += val;
         s.layers.push({ vid: String(v.id), qty, rate: val / qty });
@@ -807,7 +814,7 @@
         if (!it || qty <= 0) return;
         const s = ledger.get(it.id);
         s.inQty -= qty;
-        s.inVal -= rowTaxableValue(row);
+        s.inVal -= purchaseRowCost(v, row);
         let left = qty;
         const src = s.layers.find(l => v.returnAgainstId != null && l.vid === String(v.returnAgainstId));
         if (src) { const take = Math.min(left, src.qty); src.qty -= take; left -= take; }

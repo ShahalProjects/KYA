@@ -26,15 +26,21 @@
 
     const initials = getCompanyInitials(coData.name);
 
-    // District / State search boxes: KYA searchable select, like the Journal Department box
-    const coAddrSelectBox = (key, value) => `
+    // GST Registration: a company saved before the tab existed is Registered, Regular, Monthly
+    // (gst-registration.js)
+    const gstRegType = (typeof kyaGstRegTypeInfo === 'function') ? kyaGstRegTypeInfo(coData.gstRegType).type : (coData.gstRegType || 'Regular');
+    const gstSliderBtn = 'border: none; padding: 6px 16px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; background: transparent; color: var(--slate-500);';
+
+    // District / State / Registration Type search boxes: KYA searchable select, like the Journal
+    // Department box
+    const coAddrSelectBox = (key, value, label = key) => `
                       <div class="kya-searchable-select-wrap" id="co${key}SelectWrap" style="position:relative;width:100%;">
                         <div class="kya-searchable-select-trigger" id="co${key}SelectTrigger" style="display:flex;justify-content:space-between;align-items:center;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:9px;background:#fff;cursor:pointer;font-size:13.5px;color:#334155;height:40px;box-sizing:border-box;">
-                          <span id="co${key}SelectTriggerText" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ohEsc(value || `— Select ${key} —`)}</span>
+                          <span id="co${key}SelectTriggerText" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ohEsc(value || `— Select ${label} —`)}</span>
                           <svg viewBox="0 0 16 16" fill="none" style="width:10px;height:10px;stroke:var(--slate-500);stroke-width:2;margin-left:6px;flex-shrink:0;"><path d="M2 5l6 6 6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </div>
                         <div class="kya-searchable-select-dropdown" id="co${key}SelectDropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--slate-200);border-radius:12px;box-shadow:var(--shadow-lg);z-index:1000;padding:8px;max-height:240px;overflow-y:auto;flex-direction:column;gap:4px;width:100%;box-sizing:border-box;">
-                          <input type="text" id="co${key}SelectSearch" placeholder="Search ${key.toLowerCase()}..." class="je-input" style="padding:8px 12px;font-size:13px;border-radius:6px;border:1.5px solid var(--slate-200);margin-bottom:6px;width:100%;box-sizing:border-box;">
+                          <input type="text" id="co${key}SelectSearch" placeholder="Search ${label.toLowerCase()}..." class="je-input" style="padding:8px 12px;font-size:13px;border-radius:6px;border:1.5px solid var(--slate-200);margin-bottom:6px;width:100%;box-sizing:border-box;">
                           <div id="co${key}SelectOptionsList" style="display:flex;flex-direction:column;gap:2px;"></div>
                         </div>
                       </div>`;
@@ -66,6 +72,12 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               <span class="oh-tab-text">Basic Identity</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="gst">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+              </div>
+              <span class="oh-tab-text">GST Registration</span>
             </button>
             <button class="oh-sub-tab" data-subtab="registrations">
               <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
@@ -244,15 +256,60 @@
               </div>
             </div>
 
+            <!-- TAB: GST REGISTRATION -->
+            <div id="coSubpanel-gst" class="co-subpanel-content" style="display:none;">
+              <div style="display:flex;flex-direction:column;gap:20px;">
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Registration Status</label>
+                  <div class="books-opt-segmented" style="display: inline-flex; background: var(--slate-200); border-radius: 8px; padding: 3px; gap: 3px;">
+                    <button type="button" data-gst-status="registered" style="${gstSliderBtn}">Registered</button>
+                    <button type="button" data-gst-status="unregistered" style="${gstSliderBtn}">Unregistered</button>
+                  </div>
+                </div>
+                <div id="coGstRegisteredFields" style="display:flex;flex-direction:column;gap:20px;">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">GST Registration Number (GSTIN)</label>
+                      <input id="coGSTIN" value="${ohEsc(coData.gstin||'')}" placeholder="e.g. 27AAAAA0000A1Z5" maxlength="15" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                      <div id="coGstinStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:120px 1fr;gap:16px;">
+                      <div>
+                        <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">State Code</label>
+                        <div id="coGstStateCode" style="height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#334155;background:#f8fafc;box-sizing:border-box;display:flex;align-items:center;">—</div>
+                      </div>
+                      <div>
+                        <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">State</label>
+                        <div id="coGstState" style="height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#334155;background:#f8fafc;box-sizing:border-box;display:flex;align-items:center;">—</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                    <div>
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Registration Type</label>
+                      <input type="hidden" id="coRegTypeInput" value="${ohEsc(gstRegType)}">
+                      ${coAddrSelectBox('RegType', gstRegType, 'Registration Type')}
+                    </div>
+                    <div id="coGstr1PeriodWrap">
+                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">GSTR-1 Filing Period</label>
+                      <div class="books-opt-segmented" style="display: inline-flex; background: var(--slate-200); border-radius: 8px; padding: 3px; gap: 3px;">
+                        <button type="button" data-gstr1="monthly" style="${gstSliderBtn}">Monthly</button>
+                        <button type="button" data-gstr1="quarterly" style="${gstSliderBtn}">Quarterly</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="gst" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save GST Registration</button>
+              </div>
+            </div>
+
             <!-- TAB 2: LEGAL & REGISTRATIONS -->
             <div id="coSubpanel-registrations" class="co-subpanel-content" style="display:none;">
               <div style="display:flex;flex-direction:column;gap:20px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
-                  <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">GST Registration Number (GSTIN)</label>
-                    <input id="coGSTIN" value="${ohEsc(coData.gstin||'')}" placeholder="e.g. 27AAAAA0000A1Z5" maxlength="15" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
-                    <div id="coGstinStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
-                  </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Permanent Account Number (PAN)</label>
                     <div style="position:relative;">
@@ -724,15 +781,74 @@
       if (!list.children.length) list.appendChild(addrEmptyRow('No State Found'));
     };
 
-    ['District', 'State'].forEach(key => {
+    // GST Registration Type: the types in GST law (gst-registration.js). Hovering a type shows what
+    // it is as per law in the Supply Type box's card (sales-select-boxes.js), under the GSTR-1
+    // Filing Period slider beside the open list
+    const regTypeCardHtml = (type) => {
+      const t = (window.KYA_GST_REG_TYPES || []).find(x => x.type === type);
+      return (t && t.what && typeof kyaLawCardHtml === 'function') ? kyaLawCardHtml(t.type, 'Registration Type', t) : '';
+    };
+    const placeRegTypeCard = () => {
+      const card = document.getElementById('kyaPartyHoverCard');
+      if (!card || card.style.display === 'none') return;
+      const period = wrap.querySelector('#coGstr1PeriodWrap');
+      const cell = wrap.querySelector('#coRegTypeSelectWrap').parentElement.getBoundingClientRect();
+      // The slider's column; when the type files no GSTR-1 the slider is hidden: the column's top
+      const slider = period.style.display !== 'none' ? period.getBoundingClientRect() : null;
+      const margin = 12;
+      const vh = window.innerHeight;
+      let top = slider ? slider.bottom + 8 : cell.top;
+      // Too little room below: the card scrolls, and only moves up when even that won't do
+      let room = vh - top - margin;
+      if (room < 200) {
+        top = Math.max(margin, vh - margin - Math.min(card.scrollHeight, vh - margin * 2));
+        room = vh - top - margin;
+      }
+      card.style.maxHeight = `${Math.round(room)}px`;
+      const width = card.getBoundingClientRect().width;
+      const left = Math.max(margin, Math.min(slider ? slider.left : cell.right + 20, window.innerWidth - width - margin));
+      card.style.left = `${Math.round(left)}px`;
+      card.style.top = `${Math.round(top)}px`;
+    };
+    const showRegTypeCard = (target, type) => {
+      const html = regTypeCardHtml(type);
+      if (!html || typeof positionAndShowKyaInfoHoverCard !== 'function') return;
+      positionAndShowKyaInfoHoverCard(target, html);
+      placeRegTypeCard();
+    };
+    const hideRegTypeCardSoon = (delay) => { if (typeof scheduleHidePartyHoverCard === 'function') scheduleHidePartyHoverCard(delay); };
+    const hideRegTypeCard = () => { if (typeof hidePartyHoverCard === 'function') hidePartyHoverCard(); };
+
+    const renderRegTypeList = (filter) => {
+      const list = wrap.querySelector('#coRegTypeSelectOptionsList');
+      const q = (filter || '').toLowerCase().trim();
+      list.innerHTML = '';
+      (window.KYA_GST_REG_TYPES || []).forEach(t => {
+        if (q && !t.type.toLowerCase().includes(q)) return;
+        const item = addrListItem(t.type, '', regTypeInp.value === t.type, () => {
+          hideRegTypeCard();
+          setCoRegType(t.type);
+          closeAddrList('RegType');
+        });
+        // A long name wraps to a second line instead of being cut off
+        item.style.whiteSpace = 'normal';
+        item.addEventListener('mouseenter', () => showRegTypeCard(item, t.type));
+        item.addEventListener('mouseleave', () => hideRegTypeCardSoon(250));
+        list.appendChild(item);
+      });
+      if (!list.children.length) list.appendChild(addrEmptyRow('No Registration Type Found'));
+    };
+
+    const searchBoxKeys = ['District', 'State', 'RegType'];
+    searchBoxKeys.forEach(key => {
       const trigger = wrap.querySelector(`#co${key}SelectTrigger`);
       const dd = wrap.querySelector(`#co${key}SelectDropdown`);
       const search = wrap.querySelector(`#co${key}SelectSearch`);
-      const render = key === 'District' ? renderDistrictList : renderStateList;
+      const render = key === 'District' ? renderDistrictList : (key === 'State' ? renderStateList : renderRegTypeList);
       trigger.addEventListener('click', e => {
         e.stopPropagation();
         if (dd.style.display === 'flex') { closeAddrList(key); return; }
-        closeAddrList(key === 'District' ? 'State' : 'District');
+        searchBoxKeys.forEach(k => { if (k !== key) closeAddrList(k); });
         dd.style.display = 'flex';
         search.value = '';
         render('');
@@ -744,7 +860,7 @@
 
     // One outside-click handler, replaced each time the panel is drawn
     if (window._coAddrOutsideClick) document.removeEventListener('click', window._coAddrOutsideClick);
-    window._coAddrOutsideClick = () => { closeAddrList('District'); closeAddrList('State'); };
+    window._coAddrOutsideClick = () => searchBoxKeys.forEach(closeAddrList);
     document.addEventListener('click', window._coAddrOutsideClick);
 
 
@@ -1044,30 +1160,70 @@
     });
 
 
-    // ── GSTIN VALIDATION (format + checksum) ──
-    const GSTIN_CODE_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const gstinCheckDigit = (gstin14) => {
-      let factor = 2, sum = 0;
-      for (let i = 13; i >= 0; i--) {
-        const codePoint = GSTIN_CODE_CHARS.indexOf(gstin14[i]);
-        let d = factor * codePoint;
-        d = Math.floor(d / 36) + (d % 36);
-        sum += d;
-        factor = factor === 2 ? 1 : 2;
-      }
-      return GSTIN_CODE_CHARS[(36 - (sum % 36)) % 36];
-    };
-    const isValidGstin = (raw) => {
-      const match = /^([0-9]{2})([A-Z]{5}[0-9]{4}[A-Z])([1-9A-Z])(Z)([0-9A-Z])$/.test(raw);
-      return match && raw[14] === gstinCheckDigit(raw.slice(0, 14));
-    };
+    // ── GST REGISTRATION (gst-registration.js) ──
+    // GSTIN check: the form the registration type's GSTIN takes, its State code and check
+    // character; the State is read from its first two digits.
     const isValidPan = (raw) => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(raw);
+    const checkGstin = (raw) => (typeof kyaCheckGstin === 'function')
+      ? kyaCheckGstin(raw, regTypeInp.value) : { ok: false, code: '', state: '', pan: '' };
 
     const gstinInput = wrap.querySelector('#coGSTIN');
     const gstinStatus = wrap.querySelector('#coGstinStatus');
+    const gstStateCodeBox = wrap.querySelector('#coGstStateCode');
+    const gstStateBox = wrap.querySelector('#coGstState');
+    const regTypeInp = wrap.querySelector('#coRegTypeInput');
     const panInput = wrap.querySelector('#coPAN');
     const panStatus = wrap.querySelector('#coPanStatus');
     const panHintBtn = wrap.querySelector('#coPanFromGstinBtn');
+    let gstStatus = coData.gstRegistered === false ? 'unregistered' : 'registered';
+    let gstr1Period = coData.gstr1Period === 'quarterly' ? 'quarterly' : 'monthly';
+
+    // The sliders look like Configuration's OFF / ON (vault-settings.js): the chosen side blue,
+    // Unregistered white like OFF
+    const paintGstSlider = (btn, active, white) => {
+      btn.style.background = active ? (white ? 'var(--white)' : 'var(--blue-600)') : 'transparent';
+      btn.style.color = active ? (white ? 'var(--slate-800)' : '#ffffff') : 'var(--slate-500)';
+      btn.style.boxShadow = active ? (white ? '0 1px 2px rgba(0,0,0,0.06)' : '0 1px 2px rgba(0,0,0,0.12)') : 'none';
+    };
+
+    // Unregistered hides the registration's details; GSTR-1 Filing Period shows for the types
+    // that file GSTR-1
+    const refreshGstForm = () => {
+      wrap.querySelectorAll('[data-gst-status]').forEach(b => paintGstSlider(b, b.dataset.gstStatus === gstStatus, b.dataset.gstStatus === 'unregistered'));
+      wrap.querySelectorAll('[data-gstr1]').forEach(b => paintGstSlider(b, b.dataset.gstr1 === gstr1Period, false));
+      wrap.querySelector('#coGstRegisteredFields').style.display = gstStatus === 'registered' ? 'flex' : 'none';
+      const filesGstr1 = (typeof kyaGstRegRules === 'function') ? kyaGstRegRules({ registered: true, type: regTypeInp.value }).gstr1 : true;
+      wrap.querySelector('#coGstr1PeriodWrap').style.display = filesGstr1 ? 'block' : 'none';
+    };
+
+    const setCoRegType = (type) => {
+      regTypeInp.value = type;
+      wrap.querySelector('#coRegTypeSelectTriggerText').textContent = type;
+      renderGstinStatus();
+      refreshGstForm();
+    };
+
+    // Resting on the Registration Type box shows the chosen type's card (after a second, like the
+    // Supply Type box)
+    const regTypeTrigger = wrap.querySelector('#coRegTypeSelectTrigger');
+    const isRegTypeListOpen = () => wrap.querySelector('#coRegTypeSelectDropdown').style.display === 'flex';
+    let regTypeHoverTimer = null;
+    const cancelRegTypeTimer = () => { if (regTypeHoverTimer) { clearTimeout(regTypeHoverTimer); regTypeHoverTimer = null; } };
+    regTypeTrigger.addEventListener('mouseenter', () => {
+      cancelRegTypeTimer();
+      if (isRegTypeListOpen()) return;
+      regTypeHoverTimer = setTimeout(() => {
+        if (!isRegTypeListOpen()) showRegTypeCard(regTypeTrigger, regTypeInp.value);
+      }, 1000);
+    });
+    regTypeTrigger.addEventListener('mouseleave', () => {
+      cancelRegTypeTimer();
+      hideRegTypeCardSoon(350);
+    });
+    regTypeTrigger.addEventListener('mousedown', () => {
+      cancelRegTypeTimer();
+      hideRegTypeCard();
+    });
 
     const renderPanStatus = () => {
       const raw = panInput.value.toUpperCase().trim();
@@ -1086,14 +1242,20 @@
 
     const renderGstinStatus = () => {
       const raw = gstinInput.value.toUpperCase().trim();
+      const chk = checkGstin(raw);
       panHintBtn.style.display = 'none';
+
+      // State of registration: the GSTIN's first two digits, as State Code and State
+      gstStateCodeBox.textContent = chk.ok ? chk.code : '—';
+      gstStateBox.textContent = chk.ok ? chk.state : '—';
+      gstStateCodeBox.style.color = gstStateBox.style.color = chk.ok ? '#334155' : '#94a3b8';
 
       if (!raw) {
         gstinStatus.textContent = '';
         return;
       }
 
-      if (!isValidGstin(raw)) {
+      if (!chk.ok) {
         gstinStatus.textContent = 'Invalid GSTIN';
         gstinStatus.style.color = '#dc2626';
         return;
@@ -1102,27 +1264,138 @@
       gstinStatus.textContent = 'Valid GSTIN';
       gstinStatus.style.color = '#059669';
 
-      const panFromGstin = raw.slice(2, 12);
+      // A PAN-based GSTIN carries the PAN (a tax deductor's carries its TAN instead)
+      if (!chk.pan) return;
       const currentPan = panInput.value.trim().toUpperCase();
       if (!currentPan) {
-        panInput.value = panFromGstin;
+        panInput.value = chk.pan;
         renderPanStatus();
-      } else if (currentPan !== panFromGstin) {
+      } else if (currentPan !== chk.pan) {
         panHintBtn.style.display = 'block';
       }
     };
 
     panHintBtn.addEventListener('click', () => {
-      const raw = gstinInput.value.toUpperCase().trim();
-      if (isValidGstin(raw)) {
-        panInput.value = raw.slice(2, 12);
+      const chk = checkGstin(gstinInput.value.toUpperCase().trim());
+      if (chk.pan) {
+        panInput.value = chk.pan;
         panHintBtn.style.display = 'none';
         renderPanStatus();
       }
     });
 
+    // A change of GST registration reaches new invoices, purchases and reports, so it is confirmed
+    // first: what changes (from → to), what KYA does from now on and what the law asks on the GST
+    // portal (kyaGstRegChangeNotes, gst-registration.js), in KYA's confirm popup
+    const GST_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>';
+    const confirmGstChange = (notes, onYes) => {
+      const head = t => `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#2563eb;margin:14px 0 4px;">${t}</div>`;
+      const list = items => `<ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.55;color:#334155;">${items.map(i => `<li style="margin-bottom:4px;">${ohEsc(i)}</li>`).join('')}</ul>`;
+      const message = `
+        <div style="text-align:left;max-height:44vh;overflow-y:auto;padding-right:4px;">
+          <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:6px 12px;background:#f8fafc;">
+            ${notes.changes.map(c => `
+              <div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:12.5px;">
+                <span style="color:#64748b;font-weight:600;white-space:nowrap;">${ohEsc(c.label)}</span>
+                <span style="color:#0f172a;font-weight:700;text-align:right;">${ohEsc(c.from)} → ${ohEsc(c.to)}</span>
+              </div>`).join('')}
+          </div>
+          ${head('In KYA, from now on')}${list(notes.kya)}
+          ${notes.law.length ? head('As per law, on the GST portal') + list(notes.law) : ''}
+        </div>`;
+      showKyaConfirm({
+        title: 'Apply GST Changes?',
+        message,
+        confirmLabel: 'Yes, Apply',
+        okBg: '#2563eb',
+        iconBg: 'var(--blue-50)', iconColor: 'var(--blue-600)', iconSvg: GST_ICON,
+        onConfirm: onYes
+      });
+    };
+
+    // Applying it: each step in turn under a 0–100% bar laid out like KYA's loading screen (label
+    // and percentage over a thin bar), in the confirm popup's card
+    const runGstProgress = (steps, onDone) => {
+      document.getElementById('kyaGstApplyOverlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'kyaGstApplyOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;box-sizing:border-box;';
+      overlay.innerHTML = `
+        <div role="progressbar" aria-label="Applying GST changes" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="background:#fff;border-radius:24px;box-shadow:0 24px 48px -12px rgba(15,23,42,0.35);border:1px solid #f1f5f9;text-align:center;font-family:var(--font-main, Inter, sans-serif);max-width:440px;width:90%;padding:40px 32px 32px;box-sizing:border-box;">
+          <div style="background:var(--blue-50);color:var(--blue-600);width:64px;height:64px;border-radius:20px;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -2px 0 rgba(0,0,0,.05);">${GST_ICON}</div>
+          <div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:12px;letter-spacing:-0.4px;">Applying GST Changes</div>
+          <div data-role="step" style="font-size:14px;color:#64748b;line-height:1.6;margin-bottom:24px;min-height:22px;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:500;color:#64748b;letter-spacing:.1em;text-transform:uppercase;">Loading</span>
+            <span data-role="pct" style="font-size:13px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;">0%</span>
+          </div>
+          <div style="width:100%;height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+            <div data-role="fill" style="height:100%;width:0%;background:linear-gradient(90deg,#1e40af,#2563eb,#0284c7);border-radius:4px;transition:width .12s linear;"></div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const box = overlay.firstElementChild;
+      const stepEl = overlay.querySelector('[data-role="step"]');
+      const pctEl = overlay.querySelector('[data-role="pct"]');
+      const fillEl = overlay.querySelector('[data-role="fill"]');
+      let shown = 0, reached = 0, failed = false;
+      const paint = () => {
+        const p = Math.floor(shown);
+        pctEl.textContent = p + '%';
+        fillEl.style.width = p + '%';
+        box.setAttribute('aria-valuenow', p);
+      };
+      // The bar follows the finished steps in 40 ms ticks, as the loading screen does
+      const timer = setInterval(() => {
+        if (shown < reached) { shown = Math.min(reached, shown + 2.5); paint(); }
+        if (shown >= 100) {
+          clearInterval(timer);
+          setTimeout(() => { overlay.remove(); if (onDone) onDone(failed); }, 450);
+        }
+      }, 40);
+      let i = 0;
+      const nextStep = () => {
+        if (i >= steps.length) return;
+        const s = steps[i++];
+        stepEl.textContent = s.label + '…';
+        try { s.run(); } catch (e) { failed = true; console.error('GST change step failed:', s.label, e); }
+        reached = Math.round(100 * i / steps.length);
+        setTimeout(nextStep, 320);
+      };
+      nextStep();
+    };
+
+    // The steps: saved documents keep the GSTIN they were issued with when it changes, the
+    // registration is saved, open new invoices / orders take it, and reports and books refresh
+    // (with the auto backup)
+    const applyGstChange = (next) => {
+      const before = typeof kyaCompanyGstReg === 'function' ? kyaCompanyGstReg(coData).gstin : '';
+      const after = typeof kyaCompanyGstReg === 'function' ? kyaCompanyGstReg(next).gstin : '';
+      const steps = [];
+      if (before && before !== after && typeof kyaKeepSavedDocsGstin === 'function') {
+        steps.push({ label: 'Keeping saved documents as they were made', run: () => kyaKeepSavedDocsGstin(before) });
+      }
+      steps.push({ label: 'Saving the GST registration', run: () => { Object.assign(coData, next); saveCompanyDetails(coData); updateSidebarCompany(); } });
+      steps.push({ label: 'Updating new invoices and orders', run: () => document.dispatchEvent(new CustomEvent('kya:gst-registration-changed')) });
+      steps.push({ label: 'Updating reports and books', run: () => { if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews(); } });
+      runGstProgress(steps, failed => {
+        if (failed) showToast('GST registration saved, but some views could not be updated. Please reload KYA.', 'warning');
+        else showToast('GST registration saved and applied.', 'success');
+      });
+    };
+
+    wrap.querySelectorAll('[data-gst-status]').forEach(b => b.addEventListener('click', () => {
+      gstStatus = b.dataset.gstStatus;
+      refreshGstForm();
+    }));
+    wrap.querySelectorAll('[data-gstr1]').forEach(b => b.addEventListener('click', () => {
+      gstr1Period = b.dataset.gstr1;
+      refreshGstForm();
+    }));
+
     gstinInput.addEventListener('input', renderGstinStatus);
     renderGstinStatus();
+    refreshGstForm();
 
     // ── INITIALIZING LISTS & LOADS ──
     renderDirectors();
@@ -1167,8 +1440,34 @@
           if (iconVal !== undefined) coData.iconImage = iconVal;
         }
 
+        else if (section === 'gst') {
+          const registered = gstStatus === 'registered';
+          const gstin = gstinInput.value.trim().toUpperCase();
+          if (registered && !checkGstin(gstin).ok) {
+            gstinInput.style.borderColor = '#ef4444';
+            gstinInput.focus();
+            showToast('Please enter a valid GSTIN.', 'warning');
+            return;
+          }
+          const next = Object.assign({}, coData, {
+            gstRegistered: registered,
+            gstin: registered ? gstin : '',
+            gstRegType: regTypeInp.value || 'Regular',
+            gstr1Period
+          });
+          // A PAN filled in from the GSTIN (Legal & Registration) is saved with it
+          const pan = panInput.value.trim().toUpperCase();
+          if (!next.pan && isValidPan(pan)) next.pan = pan;
+          // A change that reaches invoices and reports: confirmed, then applied with its loading bar
+          const notes = typeof kyaGstRegChangeNotes === 'function' ? kyaGstRegChangeNotes(coData, next) : null;
+          if (notes && notes.changes.length) {
+            confirmGstChange(notes, () => applyGstChange(next));
+            return;
+          }
+          Object.assign(coData, next);
+        }
+
         else if (section === 'registrations') {
-          coData.gstin = wrap.querySelector('#coGSTIN').value.trim().toUpperCase();
           coData.pan = wrap.querySelector('#coPAN').value.trim().toUpperCase();
           coData.cin = wrap.querySelector('#coCIN').value.trim().toUpperCase();
           coData.udyam = wrap.querySelector('#coUdyam').value.trim();
