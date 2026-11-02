@@ -26,10 +26,23 @@
 
     const initials = getCompanyInitials(coData.name);
 
-    // GST Registration: a company saved before the tab existed is Registered, Regular, Monthly
-    // (gst-registration.js)
+    // GST Registration: a company that hasn't saved it yet is Unregistered, unless it already has a
+    // GSTIN (Registered, Regular, Monthly; gst-registration.js)
     const gstRegType = (typeof kyaGstRegTypeInfo === 'function') ? kyaGstRegTypeInfo(coData.gstRegType).type : (coData.gstRegType || 'Regular');
     const gstSliderBtn = 'border: none; padding: 6px 16px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; background: transparent; color: var(--slate-500);';
+
+    // Business Type: the value saved, and the name the search box shows
+    const CO_BUSINESS_TYPES = [
+      { value: 'Proprietorship', label: 'Proprietorship' },
+      { value: 'Partnership', label: 'Partnership' },
+      { value: 'LLP', label: 'LLP (Limited Liability Partnership)' },
+      { value: 'Pvt Ltd', label: 'Pvt Ltd (Private Limited)' },
+      { value: 'Public Ltd', label: 'Public Ltd (Public Limited)' },
+      { value: 'OPC', label: 'One Person Company (OPC)' },
+      { value: 'Trust', label: 'Trust / Society' },
+      { value: 'Others', label: 'Others' }
+    ];
+    const businessTypeLabel = v => (CO_BUSINESS_TYPES.find(t => t.value === v) || {}).label || v || '';
 
     // District / State / Registration Type search boxes: KYA searchable select, like the Journal
     // Department box
@@ -114,7 +127,7 @@
                 <div style="display:flex;flex-direction:column;gap:18px;">
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Company / Firm Name <span style="color:#ef4444;">*</span></label>
-                    <input id="coNameInput" value="${ohEsc(coData.name||'')}" placeholder="e.g. Acme Enterprises Pvt Ltd" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;outline:none;box-sizing:border-box;">
+                    <input id="coNameInput" value="${ohEsc(coData.name||'')}" placeholder="Enter Company / Firm Name" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;outline:none;box-sizing:border-box;">
                   </div>
                   <div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -123,25 +136,14 @@
                     </div>
                     <input id="coDisplayNameInput" maxlength="22" value="${ohEsc(coData.displayName||'')}" placeholder="Short name shown in sidebar" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;outline:none;box-sizing:border-box;">
                   </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-                    <div>
-                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Business Type</label>
-                      <select id="coBusinessType" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;background:#fff;">
-                        <option value="">Select Business Type</option>
-                        <option value="Proprietorship" ${coData.businessType==='Proprietorship'?'selected':''}>Proprietorship</option>
-                        <option value="Partnership" ${coData.businessType==='Partnership'?'selected':''}>Partnership</option>
-                        <option value="LLP" ${coData.businessType==='LLP'?'selected':''}>LLP (Limited Liability Partnership)</option>
-                        <option value="Pvt Ltd" ${coData.businessType==='Pvt Ltd'?'selected':''}>Pvt Ltd (Private Limited)</option>
-                        <option value="Public Ltd" ${coData.businessType==='Public Ltd'?'selected':''}>Public Ltd (Public Limited)</option>
-                        <option value="OPC" ${coData.businessType==='OPC'?'selected':''}>One Person Company (OPC)</option>
-                        <option value="Trust" ${coData.businessType==='Trust'?'selected':''}>Trust / Society</option>
-                        <option value="Others" ${coData.businessType==='Others'?'selected':''}>Others</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Date of Incorporation</label>
-                      <input type="date" id="coIncDate" value="${ohEsc(coData.incDate||'')}" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
-                    </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Business Type</label>
+                    <input type="hidden" id="coBusinessType" value="${ohEsc(coData.businessType||'')}">
+                    ${coAddrSelectBox('BusinessType', businessTypeLabel(coData.businessType), 'Business Type')}
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Date of Incorporation</label>
+                    <input type="date" id="coIncDate" value="${ohEsc(coData.incDate||'')}" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
                   </div>
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Business Address</label>
@@ -150,7 +152,7 @@
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                     <div>
                       <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">City</label>
-                      <input id="coCityInput" value="${ohEsc(coData.city||'')}" placeholder="e.g. Kochi" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                      <input id="coCityInput" value="${ohEsc(coData.city||'')}" placeholder="Enter City" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
                     </div>
                     <div>
                       <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">District</label>
@@ -166,22 +168,22 @@
                     </div>
                     <div>
                       <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">PIN Code</label>
-                      <input id="coPincodeInput" value="${ohEsc(coData.pincode||'')}" placeholder="e.g. 682001" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                      <input id="coPincodeInput" value="${ohEsc(coData.pincode||'')}" placeholder="Enter PIN Code" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
                     </div>
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                     <div>
                       <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Phone</label>
-                      <input id="coPhoneInput" value="${ohEsc(coData.phone||'')}" placeholder="+91 98765 43210" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                      <input id="coPhoneInput" value="${ohEsc(coData.phone||'')}" placeholder="Enter Phone" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
                     </div>
                     <div>
                       <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Email</label>
-                      <input id="coEmailInput" type="email" value="${ohEsc(coData.email||'')}" placeholder="accounts@company.com" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                      <input id="coEmailInput" type="email" value="${ohEsc(coData.email||'')}" placeholder="Enter Email" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
                     </div>
                   </div>
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Website</label>
-                    <input id="coWebsiteInput" value="${ohEsc(coData.website||'')}" placeholder="https://www.yourcompany.com" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
+                    <input id="coWebsiteInput" value="${ohEsc(coData.website||'')}" placeholder="Enter Website" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;">
                   </div>
                 </div>
 
@@ -232,7 +234,7 @@
                       <!-- Create Seal -->
                       <div style="display:flex;flex-direction:column;gap:8px;">
                         <label style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Company Seal / Stamp</label>
-                        <input id="coSealName" value="${ohEsc(coData.sealName || coData.name || coData.displayName || '')}" placeholder="Seal name (e.g. company name)" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box;">
+                        <input id="coSealName" value="${ohEsc(coData.sealName || coData.name || coData.displayName || '')}" placeholder="Enter Seal Name" style="width:100%;height:32px;border:1.5px solid #e2e8f0;border-radius:7px;padding:0 10px;font-size:12px;outline:none;box-sizing:border-box;">
                         <div style="display:flex;gap:8px;">
                           <button type="button" id="coGenerateSealBtn" style="flex:1;height:32px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
                             Generate Seal
@@ -319,7 +321,7 @@
                     <div id="coPanStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
                   </div>
                   <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Corporate Identification Number (CIN)</label>
+                    <label id="coCinLabel" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Corporate Identification Number (CIN)</label>
                     <input id="coCIN" value="${ohEsc(coData.cin||'')}" placeholder="e.g. U72200MH2020PTC123456" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
                   </div>
                 </div>
@@ -547,12 +549,14 @@
     dispInp.addEventListener('input', () => {
       counter.textContent = `${dispInp.value.length}/22`;
       counter.style.color = dispInp.value.length >= 20 ? '#ef4444' : '#94a3b8';
-      wrap.querySelector('#coPreviewAvatar').textContent = coData.iconImage ? '' : getCompanyInitials(nameInp.value || dispInp.value);
+      wrap.querySelector('#coPreviewAvatar').textContent = imageInp.value ? '' : getCompanyInitials(nameInp.value || dispInp.value);
     });
     nameInp.addEventListener('input', () => {
-      wrap.querySelector('#coPreviewAvatar').textContent = coData.iconImage ? '' : getCompanyInitials(nameInp.value || dispInp.value);
+      wrap.querySelector('#coPreviewAvatar').textContent = imageInp.value ? '' : getCompanyInitials(nameInp.value || dispInp.value);
     });
 
+    // Logo, signature and seal: picked here, saved with Basic Identity (Save Basic Identity
+    // confirms the change first)
     // Logo image file upload wiring
     const fileInp = wrap.querySelector('#coFileInput');
     const uploadBtn = wrap.querySelector('#coUploadBtn');
@@ -568,7 +572,6 @@
       reader.onload = (evt) => {
         const base64 = evt.target.result;
         imageInp.value = base64;
-        coData.iconImage = base64;
         previewAvatar.textContent = '';
         previewAvatar.style.backgroundImage = `url(${base64})`;
         removeBtn.style.display = 'block';
@@ -578,7 +581,6 @@
 
     removeBtn.addEventListener('click', () => {
       imageInp.value = '';
-      coData.iconImage = '';
       fileInp.value = '';
       previewAvatar.style.backgroundImage = 'none';
       previewAvatar.textContent = getCompanyInitials(nameInp.value || dispInp.value);
@@ -601,7 +603,6 @@
       reader.onload = (evt) => {
         const base64 = evt.target.result;
         signatureImageInp.value = base64;
-        coData.signatureImage = base64;
         signaturePreview.textContent = '';
         signaturePreview.style.background = `url(${base64}) center/contain no-repeat #fff`;
         removeSignBtn.style.display = 'block';
@@ -611,7 +612,6 @@
 
     removeSignBtn.addEventListener('click', () => {
       signatureImageInp.value = '';
-      coData.signatureImage = '';
       signFileInp.value = '';
       signaturePreview.style.background = '#fff';
       signaturePreview.textContent = 'No signature uploaded';
@@ -623,33 +623,29 @@
     const sealPreview = wrap.querySelector('#coSealPreview');
 
     const removeSealBtn = wrap.querySelector('#coRemoveSealBtn');
+    // A removed seal stays off the documents (no seal drawn from the name either)
+    let sealRemovedNow = !!coData.sealRemoved;
     wrap.querySelector('#coGenerateSealBtn').addEventListener('click', () => {
       const name = sealNameInp.value.trim() || (nameInp ? nameInp.value.trim() : '') || 'COMPANY NAME';
       // The seal's place is the City box
       const place = getInvoiceSealPlace({ ...coData, city: wrap.querySelector('#coCityInput').value });
       const svg = buildInvoiceSealSvg(name, place);
       const dataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
-      coData.sealName = name;
-      delete coData.sealPlaceCustom;
-      delete coData.sealShape;
-      coData.sealImage = dataUrl;
-      coData.sealRemoved = false;
+      sealNameInp.value = name;
+      sealRemovedNow = false;
       sealImageInp.value = dataUrl;
       sealPreview.style.background = `url(${dataUrl}) center/contain no-repeat`;
       if (removeSealBtn) removeSealBtn.style.display = 'block';
-      saveCompanyDetails(coData);
-      if (typeof showToast === 'function') showToast('Company seal generated and saved.', 'success');
+      if (typeof showToast === 'function') showToast('Company seal generated. Save Basic Identity to apply it.', 'success');
     });
 
     if (removeSealBtn) {
       removeSealBtn.addEventListener('click', () => {
-        coData.sealImage = '';
-        coData.sealRemoved = true;
+        sealRemovedNow = true;
         sealImageInp.value = '';
         sealPreview.style.background = 'transparent';
         removeSealBtn.style.display = 'none';
-        saveCompanyDetails(coData);
-        if (typeof showToast === 'function') showToast('Company seal removed.', 'info');
+        if (typeof showToast === 'function') showToast('Company seal removed. Save Basic Identity to apply it.', 'info');
       });
     }
 
@@ -839,12 +835,40 @@
       if (!list.children.length) list.appendChild(addrEmptyRow('No Registration Type Found'));
     };
 
-    const searchBoxKeys = ['District', 'State', 'RegType'];
+    // Business Type: every name shown in full
+    const businessTypeInp = wrap.querySelector('#coBusinessType');
+    // The CIN box (Legal & Registration) takes an LLP's LLPIN: its label follows the Business Type
+    const refreshCinBox = () => {
+      const llp = businessTypeInp.value === 'LLP';
+      wrap.querySelector('#coCinLabel').textContent = llp ? 'LLP Identification Number (LLPIN)' : 'Corporate Identification Number (CIN)';
+      wrap.querySelector('#coCIN').placeholder = llp ? 'e.g. AAB-1234' : 'e.g. U72200MH2020PTC123456';
+    };
+    refreshCinBox();
+    const renderBusinessTypeList = (filter) => {
+      const list = wrap.querySelector('#coBusinessTypeSelectOptionsList');
+      const q = (filter || '').toLowerCase().trim();
+      list.innerHTML = '';
+      CO_BUSINESS_TYPES.forEach(t => {
+        if (q && !t.label.toLowerCase().includes(q)) return;
+        const item = addrListItem(t.label, '', businessTypeInp.value === t.value, () => {
+          businessTypeInp.value = t.value;
+          refreshCinBox();
+          wrap.querySelector('#coBusinessTypeSelectTriggerText').textContent = t.label;
+          closeAddrList('BusinessType');
+        });
+        item.style.whiteSpace = 'normal';
+        list.appendChild(item);
+      });
+      if (!list.children.length) list.appendChild(addrEmptyRow('No Business Type Found'));
+    };
+
+    const searchBoxKeys = ['District', 'State', 'RegType', 'BusinessType'];
+    const searchBoxLists = { District: renderDistrictList, State: renderStateList, RegType: renderRegTypeList, BusinessType: renderBusinessTypeList };
     searchBoxKeys.forEach(key => {
       const trigger = wrap.querySelector(`#co${key}SelectTrigger`);
       const dd = wrap.querySelector(`#co${key}SelectDropdown`);
       const search = wrap.querySelector(`#co${key}SelectSearch`);
-      const render = key === 'District' ? renderDistrictList : (key === 'State' ? renderStateList : renderRegTypeList);
+      const render = searchBoxLists[key];
       trigger.addEventListener('click', e => {
         e.stopPropagation();
         if (dd.style.display === 'flex') { closeAddrList(key); return; }
@@ -1175,7 +1199,8 @@
     const panInput = wrap.querySelector('#coPAN');
     const panStatus = wrap.querySelector('#coPanStatus');
     const panHintBtn = wrap.querySelector('#coPanFromGstinBtn');
-    let gstStatus = coData.gstRegistered === false ? 'unregistered' : 'registered';
+    const startsRegistered = (typeof kyaCompanyGstReg === 'function') ? kyaCompanyGstReg(coData).registered : coData.gstRegistered !== false;
+    let gstStatus = startsRegistered ? 'registered' : 'unregistered';
     let gstr1Period = coData.gstr1Period === 'quarterly' ? 'quarterly' : 'monthly';
 
     // The sliders look like Configuration's OFF / ON (vault-settings.js): the chosen side blue,
@@ -1284,46 +1309,52 @@
       }
     });
 
-    // A change of GST registration reaches new invoices, purchases and reports, so it is confirmed
-    // first: what changes (from → to), what KYA does from now on and what the law asks on the GST
-    // portal (kyaGstRegChangeNotes, gst-registration.js), in KYA's confirm popup
+    // A change of GST registration or of Basic Identity reaches new invoices, purchases and
+    // reports, so it is confirmed first: what changes (from → to), what KYA does from now on and
+    // what the law asks for it (kyaGstRegChangeNotes, gst-registration.js; kyaIdentityChangeNotes,
+    // company-identity.js), in KYA's confirm popup. how: its title, button, law heading and icon.
     const GST_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>';
-    const confirmGstChange = (notes, onYes) => {
+    const IDENTITY_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+    const confirmChange = (notes, how, onYes) => {
       const head = t => `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#2563eb;margin:14px 0 4px;">${t}</div>`;
       const list = items => `<ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.55;color:#334155;">${items.map(i => `<li style="margin-bottom:4px;">${ohEsc(i)}</li>`).join('')}</ul>`;
+      // (a row without "from" is a detail entered on the first save)
       const message = `
         <div style="text-align:left;max-height:44vh;overflow-y:auto;padding-right:4px;">
           <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:6px 12px;background:#f8fafc;">
             ${notes.changes.map(c => `
               <div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:12.5px;">
                 <span style="color:#64748b;font-weight:600;white-space:nowrap;">${ohEsc(c.label)}</span>
-                <span style="color:#0f172a;font-weight:700;text-align:right;">${ohEsc(c.from)} → ${ohEsc(c.to)}</span>
+                <span style="color:#0f172a;font-weight:700;text-align:right;">${c.from === null ? '' : ohEsc(c.from) + ' → '}${ohEsc(c.to)}</span>
               </div>`).join('')}
           </div>
-          ${head('In KYA, from now on')}${list(notes.kya)}
-          ${notes.law.length ? head('As per law, on the GST portal') + list(notes.law) : ''}
+          ${notes.kya.length ? head('In KYA, from now on') + list(notes.kya) : ''}
+          ${notes.law.length ? head(how.lawHead) + list(notes.law) : ''}
         </div>`;
       showKyaConfirm({
-        title: 'Apply GST Changes?',
+        title: how.title,
         message,
-        confirmLabel: 'Yes, Apply',
+        confirmLabel: how.confirmLabel,
         okBg: '#2563eb',
-        iconBg: 'var(--blue-50)', iconColor: 'var(--blue-600)', iconSvg: GST_ICON,
+        iconBg: 'var(--blue-50)', iconColor: 'var(--blue-600)', iconSvg: how.icon,
         onConfirm: onYes
       });
     };
+    const GST_CHANGE = { title: 'Apply GST Changes?', confirmLabel: 'Yes, Apply', lawHead: 'As per law, on the GST portal', icon: GST_ICON };
+    const IDENTITY_CHANGE = { title: 'Apply Company Changes?', confirmLabel: 'Yes, Apply', lawHead: 'As per law', icon: IDENTITY_ICON };
+    const IDENTITY_ADD = { title: 'Add Company Details?', confirmLabel: 'Yes, Add', lawHead: 'As per law', icon: IDENTITY_ICON };
 
     // Applying it: each step in turn under a 0–100% bar laid out like KYA's loading screen (label
     // and percentage over a thin bar), in the confirm popup's card
-    const runGstProgress = (steps, onDone) => {
+    const runChangeProgress = (title, icon, steps, onDone) => {
       document.getElementById('kyaGstApplyOverlay')?.remove();
       const overlay = document.createElement('div');
       overlay.id = 'kyaGstApplyOverlay';
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;box-sizing:border-box;';
       overlay.innerHTML = `
-        <div role="progressbar" aria-label="Applying GST changes" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="background:#fff;border-radius:24px;box-shadow:0 24px 48px -12px rgba(15,23,42,0.35);border:1px solid #f1f5f9;text-align:center;font-family:var(--font-main, Inter, sans-serif);max-width:440px;width:90%;padding:40px 32px 32px;box-sizing:border-box;">
-          <div style="background:var(--blue-50);color:var(--blue-600);width:64px;height:64px;border-radius:20px;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -2px 0 rgba(0,0,0,.05);">${GST_ICON}</div>
-          <div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:12px;letter-spacing:-0.4px;">Applying GST Changes</div>
+        <div role="progressbar" aria-label="${title}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="background:#fff;border-radius:24px;box-shadow:0 24px 48px -12px rgba(15,23,42,0.35);border:1px solid #f1f5f9;text-align:center;font-family:var(--font-main, Inter, sans-serif);max-width:440px;width:90%;padding:40px 32px 32px;box-sizing:border-box;">
+          <div style="background:var(--blue-50);color:var(--blue-600);width:64px;height:64px;border-radius:20px;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -2px 0 rgba(0,0,0,.05);">${icon}</div>
+          <div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:12px;letter-spacing:-0.4px;">${title}</div>
           <div data-role="step" style="font-size:14px;color:#64748b;line-height:1.6;margin-bottom:24px;min-height:22px;"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <span style="font-size:12px;font-weight:500;color:#64748b;letter-spacing:.1em;text-transform:uppercase;">Loading</span>
@@ -1358,7 +1389,7 @@
         if (i >= steps.length) return;
         const s = steps[i++];
         stepEl.textContent = s.label + '…';
-        try { s.run(); } catch (e) { failed = true; console.error('GST change step failed:', s.label, e); }
+        try { s.run(); } catch (e) { failed = true; console.error('Change step failed:', s.label, e); }
         reached = Math.round(100 * i / steps.length);
         setTimeout(nextStep, 320);
       };
@@ -1378,9 +1409,43 @@
       steps.push({ label: 'Saving the GST registration', run: () => { Object.assign(coData, next); saveCompanyDetails(coData); updateSidebarCompany(); } });
       steps.push({ label: 'Updating new invoices and orders', run: () => document.dispatchEvent(new CustomEvent('kya:gst-registration-changed')) });
       steps.push({ label: 'Updating reports and books', run: () => { if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews(); } });
-      runGstProgress(steps, failed => {
+      runChangeProgress('Applying GST Changes', GST_ICON, steps, failed => {
         if (failed) showToast('GST registration saved, but some views could not be updated. Please reload KYA.', 'warning');
         else showToast('GST registration saved and applied.', 'success');
+      });
+    };
+
+    // Basic Identity (saved: the details as saved, next: as entered): documents already saved keep
+    // the details they were made with, the details are saved (with a company's former name), open
+    // new invoices / orders take them (the State decides CGST + SGST or IGST while not
+    // registered), and reports and books refresh (with the auto backup)
+    const applyIdentityChange = (saved, next, notes) => {
+      const steps = [];
+      if (notes.keeps && typeof kyaKeepSavedDocsIdentity === 'function') {
+        steps.push({ label: 'Keeping saved documents as they were made', run: () => kyaKeepSavedDocsIdentity(saved, next) });
+      }
+      steps.push({ label: 'Saving the company details', run: () => {
+        if (typeof kyaKeepFormerName === 'function') kyaKeepFormerName(saved, next);
+        Object.assign(coData, next);
+        delete coData.sealPlaceCustom;
+        // A generated seal is drawn with the name and place it now reads, as on the documents
+        if (typeof coData.sealImage === 'string' && coData.sealImage.startsWith('data:image/svg+xml')) {
+          try {
+            const svg = buildInvoiceSealSvg(coData.sealName || coData.name || coData.displayName || '', getInvoiceSealPlace(coData));
+            coData.sealImage = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+          } catch (e) {}
+          sealImageInp.value = coData.sealImage;
+          sealPreview.style.background = `url(${coData.sealImage}) center/contain no-repeat`;
+        }
+        sealNameInp.value = coData.sealName || '';
+        saveCompanyDetails(coData);
+        updateSidebarCompany();
+      } });
+      steps.push({ label: 'Updating new invoices and orders', run: () => document.dispatchEvent(new CustomEvent('kya:gst-registration-changed')) });
+      steps.push({ label: 'Updating reports and books', run: () => { if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews(); } });
+      runChangeProgress(notes.first ? 'Adding Company Details' : 'Applying Company Changes', IDENTITY_ICON, steps, failed => {
+        if (failed) showToast('Company details saved, but some views could not be updated. Please reload KYA.', 'warning');
+        else showToast('Company details saved and applied.', 'success');
       });
     };
 
@@ -1417,27 +1482,42 @@
             showToast('Please enter a company name.', 'warning');
             return;
           }
-          coData.name = name;
-          coData.displayName = wrap.querySelector('#coDisplayNameInput').value.trim();
-          coData.businessType = wrap.querySelector('#coBusinessType').value;
-          coData.incDate = wrap.querySelector('#coIncDate').value;
-          coData.address = wrap.querySelector('#coAddressInput').value.trim();
-          coData.city = wrap.querySelector('#coCityInput').value.trim();
-          coData.district = wrap.querySelector('#coDistrictInput').value.trim();
-          coData.state = wrap.querySelector('#coStateInput').value;
-          coData.pincode = wrap.querySelector('#coPincodeInput').value.trim();
-          coData.phone = wrap.querySelector('#coPhoneInput').value.trim();
-          coData.email = wrap.querySelector('#coEmailInput').value.trim();
-          coData.website = wrap.querySelector('#coWebsiteInput').value.trim();
+          const next = Object.assign({}, coData, {
+            name,
+            displayName: wrap.querySelector('#coDisplayNameInput').value.trim(),
+            businessType: wrap.querySelector('#coBusinessType').value,
+            incDate: wrap.querySelector('#coIncDate').value,
+            address: wrap.querySelector('#coAddressInput').value.trim(),
+            city: wrap.querySelector('#coCityInput').value.trim(),
+            district: wrap.querySelector('#coDistrictInput').value.trim(),
+            state: wrap.querySelector('#coStateInput').value,
+            pincode: wrap.querySelector('#coPincodeInput').value.trim(),
+            phone: wrap.querySelector('#coPhoneInput').value.trim(),
+            email: wrap.querySelector('#coEmailInput').value.trim(),
+            website: wrap.querySelector('#coWebsiteInput').value.trim(),
+            sealRemoved: sealRemovedNow
+          });
           const sealVal = wrap.querySelector('#coSealImage')?.value;
-          if (sealVal !== undefined) coData.sealImage = sealVal;
+          if (sealVal !== undefined) next.sealImage = sealVal;
           const sealNameVal = wrap.querySelector('#coSealName')?.value;
-          if (sealNameVal !== undefined) coData.sealName = sealNameVal;
-          delete coData.sealPlaceCustom;
+          if (sealNameVal !== undefined) next.sealName = sealNameVal;
           const signVal = wrap.querySelector('#coSignatureImage')?.value;
-          if (signVal !== undefined) coData.signatureImage = signVal;
+          if (signVal !== undefined) next.signatureImage = signVal;
           const iconVal = wrap.querySelector('#coIconImage')?.value;
-          if (iconVal !== undefined) coData.iconImage = iconVal;
+          if (iconVal !== undefined) next.iconImage = iconVal;
+          // The details as saved: the documents print them until the change is applied
+          const saved = getCompanyDetails();
+          // A seal that read the old company name reads the new one
+          const oldName = String(saved.name || '').trim();
+          if (oldName && name !== oldName && String(next.sealName || '').trim().toLowerCase() === oldName.toLowerCase()) next.sealName = name;
+          // Added or changed: confirmed, then applied with its loading bar (company-identity.js)
+          const notes = typeof kyaIdentityChangeNotes === 'function' ? kyaIdentityChangeNotes(saved, next, { businessTypeLabel }) : null;
+          if (notes && notes.changes.length) {
+            confirmChange(notes, notes.first ? IDENTITY_ADD : IDENTITY_CHANGE, () => applyIdentityChange(saved, next, notes));
+            return;
+          }
+          Object.assign(coData, next);
+          delete coData.sealPlaceCustom;
         }
 
         else if (section === 'gst') {
@@ -1461,7 +1541,7 @@
           // A change that reaches invoices and reports: confirmed, then applied with its loading bar
           const notes = typeof kyaGstRegChangeNotes === 'function' ? kyaGstRegChangeNotes(coData, next) : null;
           if (notes && notes.changes.length) {
-            confirmGstChange(notes, () => applyGstChange(next));
+            confirmChange(notes, GST_CHANGE, () => applyGstChange(next));
             return;
           }
           Object.assign(coData, next);

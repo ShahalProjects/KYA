@@ -260,16 +260,22 @@
     return PAN_HOLDER_TYPES[raw[3]] || '';
   }
 
-  // The 7 GSTIN taxpayer classifications under the CGST Act.
+  // The GST registration types in law, named as in Company Profile (KYA_GST_REG_TYPES,
+  // gst-registration.js), with the keys a party stores them under (one saved before keeps its key).
   const GST_REGISTRATION_TYPES = [
     { value: '', label: '-- Not Specified --' },
     { value: 'regular', label: 'Regular' },
     { value: 'composition', label: 'Composition' },
+    { value: 'composition_services', label: 'Composition (Services)' },
     { value: 'casual', label: 'Casual Taxable Person' },
     { value: 'non_resident', label: 'Non-Resident Taxable Person' },
     { value: 'isd', label: 'Input Service Distributor' },
-    { value: 'tds', label: 'TDS Deductor' },
-    { value: 'tcs', label: 'TCS Collector' }
+    { value: 'tds', label: 'Tax Deductor (TDS)' },
+    { value: 'tcs', label: 'Tax Collector (TCS) – E-commerce Operator' },
+    { value: 'sez_unit', label: 'SEZ Unit' },
+    { value: 'sez_developer', label: 'SEZ Developer' },
+    { value: 'oidar', label: 'OIDAR Service Provider' },
+    { value: 'uin', label: 'UN Body / Embassy (UIN)' }
   ];
   window.GST_REGISTRATION_TYPES = GST_REGISTRATION_TYPES; // Reports (GSTR-1 Taxpayer Type) reads the labels
 
@@ -277,7 +283,7 @@
   // existing GSTIN/PAN input pair. Safe to call after every render (creates its DOM
   // helpers once per fresh input, since contentArea is fully re-rendered each time).
   // Also adds a derived read-only "PAN Type" column next to PAN, and a "GST Registration
-  // Type" dropdown (the 7 CGST Act taxpayer classifications) below the GSTIN/PAN row.
+  // Type" dropdown (GST_REGISTRATION_TYPES) below the GSTIN/PAN row.
   function wireGstinPanValidation(container, gstinId, panId, initialGstRegType) {
     const gstinInput = container.querySelector('#' + gstinId);
     const panInput = container.querySelector('#' + panId);
@@ -336,7 +342,7 @@
       // Move PAN out of the GSTIN row — it gets its own row below.
       gstinRow.removeChild(panCell);
 
-      // Row 1, column 2: GST Registration Type (the 7 CGST Act taxpayer classifications)
+      // Row 1, column 2: GST Registration Type (GST_REGISTRATION_TYPES)
       const gstRegTypeCell = document.createElement('div');
       gstRegTypeCell.style.cssText = 'width: 100%; min-width: 0;';
       gstRegTypeSel = document.createElement('select');
@@ -436,10 +442,327 @@
     renderPanStatus();
   }
 
+  // ── A hover card in the look of the Supply Type card (sales-select-boxes.js): the title and a
+  // badge, then headed sections ({ icon, heading, text }). tone: the badge's colours ──
+  const CARD_ICON_GROUP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
+  const CARD_ICON_LIST = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>';
+  function infoCardHtml(title, badge, sections, tone) {
+    const t = tone || { color: '#1d4ed8', light: '#eff6ff', border: '#dbeafe' };
+    return `
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
+        <div style="flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; color: var(--slate-900); line-height: 1.3; word-break: break-word;">${escapeHtml(title)}</div>
+        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: ${t.light}; color: ${t.color}; border: 1px solid ${t.border}; white-space: nowrap;">${escapeHtml(badge)}</span>
+      </div>
+      ${sections.map((s, i) => `
+      <div style="${i ? 'margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--slate-200); ' : ''}font-size: 11.5px; line-height: 1.45; color: var(--slate-700);">
+        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-500); margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">${s.icon} ${escapeHtml(s.heading)}</div>
+        ${escapeHtml(s.text)}
+      </div>`).join('')}`;
+  }
+
+  // ── A list's search box stays at its top while the rows scroll under it: a sticky bar in the
+  // look of the lists' "Create new" footer ──
+  function pinListSearch(dropdown) {
+    const search = dropdown ? Array.from(dropdown.children).find(el => el.tagName === 'INPUT') : null;
+    if (!search) return;
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position: sticky; top: -8px; z-index: 6; display: flow-root; background: #fff; margin: -8px -8px 0; padding: 8px 8px 0; border-radius: 12px 12px 0 0;';
+    dropdown.insertBefore(bar, search);
+    bar.appendChild(search);
+    // (as tall as its padding makes it, as it shows in a long list)
+    search.style.height = 'auto';
+  }
+
+  // ── A search list inside a popup's scrolling body (the Additional Details popups) is cut off by
+  // it, so while it is open it is placed over the popup, under its box (above it when there is
+  // more room there), and follows the box as the popup or the page scrolls ──
+  function floatPopupList(trigger, dropdown) {
+    if (!trigger || !dropdown || dropdown._kyaFloats) return;
+    dropdown._kyaFloats = true;
+    const keys = ['position', 'top', 'bottom', 'left', 'right', 'width', 'maxHeight'];
+    let saved = null;
+    const place = () => {
+      if (!trigger.offsetParent) { dropdown.style.display = 'none'; return; }
+      const r = trigger.getBoundingClientRect();
+      const below = window.innerHeight - r.bottom - 12;
+      const above = r.top - 12;
+      const up = below < 200 && above > below;
+      Object.assign(dropdown.style, {
+        position: 'fixed', left: r.left + 'px', right: 'auto', width: r.width + 'px',
+        top: up ? 'auto' : (r.bottom + 4) + 'px',
+        bottom: up ? (window.innerHeight - r.top + 4) + 'px' : 'auto',
+        maxHeight: Math.max(140, Math.min(280, up ? above : below)) + 'px'
+      });
+    };
+    new MutationObserver(() => {
+      const open = dropdown.style.display === 'flex';
+      if (open && !saved && trigger.closest('[class*="-addl-body"]')) {
+        saved = {};
+        keys.forEach(k => { saved[k] = dropdown.style[k]; });
+        place();
+        window.addEventListener('scroll', place, true);
+        window.addEventListener('resize', place);
+      } else if (!open && saved) {
+        window.removeEventListener('scroll', place, true);
+        window.removeEventListener('resize', place);
+        keys.forEach(k => { dropdown.style[k] = saved[k]; });
+        saved = null;
+      }
+    }).observe(dropdown, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  // A search box over a popup field — the field (a hidden input, or a select) keeps the value
+  // every save and row read — in the look of the Bank Account group's Bank Name box.
+  // opts: placeholder, search (its search box's placeholder), empty (no-match line),
+  // items(query) → [{ value, label, sub }], pick(value, item) (default: set the field),
+  // own: a value not in the list can be used as typed, under this name ("Use … as" footer, as on
+  // Company Profile's District box), card(value) → the HTML of the value's law card.
+  function partySearchBox(field, opts) {
+    const wrap = document.createElement('div');
+    wrap.className = 'kya-searchable-select-wrap';
+    wrap.style.cssText = 'position: relative; width: 100%; min-width: 0;';
+    wrap.innerHTML = `
+      <div class="kya-searchable-select-trigger" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1.5px solid var(--slate-200); border-radius: 7px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--slate-400); box-sizing: border-box;">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+        <span style="font-size: 10px; color: var(--slate-400); flex-shrink: 0; margin-left: 6px;">▼</span>
+      </div>
+      <div class="kya-searchable-select-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1.5px solid var(--slate-200); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 1000; padding: 8px; max-height: 280px; overflow-y: auto; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+        <input type="text" placeholder="${escapeHtml(opts.search)}" class="je-input" style="padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1.5px solid var(--slate-200); margin-bottom: 6px; width: 100%; box-sizing: border-box;" />
+        <div style="display: flex; flex-direction: column; gap: 2px;"></div>
+      </div>`;
+    if (field.parentNode) field.parentNode.insertBefore(wrap, field);
+    wrap.insertBefore(field, wrap.firstChild);
+    const trigger = wrap.querySelector('.kya-searchable-select-trigger');
+    const text = trigger.firstElementChild;
+    const dropdown = wrap.querySelector('.kya-searchable-select-dropdown');
+    const search = dropdown.querySelector('input');
+    const list = dropdown.lastElementChild;
+    const isOpen = () => dropdown.style.display === 'flex';
+
+    const refresh = () => {
+      const v = field.value;
+      const item = v ? opts.items('').find(i => i.value === v) : null;
+      text.textContent = v ? (item ? item.label : v) : opts.placeholder;
+      trigger.style.color = v ? 'var(--slate-700)' : 'var(--slate-400)';
+    };
+    // The box follows the field when code sets it (a row's stored values loading in)
+    const proto = field.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+    Object.defineProperty(field, 'value', {
+      configurable: true,
+      get() { return desc.get.call(this); },
+      set(v) { desc.set.call(this, v); refresh(); }
+    });
+
+    // The law card, beside a row or (after a second's rest) the box — as on the Supply Type box
+    const showCard = (target, v) => {
+      const html = opts.card ? opts.card(v) : '';
+      if (html && typeof positionAndShowKyaInfoHoverCard === 'function') positionAndShowKyaInfoHoverCard(target, html);
+    };
+    const hideCardSoon = delay => { if (opts.card && typeof scheduleHidePartyHoverCard === 'function') scheduleHidePartyHoverCard(delay); };
+    const hideCard = () => { if (opts.card && typeof hidePartyHoverCard === 'function') hidePartyHoverCard(); };
+    let restTimer = null;
+    const cancelRest = () => { if (restTimer) { clearTimeout(restTimer); restTimer = null; } };
+
+    const close = () => { dropdown.style.display = 'none'; hideCard(); };
+    const setValue = (v, item) => {
+      if (opts.pick) opts.pick(v, item);
+      else field.value = v;
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const row = (item, isSelected) => {
+      const div = document.createElement('div');
+      div.style.cssText = `padding: 8.5px 12px; font-size: 13.5px; border-radius: 6px; cursor: pointer; font-weight: ${isSelected ? '700' : '500'}; background: ${isSelected ? 'var(--blue-50)' : 'transparent'}; color: ${isSelected ? 'var(--blue-700)' : 'var(--slate-700)'};`;
+      div.textContent = item.label;
+      if (item.sub) {
+        const sub = document.createElement('div');
+        sub.style.cssText = 'font-size: 11px; font-weight: 500; color: var(--slate-400);';
+        sub.textContent = item.sub;
+        div.appendChild(sub);
+      }
+      div.addEventListener('mouseover', () => { if (!isSelected) div.style.background = 'var(--slate-50)'; });
+      div.addEventListener('mouseout', () => { if (!isSelected) div.style.background = 'transparent'; });
+      if (opts.card) {
+        div.addEventListener('mouseenter', () => showCard(div, item.value));
+        div.addEventListener('mouseleave', () => hideCardSoon(250));
+      }
+      div.addEventListener('click', () => { setValue(item.value, item); close(); });
+      return div;
+    };
+
+    // A name not in the list, used as typed
+    const ownFooter = raw => {
+      const footer = document.createElement('div');
+      footer.className = 'kya-party-create-footer';
+      footer.style.cssText = 'position: sticky; bottom: -8px; z-index: 5; background: #fff; border-top: 1px solid var(--slate-200); margin: 4px -8px -8px; padding: 8px 10px 10px; border-radius: 0 0 12px 12px;';
+      const label = document.createElement('div');
+      label.style.cssText = 'font-size: 11px; font-weight: 600; color: var(--slate-500); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+      label.textContent = `Use "${raw}" as`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'je-drop-create-item';
+      btn.style.cssText = 'width: 100%; justify-content: center; padding: 7px 10px; font-size: 12px;';
+      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>${escapeHtml(opts.own)}</span>`;
+      btn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        setValue(raw);
+        close();
+      });
+      btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+      footer.appendChild(label);
+      footer.appendChild(btn);
+      return footer;
+    };
+
+    const render = () => {
+      const raw = search.value.trim();
+      const items = opts.items(raw.toLowerCase());
+      list.innerHTML = '';
+      items.forEach(item => list.appendChild(row(item, field.value === item.value)));
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'padding: 12px 10px; text-align: center; font-size: 13px; font-weight: 600; color: var(--slate-500);';
+        empty.textContent = opts.empty;
+        list.appendChild(empty);
+      }
+      if (opts.own && raw && !opts.items('').some(i => i.label.toLowerCase() === raw.toLowerCase())) list.appendChild(ownFooter(raw));
+    };
+
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      cancelRest();
+      if (isOpen()) { close(); return; }
+      document.querySelectorAll('.kya-searchable-select-dropdown').forEach(dd => { if (dd !== dropdown) dd.style.display = 'none'; });
+      hideCard();
+      dropdown.style.display = 'flex';
+      search.value = '';
+      render();
+      setTimeout(() => search.focus(), 50);
+    });
+    search.addEventListener('input', render);
+    search.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    });
+    dropdown.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', e => { if (!wrap.contains(e.target)) dropdown.style.display = 'none'; });
+    if (opts.card) {
+      trigger.addEventListener('mouseenter', () => {
+        cancelRest();
+        if (isOpen() || !field.value) return;
+        restTimer = setTimeout(() => { if (!isOpen() && field.value) showCard(trigger, field.value); }, 1000);
+      });
+      trigger.addEventListener('mouseleave', () => { cancelRest(); hideCardSoon(350); });
+    }
+    pinListSearch(dropdown);
+    floatPopupList(trigger, dropdown);
+
+    refresh();
+    return wrap;
+  }
+
+  // ── Additional Details of a party — the Trade Receivables / Payables ledger, Customer and
+  // Supplier popups, Create and Alter: Phone No and Email Address under Contact Person; District
+  // and State as search lists, as in Company Profile (picking a district fills its State, a State
+  // narrows the districts; City | District, State | PIN Code, then Country); Bank Name as a search
+  // list of Indian banks; the GST Registration Type as a search list of the types in law, each with
+  // its card (KYA_GST_REG_TYPES). A district, State or bank not in its list can be used as typed.
+  // party: the record an Alter popup shows. Call after wireGstinPanValidation. ──
+  function enhancePartyAddlFields(container, prefix, party) {
+    const el = id => container.querySelector('#' + prefix + id);
+    const contact = el('ContactName'), city = el('City'), pin = el('Pincode'), state = el('State'), country = el('Country');
+    const bank = el('BankName'), regType = el('GstinRegType');
+    if (!contact || !city || !pin || !state || !country || state.type === 'hidden') return;
+    const p = party || {};
+    const inpStyle = city.getAttribute('style') || '';
+    const column = city.parentElement.parentElement;
+    const cityPinRow = city.parentElement;
+    const stateRow = state.parentElement;
+
+    // Phone No | Email Address, under Contact Person
+    const contactRow = document.createElement('div');
+    contactRow.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;';
+    contactRow.innerHTML = `
+      <input type="text" id="${prefix}Phone" placeholder="Enter Phone No" style="${inpStyle}">
+      <input type="email" id="${prefix}Email" placeholder="Enter Email Address" style="${inpStyle}">`;
+    (contact.parentElement === column ? contact : contact.parentElement).insertAdjacentElement('afterend', contactRow);
+    contactRow.children[0].value = p.phone || p.mobile || '';
+    contactRow.children[1].value = p.email || '';
+
+    // District and State (india-districts.js)
+    const stateDistricts = window.INDIA_STATE_DISTRICTS || {};
+    const districtAliases = window.INDIA_DISTRICT_ALIASES || {};
+    const stateNames = Object.keys(stateDistricts);
+    const isListedDistrict = d => stateNames.some(s => stateDistricts[s].includes(d));
+    const district = document.createElement('input');
+    district.type = 'hidden';
+    district.id = prefix + 'District';
+    district.value = p.district || '';
+    state.type = 'hidden';
+
+    cityPinRow.replaceChild(partySearchBox(district, {
+      placeholder: 'Select District', search: 'Search district...', empty: 'No District Found', own: 'District',
+      // A picked State lists its own districts; otherwise all, with their State below
+      items: q => {
+        const st = stateDistricts[state.value] ? state.value : '';
+        const pool = [];
+        (st ? [st] : stateNames).forEach(s => stateDistricts[s].forEach(d => pool.push({ value: d, label: d, sub: st ? '' : s, state: s })));
+        if (!st) pool.sort((a, b) => a.label.localeCompare(b.label));
+        return q ? pool.filter(i => i.label.toLowerCase().includes(q) || (districtAliases[i.state + '|' + i.label] || '').toLowerCase().includes(q)) : pool;
+      },
+      pick: (v, item) => {
+        district.value = v;
+        if (item && item.state) state.value = item.state;
+      }
+    }), pin);
+
+    partySearchBox(state, {
+      placeholder: 'Select State', search: 'Search state...', empty: 'No State Found', own: 'State',
+      items: q => stateNames.filter(s => !q || s.toLowerCase().includes(q)).map(s => ({ value: s, label: s })),
+      // A district of another State no longer fits; a typed-in district is kept
+      pick: v => {
+        state.value = v;
+        const d = district.value;
+        if (d && isListedDistrict(d) && !(stateDistricts[v] || []).includes(d)) district.value = '';
+      }
+    });
+    stateRow.replaceChild(pin, country);
+    stateRow.insertAdjacentElement('afterend', country);
+    country.style.width = '100%';
+
+    // Bank Name: the Indian banks, or a name of your own
+    if (bank) {
+      bank.type = 'hidden';
+      partySearchBox(bank, {
+        placeholder: 'Select Bank', search: 'Search bank name...', empty: 'No matching bank found', own: 'Bank',
+        items: q => INDIAN_BANKS_LIST.filter(b => !q || b.toLowerCase().includes(q)).map(b => ({ value: b, label: b }))
+      });
+    }
+
+    // GST Registration Type, each with what it is as per law (the Supply Type card, sales-select-boxes.js)
+    if (regType) {
+      regType.style.display = 'none';
+      partySearchBox(regType, {
+        placeholder: '-- Not Specified --', search: 'Search registration type...', empty: 'No Registration Type Found',
+        items: q => GST_REGISTRATION_TYPES.filter(t => !q || t.label.toLowerCase().includes(q)),
+        card: v => {
+          const label = (GST_REGISTRATION_TYPES.find(t => t.value === v) || {}).label;
+          const info = (window.KYA_GST_REG_TYPES || []).find(t => t.type === label);
+          return info && typeof kyaLawCardHtml === 'function' ? kyaLawCardHtml(info.type, 'Registration Type', info) : '';
+        }
+      });
+    }
+  }
+
   // ── Generic Code -> Description combobox (HSN / SAC and similar code masters) ──
   // Code is searchable; Description is a read-only display auto-filled from the
-  // selected code, showing a hover popup when its text is truncated.
-  function wireCodeDescComboField(container, codePrefix, descPrefix, codeList, noun) {
+  // selected code, showing a hover popup when its text is truncated. card(code) → the HTML
+  // of a code's card, shown beside its row and (after a second's rest) beside the Code box.
+  function wireCodeDescComboField(container, codePrefix, descPrefix, codeList, noun, card) {
     const list = Array.isArray(codeList) ? codeList : [];
 
     const codeHidden = container.querySelector('#' + codePrefix);
@@ -454,6 +777,13 @@
     const descTriggerText = container.querySelector('#' + descPrefix + 'TriggerText');
 
     if (!codeHidden || !descHidden || !codeTrigger) return;
+
+    const showCard = (target, code) => {
+      const html = card && code ? card(code) : '';
+      if (html && typeof positionAndShowKyaInfoHoverCard === 'function') positionAndShowKyaInfoHoverCard(target, html);
+    };
+    const hideCardSoon = delay => { if (card && typeof scheduleHidePartyHoverCard === 'function') scheduleHidePartyHoverCard(delay); };
+    const hideCard = () => { if (card && typeof hidePartyHoverCard === 'function') hidePartyHoverCard(); };
 
     const MAX_RESULTS = 60;
 
@@ -526,9 +856,14 @@
 
         item.addEventListener('mouseover', () => { item.style.background = 'var(--slate-50)'; });
         item.addEventListener('mouseout', () => { item.style.background = 'transparent'; });
+        if (card) {
+          item.addEventListener('mouseenter', () => showCard(item, code));
+          item.addEventListener('mouseleave', () => hideCardSoon(250));
+        }
         item.addEventListener('click', () => {
           setPair(code, desc);
           codeDropdown.style.display = 'none';
+          hideCard();
         });
 
         optionsList.appendChild(item);
@@ -591,6 +926,7 @@
 
     codeTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
+      hideCard();
       const isOpen = codeDropdown.style.display === 'flex';
       if (!isOpen) {
         openDropdown(codeDropdown, codeSearch, codeOptionsList);
@@ -602,6 +938,21 @@
       const q = e.target.value;
       renderRows(codeOptionsList, filterList(q), q.trim(), (typed) => setPair(typed, descHidden.value));
     });
+    if (card) {
+      let restTimer = null;
+      const cancelRest = () => { if (restTimer) { clearTimeout(restTimer); restTimer = null; } };
+      codeTrigger.addEventListener('mouseenter', () => {
+        cancelRest();
+        if (codeDropdown.style.display === 'flex' || !codeHidden.value) return;
+        restTimer = setTimeout(() => {
+          if (codeDropdown.style.display !== 'flex' && codeHidden.value) showCard(codeTrigger, codeHidden.value);
+        }, 1000);
+      });
+      codeTrigger.addEventListener('mouseleave', () => { cancelRest(); hideCardSoon(350); });
+      codeTrigger.addEventListener('mousedown', cancelRest);
+    }
+    pinListSearch(codeDropdown);
+    floatPopupList(codeTrigger, codeDropdown);
 
     document.addEventListener('click', (e) => {
       if (!codeDropdown.contains(e.target) && !codeTrigger.contains(e.target)) {
@@ -674,7 +1025,22 @@
   // Backed by window.SAC_CODE_LIST ([code, description] pairs) from js/sac-codes.js.
   function wireSacCodeDescFields(container, codePrefix, descPrefix) {
     const sacList = (typeof window !== 'undefined' && Array.isArray(window.SAC_CODE_LIST)) ? window.SAC_CODE_LIST : [];
-    wireCodeDescComboField(container, codePrefix, descPrefix, sacList, 'SAC');
+    wireCodeDescComboField(container, codePrefix, descPrefix, sacList, 'SAC', sacCodeCardHtml);
+  }
+
+  // A SAC code's card: its full description, the heading it falls under (its first four digits)
+  // and Chapter 99, all services. A code typed in that isn't in the list has none.
+  function sacCodeCardHtml(code) {
+    const sacList = Array.isArray(window.SAC_CODE_LIST) ? window.SAC_CODE_LIST : [];
+    const find = c => sacList.find(p => p[0] === c);
+    const entry = find(String(code || '').trim());
+    if (!entry) return '';
+    const sections = [];
+    const heading = entry[0].length > 4 ? find(entry[0].slice(0, 4)) : null;
+    if (heading) sections.push({ icon: CARD_ICON_LIST, heading: 'Heading', text: `${heading[0]} – ${heading[1]}` });
+    const chapter = entry[0].length > 2 ? find(entry[0].slice(0, 2)) : null;
+    if (chapter) sections.push({ icon: CARD_ICON_LIST, heading: 'Chapter', text: `${chapter[0]} – ${chapter[1]}` });
+    return infoCardHtml(entry[1], 'SAC ' + entry[0], sections);
   }
 
   function syncStockGroupsToCoa() {
@@ -4982,9 +5348,12 @@
     return { refresh, open, close };
   }
 
-  function initSearchableSelectHelper(container, prefix, placeholderText) {
+  // opts.card(value) → a value's hover card (coa.js); opts.pinSearch: the search box stays at
+  // the top of the list while it scrolls
+  function initSearchableSelectHelper(container, prefix, placeholderText, opts) {
+    if (opts && opts.pinSearch) pinListSearch(container.querySelector('#' + prefix + 'Dropdown'));
     if (typeof initGenericSearchableSelect === 'function') {
-      return initGenericSearchableSelect(container, prefix, placeholderText);
+      return initGenericSearchableSelect(container, prefix, placeholderText, opts || {});
     }
     const realSelect = container.querySelector('#' + prefix);
     const trigger = container.querySelector('#' + prefix + 'Trigger');
@@ -5165,6 +5534,46 @@
       </div>
     `;
   }
+
+  // ── What a ledger group is, for its card in the Ledger's Group box (Create and Alter): its
+  // nature under Schedule III (Asset, Liability, Equity, Income or Expense) and the groups it
+  // sits under, nearest first. value: 'sg:<sub-group id>' or 'gl:<group ledger id>' ──
+  const LEDGER_GROUP_NATURE = { assets: 'Asset', income: 'Income', expense: 'Expense' };
+  function ledgerGroupCardHtml(value) {
+    const sep = String(value || '').indexOf(':');
+    const kind = String(value).slice(0, sep), id = String(value).slice(sep + 1);
+    const sgs = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS : [];
+    const gls = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
+    const findSg = sgId => sgs.find(s => s.id === sgId);
+    const findGl = glId => gls.find(l => l.type === 'group-ledger' && String(l.id) === String(glId));
+    const path = [];
+    let name = '', sg = null;
+    if (kind === 'gl') {
+      const gl = findGl(id);
+      if (!gl) return '';
+      name = gl.name;
+      for (let p = gl.glId ? findGl(gl.glId) : null; p; p = p.glId ? findGl(p.glId) : null) path.push(p.name);
+      sg = findSg(gl.sgId);
+      if (sg) path.push(sg.name);
+    } else if (kind === 'sg') {
+      sg = findSg(id);
+      if (sg) name = sg.name;
+    }
+    if (!sg) return '';
+    let top = sg;
+    for (let p = sg.parent ? findSg(sg.parent) : null; p; p = p.parent ? findSg(p.parent) : null) { path.push(p.name); top = p; }
+    const main = (typeof COA_MAIN_GROUPS !== 'undefined' ? COA_MAIN_GROUPS : []).find(m => m.id === sg.main) || {};
+    if (main.name) path.push(main.name);
+    // Equity and Liabilities: the Shareholders' Funds (or a capital / equity group of your own)
+    // are equity, the rest liabilities
+    const nature = sg.main === 'equity-liabilities'
+      ? ((top.id === 'sg-shf' || (/equity|capital|fund/i.test(top.name) && !/loan|borrow|creditor|payable|liabilit/i.test(top.name))) ? 'Equity' : 'Liability')
+      : (LEDGER_GROUP_NATURE[sg.main] || '');
+    if (!nature) return '';
+    const tone = main.color ? { color: main.color, light: main.light, border: main.color + '33' } : null;
+    return infoCardHtml(name, nature, [{ icon: CARD_ICON_GROUP, heading: 'Group', text: path.join(' → ') || name }], tone);
+  }
+  const LEDGER_GROUP_BOX = { card: ledgerGroupCardHtml, pinSearch: true };
 
   // Builds the "Group" searchable-select block for a Create Ledger row. `suffix` is ''
   // for the first row, or the row index (1, 2, ...) for rows added with "Add Another Ledger".
@@ -6372,7 +6781,7 @@
       // Group starts unselected so the dropdown shows "Select Group"
       const ledgerGroupSelInit = contentArea.querySelector('#masterLedgerGroupCombinedSel');
       if (ledgerGroupSelInit) ledgerGroupSelInit.selectedIndex = -1;
-      const searchableGroupControl = initSearchableSelectHelper(contentArea, 'masterLedgerGroupCombinedSel', 'Select Group');
+      const searchableGroupControl = initSearchableSelectHelper(contentArea, 'masterLedgerGroupCombinedSel', 'Select Group', LEDGER_GROUP_BOX);
 
       // Additional Information Dynamic Visibility and Save As Slider Toggle
       const groupSel = contentArea.querySelector('#masterLedgerGroupCombinedSel');
@@ -6512,6 +6921,7 @@
 
       // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
       wireGstinPanValidation(contentArea, 'masterLedgerGstin', 'masterLedgerPan');
+      enhancePartyAddlFields(contentArea, 'masterLedger');
       const ifscInp = contentArea.querySelector('#masterLedgerIfsc');
       if (ifscInp) {
         ifscInp.addEventListener('input', (e) => {
@@ -6612,6 +7022,8 @@
             bankNameDropdown.style.display = 'none';
           }
         });
+        pinListSearch(bankNameDropdown);
+        floatPopupList(bankNameTrigger, bankNameDropdown);
       }
 
       let _masterLedgerBankAcctQrData = null;
@@ -6771,7 +7183,8 @@
 
       // Popup field ids and the value a fresh row starts with
       const LEDGER_ADDL_FIELD_DEFAULTS = {
-        masterLedgerContactName: '', masterLedgerAddress: '', masterLedgerCity: '', masterLedgerPincode: '',
+        masterLedgerContactName: '', masterLedgerPhone: '', masterLedgerEmail: '',
+        masterLedgerAddress: '', masterLedgerCity: '', masterLedgerDistrict: '', masterLedgerPincode: '',
         masterLedgerState: '', masterLedgerCountry: 'India',
         masterLedgerBankName: '', masterLedgerAccountNo: '', masterLedgerIfsc: '', masterLedgerBranch: '',
         masterLedgerGstin: '', masterLedgerPan: '', masterLedgerGstinRegType: '',
@@ -6954,7 +7367,7 @@
         } else if (newGroupSel) {
           newGroupSel.selectedIndex = -1; // nothing chosen above -> show "Select Group"
         }
-        initSearchableSelectHelper(contentArea, 'masterLedgerGroupCombinedSel' + idx, 'Select Group');
+        initSearchableSelectHelper(contentArea, 'masterLedgerGroupCombinedSel' + idx, 'Select Group', LEDGER_GROUP_BOX);
         _masterLedgerRowState[idx] = newLedgerRowState();
         wireLedgerRowInputs(idx);
         wireLedgerRowRemoveBtn(idx);
@@ -7077,8 +7490,11 @@
           aliases: row.aliases,
           openingBalance: row.openingBalance,
           contactName: val('masterLedgerContactName'),
+          phone: val('masterLedgerPhone'),
+          email: val('masterLedgerEmail'),
           address: val('masterLedgerAddress'),
           city: val('masterLedgerCity'),
+          district: val('masterLedgerDistrict'),
           pincode: val('masterLedgerPincode'),
           state: val('masterLedgerState'),
           country: val('masterLedgerCountry') || 'India',
@@ -7508,6 +7924,7 @@
 
       // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
       wireGstinPanValidation(contentArea, 'masterCustomerGstin', 'masterCustomerPan');
+      enhancePartyAddlFields(contentArea, 'masterCustomer');
       const ifscInp = contentArea.querySelector('#masterCustomerIfsc');
       if (ifscInp) {
         ifscInp.addEventListener('input', (e) => {
@@ -7563,7 +7980,8 @@
       // ── Per-row state (like Create Ledger): the side box and popup always show the
       // active row; other rows' values are parked in _masterCustomerRowState ──
       const CUSTOMER_ADDL_FIELD_DEFAULTS = {
-        masterCustomerContactName: '', masterCustomerAddress: '', masterCustomerCity: '', masterCustomerPincode: '',
+        masterCustomerContactName: '', masterCustomerPhone: '', masterCustomerEmail: '',
+        masterCustomerAddress: '', masterCustomerCity: '', masterCustomerDistrict: '', masterCustomerPincode: '',
         masterCustomerState: '', masterCustomerCountry: 'India',
         masterCustomerBankName: '', masterCustomerAccountNo: '', masterCustomerIfsc: '', masterCustomerBranch: '',
         masterCustomerGstin: '', masterCustomerPan: '', masterCustomerGstinRegType: ''
@@ -7871,8 +8289,11 @@
               aliases: row.aliases,
               openingBalance: row.openingBalance,
               contactName: val('masterCustomerContactName'),
+              phone: val('masterCustomerPhone'),
+              email: val('masterCustomerEmail'),
               address: val('masterCustomerAddress'),
               city: val('masterCustomerCity'),
+              district: val('masterCustomerDistrict'),
               pincode: val('masterCustomerPincode'),
               state: val('masterCustomerState'),
               country: val('masterCustomerCountry'),
@@ -8143,6 +8564,7 @@
 
       // GSTIN / PAN live validity check + Update-PAN-from-GSTIN (matches Company Profile & Vault)
       wireGstinPanValidation(contentArea, 'masterSupplierGstin', 'masterSupplierPan');
+      enhancePartyAddlFields(contentArea, 'masterSupplier');
       const ifscInp = contentArea.querySelector('#masterSupplierIfsc');
       if (ifscInp) {
         ifscInp.addEventListener('input', (e) => {
@@ -8198,7 +8620,8 @@
       // ── Per-row state (like Create Ledger): the side box and popup always show the
       // active row; other rows' values are parked in _masterSupplierRowState ──
       const SUPPLIER_ADDL_FIELD_DEFAULTS = {
-        masterSupplierContactName: '', masterSupplierAddress: '', masterSupplierCity: '', masterSupplierPincode: '',
+        masterSupplierContactName: '', masterSupplierPhone: '', masterSupplierEmail: '',
+        masterSupplierAddress: '', masterSupplierCity: '', masterSupplierDistrict: '', masterSupplierPincode: '',
         masterSupplierState: '', masterSupplierCountry: 'India',
         masterSupplierBankName: '', masterSupplierAccountNo: '', masterSupplierIfsc: '', masterSupplierBranch: '',
         masterSupplierGstin: '', masterSupplierPan: '', masterSupplierGstinRegType: '',
@@ -8508,8 +8931,11 @@
               aliases: row.aliases,
               openingBalance: row.openingBalance,
               contactName: val('masterSupplierContactName'),
+              phone: val('masterSupplierPhone'),
+              email: val('masterSupplierEmail'),
               address: val('masterSupplierAddress'),
               city: val('masterSupplierCity'),
+              district: val('masterSupplierDistrict'),
               pincode: val('masterSupplierPincode'),
               state: val('masterSupplierState'),
               country: val('masterSupplierCountry'),
@@ -12068,7 +12494,7 @@
         }
 
 
-        initSearchableSelectHelper(contentArea, 'masterAlterLedgerGroupCombinedSel', 'Select Group');
+        initSearchableSelectHelper(contentArea, 'masterAlterLedgerGroupCombinedSel', 'Select Group', LEDGER_GROUP_BOX);
 
         const groupSel = contentArea.querySelector('#masterAlterLedgerGroupCombinedSel');
         const addInfoWrap = contentArea.querySelector('#masterAlterLedgerAdditionalInfoWrap');
@@ -12115,6 +12541,7 @@
         }
 
         wireGstinPanValidation(contentArea, 'masterAlterLedgerGstin', 'masterAlterLedgerPan', currentLedger.gstRegType);
+        enhancePartyAddlFields(contentArea, 'masterAlterLedger', currentLedger);
         const ifscInp = contentArea.querySelector('#masterAlterLedgerIfsc');
         if (ifscInp) {
           ifscInp.addEventListener('input', (e) => {
@@ -12206,6 +12633,8 @@
             bankNameDropdown.style.display = 'none';
           }
         });
+        pinListSearch(bankNameDropdown);
+        floatPopupList(bankNameTrigger, bankNameDropdown);
       }
 
       let _masterAlterLedgerBankAcctQrData = null;
@@ -12422,8 +12851,11 @@
 
             const isParty = isTradePartyGroup(groupVal);
             const contactName = isParty && contentArea.querySelector('#masterAlterLedgerContactName') ? contentArea.querySelector('#masterAlterLedgerContactName').value.trim() : '';
+            const phone = isParty && contentArea.querySelector('#masterAlterLedgerPhone') ? contentArea.querySelector('#masterAlterLedgerPhone').value.trim() : '';
+            const email = isParty && contentArea.querySelector('#masterAlterLedgerEmail') ? contentArea.querySelector('#masterAlterLedgerEmail').value.trim() : '';
             const address = isParty && contentArea.querySelector('#masterAlterLedgerAddress') ? contentArea.querySelector('#masterAlterLedgerAddress').value.trim() : '';
             const city = isParty && contentArea.querySelector('#masterAlterLedgerCity') ? contentArea.querySelector('#masterAlterLedgerCity').value.trim() : '';
+            const district = isParty && contentArea.querySelector('#masterAlterLedgerDistrict') ? contentArea.querySelector('#masterAlterLedgerDistrict').value.trim() : '';
             const pincode = isParty && contentArea.querySelector('#masterAlterLedgerPincode') ? contentArea.querySelector('#masterAlterLedgerPincode').value.trim() : '';
             const state = isParty && contentArea.querySelector('#masterAlterLedgerState') ? contentArea.querySelector('#masterAlterLedgerState').value.trim() : '';
             const country = isParty && contentArea.querySelector('#masterAlterLedgerCountry') ? contentArea.querySelector('#masterAlterLedgerCountry').value.trim() : 'India';
@@ -12450,8 +12882,11 @@
             currentLedger.openingBalance = openingBal;
             if (isParty) {
               currentLedger.contactName = contactName;
+              currentLedger.phone = phone;
+              currentLedger.email = email;
               currentLedger.address = address;
               currentLedger.city = city;
+              currentLedger.district = district;
               currentLedger.pincode = pincode;
               currentLedger.state = state;
               currentLedger.country = country;
@@ -12766,6 +13201,7 @@
 
 
         wireGstinPanValidation(contentArea, 'masterAlterCustomerGstin', 'masterAlterCustomerPan', currentCustomer.gstRegType);
+        enhancePartyAddlFields(contentArea, 'masterAlterCustomer', currentCustomer);
 
         // Additional Details popup (Name & Address, Bank Information, GSTIN & PAN), like Create
         wireAlterAddlPopup(contentArea, 'masterAlterCustomer', {
@@ -12870,8 +13306,11 @@
             }
 
             const contactName = contentArea.querySelector('#masterAlterCustomerContactName') ? contentArea.querySelector('#masterAlterCustomerContactName').value.trim() : '';
+            const phone = contentArea.querySelector('#masterAlterCustomerPhone') ? contentArea.querySelector('#masterAlterCustomerPhone').value.trim() : '';
+            const email = contentArea.querySelector('#masterAlterCustomerEmail') ? contentArea.querySelector('#masterAlterCustomerEmail').value.trim() : '';
             const address = contentArea.querySelector('#masterAlterCustomerAddress') ? contentArea.querySelector('#masterAlterCustomerAddress').value.trim() : '';
             const city = contentArea.querySelector('#masterAlterCustomerCity') ? contentArea.querySelector('#masterAlterCustomerCity').value.trim() : '';
+            const district = contentArea.querySelector('#masterAlterCustomerDistrict') ? contentArea.querySelector('#masterAlterCustomerDistrict').value.trim() : '';
             const pincode = contentArea.querySelector('#masterAlterCustomerPincode') ? contentArea.querySelector('#masterAlterCustomerPincode').value.trim() : '';
             const state = contentArea.querySelector('#masterAlterCustomerState') ? contentArea.querySelector('#masterAlterCustomerState').value.trim() : '';
             const country = contentArea.querySelector('#masterAlterCustomerCountry') ? contentArea.querySelector('#masterAlterCustomerCountry').value.trim() : 'India';
@@ -12888,8 +13327,11 @@
             currentCustomer.name = name;
             currentCustomer.aliases = aliases;
             currentCustomer.contactName = contactName;
+            currentCustomer.phone = phone;
+            currentCustomer.email = email;
             currentCustomer.address = address;
             currentCustomer.city = city;
+            currentCustomer.district = district;
             currentCustomer.pincode = pincode;
             currentCustomer.state = state;
             currentCustomer.country = country;
@@ -13193,6 +13635,7 @@
 
 
         wireGstinPanValidation(contentArea, 'masterAlterSupplierGstin', 'masterAlterSupplierPan', currentSupplier.gstRegType);
+        enhancePartyAddlFields(contentArea, 'masterAlterSupplier', currentSupplier);
         wireMasterMsmeSlider(contentArea, 'masterAlterSupplierMsme');
 
         // Additional Details popup (Name & Address, Bank Information, GSTIN & PAN), like Create
@@ -13298,8 +13741,11 @@
             }
 
             const contactName = contentArea.querySelector('#masterAlterSupplierContactName') ? contentArea.querySelector('#masterAlterSupplierContactName').value.trim() : '';
+            const phone = contentArea.querySelector('#masterAlterSupplierPhone') ? contentArea.querySelector('#masterAlterSupplierPhone').value.trim() : '';
+            const email = contentArea.querySelector('#masterAlterSupplierEmail') ? contentArea.querySelector('#masterAlterSupplierEmail').value.trim() : '';
             const address = contentArea.querySelector('#masterAlterSupplierAddress') ? contentArea.querySelector('#masterAlterSupplierAddress').value.trim() : '';
             const city = contentArea.querySelector('#masterAlterSupplierCity') ? contentArea.querySelector('#masterAlterSupplierCity').value.trim() : '';
+            const district = contentArea.querySelector('#masterAlterSupplierDistrict') ? contentArea.querySelector('#masterAlterSupplierDistrict').value.trim() : '';
             const pincode = contentArea.querySelector('#masterAlterSupplierPincode') ? contentArea.querySelector('#masterAlterSupplierPincode').value.trim() : '';
             const state = contentArea.querySelector('#masterAlterSupplierState') ? contentArea.querySelector('#masterAlterSupplierState').value.trim() : '';
             const country = contentArea.querySelector('#masterAlterSupplierCountry') ? contentArea.querySelector('#masterAlterSupplierCountry').value.trim() : 'India';
@@ -13316,8 +13762,11 @@
             currentSupplier.name = name;
             currentSupplier.aliases = aliases;
             currentSupplier.contactName = contactName;
+            currentSupplier.phone = phone;
+            currentSupplier.email = email;
             currentSupplier.address = address;
             currentSupplier.city = city;
+            currentSupplier.district = district;
             currentSupplier.pincode = pincode;
             currentSupplier.state = state;
             currentSupplier.country = country;

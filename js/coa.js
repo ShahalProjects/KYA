@@ -1048,7 +1048,9 @@
     _renderCoaModal();
   }
 
-  function initGenericSearchableSelect(container, prefix, placeholderText = 'Search...') {
+  // opts.card(value) → the HTML of a value's card, shown beside its row and (after a second's
+  // rest) beside the box, as on the Supply Type box
+  function initGenericSearchableSelect(container, prefix, placeholderText = 'Search...', opts = {}) {
     const realSelect = container.querySelector('#' + prefix);
     const trigger = container.querySelector('#' + prefix + 'Trigger');
     const dropdown = container.querySelector('#' + prefix + 'Dropdown');
@@ -1056,7 +1058,14 @@
     const optionsList = container.querySelector('#' + prefix + 'OptionsList');
     const triggerText = container.querySelector('#' + prefix + 'TriggerText');
     if (!realSelect || !trigger || !dropdown || !searchInput || !optionsList || !triggerText) return null;
-    
+
+    const showCard = (target, value) => {
+      const html = opts.card && value ? opts.card(value) : '';
+      if (html) positionAndShowKyaInfoHoverCard(target, html);
+    };
+    const hideCardSoon = delay => { if (opts.card) scheduleHidePartyHoverCard(delay); };
+    const hideCard = () => { if (opts.card) hidePartyHoverCard(); };
+
     const updateTriggerText = () => {
       const selectedOpt = realSelect.options[realSelect.selectedIndex];
       if (selectedOpt) {
@@ -1096,12 +1105,17 @@
         item.addEventListener('mouseout', () => {
           if (!opt.selected) item.style.background = 'transparent';
         });
-        
+        if (opts.card) {
+          item.addEventListener('mouseenter', () => showCard(item, value));
+          item.addEventListener('mouseleave', () => hideCardSoon(250));
+        }
+
         item.addEventListener('click', () => {
           realSelect.value = value;
           realSelect.dispatchEvent(new Event('change'));
           updateTriggerText();
           dropdown.style.display = 'none';
+          hideCard();
         });
         
         optionsList.appendChild(item);
@@ -1120,6 +1134,7 @@
     
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
+      hideCard();
       const isOpen = dropdown.style.display === 'flex';
       if (isOpen) {
         dropdown.style.display = 'none';
@@ -1130,7 +1145,20 @@
         setTimeout(() => searchInput.focus(), 50);
       }
     });
-    
+    if (opts.card) {
+      let restTimer = null;
+      const cancelRest = () => { if (restTimer) { clearTimeout(restTimer); restTimer = null; } };
+      trigger.addEventListener('mouseenter', () => {
+        cancelRest();
+        if (dropdown.style.display === 'flex' || !realSelect.value) return;
+        restTimer = setTimeout(() => {
+          if (dropdown.style.display !== 'flex' && realSelect.value) showCard(trigger, realSelect.value);
+        }, 1000);
+      });
+      trigger.addEventListener('mouseleave', () => { cancelRest(); hideCardSoon(350); });
+      trigger.addEventListener('mousedown', cancelRest);
+    }
+
     searchInput.addEventListener('input', () => {
       populateList(searchInput.value);
     });

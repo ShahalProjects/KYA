@@ -13,7 +13,9 @@
  *    2017), so the Supply Type offers only the inter-State choices.
  *  - The GSTIN's first two digits are the State of registration, which decides CGST + SGST or
  *    IGST; GSTR-1 is filed monthly or quarterly (QRMP) by the types that file it.
- * A company saved before the tab existed counts as Registered, Regular, Monthly. A document
+ * A company that hasn't saved the tab yet is Unregistered, unless it already has a GSTIN (typed
+ * before, e.g. in the first Company Details popup): that one counts as Registered, Regular,
+ * Monthly. A document
  * keeps the registration it was made under (doc.gstReg: status, type and GSTIN); one saved
  * before then was made as Registered, Regular. A change of registration is confirmed and applied
  * in Company Profile (company-profile.js), with gstRegChangeNotes saying what it means.
@@ -161,10 +163,11 @@
     return (typeof getCompanyDetails === 'function') ? (getCompanyDetails() || {}) : {};
   }
 
-  // The company's registration as saved in Company Profile & Vault
+  // The company's registration as saved in Company Profile & Vault. Not saved there yet: a new
+  // company is unregistered until it gets a GSTIN, one with a GSTIN already is registered.
   function getCompanyGstReg(co) {
     const c = co || companyDetails();
-    const registered = c.gstRegistered !== false;
+    const registered = c.gstRegistered === undefined ? !!String(c.gstin || '').trim() : c.gstRegistered !== false;
     return {
       registered,
       type: registered ? typeInfo(c.gstRegType).type : '',

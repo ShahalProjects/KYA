@@ -123,7 +123,7 @@
 
   // Every figure the sheet and the exports show
   function computePurchaseSheet(v) {
-    const co = (typeof getInvoiceCompany === 'function') ? getInvoiceCompany() : {};
+    const co = (typeof getInvoiceCompany === 'function') ? getInvoiceCompany(v) : {};
     const parties = getPurchaseParties(v);
     const rows = getPurchaseLineRows(v);
     const taxMode = (typeof getPurchaseTaxMode === 'function') ? getPurchaseTaxMode(v.supplyType) : 'split';
@@ -211,6 +211,8 @@
     if (co.state) coLines.push(esc(co.state));
     const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(v, co) : co.gstin;
     if (docGstin && d.gstRules.registered) coLines.push(`GSTIN: ${esc(docGstin)}`);
+    const coRegNo = (typeof getInvoiceCompanyRegLine === 'function') ? getInvoiceCompanyRegLine(co, esc) : '';
+    if (coRegNo) coLines.push(coRegNo);
     const coContact = [co.phone ? 'Phone: ' + esc(co.phone) : '', co.email ? esc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(esc(co.website));
@@ -336,6 +338,7 @@
             ${logo}
             <div style="min-width:0;">
               <div style="font-size:19px; font-weight:800; color:#1d4ed8; letter-spacing:-.2px;">${esc(companyName)}</div>
+              ${(typeof getInvoiceNameNotesHtml === 'function') ? getInvoiceNameNotesHtml(co, v) : ''}
               <div style="font-size:${FS.body}; color:#475569; margin-top:5px; line-height:1.55;">${coLines.join('<br>')}</div>
             </div>
           </div>

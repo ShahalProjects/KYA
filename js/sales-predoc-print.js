@@ -81,7 +81,7 @@
   // ── Figures and labels the sheet prints (and the exports read) ──
   function computePreDocSheet(sd) {
     const kind = PREDOC_KINDS[sd.preDocKind];
-    const co = getInvoiceCompany();
+    const co = getInvoiceCompany(sd);
     const parties = getInvoiceParties(sd);
     const rows = getInvoiceLineRows(sd);
     const isDraft = isDraftDoc(sd);
@@ -199,6 +199,8 @@
     if (co.state) coLines.push(siEsc(co.state));
     const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(sd, co) : co.gstin;
     if (docGstin && d.gstRules.registered) coLines.push(`GSTIN: ${siEsc(docGstin)}`);
+    const coRegNo = getInvoiceCompanyRegLine(co);
+    if (coRegNo) coLines.push(coRegNo);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(siEsc(co.website));
@@ -337,6 +339,7 @@
             ${getCompanyLogoHtml(co)}
             <div style="min-width:0;">
               <div style="font-size:19px; font-weight:800; color:#1d4ed8; letter-spacing:-.2px;">${siEsc(companyName)}</div>
+              ${getInvoiceNameNotesHtml(co, sd)}
               <div style="font-size:${FS.body}; color:#475569; margin-top:5px; line-height:1.55;">${coLines.join('<br>')}</div>
             </div>
           </div>

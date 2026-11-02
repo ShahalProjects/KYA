@@ -88,14 +88,16 @@
   }
 
   // ── Masters ──────────────────────────────────────────────────────
-  function getInvoiceCompany() {
+  // The company details; for a saved document (doc), the ones it was made with
+  // (company-identity.js)
+  function getInvoiceCompany(doc) {
     let co = {};
     if (typeof getCompanyDetails === 'function') {
       co = getCompanyDetails() || {};
     } else {
       try { co = JSON.parse(localStorage.getItem('kya_company_details')) || {}; } catch (e) { co = {}; }
     }
-    return co;
+    return doc && typeof kyaCompanyForDoc === 'function' ? kyaCompanyForDoc(doc, co) : co;
   }
 
   // The trading name (the exports' company name and Trading Name): the display name when one
@@ -124,6 +126,20 @@
   // Name exactly as entered in Company Profile & Vault (the trading name while it is empty).
   function getInvoiceFirmName(co) {
     return (co.name || '').trim() || getInvoiceCompanyName(co);
+  }
+
+  // Under the name, as the law asks: for a company (Section 12(3), Companies Act 2013) "(One
+  // Person Company)" for an OPC and its former names of the last two years; for an LLP, that it is
+  // registered with limited liability (Section 21(b), LLP Act 2008) (company-identity.js)
+  function getInvoiceNameNotesHtml(co, doc) {
+    const notes = typeof kyaCompanyNameNotes === 'function' ? kyaCompanyNameNotes(co, doc) : [];
+    return notes.map(n => `<div style="font-size:11.5px; color:#64748b; font-weight:600; margin-top:2px;">${siEsc(n)}</div>`).join('');
+  }
+
+  // Under the address: a company's CIN (Section 12(3)(c)) or an LLP's LLPIN (Section 21(a))
+  function getInvoiceCompanyRegLine(co, esc) {
+    const reg = typeof kyaCompanyRegNumber === 'function' ? kyaCompanyRegNumber(co) : null;
+    return reg ? `${reg.label}: ${(esc || siEsc)(reg.no)}` : '';
   }
 
   // The uploaded logo. Without one the header keeps no logo space: the company
@@ -260,6 +276,7 @@
     return `
       <div style="flex:0 0 auto; padding:8px 12px 0; box-sizing:border-box; text-align:center; break-inside:avoid; page-break-inside:avoid;">
         <div style="font-size:11px; font-weight:700; color:#0f172a;">For ${siEsc(companyName)}</div>
+        ${co.businessType === 'OPC' ? '<div style="font-size:10.5px; font-weight:600; color:#475569;">(One Person Company)</div>' : ''}
         ${getInvoiceSignatoryHtml(co)}
         <div style="border-top:1px solid #94a3b8; padding-top:5px; font-size:10.5px; color:#475569; font-weight:600;">Authorised Signatory</div>
       </div>`;
@@ -459,7 +476,7 @@
   }
 
   function renderSalesTaxInvoiceHTML(inv) {
-    const co = getInvoiceCompany();
+    const co = getInvoiceCompany(inv);
     const parties = getInvoiceParties(inv);
     let bank = getInvoiceBankDetails(inv);
     const rows = getInvoiceLineRows(inv);
@@ -511,6 +528,8 @@
     if (co.state) coLines.push(siEsc(co.state));
     const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(inv, co) : co.gstin;
     if (docGstin && gstRules.registered) coLines.push(`GSTIN: ${siEsc(docGstin)}`);
+    const coRegNo = getInvoiceCompanyRegLine(co);
+    if (coRegNo) coLines.push(coRegNo);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(siEsc(co.website));
@@ -711,6 +730,7 @@
             ${getCompanyLogoHtml(co)}
             <div style="min-width:0;">
               <div style="font-size:19px; font-weight:800; color:#1d4ed8; letter-spacing:-.2px;">${siEsc(getInvoiceFirmName(co))}</div>
+              ${getInvoiceNameNotesHtml(co, inv)}
               <div style="font-size:${FS.body}; color:#475569; margin-top:5px; line-height:1.55;">${coLines.join('<br>')}</div>
             </div>
           </div>
@@ -792,7 +812,7 @@
   // ── Export data ──────────────────────────────────────────────────
   // PDF and Excel exports read the same figures, labels and rules the sheet prints.
   function getSalesInvoiceExportData(inv) {
-    const co = getInvoiceCompany();
+    const co = getInvoiceCompany(inv);
     const parties = getInvoiceParties(inv);
     const bank = getInvoiceBankDetails(inv) || { bankName: '', accountHolder: '', accountNo: '', ifsc: '', branch: '', qrCode: '' };
     const rows = getInvoiceLineRows(inv);
