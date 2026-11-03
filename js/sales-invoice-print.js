@@ -136,6 +136,20 @@
     return notes.map(n => `<div style="font-size:11.5px; color:#64748b; font-weight:600; margin-top:2px;">${siEsc(n)}</div>`).join('');
   }
 
+  // Under the address: the PAN, which a customer who deducts tax needs (Section 139A(5A),
+  // Income-tax Act; pan-registration.js)
+  function getInvoiceCompanyPanLine(co, esc) {
+    const pan = typeof kyaCompanyPan === 'function' ? kyaCompanyPan(co) : '';
+    return pan ? `PAN: ${(esc || siEsc)(pan)}` : '';
+  }
+
+  // Under the address on sales documents: the Udyam number and MSME class, so a buyer knows the
+  // 45-day payment rule applies (Section 15, MSMED Act 2006; company-registrations.js)
+  function getInvoiceCompanyUdyamLine(co) {
+    const line = typeof kyaCompanyUdyamLine === 'function' ? kyaCompanyUdyamLine(co) : '';
+    return line ? siEsc(line) : '';
+  }
+
   // Under the address: a company's CIN (Section 12(3)(c)) or an LLP's LLPIN (Section 21(a))
   function getInvoiceCompanyRegLine(co, esc) {
     const reg = typeof kyaCompanyRegNumber === 'function' ? kyaCompanyRegNumber(co) : null;
@@ -528,8 +542,12 @@
     if (co.state) coLines.push(siEsc(co.state));
     const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(inv, co) : co.gstin;
     if (docGstin && gstRules.registered) coLines.push(`GSTIN: ${siEsc(docGstin)}`);
+    const coPan = getInvoiceCompanyPanLine(co);
+    if (coPan) coLines.push(coPan);
     const coRegNo = getInvoiceCompanyRegLine(co);
     if (coRegNo) coLines.push(coRegNo);
+    const coUdyam = getInvoiceCompanyUdyamLine(co);
+    if (coUdyam) coLines.push(coUdyam);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(siEsc(co.website));

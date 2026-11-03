@@ -26,9 +26,12 @@
 (function() {
   'use strict';
 
-  // The Basic Identity fields a document prints, or that decide what it prints
+  // The Basic Identity fields a document prints, or that decide what it prints, and the numbers
+  // it prints under the address: PAN (pan-registration.js), CIN / LLPIN and Udyam
+  // (company-registrations.js)
   const IDENTITY_KEYS = ['name', 'displayName', 'businessType', 'incDate', 'address', 'city', 'district', 'state',
-    'pincode', 'phone', 'email', 'website', 'iconImage', 'signatureImage', 'sealImage', 'sealName', 'sealRemoved'];
+    'pincode', 'phone', 'email', 'website', 'iconImage', 'signatureImage', 'sealImage', 'sealName', 'sealRemoved', 'pan',
+    'cin', 'udyam', 'msmeType'];
 
   // Business Types that are companies under the Companies Act 2013
   const COMPANY_TYPES = ['Pvt Ltd', 'Public Ltd', 'OPC'];
@@ -286,5 +289,6 @@
   window.kyaKeepFormerName = keepFormerName;
   window.kyaCompanyNameNotes = companyNameNotes;
   window.kyaCompanyRegNumber = companyRegNumber;
+  window.kyaSavedDocsCount = () => savedDocs().length;
   window.kyaIdentityChangeNotes = identityChangeNotes;
 })();

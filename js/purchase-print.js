@@ -211,6 +211,8 @@
     if (co.state) coLines.push(esc(co.state));
     const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(v, co) : co.gstin;
     if (docGstin && d.gstRules.registered) coLines.push(`GSTIN: ${esc(docGstin)}`);
+    const coPan = (typeof getInvoiceCompanyPanLine === 'function') ? getInvoiceCompanyPanLine(co, esc) : '';
+    if (coPan) coLines.push(coPan);
     const coRegNo = (typeof getInvoiceCompanyRegLine === 'function') ? getInvoiceCompanyRegLine(co, esc) : '';
     if (coRegNo) coLines.push(coRegNo);
     const coContact = [co.phone ? 'Phone: ' + esc(co.phone) : '', co.email ? esc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');

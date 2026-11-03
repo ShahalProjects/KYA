@@ -442,24 +442,6 @@
     renderPanStatus();
   }
 
-  // ── A hover card in the look of the Supply Type card (sales-select-boxes.js): the title and a
-  // badge, then headed sections ({ icon, heading, text }). tone: the badge's colours ──
-  const CARD_ICON_GROUP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
-  const CARD_ICON_LIST = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>';
-  function infoCardHtml(title, badge, sections, tone) {
-    const t = tone || { color: '#1d4ed8', light: '#eff6ff', border: '#dbeafe' };
-    return `
-      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
-        <div style="flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; color: var(--slate-900); line-height: 1.3; word-break: break-word;">${escapeHtml(title)}</div>
-        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: ${t.light}; color: ${t.color}; border: 1px solid ${t.border}; white-space: nowrap;">${escapeHtml(badge)}</span>
-      </div>
-      ${sections.map((s, i) => `
-      <div style="${i ? 'margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--slate-200); ' : ''}font-size: 11.5px; line-height: 1.45; color: var(--slate-700);">
-        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--slate-500); margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">${s.icon} ${escapeHtml(s.heading)}</div>
-        ${escapeHtml(s.text)}
-      </div>`).join('')}`;
-  }
-
   // ── A list's search box stays at its top while the rows scroll under it: a sticky bar in the
   // look of the lists' "Create new" footer ──
   function pinListSearch(dropdown) {
@@ -760,9 +742,8 @@
 
   // ── Generic Code -> Description combobox (HSN / SAC and similar code masters) ──
   // Code is searchable; Description is a read-only display auto-filled from the
-  // selected code, showing a hover popup when its text is truncated. card(code) → the HTML
-  // of a code's card, shown beside its row and (after a second's rest) beside the Code box.
-  function wireCodeDescComboField(container, codePrefix, descPrefix, codeList, noun, card) {
+  // selected code, showing a hover popup when its text is truncated.
+  function wireCodeDescComboField(container, codePrefix, descPrefix, codeList, noun) {
     const list = Array.isArray(codeList) ? codeList : [];
 
     const codeHidden = container.querySelector('#' + codePrefix);
@@ -777,13 +758,6 @@
     const descTriggerText = container.querySelector('#' + descPrefix + 'TriggerText');
 
     if (!codeHidden || !descHidden || !codeTrigger) return;
-
-    const showCard = (target, code) => {
-      const html = card && code ? card(code) : '';
-      if (html && typeof positionAndShowKyaInfoHoverCard === 'function') positionAndShowKyaInfoHoverCard(target, html);
-    };
-    const hideCardSoon = delay => { if (card && typeof scheduleHidePartyHoverCard === 'function') scheduleHidePartyHoverCard(delay); };
-    const hideCard = () => { if (card && typeof hidePartyHoverCard === 'function') hidePartyHoverCard(); };
 
     const MAX_RESULTS = 60;
 
@@ -856,14 +830,9 @@
 
         item.addEventListener('mouseover', () => { item.style.background = 'var(--slate-50)'; });
         item.addEventListener('mouseout', () => { item.style.background = 'transparent'; });
-        if (card) {
-          item.addEventListener('mouseenter', () => showCard(item, code));
-          item.addEventListener('mouseleave', () => hideCardSoon(250));
-        }
         item.addEventListener('click', () => {
           setPair(code, desc);
           codeDropdown.style.display = 'none';
-          hideCard();
         });
 
         optionsList.appendChild(item);
@@ -926,7 +895,6 @@
 
     codeTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
-      hideCard();
       const isOpen = codeDropdown.style.display === 'flex';
       if (!isOpen) {
         openDropdown(codeDropdown, codeSearch, codeOptionsList);
@@ -938,19 +906,6 @@
       const q = e.target.value;
       renderRows(codeOptionsList, filterList(q), q.trim(), (typed) => setPair(typed, descHidden.value));
     });
-    if (card) {
-      let restTimer = null;
-      const cancelRest = () => { if (restTimer) { clearTimeout(restTimer); restTimer = null; } };
-      codeTrigger.addEventListener('mouseenter', () => {
-        cancelRest();
-        if (codeDropdown.style.display === 'flex' || !codeHidden.value) return;
-        restTimer = setTimeout(() => {
-          if (codeDropdown.style.display !== 'flex' && codeHidden.value) showCard(codeTrigger, codeHidden.value);
-        }, 1000);
-      });
-      codeTrigger.addEventListener('mouseleave', () => { cancelRest(); hideCardSoon(350); });
-      codeTrigger.addEventListener('mousedown', cancelRest);
-    }
     pinListSearch(codeDropdown);
     floatPopupList(codeTrigger, codeDropdown);
 
@@ -1025,22 +980,7 @@
   // Backed by window.SAC_CODE_LIST ([code, description] pairs) from js/sac-codes.js.
   function wireSacCodeDescFields(container, codePrefix, descPrefix) {
     const sacList = (typeof window !== 'undefined' && Array.isArray(window.SAC_CODE_LIST)) ? window.SAC_CODE_LIST : [];
-    wireCodeDescComboField(container, codePrefix, descPrefix, sacList, 'SAC', sacCodeCardHtml);
-  }
-
-  // A SAC code's card: its full description, the heading it falls under (its first four digits)
-  // and Chapter 99, all services. A code typed in that isn't in the list has none.
-  function sacCodeCardHtml(code) {
-    const sacList = Array.isArray(window.SAC_CODE_LIST) ? window.SAC_CODE_LIST : [];
-    const find = c => sacList.find(p => p[0] === c);
-    const entry = find(String(code || '').trim());
-    if (!entry) return '';
-    const sections = [];
-    const heading = entry[0].length > 4 ? find(entry[0].slice(0, 4)) : null;
-    if (heading) sections.push({ icon: CARD_ICON_LIST, heading: 'Heading', text: `${heading[0]} – ${heading[1]}` });
-    const chapter = entry[0].length > 2 ? find(entry[0].slice(0, 2)) : null;
-    if (chapter) sections.push({ icon: CARD_ICON_LIST, heading: 'Chapter', text: `${chapter[0]} – ${chapter[1]}` });
-    return infoCardHtml(entry[1], 'SAC ' + entry[0], sections);
+    wireCodeDescComboField(container, codePrefix, descPrefix, sacList, 'SAC');
   }
 
   function syncStockGroupsToCoa() {
@@ -5348,7 +5288,7 @@
     return { refresh, open, close };
   }
 
-  // opts.card(value) → a value's hover card (coa.js); opts.pinSearch: the search box stays at
+  // opts.tip(value) → a value's line beside its row (coa.js); opts.pinSearch: the search box stays at
   // the top of the list while it scrolls
   function initSearchableSelectHelper(container, prefix, placeholderText, opts) {
     if (opts && opts.pinSearch) pinListSearch(container.querySelector('#' + prefix + 'Dropdown'));
@@ -5535,45 +5475,36 @@
     `;
   }
 
-  // ── What a ledger group is, for its card in the Ledger's Group box (Create and Alter): its
-  // nature under Schedule III (Asset, Liability, Equity, Income or Expense) and the groups it
-  // sits under, nearest first. value: 'sg:<sub-group id>' or 'gl:<group ledger id>' ──
-  const LEDGER_GROUP_NATURE = { assets: 'Asset', income: 'Income', expense: 'Expense' };
-  function ledgerGroupCardHtml(value) {
-    const sep = String(value || '').indexOf(':');
-    const kind = String(value).slice(0, sep), id = String(value).slice(sep + 1);
+  // ── The main head a group falls under — Assets, Liabilities, Equity, Income or Expenses —
+  // shown while the cursor is on a group in the Ledger's Group box and the Group's Under box.
+  // value: '[group:]sg:<sub-group id>' or '[group:]gl:<group ledger id>'; none for the
+  // Primary choices, which are main heads themselves ──
+  const GROUP_MAIN_HEADS = { assets: 'Assets', income: 'Income', expense: 'Expenses' };
+  function groupMainHead(value) {
+    const v = String(value || '').replace(/^group:/, '');
+    const sep = v.indexOf(':');
+    const kind = v.slice(0, sep), id = v.slice(sep + 1);
     const sgs = typeof COA_SYS_SGS !== 'undefined' ? COA_SYS_SGS : [];
-    const gls = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers)) ? coaLedgers : [];
     const findSg = sgId => sgs.find(s => s.id === sgId);
-    const findGl = glId => gls.find(l => l.type === 'group-ledger' && String(l.id) === String(glId));
-    const path = [];
-    let name = '', sg = null;
+    let sg = null;
     if (kind === 'gl') {
-      const gl = findGl(id);
-      if (!gl) return '';
-      name = gl.name;
-      for (let p = gl.glId ? findGl(gl.glId) : null; p; p = p.glId ? findGl(p.glId) : null) path.push(p.name);
-      sg = findSg(gl.sgId);
-      if (sg) path.push(sg.name);
+      const gl = (typeof coaLedgers !== 'undefined' && Array.isArray(coaLedgers) ? coaLedgers : [])
+        .find(l => l.type === 'group-ledger' && String(l.id) === id);
+      sg = gl ? findSg(gl.sgId) : null;
     } else if (kind === 'sg') {
       sg = findSg(id);
-      if (sg) name = sg.name;
     }
     if (!sg) return '';
-    let top = sg;
-    for (let p = sg.parent ? findSg(sg.parent) : null; p; p = p.parent ? findSg(p.parent) : null) { path.push(p.name); top = p; }
-    const main = (typeof COA_MAIN_GROUPS !== 'undefined' ? COA_MAIN_GROUPS : []).find(m => m.id === sg.main) || {};
-    if (main.name) path.push(main.name);
+    if (sg.main !== 'equity-liabilities') return GROUP_MAIN_HEADS[sg.main] || '';
     // Equity and Liabilities: the Shareholders' Funds (or a capital / equity group of your own)
     // are equity, the rest liabilities
-    const nature = sg.main === 'equity-liabilities'
-      ? ((top.id === 'sg-shf' || (/equity|capital|fund/i.test(top.name) && !/loan|borrow|creditor|payable|liabilit/i.test(top.name))) ? 'Equity' : 'Liability')
-      : (LEDGER_GROUP_NATURE[sg.main] || '');
-    if (!nature) return '';
-    const tone = main.color ? { color: main.color, light: main.light, border: main.color + '33' } : null;
-    return infoCardHtml(name, nature, [{ icon: CARD_ICON_GROUP, heading: 'Group', text: path.join(' → ') || name }], tone);
+    let top = sg;
+    for (let i = 0; i < 20 && top.parent && findSg(top.parent); i++) top = findSg(top.parent);
+    return (top.id === 'sg-shf' || (/equity|capital|fund/i.test(top.name) && !/loan|borrow|creditor|payable|liabilit/i.test(top.name)))
+      ? 'Equity' : 'Liabilities';
   }
-  const LEDGER_GROUP_BOX = { card: ledgerGroupCardHtml, pinSearch: true };
+  const LEDGER_GROUP_BOX = { tip: groupMainHead, pinSearch: true };
+  const GROUP_UNDER_BOX = { tip: groupMainHead };
 
   // Builds the "Group" searchable-select block for a Create Ledger row. `suffix` is ''
   // for the first row, or the row index (1, 2, ...) for rows added with "Add Another Ledger".
@@ -6044,7 +5975,7 @@
         } else if (newUnderSel) {
           newUnderSel.selectedIndex = -1; // nothing chosen above -> show "Select Group"
         }
-        initSearchableSelectHelper(contentArea, 'masterGroupUnderCombinedSel' + idx, 'Select Group');
+        initSearchableSelectHelper(contentArea, 'masterGroupUnderCombinedSel' + idx, 'Select Group', GROUP_UNDER_BOX);
         const newNameInp = contentArea.querySelector('#masterGroupName' + idx);
         if (newNameInp) {
           newNameInp.addEventListener('focus', () => setActiveGroupRow(idx));
@@ -6069,7 +6000,7 @@
       // Under starts unselected so the dropdown shows "Select Group"
       const groupUnderSelInit = contentArea.querySelector('#masterGroupUnderCombinedSel');
       if (groupUnderSelInit) groupUnderSelInit.selectedIndex = -1;
-      const searchableUnderControl = initSearchableSelectHelper(contentArea, 'masterGroupUnderCombinedSel', 'Select Group');
+      const searchableUnderControl = initSearchableSelectHelper(contentArea, 'masterGroupUnderCombinedSel', 'Select Group', GROUP_UNDER_BOX);
       renderGroupCount();
 
       const cleanBtn = contentArea.querySelector('#masterGroupRowCleanBtn');
@@ -11860,7 +11791,7 @@
         }
 
 
-        initSearchableSelectHelper(contentArea, 'masterAlterGroupUnderCombinedSel', 'Select category or parent group');
+        initSearchableSelectHelper(contentArea, 'masterAlterGroupUnderCombinedSel', 'Select category or parent group', GROUP_UNDER_BOX);
 
         const saveBtn = contentArea.querySelector('#masterAlterGroupSaveBtn');
         const cancelBtn = contentArea.querySelector('#masterAlterGroupCancelBtn');

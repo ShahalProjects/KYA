@@ -4,13 +4,17 @@
 
     // Load initial data
     let coData = getCompanyDetails();
-    if (!coData.people) coData.people = { directors: [], keyEmployees: [], auditor: {}, taxConsultant: {} };
+    if (!coData.people) coData.people = { directors: [], auditor: {}, taxConsultant: {} };
     if (!coData.people.directors) coData.people.directors = [];
-    if (!coData.people.keyEmployees) coData.people.keyEmployees = [];
     if (!coData.people.auditor) coData.people.auditor = {};
     if (!coData.people.taxConsultant) coData.people.taxConsultant = {};
     if (!coData.documents) coData.documents = [];
 
+    // EPF and ESIC were one "ESI / PF" box before: its value goes to the box its form fits (an
+    // ESIC employer code is 17 digits)
+    const legacyEsiPf = String(coData.esiPf || '').trim();
+    const epfCodeValue = coData.epfCode || (legacyEsiPf && !/^\d{17}$/.test(legacyEsiPf) ? legacyEsiPf : '');
+    const esicCodeValue = coData.esicCode || (/^\d{17}$/.test(legacyEsiPf) ? legacyEsiPf : '');
     // The seal is drawn by buildInvoiceSealSvg (sales-invoice-print.js), so the
     // profile preview matches the printed invoice. Seals made before the round-only
     // format (including old rectangle ones) are redrawn here.
@@ -62,7 +66,7 @@
     wrap.innerHTML = `
       <div class="table-card" style="padding: 24px 28px;">
         <!-- Header strip -->
-        <div class="je-card-header" style="background:linear-gradient(90deg,#1e40af,#2563eb,#0284c7);border-top-left-radius:12px;border-top-right-radius:12px;margin:-24px -28px 24px -28px;padding:20px 28px;display:flex;align-items:center;">
+        <div class="je-card-header" style="background:linear-gradient(90deg,#1e40af,#2563eb,#0284c7);border-top-left-radius:12px;border-top-right-radius:12px;margin:-24px -28px 24px -28px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:14px;">
             <div style="width:42px;height:42px;border-radius:11px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;">
               <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
@@ -74,6 +78,10 @@
               <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px;">Company Profile & Vault</div>
               <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:2px;">Organize legal entities, compliance documents, and corporate vault</div>
             </div>
+          </div>
+          <!-- Key People's Add Person: the glass look of KYA's blue title-card controls (as Track Recorder's Add Budget) -->
+          <div class="panel-actions" style="display:flex;gap:8px;align-items:center;">
+            <button type="button" class="cl-glass-control" id="coAddPersonBtn" aria-label="Add Person" style="display:none;align-items:center;gap:6px;"><svg viewBox="0 0 15 15" fill="none" style="width:14px;height:14px;"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> Add Person</button>
           </div>
         </div>
 
@@ -91,6 +99,12 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
               </div>
               <span class="oh-tab-text">GST Registration</span>
+            </button>
+            <button class="oh-sub-tab" data-subtab="pan">
+              <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><line x1="13" y1="10" x2="18" y2="10"/><line x1="13" y1="14" x2="18" y2="14"/></svg>
+              </div>
+              <span class="oh-tab-text">PAN Registration</span>
             </button>
             <button class="oh-sub-tab" data-subtab="registrations">
               <div class="oh-tab-icon-wrap" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
@@ -272,7 +286,7 @@
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
                     <div>
                       <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">GST Registration Number (GSTIN)</label>
-                      <input id="coGSTIN" value="${ohEsc(coData.gstin||'')}" placeholder="e.g. 27AAAAA0000A1Z5" maxlength="15" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                      <input id="coGSTIN" value="${ohEsc(coData.gstin||'')}" placeholder="Enter GSTIN" maxlength="15" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
                       <div id="coGstinStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
                     </div>
                     <div style="display:grid;grid-template-columns:120px 1fr;gap:16px;">
@@ -308,36 +322,66 @@
               </div>
             </div>
 
-            <!-- TAB 2: LEGAL & REGISTRATIONS -->
-            <div id="coSubpanel-registrations" class="co-subpanel-content" style="display:none;">
+            <!-- TAB: PAN (Income-tax Act, pan-registration.js) -->
+            <div id="coSubpanel-pan" class="co-subpanel-content" style="display:none;">
               <div style="display:flex;flex-direction:column;gap:20px;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
                   <div>
                     <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Permanent Account Number (PAN)</label>
                     <div style="position:relative;">
-                      <input id="coPAN" value="${ohEsc(coData.pan||'')}" placeholder="e.g. ABCDE1234F" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 70px 0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                      <input id="coPAN" value="${ohEsc(coData.pan||'')}" placeholder="Enter PAN" maxlength="10" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 70px 0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
                       <button type="button" id="coPanFromGstinBtn" class="sales-roundoff-btn-inline" style="display:none;position:absolute;right:5px;top:50%;transform:translateY(-50%);height:30px;width:auto;min-width:0;padding:0 10px;">Update</button>
                     </div>
-                    <div id="coPanStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                    <div id="coPanStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;line-height:1.5;"></div>
                   </div>
                   <div>
-                    <label id="coCinLabel" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Corporate Identification Number (CIN)</label>
-                    <input id="coCIN" value="${ohEsc(coData.cin||'')}" placeholder="e.g. U72200MH2020PTC123456" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">PAN Holder</label>
+                    <div id="coPanHolder" style="height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#334155;background:#f8fafc;box-sizing:border-box;display:flex;align-items:center;">—</div>
                   </div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-                  <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Udyam / MSME Registration Number</label>
-                    <input id="coUdyam" value="${ohEsc(coData.udyam||'')}" placeholder="e.g. UDYAM-XX-00-0000000" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                <div id="coPanAadhaarWrap" style="display:none;">
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">PAN–Aadhaar Link</label>
+                  <div class="books-opt-segmented" style="display: inline-flex; background: var(--slate-200); border-radius: 8px; padding: 3px; gap: 3px;">
+                    <button type="button" data-pan-aadhaar="linked" style="${gstSliderBtn}">Linked</button>
+                    <button type="button" data-pan-aadhaar="unlinked" style="${gstSliderBtn}">Not Linked</button>
                   </div>
-                  <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Trade License Number</label>
-                    <input id="coTradeLicense" value="${ohEsc(coData.tradeLicense||'')}" placeholder="License Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                </div>
+              </div>
+
+              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
+                <button type="button" class="co-save-section-btn" data-section="pan" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save PAN Registration</button>
+              </div>
+            </div>
+
+            <!-- TAB 2: LEGAL & REGISTRATIONS (company-registrations.js) -->
+            <div id="coSubpanel-registrations" class="co-subpanel-content" style="display:none;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                <div id="coCinWrap">
+                  <label id="coCinLabel" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Corporate Identification Number (CIN)</label>
+                  <input id="coCIN" value="${ohEsc(coData.cin||'')}" placeholder="Enter CIN" maxlength="21" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  <div id="coCinStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Udyam Registration Number</label>
+                  <input id="coUdyam" value="${ohEsc(coData.udyam||'')}" placeholder="Enter Udyam Registration Number" maxlength="19" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  <div id="coUdyamStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">MSME Type</label>
+                  <div class="books-opt-segmented" style="display: inline-flex; background: var(--slate-200); border-radius: 8px; padding: 3px; gap: 3px;">
+                    <button type="button" data-msme="micro" style="${gstSliderBtn}">Micro</button>
+                    <button type="button" data-msme="small" style="${gstSliderBtn}">Small</button>
+                    <button type="button" data-msme="medium" style="${gstSliderBtn}">Medium</button>
                   </div>
                 </div>
                 <div>
                   <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Import Export Code (IEC)</label>
-                  <input id="coIEC" value="${ohEsc(coData.iec||'')}" placeholder="10-digit Code" style="width:50%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                  <input id="coIEC" value="${ohEsc(coData.iec||'')}" placeholder="Enter IEC" maxlength="10" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  <div id="coIecStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Trade License Number</label>
+                  <input id="coTradeLicense" value="${ohEsc(coData.tradeLicense||'')}" placeholder="Enter Trade License Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
                 </div>
               </div>
 
@@ -346,28 +390,31 @@
               </div>
             </div>
 
-            <!-- TAB 3: TAX & COMPLIANCE -->
+            <!-- TAB 3: TAX & COMPLIANCE (company-registrations.js) -->
             <div id="coSubpanel-compliance" class="co-subpanel-content" style="display:none;">
-              <div style="display:flex;flex-direction:column;gap:20px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-                  <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Tax Deduction Account Number (TAN)</label>
-                    <input id="coTAN" value="${ohEsc(coData.tan||'')}" placeholder="e.g. MUMB12345C" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
-                  </div>
-                  <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Professional Tax Reg Number</label>
-                    <input id="coProfTax" value="${ohEsc(coData.profTax||'')}" placeholder="PT Registration Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
-                  </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Tax Deduction Account Number (TAN)</label>
+                  <input id="coTAN" value="${ohEsc(coData.tan||'')}" placeholder="Enter TAN" maxlength="10" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  <div id="coTanStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-                  <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">ESI / PF Registration Code</label>
-                    <input id="coEsiPf" value="${ohEsc(coData.esiPf||'')}" placeholder="EPF & ESIC Code Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
-                  </div>
-                  <div>
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Shop & Establishment License Number</label>
-                    <input id="coShopLicense" value="${ohEsc(coData.shopLicense||'')}" placeholder="Shop License ID" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
-                  </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Professional Tax Reg Number</label>
+                  <input id="coProfTax" value="${ohEsc(coData.profTax||'')}" placeholder="Enter Professional Tax Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
+                </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">EPF Establishment Code</label>
+                  <input id="coEpf" value="${ohEsc(epfCodeValue)}" placeholder="Enter EPF Establishment Code" maxlength="15" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;text-transform:uppercase;outline:none;box-sizing:border-box;">
+                  <div id="coEpfStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">ESIC Employer Code</label>
+                  <input id="coEsic" value="${ohEsc(esicCodeValue)}" placeholder="Enter ESIC Employer Code" maxlength="17" inputmode="numeric" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#0f172a;outline:none;box-sizing:border-box;">
+                  <div id="coEsicStatus" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
+                </div>
+                <div>
+                  <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">Shop & Establishment License Number</label>
+                  <input id="coShopLicense" value="${ohEsc(coData.shopLicense||'')}" placeholder="Enter Shop & Establishment License Number" style="width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;outline:none;box-sizing:border-box;">
                 </div>
               </div>
 
@@ -376,56 +423,40 @@
               </div>
             </div>
 
-            <!-- TAB 4: KEY PEOPLE -->
+            <!-- TAB 4: KEY PEOPLE (company-people.js): the list, titled for the Business Type; Add
+                 Person (title card) and Edit open the person popup, and each one saves at once -->
             <div id="coSubpanel-people" class="co-subpanel-content" style="display:none;">
-              <div style="display:flex;flex-direction:column;gap:20px;">
-                <!-- Directors / Partners -->
-                <div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Directors / Partners / Proprietor</label>
-                    <button type="button" id="coAddDirectorBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
-                      + Add Person
-                    </button>
-                  </div>
-                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
-                    <div id="coDirectorsListContainer"></div>
-                  </div>
-                </div>
-
-                <!-- Advisors & Partners -->
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px;">
-                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;background:#fafbfc;">
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#475569;margin-bottom:12px;">Auditor Details</label>
-                    <div style="display:flex;flex-direction:column;gap:10px;">
-                      <input id="coAuditorName" value="${ohEsc(coData.people.auditor.name||'')}" placeholder="Auditor Name" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
-                      <input id="coAuditorContact" value="${ohEsc(coData.people.auditor.contact||'')}" placeholder="Phone or Email" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
-                    </div>
-                  </div>
-                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;background:#fafbfc;">
-                    <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#475569;margin-bottom:12px;">CA / Tax Consultant Contact</label>
-                    <div style="display:flex;flex-direction:column;gap:10px;">
-                      <input id="coConsultantName" value="${ohEsc(coData.people.taxConsultant.name||'')}" placeholder="Consultant Name" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
-                      <input id="coConsultantContact" value="${ohEsc(coData.people.taxConsultant.contact||'')}" placeholder="Phone or Email" style="width:100%;height:36px;border:1.5px solid #e2e8f0;border-radius:6px;padding:0 10px;font-size:13px;outline:none;">
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Key Employees -->
-                <div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;margin-top:8px;">
-                    <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Key Employees</label>
-                    <button type="button" id="coAddEmployeeBtn" style="height:28px;padding:0 10px;border:none;border-radius:6px;background:#e0f2fe;color:#0369a1;font-size:11.5px;font-weight:700;cursor:pointer;">
-                      + Add Employee
-                    </button>
-                  </div>
-                  <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;overflow-x:auto;">
-                    <div id="coEmployeesListContainer"></div>
-                  </div>
-                </div>
+              <label id="coPeopleTitle" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:10px;">Directors / Partners / Proprietor</label>
+              <div style="border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:8px 12px;">
+                <div id="coDirectorsListContainer"></div>
               </div>
+              <div id="coShareTotal" style="font-size:11px;font-weight:600;margin-top:6px;min-height:14px;"></div>
 
-              <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:16px;">
-                <button type="button" class="co-save-section-btn" data-section="people" style="height:40px;padding:0 24px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.2);">Save Key People</button>
+              <!-- Person popup (the look of Master Desk's Additional Details popup): a person's details,
+                   with Edit and Delete at the top; Edit (and Add Person) turns it into the form -->
+              <div class="oh-modal-overlay" id="coPersonModal" style="display:none;">
+                <div style="background:var(--white);border-radius:14px;width:94%;max-width:640px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 40px 100px rgba(0,0,0,.24);">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 24px;border-bottom:1px solid var(--slate-200);">
+                    <div style="min-width:0;">
+                      <div id="coPersonModalTitle" style="font-size:15px;font-weight:700;color:var(--slate-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Add Person</div>
+                      <div id="coPersonModalSub" style="font-size:12.5px;color:var(--slate-500);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                      <button type="button" id="coPersonModalEdit" title="Edit" aria-label="Edit" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1.5px solid var(--slate-200);border-radius:8px;background:#fff;color:var(--slate-500);cursor:pointer;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                      </button>
+                      <button type="button" id="coPersonModalDelete" title="Delete" aria-label="Delete" style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1.5px solid var(--slate-200);border-radius:8px;background:#fff;color:#dc2626;cursor:pointer;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                      </button>
+                      <button type="button" class="oh-modal-close" id="coPersonModalClose" title="Close">✕</button>
+                    </div>
+                  </div>
+                  <div id="coPersonModalBody" style="padding:20px 24px;"></div>
+                  <div id="coPersonModalFooter" style="display:flex;justify-content:flex-end;gap:10px;padding:14px 24px;border-top:1px solid var(--slate-200);">
+                    <button type="button" class="btn btn-secondary" id="coPersonModalCancel" style="height:38px;padding:8px 18px;font-size:13px;font-weight:600;">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="coPersonModalSave" style="height:38px;padding:8px 18px;font-size:13px;font-weight:600;">Add</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -529,6 +560,8 @@
         panels.forEach(p => p.style.display = 'none');
         const activePanel = wrap.querySelector(`#coSubpanel-${subtab}`);
         if (activePanel) activePanel.style.display = 'block';
+        // Add Person shows in the title card while Key People is open
+        wrap.querySelector('#coAddPersonBtn').style.display = subtab === 'people' ? 'inline-flex' : 'none';
       });
     });
 
@@ -837,11 +870,14 @@
 
     // Business Type: every name shown in full
     const businessTypeInp = wrap.querySelector('#coBusinessType');
-    // The CIN box (Legal & Registration) takes an LLP's LLPIN: its label follows the Business Type
+    // The CIN box (Legal & Registration) is a company's CIN or an LLP's LLPIN: its label follows
+    // the Business Type, and the other Business Types have neither
     const refreshCinBox = () => {
-      const llp = businessTypeInp.value === 'LLP';
+      const type = businessTypeInp.value;
+      const llp = type === 'LLP';
+      wrap.querySelector('#coCinWrap').style.display = (llp || ['Pvt Ltd', 'Public Ltd', 'OPC'].indexOf(type) > -1) ? '' : 'none';
       wrap.querySelector('#coCinLabel').textContent = llp ? 'LLP Identification Number (LLPIN)' : 'Corporate Identification Number (CIN)';
-      wrap.querySelector('#coCIN').placeholder = llp ? 'e.g. AAB-1234' : 'e.g. U72200MH2020PTC123456';
+      wrap.querySelector('#coCIN').placeholder = llp ? 'Enter LLPIN' : 'Enter CIN';
     };
     refreshCinBox();
     const renderBusinessTypeList = (filter) => {
@@ -853,6 +889,9 @@
         const item = addrListItem(t.label, '', businessTypeInp.value === t.value, () => {
           businessTypeInp.value = t.value;
           refreshCinBox();
+          renderPanStatus();
+          renderRegStatuses();
+          renderDirectors();
           wrap.querySelector('#coBusinessTypeSelectTriggerText').textContent = t.label;
           closeAddrList('BusinessType');
         });
@@ -882,86 +921,242 @@
       dd.addEventListener('click', e => e.stopPropagation());
     });
 
-    // One outside-click handler, replaced each time the panel is drawn
+    // One outside-click handler, replaced each time the panel is drawn (with the person popup's
+    // Role box)
     if (window._coAddrOutsideClick) document.removeEventListener('click', window._coAddrOutsideClick);
-    window._coAddrOutsideClick = () => searchBoxKeys.forEach(closeAddrList);
+    window._coAddrOutsideClick = () => searchBoxKeys.concat('PersonRole').forEach(closeAddrList);
     document.addEventListener('click', window._coAddrOutsideClick);
 
 
     // ── DYNAMIC LIST RENDERING ──
 
-    // 5. Directors List
-    const renderDirectors = () => {
-      const cont = wrap.querySelector('#coDirectorsListContainer');
-      if (coData.people.directors.length === 0) {
-        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No director/partner details added.</div>`;
-        return;
-      }
-      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:600px;">
-        <thead>
-          <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
-            <th style="padding:8px;">Name</th>
-            <th style="padding:8px;width:120px;">Role</th>
-            <th style="padding:8px;width:120px;">PAN</th>
-            <th style="padding:8px;width:130px;">Aadhaar</th>
-            <th style="padding:8px;width:110px;">DIN (if applicable)</th>
-            <th style="padding:8px;text-align:right;width:60px;">Action</th>
-          </tr>
-        </thead>
-        <tbody>`;
-      coData.people.directors.forEach((d, idx) => {
-        html += `<tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="name" value="${ohEsc(d.name||'')}" placeholder="Name" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="role" value="${ohEsc(d.role||'')}" placeholder="e.g. Director" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="pan" value="${ohEsc(d.pan||'')}" placeholder="PAN" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;text-transform:uppercase;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="aadhaar" value="${ohEsc(d.aadhaar||'')}" placeholder="Aadhaar" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="directors" data-index="${idx}" data-field="din" value="${ohEsc(d.din||'')}" placeholder="DIN" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="directors" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-      cont.innerHTML = html;
+    // 5. Key People (company-people.js): who they are follows the Business Type. The list shows a
+    // person's name, role, contact no. and email; clicking a person opens the person popup with
+    // all the details, Edit and Delete at its top. Edit (and Add Person, in the title card) turns
+    // the popup into the form, in Basic Identity's look; adding, editing or deleting saves at
+    // once, with the loading bar.
+    const PERSON_FIELD_NAMES = { pan: 'PAN', aadhaar: 'Aadhaar', din: 'DIN', share: 'Share %', phone: 'Contact No.', email: 'Email' };
+    const personValid = (field, v) => !String(v || '').trim() || typeof kyaCheckPerson !== 'function' || kyaCheckPerson(field, v);
+    const renderShareTotal = () => {
+      const el = wrap.querySelector('#coShareTotal');
+      const t = typeof kyaPeopleShareTotal === 'function' ? kyaPeopleShareTotal(coData.people.directors) : { entered: false };
+      const shows = typeof kyaPeopleShowsShare === 'function' && kyaPeopleShowsShare(businessTypeInp.value) && t.entered;
+      el.textContent = shows ? `Total Share: ${t.total}%` : '';
+      el.style.color = t.ok ? '#059669' : '#dc2626';
     };
-
-    wrap.querySelector('#coAddDirectorBtn').addEventListener('click', () => {
-      coData.people.directors.push({ name: '', role: '', pan: '', aadhaar: '', din: '' });
-      renderDirectors();
-    });
-
-    // 5. Employees List
-    const renderEmployees = () => {
-      const cont = wrap.querySelector('#coEmployeesListContainer');
-      if (coData.people.keyEmployees.length === 0) {
-        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No employee contacts added.</div>`;
+    const renderDirectors = () => {
+      const type = businessTypeInp.value;
+      const title = typeof kyaPeopleTitle === 'function' ? kyaPeopleTitle(type) : 'Directors / Partners / Proprietor';
+      wrap.querySelector('#coPeopleTitle').textContent = title;
+      const cont = wrap.querySelector('#coDirectorsListContainer');
+      renderShareTotal();
+      if (coData.people.directors.length === 0) {
+        cont.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;text-align:center;padding:12px 0;">No ${ohEsc(title.toLowerCase())} added.</div>`;
         return;
       }
+      const dash = v => (String(v || '').trim() ? ohEsc(String(v).trim()) : '<span style="color:#94a3b8;">—</span>');
       let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="border-bottom:1.5px solid #cbd5e1;color:#475569;font-weight:700;text-align:left;">
             <th style="padding:8px;">Name</th>
-            <th style="padding:8px;width:160px;">Role</th>
-            <th style="padding:8px;width:150px;">Phone</th>
-            <th style="padding:8px;width:180px;">Email</th>
-            <th style="padding:8px;text-align:right;width:60px;">Action</th>
+            <th style="padding:8px;width:150px;">Role</th>
+            <th style="padding:8px;width:130px;">Contact No.</th>
+            <th style="padding:8px;">Email</th>
           </tr>
         </thead>
         <tbody>`;
-      coData.people.keyEmployees.forEach((e, idx) => {
-        html += `<tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="name" value="${ohEsc(e.name||'')}" placeholder="Name" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="role" value="${ohEsc(e.role||'')}" placeholder="Role" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="phone" value="${ohEsc(e.phone||'')}" placeholder="Phone" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;"><input data-list="keyEmployees" data-index="${idx}" data-field="email" value="${ohEsc(e.email||'')}" placeholder="Email" style="width:100%;height:32px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;outline:none;"></td>
-          <td style="padding:6px;text-align:right;"><button type="button" class="co-del-list-btn" data-list="keyEmployees" data-index="${idx}" style="border:none;background:none;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;">Delete</button></td>
+      coData.people.directors.forEach((d, idx) => {
+        html += `<tr class="co-person-row" data-index="${idx}" title="Show all details" style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+          <td style="padding:10px 8px;font-weight:600;color:#0f172a;overflow-wrap:anywhere;">${dash(d.name)}</td>
+          <td style="padding:10px 8px;color:#334155;">${dash(d.role)}</td>
+          <td style="padding:10px 8px;color:#334155;">${dash(d.phone)}</td>
+          <td style="padding:10px 8px;color:#334155;overflow-wrap:anywhere;">${dash(d.email)}</td>
         </tr>`;
       });
       html += `</tbody></table>`;
       cont.innerHTML = html;
     };
 
-    wrap.querySelector('#coAddEmployeeBtn').addEventListener('click', () => {
-      coData.people.keyEmployees.push({ name: '', role: '', phone: '', email: '' });
-      renderEmployees();
+    // Saves the people at once, with the loading bar (done: the toast once saved)
+    const savePeople = (directors, done) => {
+      const next = Object.assign({}, coData, { people: Object.assign({}, coData.people, { directors }) });
+      runChangeProgress('Saving Key People', PEOPLE_ICON, [
+        { label: 'Saving the key people', run: () => { Object.assign(coData, next); saveCompanyDetails(coData); renderDirectors(); } },
+        { label: 'Updating reports and books', run: () => { if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews(); } }
+      ], failed => {
+        if (failed) showToast('Key people saved, but some views could not be updated. Please reload KYA.', 'warning');
+        else showToast(done, 'success');
+      });
+    };
+
+    // The person popup. view: a person's details, with Edit and Delete at the top; edit: the form
+    // for that person; add: the form for a new one. The form follows the Business Type (DIN only for
+    // a role that holds one, Share % for partners) in Basic Identity's look, Role a search list like
+    // its Business Type box; each field says when it is invalid, and an invalid one isn't saved.
+    const personModal = wrap.querySelector('#coPersonModal');
+    let personMode = 'view';
+    let personIndex = null;
+    const personBox = f => personModal.querySelector(`[data-person-field="${f}"]`);
+    const renderPersonStatus = f => {
+      const box = personBox(f), status = personModal.querySelector(`[data-person-status="${f}"]`);
+      if (box && status) status.textContent = personValid(f, box.value) ? '' : 'Invalid ' + PERSON_FIELD_NAMES[f];
+    };
+    const renderPersonModal = () => {
+      const type = businessTypeInp.value;
+      const d = personIndex === null ? {} : (coData.people.directors[personIndex] || {});
+      const editing = personMode !== 'view';
+      const holdsDin = role => typeof kyaPeopleHasDin === 'function' && kyaPeopleHasDin(type, role);
+      const showsDin = typeof kyaPeopleShowsDin === 'function' && kyaPeopleShowsDin(type);
+      const showsShare = typeof kyaPeopleShowsShare === 'function' && kyaPeopleShowsShare(type);
+      const label = text => `<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:6px;">${text}</label>`;
+      const INPUT = 'width:100%;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;color:#334155;outline:none;box-sizing:border-box;';
+      // (a detail as shown: Basic Identity's grey box, like GST Registration's State)
+      const SHOWN = 'height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:13.5px;font-weight:600;color:#334155;background:#f8fafc;box-sizing:border-box;display:flex;align-items:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;';
+      const shown = v => (String(v || '').trim() ? ohEsc(String(v).trim()) : '<span style="color:#94a3b8;font-weight:500;">—</span>');
+      // A field: its box in the form, its value (view: when not the field's own) in the details
+      const field = (text, f, extra, view) => editing
+        ? `<div data-person-cell="${f}" style="min-width:0;">${label(text)}<input data-person-field="${f}" value="${ohEsc(d[f] || '')}" ${extra || ''} style="${INPUT}${f === 'pan' ? 'text-transform:uppercase;font-weight:600;color:#0f172a;' : ''}"><div data-person-status="${f}" style="font-size:11px;font-weight:600;color:#dc2626;margin-top:6px;min-height:14px;"></div></div>`
+        : `<div style="min-width:0;">${label(text)}<div style="${SHOWN}">${view === undefined ? shown(d[f]) : view}</div></div>`;
+      const role = editing
+        ? `<div style="min-width:0;">${label('Role')}<input type="hidden" id="coPersonRoleInput" value="${ohEsc(d.role || '')}">${coAddrSelectBox('PersonRole', d.role || '', 'Role')}</div>`
+        : `<div style="min-width:0;">${label('Role')}<div style="${SHOWN}">${shown(d.role)}</div></div>`;
+      const aadhaar = typeof kyaMaskAadhaar === 'function' ? kyaMaskAadhaar(d.aadhaar || '') : (d.aadhaar || '');
+      const share = String(d.share || '').trim() ? ohEsc(String(d.share).trim()) + '%' : shown('');
+      wrap.querySelector('#coPersonModalBody').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:${editing ? '4px' : '18px'} 16px;">
+          ${field(editing ? 'Name *' : 'Name', 'name', 'placeholder="Enter Name"')}
+          ${role}
+          ${field('PAN', 'pan', 'placeholder="Enter PAN" maxlength="10"', shown(String(d.pan || '').toUpperCase()))}
+          ${field('Aadhaar', 'aadhaar', 'placeholder="Enter Aadhaar" inputmode="numeric" maxlength="14"', shown(aadhaar))}
+          ${showsDin && (editing || holdsDin(d.role)) ? field('DIN', 'din', 'placeholder="Enter DIN" inputmode="numeric" maxlength="8"') : ''}
+          ${showsShare ? field('Share %', 'share', 'placeholder="Enter Share %" inputmode="decimal"', share) : ''}
+          ${field('Contact No.', 'phone', 'placeholder="Enter Contact No."')}
+          ${field('Email', 'email', 'type="email" placeholder="Enter Email"')}
+        </div>`;
+      wrap.querySelector('#coPersonModalTitle').textContent = personMode === 'add' ? 'Add Person'
+        : (personMode === 'edit' ? 'Edit Person' : (String(d.name || '').trim() || 'Person'));
+      wrap.querySelector('#coPersonModalSub').textContent = typeof kyaPeopleTitle === 'function' ? kyaPeopleTitle(type) : '';
+      ['#coPersonModalEdit', '#coPersonModalDelete'].forEach(id => { wrap.querySelector(id).style.display = editing ? 'none' : 'inline-flex'; });
+      wrap.querySelector('#coPersonModalFooter').style.display = editing ? 'flex' : 'none';
+      wrap.querySelector('#coPersonModalSave').textContent = personMode === 'add' ? 'Add' : 'Save';
+      if (!editing) return;
+
+      // The form's Role: a search list like Basic Identity's Business Type box; a role saved before
+      // the list (or under another Business Type) stays as one of the choices
+      const roleInp = wrap.querySelector('#coPersonRoleInput');
+      const roles = typeof kyaPeopleRoles === 'function' ? kyaPeopleRoles(type) : [];
+      const roleList = d.role && roles.indexOf(d.role) < 0 ? roles.concat(d.role) : roles;
+      const roleDropdown = wrap.querySelector('#coPersonRoleSelectDropdown');
+      const roleSearch = wrap.querySelector('#coPersonRoleSelectSearch');
+      // DIN for a role that holds one
+      const refreshDinCell = () => {
+        const cell = personModal.querySelector('[data-person-cell="din"]');
+        if (cell) cell.style.display = holdsDin(roleInp.value) ? '' : 'none';
+      };
+      const renderRoleList = (filter) => {
+        const list = wrap.querySelector('#coPersonRoleSelectOptionsList');
+        const q = (filter || '').toLowerCase().trim();
+        list.innerHTML = '';
+        roleList.filter(r => !q || r.toLowerCase().includes(q)).forEach(r => list.appendChild(addrListItem(r, '', roleInp.value === r, () => {
+          roleInp.value = r;
+          wrap.querySelector('#coPersonRoleSelectTriggerText').textContent = r;
+          closeAddrList('PersonRole');
+          refreshDinCell();
+        })));
+        if (!list.children.length) list.appendChild(addrEmptyRow('No Role Found'));
+      };
+      wrap.querySelector('#coPersonRoleSelectTrigger').addEventListener('click', e => {
+        e.stopPropagation();
+        if (roleDropdown.style.display === 'flex') { closeAddrList('PersonRole'); return; }
+        searchBoxKeys.forEach(closeAddrList);
+        roleDropdown.style.display = 'flex';
+        roleSearch.value = '';
+        renderRoleList('');
+        setTimeout(() => roleSearch.focus(), 50);
+      });
+      roleSearch.addEventListener('input', () => renderRoleList(roleSearch.value));
+      roleDropdown.addEventListener('click', e => e.stopPropagation());
+      refreshDinCell();
+      Object.keys(PERSON_FIELD_NAMES).forEach(f => {
+        if (!personBox(f)) return;
+        personBox(f).addEventListener('input', () => renderPersonStatus(f));
+        renderPersonStatus(f);
+      });
+      // (the form may already be gone again, e.g. Cancel straight away)
+      setTimeout(() => { const nameBox = personBox('name'); if (nameBox) nameBox.focus(); }, 50);
+    };
+    const openPerson = (idx, mode) => {
+      personIndex = idx;
+      personMode = mode;
+      renderPersonModal();
+      personModal.style.display = 'flex';
+    };
+    const closePersonModal = () => {
+      closeAddrList('PersonRole');
+      personModal.style.display = 'none';
+      personIndex = null;
+    };
+
+    wrap.querySelector('#coAddPersonBtn').addEventListener('click', () => openPerson(null, 'add'));
+    wrap.querySelector('#coPersonModalClose').addEventListener('click', closePersonModal);
+    // Cancel: an edit goes back to the details, a new person closes
+    wrap.querySelector('#coPersonModalCancel').addEventListener('click', () => {
+      if (personMode !== 'edit') { closePersonModal(); return; }
+      personMode = 'view';
+      renderPersonModal();
+    });
+    wrap.querySelector('#coPersonModalEdit').addEventListener('click', () => {
+      personMode = 'edit';
+      renderPersonModal();
+    });
+    wrap.querySelector('#coPersonModalDelete').addEventListener('click', () => {
+      const idx = personIndex;
+      const d = coData.people.directors[idx];
+      if (!d) return;
+      showKyaConfirm({
+        title: 'Delete Person?',
+        message: `Delete <strong style="color:#0f172a;">${ohEsc(d.name || 'this person')}</strong> from ${ohEsc(typeof kyaPeopleTitle === 'function' ? kyaPeopleTitle(businessTypeInp.value) : 'Key People')}?`,
+        confirmLabel: 'Yes, Delete',
+        onConfirm: () => {
+          closePersonModal();
+          savePeople(coData.people.directors.filter((_, i) => i !== idx), 'Person deleted.');
+        }
+      });
+    });
+    wrap.querySelector('#coPersonModalSave').addEventListener('click', () => {
+      const type = businessTypeInp.value;
+      const val = f => (personBox(f) ? personBox(f).value.trim() : '');
+      const refuse = (f, message) => {
+        personBox(f).style.borderColor = '#ef4444';
+        personBox(f).focus();
+        showToast(message, 'warning');
+      };
+      if (!val('name')) { refuse('name', 'Please enter a name.'); return; }
+      const role = wrap.querySelector('#coPersonRoleInput').value.trim();
+      const holdsDin = typeof kyaPeopleHasDin === 'function' && kyaPeopleHasDin(type, role);
+      const bad = Object.keys(PERSON_FIELD_NAMES).find(f => personBox(f) && (f !== 'din' || holdsDin) && !personValid(f, val(f)));
+      if (bad) { refuse(bad, 'Invalid ' + PERSON_FIELD_NAMES[bad]); return; }
+      const adding = personMode === 'add';
+      const was = adding ? {} : (coData.people.directors[personIndex] || {});
+      const person = Object.assign({}, was, {
+        name: val('name'), role, pan: val('pan').toUpperCase(), aadhaar: val('aadhaar'),
+        din: holdsDin ? val('din') : '', share: personBox('share') ? val('share') : (was.share || ''),
+        phone: val('phone'), email: val('email')
+      });
+      const directors = coData.people.directors.slice();
+      if (adding) directors.push(person);
+      else directors[personIndex] = person;
+      // The partners' shares can't go past 100%
+      const shares = typeof kyaPeopleShareTotal === 'function' ? kyaPeopleShareTotal(directors) : { total: 0 };
+      if (personBox('share') && shares.total > 100) { refuse('share', 'Invalid Share %'); return; }
+      closePersonModal();
+      savePeople(directors, adding ? 'Person added.' : 'Person updated.');
+    });
+
+    // Clicking a person opens their details
+    wrap.querySelector('#coDirectorsListContainer').addEventListener('click', (e) => {
+      const row = e.target.closest('.co-person-row');
+      if (row) openPerson(parseInt(row.dataset.index), 'view');
     });
 
     // 6. Document Vault List
@@ -1135,10 +1330,7 @@
       const index = parseInt(e.target.dataset.index);
       const field = e.target.dataset.field;
       if (list && !isNaN(index) && field) {
-        let arr;
-        if (list === 'directors') arr = coData.people.directors;
-        else if (list === 'keyEmployees') arr = coData.people.keyEmployees;
-        else arr = coData[list];
+        const arr = coData[list];
 
         if (arr && arr[index]) {
           if (e.target.type === 'checkbox') {
@@ -1155,13 +1347,7 @@
         const list = e.target.dataset.list;
         const index = parseInt(e.target.dataset.index);
         if (list && !isNaN(index)) {
-          if (list === 'directors') {
-            coData.people.directors.splice(index, 1);
-            renderDirectors();
-          } else if (list === 'keyEmployees') {
-            coData.people.keyEmployees.splice(index, 1);
-            renderEmployees();
-          } else if (list === 'documents') {
+          if (list === 'documents') {
             coData.documents.splice(index, 1);
             renderDocumentsList();
             saveCompanyDetails(coData);
@@ -1219,6 +1405,9 @@
       wrap.querySelector('#coGstRegisteredFields').style.display = gstStatus === 'registered' ? 'flex' : 'none';
       const filesGstr1 = (typeof kyaGstRegRules === 'function') ? kyaGstRegRules({ registered: true, type: regTypeInp.value }).gstr1 : true;
       wrap.querySelector('#coGstr1PeriodWrap').style.display = filesGstr1 ? 'block' : 'none';
+      // (the PAN and a tax deductor's TAN are checked against the GSTIN while registered)
+      renderPanStatus();
+      renderRegStatuses();
     };
 
     const setCoRegType = (type) => {
@@ -1250,20 +1439,85 @@
       hideRegTypeCard();
     });
 
+    // ── PAN (pan-registration.js): its form, the holder its 4th letter names, and what doesn't
+    // fit the profile as entered (Business Type, name, GSTIN); an individual's PAN has its
+    // Aadhaar link (Section 139AA) ──
+    const panHolderBox = wrap.querySelector('#coPanHolder');
+    const panAadhaarWrap = wrap.querySelector('#coPanAadhaarWrap');
+    let panAadhaar = coData.panAadhaarLinked === false ? 'unlinked' : 'linked';
+    const panContext = () => ({
+      businessType: businessTypeInp.value,
+      name: nameInp.value,
+      registered: gstStatus === 'registered',
+      gstin: gstinInput.value,
+      gstRegType: regTypeInp.value
+    });
     const renderPanStatus = () => {
       const raw = panInput.value.toUpperCase().trim();
-      if (!raw) {
-        panStatus.textContent = '';
-      } else if (isValidPan(raw)) {
-        panStatus.textContent = 'Valid PAN';
-        panStatus.style.color = '#059669';
-      } else {
-        panStatus.textContent = 'Invalid PAN';
-        panStatus.style.color = '#dc2626';
-      }
+      const chk = typeof kyaCheckPan === 'function' ? kyaCheckPan(raw, panContext()) : { ok: isValidPan(raw), code: '', holder: '' };
+      panHolderBox.textContent = chk.holder ? `${chk.holder} (${chk.code})` : '—';
+      panHolderBox.style.color = chk.holder ? '#334155' : '#94a3b8';
+      panAadhaarWrap.style.display = chk.ok && chk.code === 'P' ? 'block' : 'none';
+      wrap.querySelectorAll('[data-pan-aadhaar]').forEach(b => paintGstSlider(b, b.dataset.panAadhaar === panAadhaar, b.dataset.panAadhaar === 'unlinked'));
+      // Anything wrong makes it invalid
+      panStatus.textContent = !raw ? '' : (chk.ok ? 'Valid PAN' : 'Invalid PAN');
+      panStatus.style.color = chk.ok ? '#059669' : '#dc2626';
     };
+    wrap.querySelectorAll('[data-pan-aadhaar]').forEach(b => b.addEventListener('click', () => {
+      panAadhaar = b.dataset.panAadhaar;
+      renderPanStatus();
+    }));
     panInput.addEventListener('input', renderPanStatus);
+    nameInp.addEventListener('input', renderPanStatus);
     renderPanStatus();
+
+    // ── Legal & Registration and Tax & Compliance (company-registrations.js): each number
+    // checked against its form and the profile as entered; the CIN box is checked only while it
+    // shows ──
+    const regContext = () => Object.assign(panContext(), { incDate: wrap.querySelector('#coIncDate').value });
+    const isLlpType = () => businessTypeInp.value === 'LLP';
+    const REG_BOXES = [
+      { id: 'coCIN', status: 'coCinStatus', kind: () => (isLlpType() ? 'llpin' : 'cin'), name: () => (isLlpType() ? 'LLPIN' : 'CIN') },
+      { id: 'coUdyam', status: 'coUdyamStatus', kind: () => 'udyam', name: () => 'Udyam Number' },
+      { id: 'coIEC', status: 'coIecStatus', kind: () => 'iec', name: () => 'IEC' },
+      { id: 'coTAN', status: 'coTanStatus', kind: () => 'tan', name: () => 'TAN' },
+      { id: 'coEpf', status: 'coEpfStatus', kind: () => 'epf', name: () => 'EPF Code' },
+      { id: 'coEsic', status: 'coEsicStatus', kind: () => 'esic', name: () => 'ESIC Code' }
+    ];
+    const regBox = id => REG_BOXES.find(b => b.id === id);
+    const regInput = box => wrap.querySelector('#' + box.id);
+    const regShown = box => box.id !== 'coCIN' || wrap.querySelector('#coCinWrap').style.display !== 'none';
+    const regValid = box => typeof kyaCheckRegistration !== 'function' || kyaCheckRegistration(box.kind(), regInput(box).value, regContext());
+    const renderRegStatus = box => {
+      const raw = regInput(box).value.trim();
+      const el = wrap.querySelector('#' + box.status);
+      const ok = regValid(box);
+      el.textContent = raw ? `${ok ? 'Valid' : 'Invalid'} ${box.name()}` : '';
+      el.style.color = ok ? '#059669' : '#dc2626';
+    };
+    const renderRegStatuses = () => REG_BOXES.forEach(renderRegStatus);
+    REG_BOXES.forEach(box => regInput(box).addEventListener('input', () => renderRegStatus(box)));
+    // (the TAN follows the name and the GSTIN, the CIN the Date of Incorporation)
+    nameInp.addEventListener('input', renderRegStatuses);
+    ['input', 'change'].forEach(ev => wrap.querySelector('#coIncDate').addEventListener(ev, renderRegStatuses));
+    // The first number in the list that is entered but invalid (none: all can be saved), and
+    // refusing to save it
+    const firstInvalidReg = ids => ids.map(regBox).find(box => regShown(box) && regInput(box).value.trim() && !regValid(box));
+    const refuseInvalidReg = box => {
+      regInput(box).style.borderColor = '#ef4444';
+      regInput(box).focus();
+      showToast('Invalid ' + box.name(), 'warning');
+    };
+
+    // MSME Type: Micro, Small or Medium (MSMED Act, Section 7), with the Udyam number
+    let msmeType = Object.prototype.hasOwnProperty.call(window.KYA_MSME_TYPES || {}, coData.msmeType) ? coData.msmeType : 'micro';
+    const paintMsme = () => wrap.querySelectorAll('[data-msme]').forEach(b => paintGstSlider(b, b.dataset.msme === msmeType, false));
+    wrap.querySelectorAll('[data-msme]').forEach(b => b.addEventListener('click', () => {
+      msmeType = b.dataset.msme;
+      paintMsme();
+    }));
+    paintMsme();
+    renderRegStatuses();
 
     const renderGstinStatus = () => {
       const raw = gstinInput.value.toUpperCase().trim();
@@ -1289,15 +1543,11 @@
       gstinStatus.textContent = 'Valid GSTIN';
       gstinStatus.style.color = '#059669';
 
-      // A PAN-based GSTIN carries the PAN (a tax deductor's carries its TAN instead)
+      // A PAN-based GSTIN carries the PAN (a tax deductor's carries its TAN instead): another PAN
+      // in the PAN box can be replaced by it (Update)
       if (!chk.pan) return;
       const currentPan = panInput.value.trim().toUpperCase();
-      if (!currentPan) {
-        panInput.value = chk.pan;
-        renderPanStatus();
-      } else if (currentPan !== chk.pan) {
-        panHintBtn.style.display = 'block';
-      }
+      if (currentPan && currentPan !== chk.pan) panHintBtn.style.display = 'block';
     };
 
     panHintBtn.addEventListener('click', () => {
@@ -1308,6 +1558,39 @@
         renderPanStatus();
       }
     });
+
+    // A GSTIN entered or changed carries the PAN it was issued on (Section 25(6), CGST Act): asked
+    // whether that is the company's PAN, once for each GSTIN. Yes makes it the PAN (saved, with
+    // its loading bar); No leaves the PAN as it is.
+    let panAskedForGstin = '';
+    const askPanFromGstin = () => {
+      const raw = gstinInput.value.toUpperCase().trim();
+      const chk = checkGstin(raw);
+      if (gstStatus !== 'registered' || !chk.ok || !chk.pan || raw === panAskedForGstin) return;
+      if (chk.pan === panInput.value.trim().toUpperCase()) return;
+      panAskedForGstin = raw;
+      showKyaConfirm({
+        title: 'Is this your PAN?',
+        message: `The GSTIN ${ohEsc(raw)} carries the PAN <strong style="color:#0f172a;">${ohEsc(chk.pan)}</strong>.`,
+        confirmLabel: 'Yes',
+        cancelLabel: 'No',
+        okBg: '#2563eb',
+        iconBg: 'var(--blue-50)', iconColor: 'var(--blue-600)', iconSvg: PAN_ICON,
+        onConfirm: () => usePanFromGstin(chk.pan)
+      });
+    };
+    // The PAN box takes it, and a PAN that fits the profile is saved at once
+    const usePanFromGstin = (pan) => {
+      panInput.value = pan;
+      panHintBtn.style.display = 'none';
+      renderPanStatus();
+      const chk = typeof kyaCheckPan === 'function' ? kyaCheckPan(pan, panContext()) : { ok: isValidPan(pan) };
+      if (!chk.ok) { showToast('Invalid PAN', 'warning'); return; }
+      const next = Object.assign({}, coData, { pan, panAadhaarLinked: pan.charAt(3) === 'P' ? panAadhaar === 'linked' : undefined });
+      const saved = getCompanyDetails();
+      const notes = typeof kyaPanChangeNotes === 'function' ? kyaPanChangeNotes(saved, next) : null;
+      if (notes && notes.changes.length) applyPanChange(saved, next, notes);
+    };
 
     // A change of GST registration or of Basic Identity reaches new invoices, purchases and
     // reports, so it is confirmed first: what changes (from → to), what KYA does from now on and
@@ -1343,6 +1626,17 @@
     const GST_CHANGE = { title: 'Apply GST Changes?', confirmLabel: 'Yes, Apply', lawHead: 'As per law, on the GST portal', icon: GST_ICON };
     const IDENTITY_CHANGE = { title: 'Apply Company Changes?', confirmLabel: 'Yes, Apply', lawHead: 'As per law', icon: IDENTITY_ICON };
     const IDENTITY_ADD = { title: 'Add Company Details?', confirmLabel: 'Yes, Add', lawHead: 'As per law', icon: IDENTITY_ICON };
+    const PAN_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><line x1="13" y1="10" x2="18" y2="10"/><line x1="13" y1="14" x2="18" y2="14"/></svg>';
+    const PAN_CHANGE = { title: 'Apply PAN Changes?', confirmLabel: 'Yes, Apply', lawHead: 'As per law', icon: PAN_ICON };
+    const PAN_ADD = { title: 'Add PAN?', confirmLabel: 'Yes, Add', lawHead: 'As per law', icon: PAN_ICON };
+    const REGISTRATIONS_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    const COMPLIANCE_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+    const PEOPLE_ICON = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+    // (after: what is drawn again once saved)
+    const REGISTRATIONS_CHANGE = { title: 'Apply Registration Changes?', confirmLabel: 'Yes, Apply', lawHead: 'As per law', icon: REGISTRATIONS_ICON,
+      applying: 'Applying Registration Changes', saving: 'Saving the registrations', done: 'Registrations saved', after: renderRegStatuses };
+    const COMPLIANCE_CHANGE = { title: 'Apply Compliance Changes?', confirmLabel: 'Yes, Apply', lawHead: 'As per law', icon: COMPLIANCE_ICON,
+      applying: 'Applying Compliance Changes', saving: 'Saving the compliance details', done: 'Compliance details saved', after: renderRegStatuses };
 
     // Applying it: each step in turn under a 0–100% bar laid out like KYA's loading screen (label
     // and percentage over a thin bar), in the confirm popup's card
@@ -1449,6 +1743,37 @@
       });
     };
 
+    // PAN (saved: the details as saved, next: as entered): documents already saved keep the PAN
+    // they were made with, the PAN is saved, and reports and books refresh (with the auto backup)
+    const applyPanChange = (saved, next, notes) => {
+      const steps = [];
+      if (notes.keeps && typeof kyaKeepSavedDocsIdentity === 'function') {
+        steps.push({ label: 'Keeping saved documents as they were made', run: () => kyaKeepSavedDocsIdentity(saved, next) });
+      }
+      steps.push({ label: 'Saving the PAN', run: () => { Object.assign(coData, next); saveCompanyDetails(coData); renderPanStatus(); } });
+      steps.push({ label: 'Updating reports and books', run: () => { if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews(); } });
+      runChangeProgress(notes.first ? 'Adding PAN' : 'Applying PAN Changes', PAN_ICON, steps, failed => {
+        if (failed) showToast('PAN saved, but some views could not be updated. Please reload KYA.', 'warning');
+        else showToast('PAN saved and applied.', 'success');
+      });
+    };
+
+    // Legal & Registration / Tax & Compliance / Key People (saved: as saved, next: as entered;
+    // how: the tab's titles): documents already saved keep the numbers they print, the details are
+    // saved, and reports and books refresh (with the auto backup)
+    const applyRegistrationChange = (saved, next, notes, how) => {
+      const steps = [];
+      if (notes.keeps && typeof kyaKeepSavedDocsIdentity === 'function') {
+        steps.push({ label: 'Keeping saved documents as they were made', run: () => kyaKeepSavedDocsIdentity(saved, next) });
+      }
+      steps.push({ label: how.saving, run: () => { Object.assign(coData, next); saveCompanyDetails(coData); if (how.after) how.after(); } });
+      steps.push({ label: 'Updating reports and books', run: () => { if (typeof window.refreshAllAppViews === 'function') window.refreshAllAppViews(); } });
+      runChangeProgress(how.applying, how.icon, steps, failed => {
+        if (failed) showToast(how.done + ', but some views could not be updated. Please reload KYA.', 'warning');
+        else showToast(how.done + ' and applied.', 'success');
+      });
+    };
+
     wrap.querySelectorAll('[data-gst-status]').forEach(b => b.addEventListener('click', () => {
       gstStatus = b.dataset.gstStatus;
       refreshGstForm();
@@ -1459,12 +1784,14 @@
     }));
 
     gstinInput.addEventListener('input', renderGstinStatus);
+    gstinInput.addEventListener('input', renderPanStatus);
+    gstinInput.addEventListener('input', renderRegStatuses);
+    gstinInput.addEventListener('input', askPanFromGstin);
     renderGstinStatus();
     refreshGstForm();
 
     // ── INITIALIZING LISTS & LOADS ──
     renderDirectors();
-    renderEmployees();
     renderDocumentsList();
 
 
@@ -1535,9 +1862,6 @@
             gstRegType: regTypeInp.value || 'Regular',
             gstr1Period
           });
-          // A PAN filled in from the GSTIN (Legal & Registration) is saved with it
-          const pan = panInput.value.trim().toUpperCase();
-          if (!next.pan && isValidPan(pan)) next.pan = pan;
           // A change that reaches invoices and reports: confirmed, then applied with its loading bar
           const notes = typeof kyaGstRegChangeNotes === 'function' ? kyaGstRegChangeNotes(coData, next) : null;
           if (notes && notes.changes.length) {
@@ -1547,26 +1871,67 @@
           Object.assign(coData, next);
         }
 
+        else if (section === 'pan') {
+          const pan = panInput.value.trim().toUpperCase();
+          // An invalid PAN isn't saved: its form, holder status and fit with the profile
+          const panCheck = typeof kyaCheckPan === 'function' ? kyaCheckPan(pan, panContext()) : { ok: isValidPan(pan) };
+          if (pan && !panCheck.ok) {
+            panInput.style.borderColor = '#ef4444';
+            panInput.focus();
+            showToast('Invalid PAN', 'warning');
+            return;
+          }
+          // An individual's PAN keeps its Aadhaar link; any other holder's has none
+          const next = Object.assign({}, coData, { pan, panAadhaarLinked: pan.charAt(3) === 'P' ? panAadhaar === 'linked' : undefined });
+          const saved = getCompanyDetails();
+          // A change that reaches the documents: confirmed, then applied with its loading bar
+          const notes = typeof kyaPanChangeNotes === 'function' ? kyaPanChangeNotes(saved, next) : null;
+          if (notes && notes.changes.length) {
+            confirmChange(notes, notes.first ? PAN_ADD : PAN_CHANGE, () => applyPanChange(saved, next, notes));
+            return;
+          }
+          Object.assign(coData, next);
+        }
+
         else if (section === 'registrations') {
-          coData.pan = wrap.querySelector('#coPAN').value.trim().toUpperCase();
-          coData.cin = wrap.querySelector('#coCIN').value.trim().toUpperCase();
-          coData.udyam = wrap.querySelector('#coUdyam').value.trim();
-          coData.tradeLicense = wrap.querySelector('#coTradeLicense').value.trim();
-          coData.iec = wrap.querySelector('#coIEC').value.trim();
+          const invalid = firstInvalidReg(['coCIN', 'coUdyam', 'coIEC']);
+          if (invalid) { refuseInvalidReg(invalid); return; }
+          const next = Object.assign({}, coData, {
+            cin: wrap.querySelector('#coCIN').value.trim().toUpperCase(),
+            udyam: wrap.querySelector('#coUdyam').value.trim().toUpperCase(),
+            msmeType,
+            tradeLicense: wrap.querySelector('#coTradeLicense').value.trim(),
+            iec: wrap.querySelector('#coIEC').value.trim().toUpperCase()
+          });
+          const saved = getCompanyDetails();
+          // A change: confirmed, then applied with its loading bar (company-registrations.js)
+          const notes = typeof kyaRegistrationsChangeNotes === 'function' ? kyaRegistrationsChangeNotes(saved, next) : null;
+          if (notes && notes.changes.length) {
+            confirmChange(notes, REGISTRATIONS_CHANGE, () => applyRegistrationChange(saved, next, notes, REGISTRATIONS_CHANGE));
+            return;
+          }
+          Object.assign(coData, next);
         }
 
         else if (section === 'compliance') {
-          coData.tan = wrap.querySelector('#coTAN').value.trim().toUpperCase();
-          coData.profTax = wrap.querySelector('#coProfTax').value.trim();
-          coData.esiPf = wrap.querySelector('#coEsiPf').value.trim();
-          coData.shopLicense = wrap.querySelector('#coShopLicense').value.trim();
-        }
-
-        else if (section === 'people') {
-          coData.people.auditor.name = wrap.querySelector('#coAuditorName').value.trim();
-          coData.people.auditor.contact = wrap.querySelector('#coAuditorContact').value.trim();
-          coData.people.taxConsultant.name = wrap.querySelector('#coConsultantName').value.trim();
-          coData.people.taxConsultant.contact = wrap.querySelector('#coConsultantContact').value.trim();
+          const invalid = firstInvalidReg(['coTAN', 'coEpf', 'coEsic']);
+          if (invalid) { refuseInvalidReg(invalid); return; }
+          // (the old ESI / PF box is now the EPF and ESIC boxes)
+          const next = Object.assign({}, coData, {
+            tan: wrap.querySelector('#coTAN').value.trim().toUpperCase(),
+            profTax: wrap.querySelector('#coProfTax').value.trim(),
+            epfCode: wrap.querySelector('#coEpf').value.trim().toUpperCase(),
+            esicCode: wrap.querySelector('#coEsic').value.trim(),
+            shopLicense: wrap.querySelector('#coShopLicense').value.trim(),
+            esiPf: undefined
+          });
+          const saved = getCompanyDetails();
+          const notes = typeof kyaComplianceChangeNotes === 'function' ? kyaComplianceChangeNotes(saved, next) : null;
+          if (notes && notes.changes.length) {
+            confirmChange(notes, COMPLIANCE_CHANGE, () => applyRegistrationChange(saved, next, notes, COMPLIANCE_CHANGE));
+            return;
+          }
+          Object.assign(coData, next);
         }
 
         // Write coData object to localstorage

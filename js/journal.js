@@ -2221,7 +2221,7 @@
 
   // ── Shared styled confirmation popup ─────────────────────────────
   // showKyaConfirm({ title, message, confirmLabel, iconBg, iconColor, iconSvg, okBg, onConfirm })
-  function showKyaConfirm({ title, message, confirmLabel = 'Confirm', iconBg, iconColor, iconSvg, okBg = '#dc2626', onConfirm }) {
+  function showKyaConfirm({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', iconBg, iconColor, iconSvg, okBg = '#dc2626', onConfirm }) {
     // Remove any existing overlay
     document.getElementById('kyaConfirmOverlay')?.remove();
     document.getElementById('kyaConfirmStyles')?.remove();
@@ -2290,7 +2290,7 @@
       <div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:12px;letter-spacing:-0.4px;">${title}</div>
       <div style="font-size:14px;color:#64748b;line-height:1.6;margin-bottom:28px;">${message}</div>
       <div style="display:flex;gap:12px;width:100%;">
-        <button id="btnConfirmCancel" style="flex:1;height:46px;border:1.5px solid #e2e8f0;border-radius:12px;background:#fff;font-size:13.5px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.15s;box-sizing:border-box;">Cancel</button>
+        <button id="btnConfirmCancel" style="flex:1;height:46px;border:1.5px solid #e2e8f0;border-radius:12px;background:#fff;font-size:13.5px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.15s;box-sizing:border-box;">${cancelLabel}</button>
         <button id="btnConfirmOk" style="flex:1;height:46px;border:none;border-radius:12px;background:${okBg};font-size:13.5px;font-weight:700;color:#fff;cursor:pointer;transition:all 0.15s;box-shadow:0 4px 12px rgba(0,0,0,.15);box-sizing:border-box;">${confirmLabel}</button>
       </div>`;
 

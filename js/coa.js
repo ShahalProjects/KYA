@@ -1048,8 +1048,39 @@
     _renderCoaModal();
   }
 
-  // opts.card(value) → the HTML of a value's card, shown beside its row and (after a second's
-  // rest) beside the box, as on the Supply Type box
+  // A small line beside a list's row (beside: the list) or under its box, in the look of Master
+  // Desk's description hover box; one at a time
+  let _kyaListTipEl = null;
+  function hideKyaListTip() {
+    if (_kyaListTipEl) { _kyaListTipEl.remove(); _kyaListTipEl = null; }
+  }
+  function showKyaListTip(target, text, beside) {
+    hideKyaListTip();
+    if (!target || !text) return;
+    const tip = document.createElement('div');
+    tip.textContent = text;
+    tip.style.cssText = 'position: fixed; z-index: 3000; max-width: 320px; padding: 8px 12px; font-size: 12.5px; font-weight: 500; line-height: 1.4; color: var(--slate-700); background: #fff; border: 1.5px solid var(--slate-200); border-radius: 8px; box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)); pointer-events: none;';
+    document.body.appendChild(tip);
+    const rect = target.getBoundingClientRect();
+    const tipRect = tip.getBoundingClientRect();
+    let left, top;
+    if (beside) {
+      const box = beside.getBoundingClientRect();
+      left = box.right + 8;
+      if (left + tipRect.width > window.innerWidth - 8) left = Math.max(8, box.left - tipRect.width - 8);
+      top = rect.top + (rect.height - tipRect.height) / 2;
+    } else {
+      left = Math.min(rect.left, Math.max(8, window.innerWidth - tipRect.width - 8));
+      top = rect.bottom + 6;
+      if (top + tipRect.height > window.innerHeight - 8) top = rect.top - tipRect.height - 6;
+    }
+    tip.style.left = left + 'px';
+    tip.style.top = Math.max(8, Math.min(top, window.innerHeight - tipRect.height - 8)) + 'px';
+    _kyaListTipEl = tip;
+  }
+
+  // opts.tip(value) → a value's line, shown beside its row and under the box while the cursor
+  // is on them
   function initGenericSearchableSelect(container, prefix, placeholderText = 'Search...', opts = {}) {
     const realSelect = container.querySelector('#' + prefix);
     const trigger = container.querySelector('#' + prefix + 'Trigger');
@@ -1059,12 +1090,11 @@
     const triggerText = container.querySelector('#' + prefix + 'TriggerText');
     if (!realSelect || !trigger || !dropdown || !searchInput || !optionsList || !triggerText) return null;
 
-    const showCard = (target, value) => {
-      const html = opts.card && value ? opts.card(value) : '';
-      if (html) positionAndShowKyaInfoHoverCard(target, html);
+    const showTip = (target, value, beside) => {
+      const text = opts.tip && value ? opts.tip(value) : '';
+      if (text) showKyaListTip(target, text, beside);
     };
-    const hideCardSoon = delay => { if (opts.card) scheduleHidePartyHoverCard(delay); };
-    const hideCard = () => { if (opts.card) hidePartyHoverCard(); };
+    const hideTip = () => { if (opts.tip) hideKyaListTip(); };
 
     const updateTriggerText = () => {
       const selectedOpt = realSelect.options[realSelect.selectedIndex];
@@ -1105,9 +1135,9 @@
         item.addEventListener('mouseout', () => {
           if (!opt.selected) item.style.background = 'transparent';
         });
-        if (opts.card) {
-          item.addEventListener('mouseenter', () => showCard(item, value));
-          item.addEventListener('mouseleave', () => hideCardSoon(250));
+        if (opts.tip) {
+          item.addEventListener('mouseenter', () => showTip(item, value, dropdown));
+          item.addEventListener('mouseleave', hideTip);
         }
 
         item.addEventListener('click', () => {
@@ -1115,7 +1145,7 @@
           realSelect.dispatchEvent(new Event('change'));
           updateTriggerText();
           dropdown.style.display = 'none';
-          hideCard();
+          hideTip();
         });
         
         optionsList.appendChild(item);
@@ -1134,7 +1164,7 @@
     
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
-      hideCard();
+      hideTip();
       const isOpen = dropdown.style.display === 'flex';
       if (isOpen) {
         dropdown.style.display = 'none';
@@ -1145,18 +1175,11 @@
         setTimeout(() => searchInput.focus(), 50);
       }
     });
-    if (opts.card) {
-      let restTimer = null;
-      const cancelRest = () => { if (restTimer) { clearTimeout(restTimer); restTimer = null; } };
+    if (opts.tip) {
       trigger.addEventListener('mouseenter', () => {
-        cancelRest();
-        if (dropdown.style.display === 'flex' || !realSelect.value) return;
-        restTimer = setTimeout(() => {
-          if (dropdown.style.display !== 'flex' && realSelect.value) showCard(trigger, realSelect.value);
-        }, 1000);
+        if (dropdown.style.display !== 'flex' && realSelect.selectedIndex >= 0) showTip(trigger, realSelect.value);
       });
-      trigger.addEventListener('mouseleave', () => { cancelRest(); hideCardSoon(350); });
-      trigger.addEventListener('mousedown', cancelRest);
+      trigger.addEventListener('mouseleave', hideTip);
     }
 
     searchInput.addEventListener('input', () => {

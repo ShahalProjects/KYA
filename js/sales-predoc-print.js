@@ -199,8 +199,12 @@
     if (co.state) coLines.push(siEsc(co.state));
     const docGstin = typeof kyaDocGstin === 'function' ? kyaDocGstin(sd, co) : co.gstin;
     if (docGstin && d.gstRules.registered) coLines.push(`GSTIN: ${siEsc(docGstin)}`);
+    const coPan = getInvoiceCompanyPanLine(co);
+    if (coPan) coLines.push(coPan);
     const coRegNo = getInvoiceCompanyRegLine(co);
     if (coRegNo) coLines.push(coRegNo);
+    const coUdyam = getInvoiceCompanyUdyamLine(co);
+    if (coUdyam) coLines.push(coUdyam);
     const coContact = [co.phone ? 'Phone: ' + siEsc(co.phone) : '', co.email ? siEsc(co.email) : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
     if (coContact) coLines.push(coContact);
     if (co.website) coLines.push(siEsc(co.website));
